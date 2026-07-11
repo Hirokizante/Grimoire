@@ -16,9 +16,11 @@ import {
   calcSaveDC,
 } from '@/lib/calculations'
 import type { Character } from '@/types'
+import type { SheetMode } from '@/pages/CharacterSheetPage'
 
 export interface StatsSectionProps {
   character: Character
+  mode?: SheetMode
 }
 
 /** Maximum Action Points, constant per DESIGN.md "Action Points". */
@@ -28,7 +30,7 @@ const MAX_END = 10
 /** Maximum Mortal Wounds a character can sustain. */
 const MAX_MORTAL_WOUNDS = 2
 
-export default function StatsSection({ character }: StatsSectionProps) {
+export default function StatsSection({ character, mode }: StatsSectionProps) {
   const { attributes, milestones } = character
 
   const maxHP = calcHP(attributes.VIT)

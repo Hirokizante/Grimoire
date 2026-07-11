@@ -15,7 +15,7 @@
 
 ### Core Philosophy
 - Divergence is a very DIY system. There is no compendium with spells or items. The players are expected for creating their characters' abilities and equipment from scratch, using the system as a framework. Thus, most of of a character sheet will consist of structured text fields for describing a character's abilities and equipment, providing an opportunity for the player to exercise their creativity and game design skills. Do not place any pre-written content in these fields or put unnecessary constraints. The primary goal is to support player freedom.
-- Equipment has no dedicated section on the sheet. Equipment is flavored through Sloted Abilities and has no functional distinction from them.
+- Equipment has no dedicated section on the sheet. Equipment is flavored through Slotted Abilities and has no functional distinction from them.
 
 ### Brief Gameplay Overview
 - For the purposes of Grimoire, the most important thing to note is the four types rolls most often made in Divergence: the skill check, attack, save, and effectiveness rolls. 

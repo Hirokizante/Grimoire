@@ -1,35 +1,56 @@
-import { useCharacterStore } from '@/store/characterStore'
-
 /**
- * Placeholder character sheet view.
- *
- * The full sheet (attributes, skills, abilities, combat trackers, etc.) will
- * be built in Phase 4. For now we just confirm the selected character is
- * reachable and offer a way back to the list.
+ * CharacterSheetPage — wraps the CharacterSheet component with a mode toggle
+ * (Edit / View) and a back button. Edit mode makes all fields editable;
+ * View mode locks editing but allows live-session interactivity.
  */
+
+import { useState } from 'react'
+import { useCharacterStore } from '@/store/characterStore'
+import CharacterSheet from '@/components/sheet/CharacterSheet'
+
+export type SheetMode = 'edit' | 'view'
+
 export default function CharacterSheetPage() {
   const currentCharacter = useCharacterStore((s) => s.currentCharacter)
   const closeCharacter = useCharacterStore((s) => s.closeCharacter)
+  const [mode, setMode] = useState<SheetMode>('view')
 
   if (!currentCharacter) return null
 
-  const { name, portrait, milestones } = currentCharacter
-
   return (
-    <div className="sheet-placeholder">
-      {portrait ? (
-        <img className="sheet-portrait" src={portrait} alt={name} />
-      ) : (
-        <div className="sheet-portrait sheet-portrait--empty" aria-hidden />
-      )}
+    <div className="sheet-page">
+      <div className="sheet-page__toolbar">
+        <button
+          className="btn btn--ghost"
+          type="button"
+          onClick={closeCharacter}
+        >
+          ← Back
+        </button>
 
-      <h2 className="sheet-name">{name}</h2>
-      <p className="sheet-meta">Milestones: {milestones}</p>
-      <p className="sheet-note">Phase 4 will build this out.</p>
+        <div className="mode-toggle" role="tablist" aria-label="Sheet mode">
+          <button
+            className={'mode-toggle__btn' + (mode === 'view' ? ' mode-toggle__btn--active' : '')}
+            type="button"
+            role="tab"
+            aria-selected={mode === 'view'}
+            onClick={() => setMode('view')}
+          >
+            View
+          </button>
+          <button
+            className={'mode-toggle__btn' + (mode === 'edit' ? ' mode-toggle__btn--active' : '')}
+            type="button"
+            role="tab"
+            aria-selected={mode === 'edit'}
+            onClick={() => setMode('edit')}
+          >
+            Edit
+          </button>
+        </div>
+      </div>
 
-      <button className="btn btn--ghost" type="button" onClick={closeCharacter}>
-        Back to characters
-      </button>
+      <CharacterSheet character={currentCharacter} mode={mode} />
     </div>
   )
 }

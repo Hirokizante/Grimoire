@@ -15,7 +15,7 @@ import {
   getAllCharacters,
   putCharacter,
 } from '@/lib/db'
-import type { Character } from '@/types'
+import type { AbilityBlock, Character } from '@/types'
 
 /** Debounce window for autosave (ms). */
 const AUTOSAVE_DEBOUNCE_MS = 500
@@ -30,6 +30,16 @@ export interface CharacterStoreState {
   /** True while a save to IndexedDB is pending / in flight. */
   isSaving: boolean
 }
+
+/** Sections that hold a list of AbilityBlocks on a character. */
+type AbilitySection = 'slottedAbilities' | 'abilityPool'
+
+/** Core ability fields editable via {@link CharacterStoreActions.updateCoreAbility}. */
+type CoreAbilityField =
+  | 'innateDescription'
+  | 'innateAbility'
+  | 'basicAttack'
+  | 'fatebreaker'
 
 export interface CharacterStoreActions {
   /** Load all characters from IndexedDB into the store. */
@@ -46,6 +56,27 @@ export interface CharacterStoreActions {
   deleteCharacter: (id: string) => Promise<void>
   /** Explicitly persist the current character to IndexedDB. */
   saveCurrentCharacter: () => Promise<void>
+  /** Update a single AbilityBlock within a slotted/pool list. */
+  updateAbilityBlock: (
+    section: AbilitySection,
+    id: string,
+    updated: AbilityBlock,
+  ) => void
+  /** Append an AbilityBlock to a slotted/pool list. */
+  addAbilityBlock: (section: AbilitySection, ability: AbilityBlock) => void
+  /** Remove an AbilityBlock by id from a slotted/pool list. */
+  removeAbilityBlock: (section: AbilitySection, id: string) => void
+  /** Move an AbilityBlock from one slotted/pool list to the other. */
+  moveAbility: (
+    id: string,
+    from: AbilitySection,
+    to: AbilitySection,
+  ) => void
+  /** Update a core ability field (innateDescription, innateAbility, basicAttack, fatebreaker). */
+  updateCoreAbility: (
+    field: CoreAbilityField,
+    value: string | AbilityBlock | null,
+  ) => void
 }
 
 export type CharacterStore = CharacterStoreState & CharacterStoreActions
@@ -122,6 +153,47 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
     set({ isSaving: true })
     await putCharacter(current)
     set({ isSaving: false })
+  },
+
+  updateAbilityBlock: (section, id, updated) => {
+    get().updateCurrentCharacter((char) => ({
+      ...char,
+      [section]: char[section].map((a) => (a.id === id ? updated : a)),
+    }))
+  },
+
+  addAbilityBlock: (section, ability) => {
+    get().updateCurrentCharacter((char) => ({
+      ...char,
+      [section]: [...char[section], ability],
+    }))
+  },
+
+  removeAbilityBlock: (section, id) => {
+    get().updateCurrentCharacter((char) => ({
+      ...char,
+      [section]: char[section].filter((a) => a.id !== id),
+    }))
+  },
+
+  moveAbility: (id, from, to) => {
+    if (from === to) return
+    get().updateCurrentCharacter((char) => {
+      const moved = char[from].find((a) => a.id === id)
+      if (!moved) return char
+      return {
+        ...char,
+        [from]: char[from].filter((a) => a.id !== id),
+        [to]: [...char[to], moved],
+      }
+    })
+  },
+
+  updateCoreAbility: (field, value) => {
+    get().updateCurrentCharacter((char) => ({
+      ...char,
+      [field]: value,
+    }))
   },
 }))
 

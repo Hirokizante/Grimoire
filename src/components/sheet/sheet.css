@@ -603,3 +603,253 @@
   margin: 0;
   white-space: pre-wrap;
 }
+
+/* ---- Phase 5: toolbar & mode toggle --------------------------------------- */
+
+.sheet-page__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 1.1rem;
+  margin-bottom: 0.75rem;
+  border-radius: 12px;
+  border: 1px solid var(--border-soft);
+  background: var(--bg-surface);
+}
+
+.mode-toggle {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.mode-toggle__btn {
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 0.35rem 1rem;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.mode-toggle__btn:hover {
+  color: var(--text-primary);
+}
+
+.mode-toggle__btn--active {
+  background: var(--accent-violet);
+  color: var(--bg-base);
+}
+
+.mode-toggle__btn--active:hover {
+  color: var(--bg-base);
+}
+
+/* ---- Phase 5: edit-mode inputs -------------------------------------------- */
+
+.sheet-input {
+  width: 100%;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.88rem;
+  font-family: inherit;
+  transition: border-color 0.15s ease;
+}
+
+.sheet-input:focus {
+  outline: none;
+  border-color: var(--accent-violet);
+}
+
+.sheet-input::placeholder {
+  color: var(--text-muted);
+}
+
+.sheet-input--num {
+  width: 3.5rem;
+  text-align: right;
+}
+
+.sheet-textarea {
+  width: 100%;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.4rem 0.5rem;
+  font-size: 0.88rem;
+  font-family: inherit;
+  line-height: 1.5;
+  resize: vertical;
+  transition: border-color 0.15s ease;
+}
+
+.sheet-textarea:focus {
+  outline: none;
+  border-color: var(--accent-violet);
+}
+
+.sheet-textarea::placeholder {
+  color: var(--text-muted);
+}
+
+/* Profile edit overrides */
+.profile__name-input {
+  font-family: var(--sheet-heading-font, inherit);
+  font-weight: 700;
+  font-size: 1.3rem;
+  letter-spacing: 0.02em;
+  color: var(--accent-violet-soft);
+  padding: 0.2rem 0.4rem;
+}
+
+/* Attribute / skill number inputs */
+.attribute-list__value-input,
+.skill-list__value-input {
+  font-family: var(--sheet-heading-font, inherit);
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+/* ---- Phase 5: portrait uploader ------------------------------------------ */
+
+.portrait-uploader {
+  margin-top: 0.5rem;
+}
+
+.portrait-uploader__btn {
+  font-size: 0.75rem;
+  padding: 0.3rem 0.6rem;
+}
+
+.portrait-uploader__input {
+  display: none;
+}
+
+/* ---- Phase 5: ability editor (inline form) ------------------------------- */
+
+.ability-editor {
+  margin-top: 0.75rem;
+  padding: 0.85rem 0.9rem;
+  border-radius: 10px;
+  border: 1px solid var(--accent-violet);
+  background: var(--bg-surface);
+}
+
+.ability-editor__inner {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.ability-editor__title {
+  font-family: var(--sheet-heading-font, inherit);
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--accent-violet-soft);
+  margin: 0 0 0.2rem 0;
+}
+
+.ability-editor__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.ability-editor__field--inline {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ability-editor__label {
+  font-family: var(--sheet-label-font, inherit);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.ability-editor__row {
+  display: flex;
+  gap: 0.6rem;
+}
+
+.ability-editor__row .ability-editor__field {
+  flex: 1 1 0;
+}
+
+.ability-editor__row .sheet-input--num {
+  width: 100%;
+  text-align: left;
+}
+
+.ability-editor__actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.2rem;
+}
+
+.ability-editor__btn {
+  font-size: 0.85rem;
+  padding: 0.4rem 0.9rem;
+}
+
+/* ---- Phase 5: ability card edit actions ----------------------------------- */
+
+.ability-card-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.ability-card__actions {
+  display: flex;
+  gap: 0.4rem;
+  padding: 0.4rem 0.9rem 0.75rem;
+  border: 1px solid var(--border-soft);
+  border-top: none;
+  border-bottom-left-radius: 10px;
+  border-bottom-right-radius: 10px;
+  background: var(--bg-surface-raised);
+}
+
+.ability-card-wrap:first-of-type .ability-card__actions {
+  /* keep spacing consistent across cards */
+}
+
+.ability-card__action-btn {
+  font-size: 0.75rem;
+  padding: 0.25rem 0.6rem;
+  border-color: var(--border-soft);
+}
+
+.ability-card__action-btn:hover {
+  background: var(--bg-surface-hover);
+}
+
+.ability-card__action-btn--danger {
+  color: var(--danger);
+}
+
+.ability-card__action-btn--danger:hover {
+  background: rgba(229, 115, 115, 0.12);
+  border-color: var(--danger);
+}
+
+/* ---- Phase 5: section add button ------------------------------------------ */
+
+.section-add-btn {
+  font-size: 0.8rem;
+  padding: 0.35rem 0.75rem;
+  margin-bottom: 0.6rem;
+  border-style: dashed;
+}
