@@ -13,6 +13,7 @@ import { useCharacterStore } from '@/store/characterStore'
 import type { Character } from '@/types'
 import type { SheetMode } from '@/pages/CharacterSheetPage'
 
+import AbilitiesDndContext from '@/components/sheet/AbilitiesDndContext'
 import AbilityPoolSection from '@/components/sheet/AbilityPoolSection'
 import AttributesSection from '@/components/sheet/AttributesSection'
 import CoreAbilitySection from '@/components/sheet/CoreAbilitySection'
@@ -82,13 +83,18 @@ export default function CharacterSheet({
         mode={mode}
       />
 
-      <SlottedAbilitiesSection
-        abilities={char.slottedAbilities}
+      <AbilitiesDndContext
         maxSlots={char.maxAbilitySlots}
-        mode={mode}
-      />
+        slottedAbilities={char.slottedAbilities}
+      >
+        <SlottedAbilitiesSection
+          abilities={char.slottedAbilities}
+          maxSlots={char.maxAbilitySlots}
+          mode={mode}
+        />
 
-      <AbilityPoolSection abilities={char.abilityPool} mode={mode} />
+        <AbilityPoolSection abilities={char.abilityPool} mode={mode} />
+      </AbilitiesDndContext>
     </div>
   )
 }

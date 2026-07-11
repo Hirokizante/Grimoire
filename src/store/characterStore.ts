@@ -72,6 +72,12 @@ export interface CharacterStoreActions {
     from: AbilitySection,
     to: AbilitySection,
   ) => void
+  /** Reorder an AbilityBlock within a single slotted/pool list. */
+  reorderAbility: (
+    section: AbilitySection,
+    fromIndex: number,
+    toIndex: number,
+  ) => void
   /** Update a core ability field (innateDescription, innateAbility, basicAttack, fatebreaker). */
   updateCoreAbility: (
     field: CoreAbilityField,
@@ -186,6 +192,18 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
         [from]: char[from].filter((a) => a.id !== id),
         [to]: [...char[to], moved],
       }
+    })
+  },
+
+  reorderAbility: (section, fromIndex, toIndex) => {
+    if (fromIndex === toIndex) return
+    get().updateCurrentCharacter((char) => {
+      const list = [...char[section]]
+      if (fromIndex < 0 || fromIndex >= list.length) return char
+      if (toIndex < 0 || toIndex >= list.length) return char
+      const [moved] = list.splice(fromIndex, 1)
+      list.splice(toIndex, 0, moved)
+      return { ...char, [section]: list }
     })
   },
 

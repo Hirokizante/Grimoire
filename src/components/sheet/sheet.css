@@ -853,3 +853,95 @@
   margin-bottom: 0.6rem;
   border-style: dashed;
 }
+
+/* ---- Phase 6: drag-and-drop ----------------------------------------------- */
+
+.drag-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 0.2rem 0;
+  border: 1px solid var(--border-soft);
+  border-bottom: none;
+  border-top-left-radius: 10px;
+  border-top-right-radius: 10px;
+  background: var(--bg-surface-hover);
+  cursor: grab;
+  transition: background-color 0.15s ease;
+}
+
+.drag-handle:hover {
+  background: var(--bg-surface-raised);
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+.drag-handle__grip {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  letter-spacing: -0.1em;
+  user-select: none;
+}
+
+.sortable-ability {
+  position: relative;
+}
+
+.sortable-ability--dragging {
+  z-index: 100;
+}
+
+/* Drag overlay — follows the cursor */
+.sortable-ability--overlay {
+  opacity: 0.9;
+  cursor: grabbing;
+  transform: rotate(1deg);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5);
+}
+
+/* Card wrapping: when there's a drag handle, the card's top border is removed */
+.sortable-ability .ability-card {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+  border-top: none;
+}
+
+/* When there's a drag handle and no action buttons, card wraps flush */
+.sortable-ability:has(.drag-handle):not(:has(.ability-card__actions)) .ability-card {
+  border-bottom-left-radius: 10px;
+  border-bottom-right-radius: 10px;
+}
+
+/* Drop zone highlight */
+.ability-dropzone--over {
+  outline: 2px dashed var(--accent-violet);
+  outline-offset: 2px;
+  border-radius: 10px;
+  background: rgba(155, 126, 214, 0.06);
+  transition: outline-color 0.15s ease, background-color 0.15s ease;
+}
+
+.ability-dropzone--empty {
+  min-height: 3.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  border: 2px dashed var(--border);
+  padding: 0.75rem 1rem;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.ability-dropzone--empty.ability-dropzone--over {
+  border-color: var(--accent-violet);
+  background: rgba(155, 126, 214, 0.08);
+}
+
+/* Slot overflow counter */
+.sheet-section__counter--over {
+  color: var(--danger);
+  font-weight: 700;
+}

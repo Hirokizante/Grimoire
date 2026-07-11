@@ -1,19 +1,33 @@
 /**
  * AbilityPoolSection — inactive abilities available to swap into slots before
  * an encounter (DESIGN.md "Ability Pool"). There is no limit on the number of
- * abilities in the pool; each is rendered as an {@link AbilityBlockCard}.
+ * abilities in the pool; each is rendered as a sortable card.
  *
  * In edit mode an "Add Ability" button opens the {@link AbilityBlockEditor};
- * each card gains Edit, Remove, and "Move to Slotted" buttons.
+ * each card gains Edit, Remove, and "Move to Slotted" buttons and can be
+ * dragged to reorder or to move into the slotted section.
+ *
+ * The section is wrapped in a dnd-kit `SortableContext` (vertical) and
+ * `useDroppable` so it acts as a drop target for abilities dragged from the
+ * slotted section. The parent {@link AbilitiesDndContext} handles the drag.
  */
 
 import { useState } from 'react'
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { useDroppable } from '@dnd-kit/core'
 
-import AbilityBlockCard from '@/components/sheet/AbilityBlockCard'
 import AbilityBlockEditor from '@/components/sheet/AbilityBlockEditor'
+import SortableAbilityCard, {
+  type AbilitySectionId,
+} from '@/components/sheet/SortableAbilityCard'
 import { useCharacterStore } from '@/store/characterStore'
 import type { AbilityBlock } from '@/types'
 import type { SheetMode } from '@/pages/CharacterSheetPage'
+
+const SECTION: AbilitySectionId = 'abilityPool'
 
 export interface AbilityPoolSectionProps {
   abilities: AbilityBlock[]
@@ -32,6 +46,8 @@ export default function AbilityPoolSection({
 
   const [editing, setEditing] = useState<AbilityBlock | null>(null)
   const [showEditor, setShowEditor] = useState(false)
+
+  const { setNodeRef, isOver } = useDroppable({ id: SECTION, data: { section: SECTION } })
 
   const openNew = () => {
     setEditing(null)
@@ -74,43 +90,67 @@ export default function AbilityPoolSection({
           The ability pool is empty.
         </p>
       ) : abilities.length === 0 ? (
-        <p className="sheet-section__empty muted">
-          The ability pool is empty — click “Add Ability” to create one.
-        </p>
+        <div
+          ref={setNodeRef}
+          className={
+            'ability-dropzone ability-dropzone--empty' +
+            (isOver ? ' ability-dropzone--over' : '')
+          }
+        >
+          <p className="sheet-section__empty muted">
+            The ability pool is empty — click “Add Ability” to create one.
+          </p>
+        </div>
       ) : (
-        <div className="ability-grid">
-          {abilities.map((ability) => (
-            <div className="ability-card-wrap" key={ability.id}>
-              <AbilityBlockCard ability={ability} />
-              {isEdit && (
-                <div className="ability-card__actions">
-                  <button
-                    type="button"
-                    className="btn btn--ghost ability-card__action-btn"
-                    onClick={() => openEdit(ability)}
-                  >
-                    Edit
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn--ghost ability-card__action-btn"
-                    onClick={() =>
-                      moveAbility(ability.id, 'abilityPool', 'slottedAbilities')
-                    }
-                  >
-                    Move to Slotted
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn--ghost ability-card__action-btn ability-card__action-btn--danger"
-                    onClick={() => removeAbilityBlock('abilityPool', ability.id)}
-                  >
-                    Remove
-                  </button>
-                </div>
-              )}
-            </div>
-          ))}
+        <div
+          ref={setNodeRef}
+          className={
+            'ability-grid' +
+            (isOver ? ' ability-dropzone--over' : '')
+          }
+        >
+          <SortableContext
+            items={abilities.map((a) => a.id)}
+            strategy={verticalListSortingStrategy}
+          >
+            {abilities.map((ability) => (
+              <SortableAbilityCard
+                key={ability.id}
+                ability={ability}
+                section={SECTION}
+                mode={mode}
+                actions={
+                  isEdit ? (
+                    <>
+                      <button
+                        type="button"
+                        className="btn btn--ghost ability-card__action-btn"
+                        onClick={() => openEdit(ability)}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn--ghost ability-card__action-btn"
+                        onClick={() =>
+                          moveAbility(ability.id, 'abilityPool', 'slottedAbilities')
+                        }
+                      >
+                        Move to Slotted
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn--ghost ability-card__action-btn ability-card__action-btn--danger"
+                        onClick={() => removeAbilityBlock('abilityPool', ability.id)}
+                      >
+                        Remove
+                      </button>
+                    </>
+                  ) : undefined
+                }
+              />
+            ))}
+          </SortableContext>
         </div>
       )}
 
