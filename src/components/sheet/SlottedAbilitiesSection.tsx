@@ -22,6 +22,7 @@ import {
 } from '@dnd-kit/sortable'
 import { useDroppable } from '@dnd-kit/core'
 
+import AbilityActivation from '@/components/sheet/AbilityActivation'
 import AbilityBlockEditor from '@/components/sheet/AbilityBlockEditor'
 import SortableAbilityCard, {
   type AbilitySectionId,
@@ -45,6 +46,7 @@ export default function SlottedAbilitiesSection({
   mode = 'view',
 }: SlottedAbilitiesSectionProps) {
   const isEdit = mode === 'edit'
+  const isView = !isEdit
   const addAbilityBlock = useCharacterStore((s) => s.addAbilityBlock)
   const updateAbilityBlock = useCharacterStore((s) => s.updateAbilityBlock)
   const removeAbilityBlock = useCharacterStore((s) => s.removeAbilityBlock)
@@ -122,6 +124,12 @@ export default function SlottedAbilitiesSection({
             No abilities slotted — click “Add Ability” or drag one in.
           </p>
         </div>
+      ) : isView ? (
+        <div className="ability-grid">
+          {abilities.map((ability) => (
+            <AbilityActivation key={ability.id} ability={ability} />
+          ))}
+        </div>
       ) : (
         <div
           ref={setNodeRef}
@@ -141,35 +149,33 @@ export default function SlottedAbilitiesSection({
                 section={SECTION}
                 mode={mode}
                 actions={
-                  isEdit ? (
-                    <>
-                      <button
-                        type="button"
-                        className="btn btn--ghost ability-card__action-btn"
-                        onClick={() => openEdit(ability)}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn--ghost ability-card__action-btn"
-                        onClick={() =>
-                          moveAbility(ability.id, 'slottedAbilities', 'abilityPool')
-                        }
-                      >
-                        Move to Pool
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn--ghost ability-card__action-btn ability-card__action-btn--danger"
-                        onClick={() =>
-                          removeAbilityBlock('slottedAbilities', ability.id)
-                        }
-                      >
-                        Remove
-                      </button>
-                    </>
-                  ) : undefined
+                  <>
+                    <button
+                      type="button"
+                      className="btn btn--ghost ability-card__action-btn"
+                      onClick={() => openEdit(ability)}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn--ghost ability-card__action-btn"
+                      onClick={() =>
+                        moveAbility(ability.id, 'slottedAbilities', 'abilityPool')
+                      }
+                    >
+                      Move to Pool
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn--ghost ability-card__action-btn ability-card__action-btn--danger"
+                      onClick={() =>
+                        removeAbilityBlock('slottedAbilities', ability.id)
+                      }
+                    >
+                      Remove
+                    </button>
+                  </>
                 }
               />
             ))}

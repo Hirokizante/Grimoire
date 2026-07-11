@@ -945,3 +945,432 @@
   color: var(--danger);
   font-weight: 700;
 }
+
+/* ---- Phase 7: live play — HP clickable & damage dialog --------------------- */
+
+.stat-bars__hp--clickable {
+  cursor: pointer;
+  border-radius: 6px;
+  padding: 0.15rem 0.25rem;
+  margin: -0.15rem -0.25rem;
+  transition: background-color 0.15s ease;
+}
+
+.stat-bars__hp--clickable:hover {
+  background: var(--bg-surface-hover);
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+
+.modal-content {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  max-width: 420px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.modal-header h3 {
+  font-family: var(--sheet-heading-font, inherit);
+  font-size: 1.05rem;
+  color: var(--accent-violet-soft);
+  margin: 0;
+}
+
+.modal-close {
+  font-size: 1rem;
+  padding: 0.2rem 0.5rem;
+  line-height: 1;
+}
+
+.damage-dialog__body {
+  padding: 0.85rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.damage-dialog__options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.checkbox-field {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.checkbox-field input[type='checkbox'] {
+  accent-color: var(--accent-violet);
+}
+
+.damage-dialog__actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.damage-result {
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border-soft);
+}
+
+.damage-result h4 {
+  font-size: 0.85rem;
+  color: var(--accent-violet-soft);
+  margin: 0 0 0.35rem 0;
+}
+
+.damage-result__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.2rem 0.8rem;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
+.damage-result__label {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.damage-result__alert {
+  color: var(--danger);
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin: 0.5rem 0 0 0;
+}
+
+/* ---- Phase 7: resource tracker --------------------------------------------- */
+
+.resource-tracker {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-top: 0.65rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid var(--border-soft);
+}
+
+.resource-tracker__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.resource-tracker__label {
+  font-family: var(--sheet-label-font, inherit);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  min-width: 2.5rem;
+}
+
+.resource-tracker__controls {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.resource-btn {
+  font-size: 0.85rem;
+  padding: 0.15rem 0.45rem;
+  min-width: 1.8rem;
+  text-align: center;
+  border-color: var(--border-soft);
+}
+
+.resource-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.resource-btn--reset {
+  font-size: 0.8rem;
+  opacity: 0.6;
+}
+
+.resource-btn--reset:hover {
+  opacity: 1;
+}
+
+.resource-tracker__value {
+  font-family: var(--sheet-heading-font, inherit);
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  min-width: 3rem;
+  text-align: center;
+}
+
+.resource-tracker__end-turn {
+  font-size: 0.8rem;
+  padding: 0.35rem 0.6rem;
+  margin-top: 0.3rem;
+  border-color: var(--accent-violet);
+  color: var(--accent-violet-soft);
+}
+
+.resource-tracker__end-turn:hover {
+  background: rgba(155, 126, 214, 0.1);
+}
+
+/* ---- Phase 7: recover action ----------------------------------------------- */
+
+.recover-action {
+  margin-top: 0.5rem;
+}
+
+.recover-action__btn {
+  font-size: 0.82rem;
+  padding: 0.4rem 0.8rem;
+  width: 100%;
+}
+
+.recover-action__btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.recover-action__msg {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin: 0.3rem 0 0 0;
+  text-align: center;
+}
+
+/* ---- Phase 7: mortal wound roller (view mode) ------------------------------ */
+
+.mortal-wound-roller {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-top: 0.3rem;
+}
+
+.mortal-wound-roller__slots {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.mortal-wound-roller__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.mortal-wound-roller__entry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.2rem 0.4rem;
+  background: rgba(229, 115, 115, 0.08);
+  border-radius: 6px;
+}
+
+.mortal-wound-roller__name {
+  font-size: 0.82rem;
+  color: var(--danger-hover);
+  font-weight: 600;
+}
+
+.mortal-wound-roller__clear {
+  font-size: 0.7rem;
+  padding: 0.15rem 0.4rem;
+}
+
+.mortal-wound-roller__roll {
+  font-size: 0.82rem;
+  padding: 0.4rem 0.8rem;
+  width: 100%;
+}
+
+.mortal-wound-roller__rest {
+  font-size: 0.78rem;
+  padding: 0.3rem 0.6rem;
+  border-color: var(--accent-violet);
+  color: var(--accent-violet-soft);
+}
+
+.mortal-wound-result {
+  padding: 0.4rem 0.5rem;
+  border-radius: 8px;
+  background: var(--bg-surface-raised);
+  border: 1px solid var(--border-soft);
+  font-size: 0.82rem;
+  color: var(--text-primary);
+}
+
+.mortal-wound-result p {
+  margin: 0.15rem 0;
+}
+
+.mortal-wound-result__desc {
+  color: var(--text-secondary) !important;
+  font-size: 0.78rem !important;
+}
+
+.mortal-wound-result--ko {
+  color: var(--danger);
+  font-weight: 700;
+}
+
+/* ---- Phase 7: death save tracker ------------------------------------------- */
+
+.stat-section__death-saves {
+  margin-top: 0.65rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid var(--border-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.death-save-tracker {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.death-save-tracker__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.death-save-tracker__label {
+  font-family: var(--sheet-label-font, inherit);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.death-save-tracker__pips {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.death-pip {
+  width: 1.1rem;
+  height: 1.1rem;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  background: var(--bg-surface-raised);
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.death-pip--success {
+  background: var(--accent-violet);
+  border-color: var(--accent-violet);
+}
+
+.death-pip--failure {
+  background: var(--danger);
+  border-color: var(--danger);
+}
+
+.pip-btn {
+  font-size: 0.8rem;
+  padding: 0.1rem 0.35rem;
+  min-width: 1.5rem;
+}
+
+.death-save-tracker__roll {
+  font-size: 0.82rem;
+  padding: 0.4rem 0.8rem;
+  width: 100%;
+  margin-top: 0.2rem;
+}
+
+.death-save-result {
+  font-size: 0.82rem;
+  color: var(--text-primary);
+  padding: 0.3rem 0;
+}
+
+.death-save-result p {
+  margin: 0.15rem 0;
+}
+
+.death-save-result--revive {
+  color: var(--accent-violet-soft);
+  font-weight: 700;
+}
+
+.death-save-result--dead {
+  color: var(--danger);
+  font-weight: 700;
+}
+
+/* ---- Phase 7: ability activation ------------------------------------------- */
+
+.ability-activation {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.ability-activation__footer {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.9rem 0.75rem;
+  border: 1px solid var(--border-soft);
+  border-top: none;
+  border-bottom-left-radius: 10px;
+  border-bottom-right-radius: 10px;
+  background: var(--bg-surface-raised);
+}
+
+.ability-activation__btn {
+  font-size: 0.78rem;
+  padding: 0.3rem 0.7rem;
+  flex: 0 0 auto;
+}
+
+.ability-activation__btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.ability-activation__msg {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.ability-activation .ability-card {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  border-bottom: none;
+}

@@ -15,6 +15,7 @@
 
 import { useState } from 'react'
 
+import AbilityActivation from '@/components/sheet/AbilityActivation'
 import AbilityBlockCard from '@/components/sheet/AbilityBlockCard'
 import AbilityBlockEditor from '@/components/sheet/AbilityBlockEditor'
 import { useCharacterStore } from '@/store/characterStore'
@@ -106,27 +107,31 @@ export default function CoreAbilitySection({
 
       <div className="ability-grid ability-grid--core">
         {innateAbility ? (
-          <div className="ability-card-wrap">
-            <AbilityBlockCard ability={innateAbility} />
-            {isEdit && (
-              <div className="ability-card__actions">
-                <button
-                  type="button"
-                  className="btn btn--ghost ability-card__action-btn"
-                  onClick={() => openCoreEdit('innateAbility')}
-                >
-                  Edit
-                </button>
-                <button
-                  type="button"
-                  className="btn btn--ghost ability-card__action-btn ability-card__action-btn--danger"
-                  onClick={() => updateCoreAbility('innateAbility', null)}
-                >
-                  Remove
-                </button>
-              </div>
-            )}
-          </div>
+          isEdit ? (
+            <div className="ability-card-wrap">
+              <AbilityBlockCard ability={innateAbility} />
+              {isEdit && (
+                <div className="ability-card__actions">
+                  <button
+                    type="button"
+                    className="btn btn--ghost ability-card__action-btn"
+                    onClick={() => openCoreEdit('innateAbility')}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn--ghost ability-card__action-btn ability-card__action-btn--danger"
+                    onClick={() => updateCoreAbility('innateAbility', null)}
+                  >
+                    Remove
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <AbilityActivation ability={innateAbility} />
+          )
         ) : (
           isEdit && (
             <button
@@ -139,9 +144,9 @@ export default function CoreAbilitySection({
           )
         )}
 
-        <div className="ability-card-wrap">
-          <AbilityBlockCard ability={basicAttack} />
-          {isEdit && (
+        {isEdit ? (
+          <div className="ability-card-wrap">
+            <AbilityBlockCard ability={basicAttack} />
             <div className="ability-card__actions">
               <button
                 type="button"
@@ -151,12 +156,14 @@ export default function CoreAbilitySection({
                 Edit
               </button>
             </div>
-          )}
-        </div>
+          </div>
+        ) : (
+          <AbilityActivation ability={basicAttack} />
+        )}
 
-        <div className="ability-card-wrap">
-          <AbilityBlockCard ability={fatebreaker} />
-          {isEdit && (
+        {isEdit ? (
+          <div className="ability-card-wrap">
+            <AbilityBlockCard ability={fatebreaker} />
             <div className="ability-card__actions">
               <button
                 type="button"
@@ -166,8 +173,10 @@ export default function CoreAbilitySection({
                 Edit
               </button>
             </div>
-          )}
-        </div>
+          </div>
+        ) : (
+          <AbilityActivation ability={fatebreaker} />
+        )}
       </div>
 
       {editingField && (

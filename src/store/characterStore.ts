@@ -9,12 +9,14 @@
 
 import { create } from 'zustand'
 
-import { createDefaultCharacter, generateId } from '@/constants/gameData'
+import { createDefaultCharacter, generateId, MORTAL_WOUNDS } from '@/constants/gameData'
 import {
   deleteCharacter as dbDeleteCharacter,
   getAllCharacters,
   putCharacter,
 } from '@/lib/db'
+import { calcHP } from '@/lib/calculations'
+import { rollDie } from '@/lib/dice'
 import type { AbilityBlock, Character } from '@/types'
 
 /** Debounce window for autosave (ms). */
@@ -40,6 +42,61 @@ type CoreAbilityField =
   | 'innateAbility'
   | 'basicAttack'
   | 'fatebreaker'
+
+/** Maximum Action Points, constant per DESIGN.md. */
+const MAX_AP = 3
+/** Maximum Endurance, constant per DESIGN.md. */
+const MAX_END = 10
+/** Maximum Mortal Wounds a character can sustain. */
+const MAX_MORTAL_WOUNDS = 2
+/** Death Save DC (DESIGN.md "Death Saves"). */
+const DEATH_SAVE_DC = 10
+
+/** Result of a damage application, for UI feedback. */
+export interface DamageResult {
+  /** Raw damage input. */
+  rawDamage: number
+  /** Damage after armor reduction. */
+  afterArmor: number
+  /** Damage after resistance. */
+  afterResistance: number
+  /** How much temp HP was consumed. */
+  tempHPConsumed: number
+  /** How much regular HP was lost. */
+  hpLost: number
+  /** Final HP after damage. */
+  finalHP: number
+  /** Whether a Mortal Wound was incurred. */
+  causedMortalWound: boolean
+  /** Number of Mortal Wounds incurred (0, 1, or 2). */
+  mortalWoundsIncurred: number
+  /** Whether the character is now knocked out. */
+  knockedOut: boolean
+}
+
+/** Result of a Death Save roll, for UI feedback. */
+export interface DeathSaveResult {
+  roll: number
+  successes: number
+  failures: number
+  /** Whether this roll counted as 2 (nat 20 or nat 1). */
+  doubled: boolean
+  /** Whether the character regained consciousness (3 successes). */
+  revived: boolean
+  /** Whether the character died (3 failures). */
+  died: boolean
+}
+
+/** Result of a Mortal Wound roll, for UI feedback. */
+export interface MortalWoundResult {
+  roll: number
+  woundName: string
+  woundDescription: string
+  /** Which mortal wound slot was filled (0 or 1). */
+  slotIndex: number
+  /** Whether the character is now knocked out (both slots filled). */
+  knockedOut: boolean
+}
 
 export interface CharacterStoreActions {
   /** Load all characters from IndexedDB into the store. */
@@ -83,6 +140,51 @@ export interface CharacterStoreActions {
     field: CoreAbilityField,
     value: string | AbilityBlock | null,
   ) => void
+  /** Apply damage to the character (handles temp HP, armor, resistance, mortal wound overflow). */
+  takeDamage: (amount: number, opts?: {
+    /** Whether to apply armor reduction (1d6 per armor point). */
+    applyArmor?: boolean
+    /** Whether the character has Resistance (halves damage after armor). */
+    resistant?: boolean
+    /** Whether to bypass temp HP. */
+    ignoreTempHP?: boolean
+  }) => DamageResult
+  /** Heal the character (respecting Circulatory Dysfunction mortal wound if present). */
+  heal: (amount: number) => void
+  /** Add or replace Temporary HP (higher value takes precedence). */
+  setTempHP: (amount: number) => void
+  /** Spend AP; returns false if insufficient. */
+  spendAP: (amount: number) => boolean
+  /** Restore AP (e.g. at the start of a turn). */
+  restoreAP: (amount: number) => void
+  /** Reset AP to max (3). */
+  resetAP: () => void
+  /** Spend END; returns false if insufficient. */
+  spendEND: (amount: number) => boolean
+  /** Restore END (e.g. at end of turn via END Recovery). */
+  restoreEND: (amount: number) => void
+  /** Reset END to max (10). */
+  resetEND: () => void
+  /** Spend FP; returns false if insufficient. */
+  spendFP: (amount: number) => boolean
+  /** Restore FP. */
+  restoreFP: (amount: number) => void
+  /** Recover action: spend 3 AP, regain all END. Returns false if insufficient AP. */
+  recover: () => boolean
+  /** Regenerate END at end of turn (END Recovery from GRT). */
+  regenerateEND: () => void
+  /** Convert unspent AP to END at end of turn (1:1, capped at max END). */
+  convertAPtoEND: () => void
+  /** Roll a Death Save (d20, DC 10). Returns the roll and updated tracker. */
+  rollDeathSave: () => DeathSaveResult
+  /** Roll on the Mortal Wounds table (d20). Returns the wound and applies it. */
+  rollMortalWound: () => MortalWoundResult
+  /** Clear a Mortal Wound at the given index. */
+  clearMortalWound: (index: number) => void
+  /** Reset to full HP, clear mortal wounds, clear death saves (end of encounter / Rest). */
+  fullRestore: () => void
+  /** Reset only HP to max (end of encounter). */
+  resetHP: () => void
 }
 
 export type CharacterStore = CharacterStoreState & CharacterStoreActions
@@ -211,6 +313,352 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
     get().updateCurrentCharacter((char) => ({
       ...char,
       [field]: value,
+    }))
+  },
+
+  // ---- Live play: damage & healing -------------------------------------------
+
+  takeDamage: (amount, opts = {}) => {
+    const current = get().currentCharacter
+    if (!current) {
+      return {
+        rawDamage: amount, afterArmor: amount, afterResistance: amount,
+        tempHPConsumed: 0, hpLost: 0, finalHP: 0,
+        causedMortalWound: false, mortalWoundsIncurred: 0, knockedOut: false,
+      }
+    }
+
+    const { applyArmor = false, resistant = false, ignoreTempHP = false } = opts
+    const maxHP = calcHP(current.attributes.VIT)
+    const armor = Math.floor(current.attributes.VIT / 2)
+
+    // Step 1: Armor reduction — 1d6 per armor point.
+    let dmg = amount
+    let afterArmor = dmg
+    if (applyArmor && armor > 0) {
+      const reduction = Array.from({ length: armor }, () => rollDie(6))
+        .reduce((a, b) => a + b, 0)
+      dmg = Math.max(0, dmg - reduction)
+      afterArmor = dmg
+    }
+
+    // Step 2: Resistance — halves damage.
+    let afterResistance = dmg
+    if (resistant) {
+      dmg = Math.floor(dmg / 2)
+      afterResistance = dmg
+    }
+
+    // Step 3: Temp HP absorbs first.
+    let tempHPConsumed = 0
+    let remainingDamage = dmg
+    let newTempHP = current.tempHP
+    if (!ignoreTempHP && current.tempHP > 0) {
+      tempHPConsumed = Math.min(current.tempHP, remainingDamage)
+      newTempHP = current.tempHP - tempHPConsumed
+      remainingDamage -= tempHPConsumed
+    }
+
+    // Step 4: Apply remaining to HP, handle mortal wound overflow.
+    let newHP = current.currentHP - remainingDamage
+    let mortalWoundsIncurred = 0
+    let knockedOut = false
+
+    while (newHP <= 0 && mortalWoundsIncurred < MAX_MORTAL_WOUNDS) {
+      const filledSlots = current.mortalWounds.filter((w) => w != null).length + mortalWoundsIncurred
+      if (filledSlots >= MAX_MORTAL_WOUNDS) {
+        knockedOut = true
+        break
+      }
+      mortalWoundsIncurred++
+      // HP resets to max after a mortal wound, excess spills over.
+      const overflow = Math.abs(newHP)
+      newHP = maxHP - overflow
+    }
+
+    if (newHP <= 0 && mortalWoundsIncurred >= MAX_MORTAL_WOUNDS) {
+      knockedOut = true
+      newHP = 0
+    }
+
+    // Apply mortal wound slots (names filled by rollMortalWound in UI flow).
+    const newMortalWounds = [...current.mortalWounds]
+    let slotIdx = 0
+    for (let i = 0; i < mortalWoundsIncurred; i++) {
+      while (slotIdx < newMortalWounds.length && newMortalWounds[slotIdx] != null) slotIdx++
+      if (slotIdx < newMortalWounds.length) {
+        newMortalWounds[slotIdx] = 'Pending Roll'
+      }
+    }
+
+    get().updateCurrentCharacter((char) => ({
+      ...char,
+      currentHP: newHP,
+      tempHP: newTempHP,
+      mortalWounds: newMortalWounds,
+    }))
+
+    return {
+      rawDamage: amount,
+      afterArmor,
+      afterResistance,
+      tempHPConsumed,
+      hpLost: current.currentHP - newHP,
+      finalHP: newHP,
+      causedMortalWound: mortalWoundsIncurred > 0,
+      mortalWoundsIncurred,
+      knockedOut,
+    } satisfies DamageResult
+  },
+
+  heal: (amount) => {
+    const current = get().currentCharacter
+    if (!current) return
+    const maxHP = calcHP(current.attributes.VIT)
+    // Check for Circulatory Dysfunction (halves healing, rounded down).
+    const hasCirculatory = current.mortalWounds.includes('Circulatory Dysfunction')
+    const effective = hasCirculatory ? Math.floor(amount / 2) : amount
+    get().updateCurrentCharacter((char) => ({
+      ...char,
+      currentHP: Math.min(maxHP, char.currentHP + effective),
+    }))
+  },
+
+  setTempHP: (amount) => {
+    get().updateCurrentCharacter((char) => ({
+      ...char,
+      tempHP: Math.max(char.tempHP, amount),
+    }))
+  },
+
+  // ---- Live play: resource spend/restore ------------------------------------
+
+  spendAP: (amount) => {
+    const current = get().currentCharacter
+    if (!current || current.currentAP < amount) return false
+    get().updateCurrentCharacter((char) => ({
+      ...char,
+      currentAP: char.currentAP - amount,
+    }))
+    return true
+  },
+
+  restoreAP: (amount) => {
+    get().updateCurrentCharacter((char) => ({
+      ...char,
+      currentAP: Math.min(MAX_AP, char.currentAP + amount),
+    }))
+  },
+
+  resetAP: () => {
+    get().updateCurrentCharacter((char) => ({
+      ...char,
+      currentAP: MAX_AP,
+    }))
+  },
+
+  spendEND: (amount) => {
+    const current = get().currentCharacter
+    if (!current || current.currentEND < amount) return false
+    get().updateCurrentCharacter((char) => ({
+      ...char,
+      currentEND: char.currentEND - amount,
+    }))
+    return true
+  },
+
+  restoreEND: (amount) => {
+    get().updateCurrentCharacter((char) => ({
+      ...char,
+      currentEND: Math.min(MAX_END, char.currentEND + amount),
+    }))
+  },
+
+  resetEND: () => {
+    get().updateCurrentCharacter((char) => ({
+      ...char,
+      currentEND: MAX_END,
+    }))
+  },
+
+  spendFP: (amount) => {
+    const current = get().currentCharacter
+    if (!current || current.currentFP < amount) return false
+    get().updateCurrentCharacter((char) => ({
+      ...char,
+      currentFP: char.currentFP - amount,
+    }))
+    return true
+  },
+
+  restoreFP: (amount) => {
+    get().updateCurrentCharacter((char) => ({
+      ...char,
+      currentFP: Math.min(char.maxFP, char.currentFP + amount),
+    }))
+  },
+
+  // ---- Live play: recover & end-of-turn -------------------------------------
+
+  recover: () => {
+    const current = get().currentCharacter
+    if (!current || current.currentAP < 3) return false
+    // Check for Damaged Throat (Recover only restores half END).
+    const hasDamagedThroat = current.mortalWounds.includes('Damaged Throat')
+    const restoredEND = hasDamagedThroat ? Math.floor(MAX_END / 2) : MAX_END
+    get().updateCurrentCharacter((char) => ({
+      ...char,
+      currentAP: char.currentAP - 3,
+      currentEND: restoredEND,
+    }))
+    return true
+  },
+
+  regenerateEND: () => {
+    const current = get().currentCharacter
+    if (!current) return
+    // Damaged Throat: unable to regain END passively.
+    if (current.mortalWounds.includes('Damaged Throat')) return
+    const recovery = Math.max(1, 1 + Math.floor(current.attributes.GRT / 2))
+    get().updateCurrentCharacter((char) => ({
+      ...char,
+      currentEND: Math.min(MAX_END, char.currentEND + recovery),
+    }))
+  },
+
+  convertAPtoEND: () => {
+    get().updateCurrentCharacter((char) => {
+      const converted = Math.min(char.currentAP, MAX_END - char.currentEND)
+      return {
+        ...char,
+        currentAP: 0,
+        currentEND: char.currentEND + converted,
+      }
+    })
+  },
+
+  // ---- Live play: death saves & mortal wounds --------------------------------
+
+  rollDeathSave: () => {
+    const current = get().currentCharacter
+    if (!current) {
+      return { roll: 0, successes: 0, failures: 0, doubled: false, revived: false, died: false }
+    }
+
+    const roll = rollDie(20)
+    let successGain = 0
+    let failureGain = 0
+    let doubled = false
+
+    if (roll >= 20) {
+      successGain = 2
+      doubled = true
+    } else if (roll <= 1) {
+      failureGain = 2
+      doubled = true
+    } else if (roll >= DEATH_SAVE_DC) {
+      successGain = 1
+    } else {
+      failureGain = 1
+    }
+
+    const successes = Math.min(3, current.deathSaves.successes + successGain)
+    const failures = Math.min(3, current.deathSaves.failures + failureGain)
+
+    let revived = false
+    let died = false
+    let hpUpdate: Partial<Character> = {}
+    if (successes >= 3) {
+      revived = true
+      hpUpdate = { currentHP: 1 }
+    }
+    if (failures >= 3) {
+      died = true
+    }
+
+    get().updateCurrentCharacter((char) => ({
+      ...char,
+      deathSaves: { successes, failures },
+      ...hpUpdate,
+    }))
+
+    return { roll, successes, failures, doubled, revived, died } satisfies DeathSaveResult
+  },
+
+  rollMortalWound: () => {
+    const current = get().currentCharacter
+    if (!current) {
+      return { roll: 0, woundName: '', woundDescription: '', slotIndex: -1, knockedOut: false }
+    }
+
+    const roll = rollDie(20)
+    const wound = MORTAL_WOUNDS.find((w) => w.id === roll) ?? MORTAL_WOUNDS[0]
+
+    // Find first empty slot.
+    const newMortalWounds = [...current.mortalWounds]
+    let slotIndex = -1
+    for (let i = 0; i < newMortalWounds.length; i++) {
+      if (newMortalWounds[i] === 'Pending Roll' || newMortalWounds[i] == null) {
+        slotIndex = i
+        newMortalWounds[i] = wound.name
+        break
+      }
+    }
+
+    if (slotIndex === -1) {
+      // No empty slot — shouldn't normally happen, but handle gracefully.
+      newMortalWounds.push(wound.name)
+      slotIndex = newMortalWounds.length - 1
+    }
+
+    const knockedOut = newMortalWounds.filter((w) => w != null).length >= MAX_MORTAL_WOUNDS
+
+    get().updateCurrentCharacter((char) => ({
+      ...char,
+      mortalWounds: newMortalWounds,
+    }))
+
+    return {
+      roll,
+      woundName: wound.name,
+      woundDescription: wound.description,
+      slotIndex,
+      knockedOut,
+    } satisfies MortalWoundResult
+  },
+
+  clearMortalWound: (index) => {
+    get().updateCurrentCharacter((char) => {
+      const wounds = [...char.mortalWounds]
+      if (index >= 0 && index < wounds.length) {
+        wounds[index] = null
+      }
+      return { ...char, mortalWounds: wounds }
+    })
+  },
+
+  // ---- Live play: full restore & reset ---------------------------------------
+
+  fullRestore: () => {
+    get().updateCurrentCharacter((char) => {
+      const maxHP = calcHP(char.attributes.VIT)
+      return {
+        ...char,
+        currentHP: maxHP,
+        tempHP: 0,
+        currentEND: MAX_END,
+        currentAP: MAX_AP,
+        currentFP: char.maxFP,
+        mortalWounds: [null, null],
+        deathSaves: { successes: 0, failures: 0 },
+      }
+    })
+  },
+
+  resetHP: () => {
+    get().updateCurrentCharacter((char) => ({
+      ...char,
+      currentHP: calcHP(char.attributes.VIT),
     }))
   },
 }))

@@ -1,10 +1,24 @@
 /**
- * StatsSection — all derived combat trackers and resource pools, read-only for
- * now (edit / live-track comes in Phase 5). Calculated fields use the pure
- * functions from `lib/calculations.ts`; resource pools (HP, FP, AP, END) are
- * rendered with the reusable {@link SegmentedBar}.
+ * StatsSection — combat stats, resource pools, and all live-play trackers.
+ *
+ * In **view mode**, this section is the live-play hub:
+ *   - HP bar is clickable to open the DamageDialog
+ *   - ResourceTracker for AP/END/FP spend/restore
+ *   - RecoverAction button (3 AP → all END)
+ *   - MortalWoundRoller for wound slots + rolling
+ *   - DeathSaveTracker (shown when knocked out: 0 HP + 2 Mortal Wounds)
+ *
+ * In **edit mode**, all trackers are hidden — only the calculated stats and
+ * bars are shown (edit mode is for building the sheet, not playing).
  */
 
+import { useState } from 'react'
+
+import DamageDialog from '@/components/sheet/DamageDialog'
+import DeathSaveTracker from '@/components/sheet/DeathSaveTracker'
+import MortalWoundRoller from '@/components/sheet/MortalWoundRoller'
+import RecoverAction from '@/components/sheet/RecoverAction'
+import ResourceTracker from '@/components/sheet/ResourceTracker'
 import SegmentedBar from '@/components/ui/SegmentedBar'
 import {
   calcArmor,
@@ -30,7 +44,8 @@ const MAX_END = 10
 /** Maximum Mortal Wounds a character can sustain. */
 const MAX_MORTAL_WOUNDS = 2
 
-export default function StatsSection({ character, mode: _mode }: StatsSectionProps) {
+export default function StatsSection({ character, mode = 'view' }: StatsSectionProps) {
+  const isView = mode === 'view'
   const { attributes, milestones } = character
 
   const maxHP = calcHP(attributes.VIT)
@@ -40,6 +55,13 @@ export default function StatsSection({ character, mode: _mode }: StatsSectionPro
   const movement = calcMovement(attributes.AGI)
   const saveDC = calcSaveDC(milestones)
   const endRecovery = calcENDRecovery(attributes.GRT)
+
+  const [showDamageDialog, setShowDamageDialog] = useState(false)
+
+  // Knocked Out = 0 HP and both mortal wound slots filled.
+  const isKnockedOut =
+    character.currentHP <= 0 &&
+    character.mortalWounds.filter((w) => w != null).length >= MAX_MORTAL_WOUNDS
 
   return (
     <section className="sheet-section sheet-section--stats">
@@ -76,12 +98,21 @@ export default function StatsSection({ character, mode: _mode }: StatsSectionPro
       </div>
 
       <div className="stat-bars">
-        <SegmentedBar
-          label="HP"
-          value={character.currentHP}
-          max={maxHP}
-          color="var(--accent-blush)"
-        />
+        <div
+          className={
+            'stat-bars__hp' + (isView ? ' stat-bars__hp--clickable' : '')
+          }
+          onClick={isView ? () => setShowDamageDialog(true) : undefined}
+          role={isView ? 'button' : undefined}
+          title={isView ? 'Click to apply damage or heal' : undefined}
+        >
+          <SegmentedBar
+            label="HP"
+            value={character.currentHP}
+            max={maxHP}
+            color="var(--accent-blush)"
+          />
+        </div>
         {character.tempHP > 0 && (
           <SegmentedBar
             label="Temp HP"
@@ -110,27 +141,49 @@ export default function StatsSection({ character, mode: _mode }: StatsSectionPro
         />
       </div>
 
+      {isView && (
+        <>
+          <ResourceTracker character={character} />
+          <RecoverAction />
+        </>
+      )}
+
       <div className="stat-mortals">
         <span className="stat-item__label">Mortal Wounds</span>
-        <div className="mortal-wounds">
-          {Array.from({ length: MAX_MORTAL_WOUNDS }, (_, i) => {
-            const wound = character.mortalWounds[i]
-            const filled = wound != null
-            return (
-              <div
-                key={i}
-                className={
-                  'mortal-wound-slot' +
-                  (filled ? ' mortal-wound-slot--filled' : '')
-                }
-                title={filled ? wound ?? '' : 'Empty'}
-              >
-                {filled ? '✕' : ''}
-              </div>
-            )
-          })}
-        </div>
+        {isView ? (
+          <MortalWoundRoller character={character} />
+        ) : (
+          <div className="mortal-wounds">
+            {Array.from({ length: MAX_MORTAL_WOUNDS }, (_, i) => {
+              const wound = character.mortalWounds[i]
+              const filled = wound != null
+              return (
+                <div
+                  key={i}
+                  className={
+                    'mortal-wound-slot' +
+                    (filled ? ' mortal-wound-slot--filled' : '')
+                  }
+                  title={filled ? wound ?? '' : 'Empty'}
+                >
+                  {filled ? '✕' : ''}
+                </div>
+              )
+            })}
+          </div>
+        )}
       </div>
+
+      {isView && isKnockedOut && (
+        <div className="stat-section__death-saves">
+          <span className="stat-item__label">Death Saves</span>
+          <DeathSaveTracker character={character} />
+        </div>
+      )}
+
+      {showDamageDialog && (
+        <DamageDialog onClose={() => setShowDamageDialog(false)} />
+      )}
     </section>
   )
 }
