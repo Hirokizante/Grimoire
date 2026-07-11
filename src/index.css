@@ -1,10 +1,29 @@
 :root {
+  --bg-base: #1a1a2e;
+  --bg-surface: #21213a;
+  --bg-surface-raised: #2a2a47;
+  --bg-surface-hover: #323257;
+  --text-primary: #e6e2ee;
+  --text-secondary: #a9a4c0;
+  --text-muted: #7a7693;
+  --border: #34344f;
+  --border-soft: #2a2a47;
+  --accent-blush: #e8a0bf;
+  --accent-violet: #9b7ed6;
+  --accent-violet-soft: #c4b1eb;
+  --danger: #e57373;
+  --danger-hover: #ef8a8a;
+
   color-scheme: dark;
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial,
+    sans-serif;
   line-height: 1.5;
   font-weight: 400;
-  background-color: #14121b;
-  color: #e6e2ee;
+  background-color: var(--bg-base);
+  color: var(--text-primary);
+
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 * {
@@ -18,4 +37,14 @@ body {
 
 #root {
   min-height: 100vh;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+img {
+  max-width: 100%;
+  display: block;
 }

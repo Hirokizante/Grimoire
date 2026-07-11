@@ -38,6 +38,8 @@ export interface CharacterStoreActions {
   createCharacter: (name: string) => Promise<void>
   /** Select a loaded character as current by id. */
   selectCharacter: (id: string) => void
+  /** Clear current character and return to list view. */
+  closeCharacter: () => void
   /** Apply an updater to the current character, autosave, and sync the list. */
   updateCurrentCharacter: (updater: (char: Character) => Character) => void
   /** Delete a character from DB and the store, clearing current if needed. */
@@ -77,6 +79,10 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
   selectCharacter: (id: string) => {
     const found = get().characters.find((c) => c.id === id) ?? null
     set({ currentCharacter: found })
+  },
+
+  closeCharacter: () => {
+    set({ currentCharacter: null })
   },
 
   updateCurrentCharacter: (updater) => {

@@ -1,8 +1,285 @@
 .app {
   display: flex;
   flex-direction: column;
+  min-height: 100vh;
+}
+
+/* Header */
+.app-header {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  padding: 0.75rem 1.25rem;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-soft);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.app-title {
+  font-size: 1.15rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--accent-violet-soft);
+  text-align: center;
+}
+
+.app-back {
+  justify-self: start;
+}
+
+.app-back-spacer {
+  justify-self: end;
+}
+
+/* Main */
+.app-main {
+  flex: 1;
+  padding: 1.5rem 1.25rem 3rem;
+  max-width: 1100px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  min-height: 50vh;
+}
+
+.page--empty {
   align-items: center;
   justify-content: center;
-  min-height: 100vh;
+  min-height: 60vh;
   text-align: center;
+}
+
+.page-head {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.page-count {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.saving-badge {
+  font-size: 0.8rem;
+}
+
+.page-head .btn--primary {
+  margin-left: auto;
+}
+
+.muted {
+  color: var(--text-muted);
+}
+
+/* Empty state */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.empty-title {
+  margin: 0;
+  font-size: 1.5rem;
+  color: var(--accent-violet-soft);
+}
+
+/* Buttons */
+.btn {
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 0.55rem 1rem;
+  font-size: 0.95rem;
+  font-weight: 500;
+  background: transparent;
+  color: var(--text-primary);
+  transition: background-color 0.15s ease, border-color 0.15s ease,
+    transform 0.05s ease;
+}
+
+.btn:active {
+  transform: translateY(1px);
+}
+
+.btn--primary {
+  background: var(--accent-violet);
+  color: #1a1a2e;
+  font-weight: 600;
+}
+
+.btn--primary:hover {
+  background: var(--accent-violet-soft);
+}
+
+.btn--ghost {
+  border-color: var(--border);
+  color: var(--text-secondary);
+}
+
+.btn--ghost:hover {
+  background: var(--bg-surface-hover);
+  color: var(--text-primary);
+}
+
+/* Card grid */
+.card-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 1rem;
+}
+
+.card {
+  position: relative;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  overflow: hidden;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.card:hover {
+  border-color: var(--accent-violet);
+  background: var(--bg-surface-raised);
+}
+
+.card-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0;
+  border: none;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+  color: inherit;
+}
+
+.card-portrait {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  background: var(--border-soft);
+}
+
+.card-portrait--empty {
+  background: linear-gradient(
+    135deg,
+    var(--bg-surface-raised),
+    var(--border-soft)
+  );
+}
+
+.card-name {
+  padding: 0 0.9rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.card-meta {
+  padding: 0 0.9rem 0.9rem;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.card-delete {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.4rem;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 50%;
+  border: none;
+  background: rgba(26, 26, 46, 0.7);
+  color: var(--text-secondary);
+  font-size: 1.1rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.15s ease, background-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.card:hover .card-delete {
+  opacity: 1;
+}
+
+.card-delete:hover {
+  background: var(--danger-hover);
+  color: #1a1a2e;
+}
+
+/* Sheet placeholder */
+.sheet-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  text-align: center;
+  padding: 2rem 1rem;
+}
+
+.sheet-portrait {
+  width: 160px;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border-radius: 12px;
+  border: 1px solid var(--border-soft);
+}
+
+.sheet-portrait--empty {
+  background: linear-gradient(
+    135deg,
+    var(--bg-surface-raised),
+    var(--border-soft)
+  );
+}
+
+.sheet-name {
+  margin: 0;
+  font-size: 1.6rem;
+  color: var(--accent-violet-soft);
+}
+
+.sheet-meta {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.sheet-note {
+  margin: 0;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+  .app-main {
+    padding: 1rem 0.75rem 2.5rem;
+  }
+
+  .card-grid {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  }
+
+  .card-delete {
+    opacity: 1;
+  }
 }
