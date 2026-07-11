@@ -30,7 +30,7 @@ const MAX_END = 10
 /** Maximum Mortal Wounds a character can sustain. */
 const MAX_MORTAL_WOUNDS = 2
 
-export default function StatsSection({ character, mode }: StatsSectionProps) {
+export default function StatsSection({ character, mode: _mode }: StatsSectionProps) {
   const { attributes, milestones } = character
 
   const maxHP = calcHP(attributes.VIT)

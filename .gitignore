@@ -25,3 +25,4 @@ dist/
 
 # Hermes
 .hermes/plans/
+dist/
