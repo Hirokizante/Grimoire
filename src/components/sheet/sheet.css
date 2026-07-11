@@ -1,0 +1,605 @@
+/**
+ * Styles for the Phase 4 character sheet and its sections.
+ *
+ * The sheet uses a responsive multi-column flow: three columns on desktop,
+ * two on tablet, and a single stacked column on mobile. Each section keeps
+ * itself intact via `break-inside: avoid` so it never splits across columns.
+ *
+ * The dark surface, blush/violet accents, and CSS-variable theming follow the
+ * conventions established in index.css / App.css. Per DESIGN.md we avoid
+ * colored side-stripe borders, decorative gradient text, and glassmorphism.
+ */
+
+/* ---- Sheet shell ---------------------------------------------------------- */
+
+.character-sheet {
+  background: var(--sheet-bg, var(--bg-base));
+  color: var(--text-primary);
+  font-family: var(--sheet-text-font, inherit);
+  padding: 1.25rem;
+  border-radius: 14px;
+  border: 1px solid var(--border-soft);
+
+  column-count: 3;
+  column-gap: 1.25rem;
+}
+
+@media (max-width: 1024px) {
+  .character-sheet {
+    column-count: 2;
+  }
+}
+
+@media (max-width: 640px) {
+  .character-sheet {
+    column-count: 1;
+    padding: 1rem 0.75rem;
+  }
+}
+
+/* ---- Section shell -------------------------------------------------------- */
+
+.sheet-section {
+  break-inside: avoid;
+  margin: 0 0 1.25rem 0;
+  padding: 1rem 1.1rem;
+  border-radius: 12px;
+  border: 1px solid var(--border-soft);
+  background: var(--bg-surface);
+}
+
+.character-sheet--flat .sheet-section {
+  background: transparent;
+  border-color: transparent;
+  padding-left: 0.25rem;
+  padding-right: 0.25rem;
+}
+
+.sheet-section__heading {
+  font-family: var(--sheet-heading-font, inherit);
+  font-weight: var(--sheet-heading-weight, 600);
+  font-size: 1.05rem;
+  letter-spacing: 0.04em;
+  color: var(--accent-violet-soft);
+  margin: 0 0 0.75rem 0;
+}
+
+.sheet-section__heading-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.sheet-section__heading-row .sheet-section__heading {
+  margin: 0;
+}
+
+.sheet-section__counter {
+  font-family: var(--sheet-label-font, inherit);
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.sheet-section__empty {
+  font-family: var(--sheet-helper-font, inherit);
+  font-style: italic;
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+/* ---- Profile -------------------------------------------------------------- */
+
+.profile {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.profile__portrait-wrap {
+  flex: 0 0 auto;
+}
+
+.profile__portrait {
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--accent-violet);
+  background: var(--bg-surface-raised);
+}
+
+.profile__portrait--empty {
+  background: radial-gradient(
+    circle at 50% 35%,
+    var(--bg-surface-raised),
+    var(--border-soft)
+  );
+}
+
+.profile__body {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.profile__name {
+  font-family: var(--sheet-heading-font, inherit);
+  font-weight: 700;
+  font-size: 1.5rem;
+  letter-spacing: 0.02em;
+  color: var(--accent-violet-soft);
+  margin: 0;
+  line-height: 1.15;
+}
+
+.profile__block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.profile__block-label {
+  font-family: var(--sheet-label-font, inherit);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+.profile__text {
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: var(--text-primary);
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+/* ---- Attributes ----------------------------------------------------------- */
+
+.attribute-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.attribute-list__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: 8px;
+  background: var(--bg-surface-raised);
+  border: 1px solid var(--border-soft);
+}
+
+.attribute-list__main {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.attribute-list__abbr {
+  font-family: var(--sheet-heading-font, inherit);
+  font-weight: 700;
+  font-size: 0.92rem;
+  color: var(--accent-violet-soft);
+  letter-spacing: 0.04em;
+}
+
+.attribute-list__name {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attribute-list__value {
+  font-family: var(--sheet-heading-font, inherit);
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--text-primary);
+  min-width: 2.5rem;
+  text-align: right;
+}
+
+/* ---- Skills --------------------------------------------------------------- */
+
+.skill-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.skill-list__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.3rem 0.4rem;
+  border-radius: 6px;
+}
+
+.skill-list__item:nth-child(odd) {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.skill-list__name {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.skill-list__value {
+  font-family: var(--sheet-heading-font, inherit);
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  min-width: 2.5rem;
+  text-align: right;
+}
+
+.skill-list__value--active {
+  color: var(--accent-violet-soft);
+}
+
+/* ---- Combat Stats --------------------------------------------------------- */
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.5rem;
+  margin-bottom: 0.85rem;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  padding: 0.45rem 0.6rem;
+  border-radius: 8px;
+  background: var(--bg-surface-raised);
+  border: 1px solid var(--border-soft);
+}
+
+.stat-item__label {
+  font-family: var(--sheet-label-font, inherit);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.stat-item__value {
+  font-family: var(--sheet-heading-font, inherit);
+  font-weight: 700;
+  font-size: 1.15rem;
+  color: var(--text-primary);
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+}
+
+.stat-item__sub {
+  font-family: var(--sheet-helper-font, inherit);
+  font-size: 0.72rem;
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.stat-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.stat-mortals {
+  margin-top: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.mortal-wounds {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.mortal-wound-slot {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-surface-raised);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  color: var(--text-muted);
+}
+
+.mortal-wound-slot--filled {
+  border-color: var(--danger);
+  background: rgba(229, 115, 115, 0.16);
+  color: var(--danger-hover);
+  font-weight: 700;
+}
+
+/* ---- Segmented bar -------------------------------------------------------- */
+
+.seg-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.seg-bar__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.seg-bar__label {
+  font-family: var(--sheet-label-font, inherit);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+}
+
+.seg-bar__value {
+  font-family: var(--sheet-heading-font, inherit);
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+}
+
+.seg-bar__max {
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.seg-bar__track {
+  display: flex;
+  gap: 3px;
+  height: 13px;
+}
+
+.seg-bar__track--empty {
+  height: 13px;
+  border-radius: 4px;
+  background: var(--bg-surface-hover);
+  border: 1px dashed var(--border);
+}
+
+.seg-bar__segment {
+  flex: 1 1 0;
+  min-width: 4px;
+  border-radius: 3px;
+  background: var(--bg-surface-hover);
+  border: 1px solid var(--border-soft);
+  transition: background-color 0.15s ease;
+}
+
+.seg-bar__segment--filled {
+  background: var(--seg-color, var(--accent-violet));
+  border-color: var(--seg-color, var(--accent-violet));
+}
+
+/* ---- Ability cards -------------------------------------------------------- */
+
+.ability-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.ability-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: 10px;
+  border: 1px solid var(--border-soft);
+  background: var(--bg-surface-raised);
+}
+
+.ability-card--minor {
+  border-style: dashed;
+  border-color: var(--accent-violet);
+  background: rgba(155, 126, 214, 0.06);
+}
+
+.ability-card__head {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.ability-card__name {
+  font-family: var(--sheet-heading-font, inherit);
+  font-weight: 700;
+  font-size: 1.02rem;
+  margin: 0;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.ability-card__minor-badge {
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--accent-violet);
+  color: var(--bg-base);
+}
+
+.ability-card__traits {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.ability-card__trait {
+  font-size: 0.72rem;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--bg-surface-hover);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-soft);
+}
+
+.ability-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ability-card__costs {
+  display: inline-flex;
+  gap: 0.3rem;
+  flex-wrap: wrap;
+}
+
+.cost-badge {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 1px 8px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  line-height: 1.5;
+}
+
+.cost-badge--ap {
+  background: rgba(155, 126, 214, 0.16);
+  color: var(--accent-violet-soft);
+  border-color: rgba(155, 126, 214, 0.4);
+}
+
+.cost-badge--end {
+  background: rgba(232, 160, 191, 0.16);
+  color: var(--accent-blush);
+  border-color: rgba(232, 160, 191, 0.4);
+}
+
+.cost-badge--fp {
+  background: rgba(196, 177, 235, 0.16);
+  color: var(--accent-violet-soft);
+  border-color: rgba(196, 177, 235, 0.45);
+}
+
+.ability-card__damage {
+  font-size: 0.82rem;
+  color: var(--text-primary);
+}
+
+.ability-card__meta-label {
+  font-family: var(--sheet-label-font, inherit);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.ability-card__description {
+  font-family: var(--sheet-text-font, inherit);
+  font-size: 0.88rem;
+  line-height: 1.55;
+  color: var(--text-primary);
+}
+
+.ability-card__description > :first-child {
+  margin-top: 0;
+}
+
+.ability-card__description > :last-child {
+  margin-bottom: 0;
+}
+
+.ability-card__overcharge {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding-top: 0.4rem;
+  border-top: 1px solid var(--border-soft);
+}
+
+.ability-card__section-label {
+  font-family: var(--sheet-label-font, inherit);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--accent-violet-soft);
+}
+
+.ability-card__overcharge-body {
+  font-size: 0.86rem;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.ability-card__overcharge-body > :first-child {
+  margin-top: 0;
+}
+
+.ability-card__overcharge-body > :last-child {
+  margin-bottom: 0;
+}
+
+.ability-card__flavor {
+  font-family: var(--sheet-helper-font, inherit);
+  font-style: italic;
+  font-size: 0.84rem;
+  color: var(--text-muted);
+  margin: 0;
+  padding-left: 0.5rem;
+  border-left: 2px solid var(--border-soft);
+}
+
+/* ---- Core innate narrative ------------------------------------------------ */
+
+.core-innate {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-bottom: 0.7rem;
+}
+
+.core-innate__label {
+  font-family: var(--sheet-label-font, inherit);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--accent-violet-soft);
+}
+
+.core-innate__text {
+  font-family: var(--sheet-text-font, inherit);
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: var(--text-primary);
+  margin: 0;
+  white-space: pre-wrap;
+}
