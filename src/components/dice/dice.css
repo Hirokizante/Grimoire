@@ -1,0 +1,247 @@
+/**
+ * Dice component styles — notation highlighting, roll overlay, and result
+ * display for the inline dice rolling system (Phase 8).
+ */
+
+/* ---- Dice notation highlighting -------------------------------------------- */
+
+.dice-notation {
+  display: inline;
+  background: rgba(155, 126, 214, 0.14);
+  color: var(--accent-violet-soft);
+  border: 1px solid rgba(155, 126, 214, 0.3);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 0.85em;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+  font-family: var(--sheet-label-font, inherit);
+  letter-spacing: 0.02em;
+}
+
+.dice-notation:hover:not(:disabled) {
+  background: rgba(155, 126, 214, 0.24);
+  border-color: var(--accent-violet);
+}
+
+.dice-notation:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.dice-notation:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+/* ---- Dice roll overlay ----------------------------------------------------- */
+
+.dice-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 8, 16, 0.85);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  padding: 1.5rem;
+  animation: dice-overlay-fade 0.2s ease;
+}
+
+@keyframes dice-overlay-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.dice-overlay__inner {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 1.5rem 2rem;
+  max-width: 480px;
+  width: 100%;
+  text-align: center;
+}
+
+/* ---- Dice animation -------------------------------------------------------- */
+
+.dice-overlay__animation {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.dice-overlay__die {
+  display: inline-block;
+  width: 3rem;
+  height: 3rem;
+  margin: 0 0.3rem;
+  animation: dice-tumble 0.9s ease-out;
+}
+
+.dice-overlay__die-face {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  background: var(--bg-surface-raised);
+  border: 2px solid var(--accent-violet);
+  border-radius: 8px;
+  box-shadow: 0 2px 12px rgba(155, 126, 214, 0.2);
+}
+
+@keyframes dice-tumble {
+  0% {
+    transform: rotateX(0) rotateY(0) translateY(-40px) scale(0.6);
+    opacity: 0;
+  }
+  30% {
+    opacity: 1;
+  }
+  60% {
+    transform: rotateX(360deg) rotateY(180deg) translateY(0) scale(1.1);
+  }
+  100% {
+    transform: rotateX(720deg) rotateY(360deg) translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+.dice-overlay__rolling-text {
+  font-family: var(--sheet-heading-font, inherit);
+  font-size: 1.1rem;
+  color: var(--accent-violet-soft);
+  letter-spacing: 0.05em;
+  margin: 0;
+}
+
+/* ---- Dice result display --------------------------------------------------- */
+
+.dice-result {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.dice-result__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.dice-result__notation {
+  font-family: var(--sheet-heading-font, inherit);
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--accent-violet-soft);
+  letter-spacing: 0.02em;
+}
+
+.dice-result__close {
+  font-size: 1.1rem;
+  padding: 0.2rem 0.5rem;
+  line-height: 1;
+}
+
+.dice-result__terms {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.5rem 0;
+  border-top: 1px solid var(--border-soft);
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.dice-result__term {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.88rem;
+  color: var(--text-secondary);
+}
+
+.dice-result__term-label {
+  font-family: var(--sheet-label-font, inherit);
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  min-width: 4rem;
+}
+
+.dice-result__term--dice {
+  gap: 0.4rem;
+}
+
+.dice-result__dice-rolls {
+  display: inline-flex;
+  gap: 0.25rem;
+  flex-wrap: wrap;
+}
+
+.dice-result__die-result {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.8rem;
+  height: 1.8rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  background: var(--bg-surface-raised);
+  border: 1px solid var(--accent-violet);
+  border-radius: 5px;
+}
+
+.dice-result__term-value {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.dice-result__term--variable .dice-result__term-label,
+.dice-result__term--constant .dice-result__term-label {
+  color: var(--accent-violet-soft);
+  font-weight: 600;
+}
+
+.dice-result__total {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.8rem;
+  padding: 0.5rem 0;
+}
+
+.dice-result__total-label {
+  font-family: var(--sheet-label-font, inherit);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+.dice-result__total-value {
+  font-family: var(--sheet-heading-font, inherit);
+  font-size: 2.2rem;
+  font-weight: 700;
+  color: var(--accent-blush);
+  text-shadow: 0 0 20px rgba(232, 160, 191, 0.3);
+}
+
+.dice-result__breakdown {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  text-align: center;
+  margin: 0;
+  word-break: break-word;
+}
+
+.dice-result__dismiss {
+  width: 100%;
+  margin-top: 0.3rem;
+}

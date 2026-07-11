@@ -67,7 +67,7 @@ export default function AbilityActivation({ ability }: AbilityActivationProps) {
 
   return (
     <div className="ability-activation">
-      <AbilityBlockCard ability={ability} />
+      <AbilityBlockCard ability={ability} mode="view" />
       <div className="ability-activation__footer">
         <button
           type="button"

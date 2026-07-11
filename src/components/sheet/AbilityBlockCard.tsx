@@ -5,15 +5,21 @@
  * The description and overcharge fields hold HTML strings produced by a rich
  * text editor (DESIGN.md "Rich Text Editor in Ability Blocks"), so they are
  * rendered with `dangerouslySetInnerHTML`.
+ *
+ * The damage field is scanned for dice notation and rendered with the
+ * {@link DiceHighlighter} so players can click to roll in view mode.
  */
 
+import DiceHighlighter from '@/components/dice/DiceHighlighter'
 import type { AbilityBlock } from '@/types'
+import type { SheetMode } from '@/pages/CharacterSheetPage'
 
 export interface AbilityBlockCardProps {
   ability: AbilityBlock
+  mode?: SheetMode
 }
 
-export default function AbilityBlockCard({ ability }: AbilityBlockCardProps) {
+export default function AbilityBlockCard({ ability, mode = 'view' }: AbilityBlockCardProps) {
   const {
     name,
     traits,
@@ -66,7 +72,7 @@ export default function AbilityBlockCard({ ability }: AbilityBlockCardProps) {
           {damage && (
             <span className="ability-card__damage">
               <span className="ability-card__meta-label">Dmg</span>{' '}
-              {damage}
+              <DiceHighlighter text={damage} mode={mode} />
             </span>
           )}
         </div>

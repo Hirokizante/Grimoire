@@ -1,7 +1,9 @@
 import './App.css'
+import '@/components/dice/dice.css'
 
 import CharacterListPage from '@/pages/CharacterListPage'
 import CharacterSheetPage from '@/pages/CharacterSheetPage'
+import DiceRollOverlay from '@/components/dice/DiceRollOverlay'
 import { useCharacterStore } from '@/store/characterStore'
 
 function App() {
@@ -31,6 +33,8 @@ function App() {
       <main className="app-main">
         {onSheet ? <CharacterSheetPage /> : <CharacterListPage />}
       </main>
+
+      <DiceRollOverlay />
     </div>
   )
 }

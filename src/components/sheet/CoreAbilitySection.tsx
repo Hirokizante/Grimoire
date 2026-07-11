@@ -109,7 +109,7 @@ export default function CoreAbilitySection({
         {innateAbility ? (
           isEdit ? (
             <div className="ability-card-wrap">
-              <AbilityBlockCard ability={innateAbility} />
+              <AbilityBlockCard ability={innateAbility} mode={mode} />
               {isEdit && (
                 <div className="ability-card__actions">
                   <button
@@ -146,7 +146,7 @@ export default function CoreAbilitySection({
 
         {isEdit ? (
           <div className="ability-card-wrap">
-            <AbilityBlockCard ability={basicAttack} />
+            <AbilityBlockCard ability={basicAttack} mode={mode} />
             <div className="ability-card__actions">
               <button
                 type="button"
@@ -163,7 +163,7 @@ export default function CoreAbilitySection({
 
         {isEdit ? (
           <div className="ability-card-wrap">
-            <AbilityBlockCard ability={fatebreaker} />
+            <AbilityBlockCard ability={fatebreaker} mode={mode} />
             <div className="ability-card__actions">
               <button
                 type="button"
