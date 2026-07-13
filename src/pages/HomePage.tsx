@@ -45,8 +45,10 @@ export default function HomePage() {
             className="home-nav__btn home-nav__btn--primary"
             onClick={() => setView('characters')}
           >
-            <Users size={36} className="home-nav__icon" />
-            <span className="home-nav__label">Characters</span>
+            <span className="home-nav__btn-inner">
+              <Users size={48} className="home-nav__icon" />
+              <span className="home-nav__label">Characters</span>
+            </span>
           </button>
 
           <button
@@ -54,8 +56,10 @@ export default function HomePage() {
             className="home-nav__btn"
             onClick={() => setView('npcs')}
           >
-            <Ghost size={36} className="home-nav__icon" />
-            <span className="home-nav__label">NPCs</span>
+            <span className="home-nav__btn-inner">
+              <Ghost size={48} className="home-nav__icon" />
+              <span className="home-nav__label">NPCs</span>
+            </span>
           </button>
 
           <button
@@ -63,8 +67,10 @@ export default function HomePage() {
             className="home-nav__btn"
             onClick={() => setView('settings')}
           >
-            <Settings size={36} className="home-nav__icon" />
-            <span className="home-nav__label">Settings</span>
+            <span className="home-nav__btn-inner">
+              <Settings size={48} className="home-nav__icon" />
+              <span className="home-nav__label">Settings</span>
+            </span>
           </button>
         </nav>
       </div>
