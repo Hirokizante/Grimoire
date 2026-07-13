@@ -34,6 +34,9 @@ import type {
 /** Debounce window for autosave (ms). */
 const AUTOSAVE_DEBOUNCE_MS = 500
 
+/** Top-level navigation view (home screen sections). */
+export type AppView = 'home' | 'characters' | 'npcs' | 'settings'
+
 export interface CharacterStoreState {
   /** All characters loaded from IndexedDB. */
   characters: Character[]
@@ -47,6 +50,8 @@ export interface CharacterStoreState {
   versionHistory: VersionSnapshot[] | null
   /** True while a restore-from-version is in flight. */
   isRestoring: boolean
+  /** Current top-level view (home, characters, npcs, settings). */
+  view: AppView
 }
 
 /** Sections that hold a list of AbilityBlocks on a character. */
@@ -123,6 +128,8 @@ export interface CharacterStoreActions {
   selectCharacter: (id: string) => void
   /** Clear current character and return to list view. */
   closeCharacter: () => void
+  /** Navigate to a top-level view (home, characters, npcs, settings). */
+  setView: (view: AppView) => void
   /** Apply an updater to the current character, autosave, and sync the list. */
   updateCurrentCharacter: (updater: (char: Character) => Character) => void
   /** Delete a character from DB and the store, clearing current if needed. */
@@ -251,6 +258,7 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
   isSaving: false,
   versionHistory: null,
   isRestoring: false,
+  view: 'home',
 
   loadCharacters: async () => {
     const characters = await getAllCharacters()
@@ -275,7 +283,11 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
   },
 
   closeCharacter: () => {
-    set({ currentCharacter: null })
+    set({ currentCharacter: null, view: 'characters' })
+  },
+
+  setView: (view) => {
+    set({ view })
   },
 
   updateCurrentCharacter: (updater) => {
