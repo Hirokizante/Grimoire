@@ -13,6 +13,7 @@
 
 import { useState } from 'react'
 
+import { useEscapeKey } from '@/hooks/useEscapeKey'
 import { useNotification } from '@/context/NotificationContext'
 import { useCharacterStore, type DamageResult } from '@/store/characterStore'
 import { calcArmor } from '@/lib/calculations'
@@ -31,6 +32,8 @@ export default function DamageDialog({ onClose }: DamageDialogProps) {
   const [resistant, setResistant] = useState(false)
   const [ignoreTempHP, setIgnoreTempHP] = useState(false)
   const [result, setResult] = useState<DamageResult | null>(null)
+
+  useEscapeKey(onClose)
 
   const armor = character ? calcArmor(character.attributes.VIT) : 0
 

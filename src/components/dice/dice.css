@@ -30,67 +30,16 @@
 }
 
 /* ---- Dice result modal (replaces the 3D scene) ----------------------------- */
-
-.dice-modal-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(10, 8, 16, 0.7);
-  backdrop-filter: blur(6px);
-  z-index: 2000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1.5rem;
-  animation: modal-overlay-fade 0.2s ease;
-}
+/* Uses the shared .modal-overlay / .modal-content / .modal-header classes.
+ * Only dice-specific overrides live here. */
 
 .dice-modal {
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 1.5rem 2rem;
   max-width: 480px;
-  width: 100%;
   text-align: center;
-  position: relative;
-  animation: modal-pop 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-@keyframes modal-pop {
-  from {
-    opacity: 0;
-    transform: scale(0.92);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-.dice-modal__close {
-  position: absolute;
-  top: 0.5rem;
-  right: 0.75rem;
-  font-size: 1.5rem;
-  background: none;
-  border: none;
-  color: var(--text-muted);
-  cursor: pointer;
-  padding: 0.2rem 0.4rem;
-  line-height: 1;
-}
-
-.dice-modal__close:hover {
-  color: var(--text-primary);
-}
-
-.dice-modal__source {
-  font-family: var(--sheet-label-font, inherit);
-  font-size: 0.8rem;
-  color: var(--text-muted);
-  margin: 0 0 0.5rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+.dice-modal__body {
+  padding: 1.5rem 2rem;
 }
 
 .dice-modal__total-row {

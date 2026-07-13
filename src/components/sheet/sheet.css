@@ -769,22 +769,29 @@
   gap: 0.7rem;
 }
 
-/* Card grid for slotted abilities and pool — max 3 per row */
+/* Masonry-style card grid for slotted abilities and pool.
+   CSS multi-column gives flush packing — each card takes only
+   its natural height and cards pack tightly with no row gaps. */
 .ability-grid--cards {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 0.7rem;
+  display: block;
+  column-count: 3;
+  column-gap: 0.7rem;
+}
+
+.ability-grid--cards > * {
+  break-inside: avoid;
+  margin-bottom: 0.7rem;
 }
 
 @media (max-width: 1024px) {
   .ability-grid--cards {
-    grid-template-columns: repeat(2, 1fr);
+    column-count: 2;
   }
 }
 
 @media (max-width: 640px) {
   .ability-grid--cards {
-    grid-template-columns: 1fr;
+    column-count: 1;
   }
 }
 
@@ -1187,18 +1194,6 @@
 
 .ability-editor-dialog {
   max-width: 540px;
-  animation: modal-content-pop 0.2s ease;
-}
-
-@keyframes modal-content-pop {
-  from {
-    opacity: 0;
-    transform: scale(0.96) translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1) translateY(0);
-  }
 }
 
 .ability-editor-dialog__body {
@@ -1401,6 +1396,17 @@
   to { opacity: 1; }
 }
 
+@keyframes modal-content-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
 .modal-content {
   background: var(--bg-surface);
   border: 1px solid var(--border);
@@ -1409,6 +1415,7 @@
   width: 100%;
   max-height: 90vh;
   overflow-y: auto;
+  animation: modal-content-pop 0.2s ease;
 }
 
 .modal-header {
@@ -2127,47 +2134,19 @@
 
 /* ---- Phase 10: customization modal -------------------------------------- */
 
-.customize-modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(10, 8, 16, 0.85);
-  backdrop-filter: blur(4px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 2000;
-  padding: 1rem;
-  animation: modal-overlay-fade 0.2s ease;
-}
+/* Uses the shared .modal-overlay / .modal-content / .modal-header classes.
+ * Only the panel-specific overrides live here. */
 
 .customize-modal {
-  background: var(--bg-surface);
-  border: 1px solid var(--border-soft);
-  border-radius: 14px;
   max-width: 860px;
-  width: 100%;
-  max-height: 90vh;
-  overflow-y: auto;
   display: flex;
   flex-direction: column;
 }
 
 .customize-panel__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.75rem 1.1rem;
-  border-bottom: 1px solid var(--border-soft);
   position: sticky;
   top: 0;
   background: var(--bg-surface);
-}
-
-.customize-panel__title {
-  font-family: var(--sheet-heading-font, inherit);
-  font-size: 1rem;
-  color: var(--accent-violet-soft);
-  margin: 0;
 }
 
 .customize-panel__body {

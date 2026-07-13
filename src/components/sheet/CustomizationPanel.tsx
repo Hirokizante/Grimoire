@@ -13,6 +13,7 @@
 import { useRef, useState } from 'react'
 import { HexColorPicker } from 'react-colorful'
 import { processImage } from '@/lib/imageProcessing'
+import { useEscapeKey } from '@/hooks/useEscapeKey'
 import { useCharacterStore } from '@/store/characterStore'
 import type { SheetColors, SheetConfig } from '@/types'
 
@@ -665,13 +666,18 @@ export default function CustomizationPanel({
   const config = useCharacterStore((s) => s.currentCharacter?.config)
   const updateConfig = useCharacterStore((s) => s.updateConfig)
 
+  useEscapeKey(onClose, open)
+
   if (!config || !open) return null
 
   return (
-    <div className="customize-modal-overlay" onClick={onClose}>
-      <div className="customize-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="customize-panel__header">
-          <h3 className="customize-panel__title">Customize Sheet</h3>
+    <div className="modal-overlay" onClick={onClose}>
+      <div
+        className="modal-content customize-modal"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="modal-header customize-panel__header">
+          <h3>Customize Sheet</h3>
           <button
             type="button"
             className="btn btn--ghost modal-close"

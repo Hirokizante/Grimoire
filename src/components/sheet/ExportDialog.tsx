@@ -15,6 +15,7 @@
 import { useEffect } from 'react'
 import { ArrowUpFromLine, RotateCcw, Trash2 } from 'lucide-react'
 
+import { useEscapeKey } from '@/hooks/useEscapeKey'
 import { useNotification } from '@/context/NotificationContext'
 import { useCharacterStore } from '@/store/characterStore'
 import { downloadJson, versionedFilename } from '@/lib/exportImport'
@@ -46,6 +47,8 @@ export default function ExportDialog({ open, onClose }: ExportDialogProps) {
   const restoreVersion = useCharacterStore((s) => s.restoreVersion)
   const deleteVersion = useCharacterStore((s) => s.deleteVersion)
   const { notify } = useNotification()
+
+  useEscapeKey(onClose, open)
 
   // Relocal history whenever the dialog opens.
   useEffect(() => {

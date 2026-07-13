@@ -6,9 +6,10 @@
  *   - Color-coded breakdown of every term (dice, attributes, constants)
  *   - The original roll source (ability, manual note, etc.) so players
  *     remember *why* this roll happened
- *   - Dismiss button + click-outside-to-dismiss
+ *   - Done button + click-outside-to-dismiss + Esc to dismiss
  */
 
+import { useEscapeKey } from '@/hooks/useEscapeKey'
 import { useDiceRollStore } from '@/store/diceRollStore'
 import type { RollSource } from '@/types'
 
@@ -39,6 +40,8 @@ export default function DiceResultModal({ onClose }: DiceResultModalProps) {
   const result = useDiceRollStore((s) => s.result)
   const source = useDiceRollStore((s) => s.source)
 
+  useEscapeKey(onClose)
+
   if (!result) return null
 
   const { total, terms, breakdown } = result
@@ -52,97 +55,91 @@ export default function DiceResultModal({ onClose }: DiceResultModalProps) {
     return t.term.sides === 20 && (t.rolls ?? []).some((r) => r === 1)
   })
 
+  const label = sourceLabel(source)
+
   return (
     <div
-      className="dice-modal-backdrop"
+      className="modal-overlay"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose()
       }}
       role="dialog"
       aria-modal="true"
-      aria-labelledby="dice-result-title"
     >
-      <div className="dice-modal">
-        <button
-          type="button"
-          className="dice-modal__close"
-          onClick={onClose}
-          aria-label="Dismiss roll result"
-        >
-          ×
-        </button>
-
-        {/* Source context */}
-        {sourceLabel(source) && (
-          <p className="dice-modal__source">{sourceLabel(source)}</p>
-        )}
-
-        {/* Big total */}
-        <div className="dice-modal__total-row">
-          <h2 id="dice-result-title" className="dice-modal__total">
-            {total}
-          </h2>
-          {criticalHit && <span className="dice-badge dice-badge--crit">★ NAT 20</span>}
-          {criticalFail && <span className="dice-badge dice-badge--fail">✗ NAT 1</span>}
+      <div
+        className="modal-content dice-modal"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="modal-header">
+          <h3>{label ?? 'Roll Result'}</h3>
         </div>
 
-        {/* Per-term breakdown */}
-        <div className="dice-modal__terms">
-          {terms.map((term, i) => {
-            if (term.term.type === 'dice' && term.rolls) {
-              return (
-                <div key={i} className="dice-modal__term dice-modal__term--dice">
-                  <span className="dice-modal__term-label">
-                    {term.term.count}d{term.term.sides}:
-                  </span>
-                  <div className="dice-modal__rolls">
-                    {term.rolls.map((roll, j) => {
-                      const isCrit = term.term.type === 'dice' && term.term.sides === 20 && roll === 20
-                      const isFumble = term.term.type === 'dice' && term.term.sides === 20 && roll === 1
-                      const maxRoll = term.term.type === 'dice' && roll === term.term.sides
-                      return (
-                        <span
-                          key={j}
-                          className={`dice-modal__roll${
-                            isCrit
-                              ? ' dice-modal__roll--crit'
-                              : isFumble
-                              ? ' dice-modal__roll--fumble'
-                              : maxRoll
-                              ? ' dice-modal__roll--max'
-                              : ''
-                          }`}
-                        >
-                          {roll}
-                        </span>
-                      )
-                    })}
+        <div className="dice-modal__body">
+          {/* Big total */}
+          <div className="dice-modal__total-row">
+            <h2 className="dice-modal__total">{total}</h2>
+            {criticalHit && <span className="dice-badge dice-badge--crit">★ NAT 20</span>}
+            {criticalFail && <span className="dice-badge dice-badge--fail">✗ NAT 1</span>}
+          </div>
+
+          {/* Per-term breakdown */}
+          <div className="dice-modal__terms">
+            {terms.map((term, i) => {
+              if (term.term.type === 'dice' && term.rolls) {
+                return (
+                  <div key={i} className="dice-modal__term dice-modal__term--dice">
+                    <span className="dice-modal__term-label">
+                      {term.term.count}d{term.term.sides}:
+                    </span>
+                    <div className="dice-modal__rolls">
+                      {term.rolls.map((roll, j) => {
+                        const isCrit = term.term.type === 'dice' && term.term.sides === 20 && roll === 20
+                        const isFumble = term.term.type === 'dice' && term.term.sides === 20 && roll === 1
+                        const maxRoll = term.term.type === 'dice' && roll === term.term.sides
+                        return (
+                          <span
+                            key={j}
+                            className={`dice-modal__roll${
+                              isCrit
+                                ? ' dice-modal__roll--crit'
+                                : isFumble
+                                ? ' dice-modal__roll--fumble'
+                                : maxRoll
+                                ? ' dice-modal__roll--max'
+                                : ''
+                            }`}
+                          >
+                            {roll}
+                          </span>
+                        )
+                      })}
+                    </div>
+                    <span className="dice-modal__term-value">= {term.value}</span>
                   </div>
-                  <span className="dice-modal__term-value">= {term.value}</span>
+                )
+              }
+              return (
+                <div
+                  key={i}
+                  className={`dice-modal__term dice-modal__term--${term.term.type}`}
+                >
+                  <span className="dice-modal__term-label">{term.label}</span>
                 </div>
               )
-            }
-            return (
-              <div
-                key={i}
-                className={`dice-modal__term dice-modal__term--${term.term.type}`}
-              >
-                <span className="dice-modal__term-label">{term.label}</span>
-              </div>
-            )
-          })}
+            })}
+          </div>
+
+          {/* Breakdown */}
+          <p className="dice-modal__breakdown">{breakdown}</p>
+
+          <button
+            type="button"
+            className="btn btn--primary dice-modal__dismiss"
+            onClick={onClose}
+          >
+            Done
+          </button>
         </div>
-
-        {/* Breakdown */}
-        <p className="dice-modal__breakdown">{breakdown}</p>
-
-        <button
-          type="button"
-          className="btn btn--primary dice-modal__dismiss"
-          onClick={onClose}
-        >
-          Done
-        </button>
       </div>
     </div>
   )

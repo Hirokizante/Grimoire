@@ -5,9 +5,10 @@
  * workspace for ability creation without the cramped inline panel feel. Overlay
  * clicks and the Esc key both cancel.
  */
-import { useEffect, useMemo } from 'react'
+import { useMemo } from 'react'
 
 import AbilityBlockEditor from '@/components/sheet/AbilityBlockEditor'
+import { useEscapeKey } from '@/hooks/useEscapeKey'
 import type { AbilityBlock } from '@/types'
 
 export interface AbilityEditorModalProps {
@@ -33,15 +34,7 @@ export default function AbilityEditorModal({
     [ability],
   )
 
-  // Close on Escape while the modal is open.
-  useEffect(() => {
-    if (!open) return
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', handleKey)
-    return () => window.removeEventListener('keydown', handleKey)
-  }, [open, onClose])
+  useEscapeKey(onClose, open)
 
   if (!open) return null
 
@@ -56,14 +49,6 @@ export default function AbilityEditorModal({
       >
         <div className="modal-header">
           <h3>{ability ? 'Edit Ability' : 'New Ability'}</h3>
-          <button
-            type="button"
-            className="btn btn--ghost modal-close"
-            onClick={onClose}
-            aria-label="Close"
-          >
-            ✕
-          </button>
         </div>
 
         <div className="ability-editor-dialog__body">

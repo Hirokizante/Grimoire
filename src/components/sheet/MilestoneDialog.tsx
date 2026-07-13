@@ -12,6 +12,7 @@
 
 import { useState } from 'react'
 import { ATTRIBUTE_LIST, SKILL_LIST } from '@/constants/gameData'
+import { useEscapeKey } from '@/hooks/useEscapeKey'
 import { useNotification } from '@/context/NotificationContext'
 import { useCharacterStore } from '@/store/characterStore'
 import type { AttributeKey, SkillName } from '@/types'
@@ -32,6 +33,8 @@ export default function MilestoneDialog({ onClose }: MilestoneDialogProps) {
   const [selectedAttr, setSelectedAttr] = useState<AttributeKey | null>(null)
   const [selectedSkill, setSelectedSkill] = useState<SkillName | null>(null)
   const [choice, setChoice] = useState<'slot' | 'fp' | null>(null)
+
+  useEscapeKey(onClose)
 
   if (!character) return null
 
@@ -94,13 +97,6 @@ export default function MilestoneDialog({ onClose }: MilestoneDialogProps) {
       >
         <div className="modal-header">
           <h3>Level Up — Milestone {newMilestone}</h3>
-          <button
-            type="button"
-            className="btn btn--ghost modal-close"
-            onClick={onClose}
-          >
-            ✕
-          </button>
         </div>
 
         {/* Progress dots */}
