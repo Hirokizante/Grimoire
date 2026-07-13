@@ -11,11 +11,13 @@ import DiceRollOverlay from '@/components/dice/DiceRollOverlay'
 import RollLogDrawer from '@/components/dice/RollLogDrawer'
 import { useCharacterStore } from '@/store/characterStore'
 import { useEffect } from 'react'
+import { Home } from 'lucide-react'
 import { useRollLogStore } from '@/store/rollLogStore'
 import { NotificationProvider } from '@/context/NotificationContext'
 
 function App() {
   const currentCharacter = useCharacterStore((s) => s.currentCharacter)
+  const closeCharacter = useCharacterStore((s) => s.closeCharacter)
   const loadRollLog = useRollLogStore((s) => s.loadRollLog)
 
   useEffect(() => {
@@ -28,9 +30,17 @@ function App() {
     <NotificationProvider>
       <div className="app">
         <header className="app-header">
-          <span className="app-back-spacer" />
+          <button
+            type="button"
+            className="app-menu-btn"
+            onClick={closeCharacter}
+            title="Main Menu"
+            aria-label="Main Menu"
+          >
+            <Home size={18} />
+          </button>
+          <span className="app-header__divider" />
           <span className="app-title">Grimoire</span>
-          <span className="app-back-spacer" />
         </header>
 
         <main className="app-main">

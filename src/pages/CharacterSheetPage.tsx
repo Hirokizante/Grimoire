@@ -1,6 +1,6 @@
 /**
  * CharacterSheetPage — wraps the CharacterSheet component with a mode toggle
- * (Edit / View), a customize panel trigger, and a back button.
+ * (Edit / View), a customize panel trigger, and background image layers.
  *
  * If the character has a background image configured, it is rendered as a
  * fixed full-viewport layer behind the sheet, with optional darken and blur
@@ -15,7 +15,6 @@ export type SheetMode = 'edit' | 'view'
 
 export default function CharacterSheetPage() {
   const currentCharacter = useCharacterStore((s) => s.currentCharacter)
-  const closeCharacter = useCharacterStore((s) => s.closeCharacter)
   const [mode, setMode] = useState<SheetMode>('view')
 
   if (!currentCharacter) return null
@@ -51,16 +50,6 @@ export default function CharacterSheetPage() {
       )}
 
       <div className="sheet-page__content">
-        <div className="sheet-page__toolbar">
-          <button
-            className="btn btn--ghost"
-            type="button"
-            onClick={closeCharacter}
-          >
-            ← Back
-          </button>
-        </div>
-
         <CharacterSheet
           character={currentCharacter}
           mode={mode}
