@@ -233,6 +233,9 @@ export const DEFAULT_SHEET_CONFIG: SheetConfig = {
   hideSectionBackground: false,
   customCss: '',
   colors: { ...DEFAULT_SHEET_COLORS },
+  backgroundImage: null,
+  backgroundImageDarken: 0.5,
+  backgroundImageBlur: 0,
 }
 
 /**

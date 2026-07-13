@@ -10,8 +10,9 @@
  * them in) and persisted per-character through the store's updateConfig action.
  */
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { HexColorPicker } from 'react-colorful'
+import { processImage } from '@/lib/imageProcessing'
 import { useCharacterStore } from '@/store/characterStore'
 import type { SheetColors, SheetConfig } from '@/types'
 
@@ -345,6 +346,139 @@ const FONT_OPTIONS = [
   { label: 'Trebuchet', value: '"Trebuchet MS", "Lucida Sans", sans-serif' },
 ]
 
+/**
+ * BackgroundImageSection — upload, preview, remove, and adjust the darken /
+ * blur overlays for the sheet's background image.
+ *
+ * Images are compressed via {@link processImage} (max 1920px, JPEG 0.82)
+ * before being stored as base64 data URLs in the character config. This keeps
+ * export files small while providing full-resolution background imagery.
+ */
+function BackgroundImageSection() {
+  const config = useCharacterStore((s) => s.currentCharacter?.config)
+  const updateConfig = useCharacterStore((s) => s.updateConfig)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [processing, setProcessing] = useState(false)
+
+  if (!config) return null
+
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file || !file.type.startsWith('image/')) return
+
+    setProcessing(true)
+    try {
+      const dataUrl = await processImage(file, {
+        maxDim: 1920,
+        quality: 0.82,
+      })
+      updateConfig((c) => ({ ...c, backgroundImage: dataUrl }))
+    } catch {
+      // Ignore decode errors silently.
+    } finally {
+      setProcessing(false)
+    }
+  }
+
+  const removeImage = () => {
+    updateConfig((c) => ({ ...c, backgroundImage: null }))
+  }
+
+  return (
+    <Section
+      title="Background Image"
+      blurb="An image displayed behind the character sheet, with optional darken and blur overlays for readability."
+    >
+      <div className="customize__bg-image">
+        {config.backgroundImage ? (
+          <>
+            <div className="customize__bg-preview">
+              <img src={config.backgroundImage} alt="Background preview" />
+            </div>
+            <div className="customize__bg-controls">
+              <button
+                type="button"
+                className="btn btn--ghost customize__bg-btn"
+                onClick={() => inputRef.current?.click()}
+                disabled={processing}
+              >
+                {processing ? 'Processing…' : 'Replace'}
+              </button>
+              <button
+                type="button"
+                className="btn btn--ghost customize__bg-btn"
+                onClick={removeImage}
+                disabled={processing}
+              >
+                Remove
+              </button>
+            </div>
+          </>
+        ) : (
+          <button
+            type="button"
+            className="btn btn--ghost customize__bg-upload"
+            onClick={() => inputRef.current?.click()}
+            disabled={processing}
+          >
+            {processing ? 'Processing…' : 'Upload Background Image'}
+          </button>
+        )}
+
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/*"
+          className="portrait-uploader__input"
+          onChange={handleFile}
+        />
+
+        {config.backgroundImage && (
+          <>
+            <label className="customize__field customize__bg-slider">
+              <span className="customize__label-text">
+                Darken — {Math.round(config.backgroundImageDarken * 100)}%
+              </span>
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.05}
+                value={config.backgroundImageDarken}
+                onChange={(e) =>
+                  updateConfig((c) => ({
+                    ...c,
+                    backgroundImageDarken: parseFloat(e.target.value),
+                  }))
+                }
+              />
+            </label>
+            <label className="customize__field customize__bg-slider">
+              <span className="customize__label-text">
+                Blur — {config.backgroundImageBlur}px
+              </span>
+              <input
+                type="range"
+                min={0}
+                max={20}
+                step={1}
+                value={config.backgroundImageBlur}
+                onChange={(e) =>
+                  updateConfig((c) => ({
+                    ...c,
+                    backgroundImageBlur: parseInt(e.target.value, 10),
+                  }))
+                }
+              />
+            </label>
+          </>
+        )}
+      </div>
+    </Section>
+  )
+}
+
 export interface CustomizationPanelProps {
   open: boolean
   onClose: () => void
@@ -466,6 +600,9 @@ export default function CustomizationPanel({
               </label>
             </label>
           </Section>
+
+          {/* Background Image */}
+          <BackgroundImageSection />
 
           {/* Custom CSS */}
           <Section title="Custom CSS (advanced)">

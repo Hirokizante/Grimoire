@@ -118,6 +118,12 @@ export interface SheetConfig {
   customCss: string
   /** Every configurable color for the sheet. */
   colors: SheetColors
+  /** Background image as a base64 data URL (null = no background image). */
+  backgroundImage: string | null
+  /** Darken overlay opacity over the background image (0–1, 0 = none). */
+  backgroundImageDarken: number
+  /** Blur applied to the background image in px (0–20, 0 = none). */
+  backgroundImageBlur: number
 }
 
 /**
