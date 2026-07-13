@@ -14,6 +14,7 @@
 
 import { useState } from 'react'
 
+import { useNotification } from '@/context/NotificationContext'
 import { useCharacterStore, type DeathSaveResult } from '@/store/characterStore'
 import type { Character } from '@/types'
 
@@ -25,6 +26,7 @@ export default function DeathSaveTracker({ character }: DeathSaveTrackerProps) {
   const rollDeathSave = useCharacterStore((s) => s.rollDeathSave)
   const updateCurrentCharacter = useCharacterStore((s) => s.updateCurrentCharacter)
   const [lastRoll, setLastRoll] = useState<DeathSaveResult | null>(null)
+  const { notify } = useNotification()
 
   const { successes, failures } = character.deathSaves
   const isDead = failures >= 3
@@ -33,8 +35,12 @@ export default function DeathSaveTracker({ character }: DeathSaveTrackerProps) {
   const handleRoll = () => {
     const result = rollDeathSave()
     setLastRoll(result)
-    if (result.revived || result.died) {
-      setTimeout(() => setLastRoll(null), 5000)
+    if (result.revived) {
+      notify('Revived at 1 HP!', 'success', 5000)
+    } else if (result.died) {
+      notify('The character has died.', 'error', 5000)
+    } else {
+      notify(`Rolled ${result.roll}: ${result.doubled ? (result.roll >= 20 ? '2 successes!' : '2 failures!') : result.roll >= 10 ? '1 success' : '1 failure'}`, 'info')
     }
   }
 

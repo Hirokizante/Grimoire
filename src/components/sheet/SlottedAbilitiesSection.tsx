@@ -6,7 +6,7 @@
  * Minor Abilities occupy half a slot each (DESIGN.md "Minor Abilities"). The
  * slot-counting is handled by {@link slotLogic}.
  *
- * In edit mode an "Add Ability" button opens the {@link AbilityBlockEditor};
+ * In edit mode an "Add Ability" button opens the {@link AbilityEditorModal};
  * each card gains Edit, Remove, and "Move to Pool" buttons and can be dragged
  * to reorder or to move to the pool.
  *
@@ -18,12 +18,12 @@
 import { useState } from 'react'
 import {
   SortableContext,
-  verticalListSortingStrategy,
+  rectSortingStrategy,
 } from '@dnd-kit/sortable'
 import { useDroppable } from '@dnd-kit/core'
 
 import AbilityActivation from '@/components/sheet/AbilityActivation'
-import AbilityBlockEditor from '@/components/sheet/AbilityBlockEditor'
+import AbilityEditorModal from '@/components/sheet/AbilityEditorModal'
 import SortableAbilityCard, {
   type AbilitySectionId,
 } from '@/components/sheet/SortableAbilityCard'
@@ -125,7 +125,7 @@ export default function SlottedAbilitiesSection({
           </p>
         </div>
       ) : isView ? (
-        <div className="ability-grid">
+        <div className="ability-grid ability-grid--cards">
           {abilities.map((ability) => (
             <AbilityActivation key={ability.id} ability={ability} />
           ))}
@@ -134,13 +134,13 @@ export default function SlottedAbilitiesSection({
         <div
           ref={setNodeRef}
           className={
-            'ability-grid' +
+            'ability-grid ability-grid--cards' +
             (isOver ? ' ability-dropzone--over' : '')
           }
         >
           <SortableContext
             items={abilities.map((a) => a.id)}
-            strategy={verticalListSortingStrategy}
+            strategy={rectSortingStrategy}
           >
             {abilities.map((ability) => (
               <SortableAbilityCard
@@ -183,13 +183,12 @@ export default function SlottedAbilitiesSection({
         </div>
       )}
 
-      {showEditor && (
-        <AbilityBlockEditor
-          ability={editing}
-          onSave={handleSave}
-          onCancel={handleCancel}
-        />
-      )}
+      <AbilityEditorModal
+        ability={editing}
+        open={showEditor}
+        onSave={handleSave}
+        onClose={handleCancel}
+      />
     </section>
   )
 }

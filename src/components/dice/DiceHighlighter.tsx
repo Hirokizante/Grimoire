@@ -64,7 +64,7 @@ export default function DiceHighlighter({
         className="dice-notation"
         onClick={() => {
           if (character) {
-            roll(match.match, character)
+            roll({ notation: match.match, character })
           }
         }}
         title={isView ? `Roll ${match.match}` : undefined}

@@ -90,3 +90,25 @@ export function calcSaveDC(milestones: number): number {
 export function calcENDRecovery(grt: number): number {
   return Math.max(1, 1 + Math.floor(grt / 2))
 }
+
+/**
+ * Total END gained when ending a turn: sum of unspent AP (1:1) and END
+ * Recovery, capped so final END does not exceed max END.
+ *
+ * @param currentAP - Current unspent Action Points.
+ * @param currentEND - Current Endurance before the turn ends.
+ * @param grt - Grit attribute (drives END Recovery).
+ * @param maxEND - Maximum Endurance (defaults to 10).
+ * @returns Actual END regained at end of turn (0 if already at max).
+ */
+export function calcEndTurnENDGain(
+  currentAP: number,
+  currentEND: number,
+  grt: number,
+  maxEND: number = 10,
+): number {
+  const apToEND = Math.min(currentAP, maxEND - currentEND)
+  const recovery = calcENDRecovery(grt)
+  const finalEND = Math.min(maxEND, currentEND + apToEND + recovery)
+  return finalEND - currentEND
+}

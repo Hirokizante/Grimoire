@@ -2,24 +2,27 @@
  * AbilityBlockCard — renders a single AbilityBlock as a styled card.
  *
  * Used by the Core Ability, Slotted Abilities, and Ability Pool sections.
- * The description and overcharge fields hold HTML strings produced by a rich
- * text editor (DESIGN.md "Rich Text Editor in Ability Blocks"), so they are
- * rendered with `dangerouslySetInnerHTML`.
+ * The description and overcharge fields support Markdown formatting (with
+ * GFM tables/strikethrough and raw HTML for backward-compat), rendered via
+ * the shared {@link MarkdownText} component.
  *
  * The damage field is scanned for dice notation and rendered with the
  * {@link DiceHighlighter} so players can click to roll in view mode.
  */
 
 import DiceHighlighter from '@/components/dice/DiceHighlighter'
+import MarkdownText from '@/components/ui/MarkdownText'
 import type { AbilityBlock } from '@/types'
 import type { SheetMode } from '@/pages/CharacterSheetPage'
 
 export interface AbilityBlockCardProps {
   ability: AbilityBlock
   mode?: SheetMode
+  /** Optional action buttons rendered inside the card footer (edit-mode only). */
+  actions?: React.ReactNode
 }
 
-export default function AbilityBlockCard({ ability, mode = 'view' }: AbilityBlockCardProps) {
+export default function AbilityBlockCard({ ability, mode = 'view', actions }: AbilityBlockCardProps) {
   const {
     name,
     traits,
@@ -79,23 +82,23 @@ export default function AbilityBlockCard({ ability, mode = 'view' }: AbilityBloc
       )}
 
       {description && (
-        <div
-          className="ability-card__description"
-          dangerouslySetInnerHTML={{ __html: description }}
-        />
+        <MarkdownText className="ability-card__description">
+          {description}
+        </MarkdownText>
       )}
 
       {overcharge && (
         <div className="ability-card__overcharge">
           <span className="ability-card__section-label">Overcharge</span>
-          <div
-            className="ability-card__overcharge-body"
-            dangerouslySetInnerHTML={{ __html: overcharge }}
-          />
+          <MarkdownText className="ability-card__overcharge-body">
+            {overcharge}
+          </MarkdownText>
         </div>
       )}
 
       {flavorText && <p className="ability-card__flavor">{flavorText}</p>}
+
+      {actions && <div className="ability-card__actions">{actions}</div>}
     </article>
   )
 }

@@ -8,7 +8,6 @@
  */
 
 import { create } from 'zustand'
-
 import { createDefaultCharacter, generateId, MORTAL_WOUNDS } from '@/constants/gameData'
 import {
   deleteCharacter as dbDeleteCharacter,
@@ -17,7 +16,20 @@ import {
 } from '@/lib/db'
 import { calcHP } from '@/lib/calculations'
 import { rollDie } from '@/lib/dice'
-import type { AbilityBlock, Character } from '@/types'
+import {
+  exportCharacter,
+  importCharacter as parseImportCharacter,
+  listVersions,
+  restoreFromSnapshot,
+} from '@/lib/exportImport'
+import type {
+  AbilityBlock,
+  AttributeKey,
+  Character,
+  SheetConfig,
+  SkillName,
+  VersionSnapshot,
+} from '@/types'
 
 /** Debounce window for autosave (ms). */
 const AUTOSAVE_DEBOUNCE_MS = 500
@@ -31,6 +43,10 @@ export interface CharacterStoreState {
   isLoaded: boolean
   /** True while a save to IndexedDB is pending / in flight. */
   isSaving: boolean
+  /** Version history for the current character (null until loaded). */
+  versionHistory: VersionSnapshot[] | null
+  /** True while a restore-from-version is in flight. */
+  isRestoring: boolean
 }
 
 /** Sections that hold a list of AbilityBlocks on a character. */
@@ -113,6 +129,8 @@ export interface CharacterStoreActions {
   deleteCharacter: (id: string) => Promise<void>
   /** Explicitly persist the current character to IndexedDB. */
   saveCurrentCharacter: () => Promise<void>
+  /** Import a character from JSON text, persist it, and select it as current. */
+  importCharacterFile: (text: string) => Promise<void>
   /** Update a single AbilityBlock within a slotted/pool list. */
   updateAbilityBlock: (
     section: AbilitySection,
@@ -175,6 +193,11 @@ export interface CharacterStoreActions {
   regenerateEND: () => void
   /** Convert unspent AP to END at end of turn (1:1, capped at max END). */
   convertAPtoEND: () => void
+  /**
+   * End the character's turn: convert unspent AP to END (1:1), apply END
+   * Recovery, and reset AP to max. Returns the total END gained.
+   */
+  endTurn: () => number
   /** Roll a Death Save (d20, DC 10). Returns the roll and updated tracker. */
   rollDeathSave: () => DeathSaveResult
   /** Roll on the Mortal Wounds table (d20). Returns the wound and applies it. */
@@ -185,6 +208,35 @@ export interface CharacterStoreActions {
   fullRestore: () => void
   /** Reset only HP to max (end of encounter). */
   resetHP: () => void
+  /** Apply a milestone increase with attribute/skill/choice selections. */
+  addMilestone: (opts: {
+    attribute: AttributeKey
+    skill: SkillName
+    choice?: 'slot' | 'fp'
+  }) => void
+  /** Skip milestone bonuses (milestone still increases by 1). */
+  skipMilestone: () => void
+  /** Update the sheet configuration (colors, fonts, custom CSS). */
+  updateConfig: (updater: (config: SheetConfig) => SheetConfig) => void
+  /**
+   * Create and store a version snapshot of the current character.
+   * Returns the snapshot, or null if there is no current character.
+   */
+  saveVersion: () => Promise<VersionSnapshot | null>
+  /**
+   * Load the version history for the current character into the store.
+   * Resets to null if there is no current character.
+   */
+  loadVersions: () => Promise<void>
+  /**
+   * Restore the current character to the data captured in a given snapshot.
+   * Bumps the version counter so history is preserved forward.
+   */
+  restoreVersion: (snapshotId: string) => Promise<void>
+  /**
+   * Delete a version snapshot from history. Reloads the history afterwards.
+   */
+  deleteVersion: (snapshotId: string) => Promise<void>
 }
 
 export type CharacterStore = CharacterStoreState & CharacterStoreActions
@@ -197,6 +249,8 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
   currentCharacter: null,
   isLoaded: false,
   isSaving: false,
+  versionHistory: null,
+  isRestoring: false,
 
   loadCharacters: async () => {
     const characters = await getAllCharacters()
@@ -261,6 +315,17 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
     set({ isSaving: true })
     await putCharacter(current)
     set({ isSaving: false })
+  },
+
+  importCharacterFile: async (text: string) => {
+    const imported = parseImportCharacter(text)
+    set({ isSaving: true })
+    await putCharacter(imported)
+    set((state) => ({
+      characters: [...state.characters, imported],
+      currentCharacter: imported,
+      isSaving: false,
+    }))
   },
 
   updateAbilityBlock: (section, id, updated) => {
@@ -502,13 +567,12 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
 
   recover: () => {
     const current = get().currentCharacter
-    if (!current || current.currentAP < 3) return false
+    if (!current) return false
     // Check for Damaged Throat (Recover only restores half END).
     const hasDamagedThroat = current.mortalWounds.includes('Damaged Throat')
     const restoredEND = hasDamagedThroat ? Math.floor(MAX_END / 2) : MAX_END
     get().updateCurrentCharacter((char) => ({
       ...char,
-      currentAP: char.currentAP - 3,
       currentEND: restoredEND,
     }))
     return true
@@ -535,6 +599,28 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
         currentEND: char.currentEND + converted,
       }
     })
+  },
+
+  endTurn: () => {
+    let totalGained = 0
+    get().updateCurrentCharacter((char) => {
+      // 1. Convert unspent AP to END (1:1, capped at max END).
+      const apToEND = Math.min(char.currentAP, MAX_END - char.currentEND)
+      let newEND = char.currentEND + apToEND
+      // 2. Apply END Recovery (unless Damaged Throat prevents it).
+      let recovery = 0
+      if (!char.mortalWounds.includes('Damaged Throat')) {
+        recovery = Math.max(1, 1 + Math.floor(char.attributes.GRT / 2))
+        newEND = Math.min(MAX_END, newEND + recovery)
+      }
+      totalGained = apToEND + recovery
+      return {
+        ...char,
+        currentAP: MAX_AP,
+        currentEND: newEND,
+      }
+    })
+    return totalGained
   },
 
   // ---- Live play: death saves & mortal wounds --------------------------------
@@ -660,6 +746,98 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
       ...char,
       currentHP: calcHP(char.attributes.VIT),
     }))
+  },
+
+  addMilestone: (opts) => {
+    const { attribute, skill, choice } = opts
+    get().updateCurrentCharacter((char) => {
+      const newAttrs = { ...char.attributes, [attribute]: char.attributes[attribute] + 1 }
+      const newSkills = { ...char.skills, [skill]: char.skills[skill] + 2 }
+      const newMilestones = char.milestones + 1
+
+      // Every 2 milestones: apply choice.
+      let maxAbilitySlots = char.maxAbilitySlots
+      let maxFP = char.maxFP
+      if (newMilestones % 2 === 0 && choice) {
+        if (choice === 'slot') maxAbilitySlots++
+        else maxFP++
+      }
+
+      return {
+        ...char,
+        attributes: newAttrs,
+        skills: newSkills,
+        milestones: newMilestones,
+        maxAbilitySlots,
+        maxFP,
+      }
+    })
+  },
+
+  skipMilestone: () => {
+    get().updateCurrentCharacter((char) => ({
+      ...char,
+      milestones: char.milestones + 1,
+    }))
+  },
+
+  updateConfig: (updater) => {
+    get().updateCurrentCharacter((char) => ({
+      ...char,
+      config: updater(char.config),
+    }))
+  },
+
+  saveVersion: async () => {
+    const current = get().currentCharacter
+    if (!current) return null
+    // Bump version counter on the character.
+    get().updateCurrentCharacter((char) => ({
+      ...char,
+      version: char.version + 1,
+    }))
+    // Snapshot uses the bumped version.
+    const snapshot = await exportCharacter({
+      ...current,
+      version: current.version + 1,
+    })
+    await get().loadVersions()
+    return snapshot.snapshot
+  },
+
+  loadVersions: async () => {
+    const current = get().currentCharacter
+    if (!current) {
+      set({ versionHistory: null })
+      return
+    }
+    const versions = await listVersions(current.id)
+    set({ versionHistory: versions })
+  },
+
+  restoreVersion: async (snapshotId) => {
+    const current = get().currentCharacter
+    const history = get().versionHistory
+    if (!current || !history) return
+    const snap = history.find((s) => s.id === snapshotId)
+    if (!snap) return
+    set({ isRestoring: true })
+    const restored = restoreFromSnapshot(snap)
+    await putCharacter(restored)
+    set((state) => ({
+      currentCharacter: restored,
+      characters: state.characters.map((c) =>
+        c.id === restored.id ? restored : c,
+      ),
+      isRestoring: false,
+    }))
+    await get().loadVersions()
+  },
+
+  deleteVersion: async (snapshotId) => {
+    const { deleteVersionSnapshot } = await import('@/lib/db')
+    await deleteVersionSnapshot(snapshotId)
+    await get().loadVersions()
   },
 }))
 

@@ -12,6 +12,7 @@
 
 import { useState } from 'react'
 
+import { useNotification } from '@/context/NotificationContext'
 import { useCharacterStore, type MortalWoundResult } from '@/store/characterStore'
 import type { Character } from '@/types'
 
@@ -24,6 +25,7 @@ export default function MortalWoundRoller({ character }: MortalWoundRollerProps)
   const clearMortalWound = useCharacterStore((s) => s.clearMortalWound)
   const fullRestore = useCharacterStore((s) => s.fullRestore)
   const [lastRoll, setLastRoll] = useState<MortalWoundResult | null>(null)
+  const { notify } = useNotification()
 
   const hasPendingRoll = character.mortalWounds.some((w) => w === 'Pending Roll')
   const filledWounds = character.mortalWounds.filter((w) => w != null && w !== 'Pending Roll')
@@ -31,18 +33,22 @@ export default function MortalWoundRoller({ character }: MortalWoundRollerProps)
   const handleRoll = () => {
     const result = rollMortalWound()
     setLastRoll(result)
+    notify(`Rolled ${result.roll}: ${result.woundName}`, 'warning')
     if (result.knockedOut) {
       setTimeout(() => setLastRoll(null), 5000)
+      notify('Character knocked out! Death Saves begin next turn.', 'error', 5000)
     }
   }
 
   const handleClear = (index: number) => {
     clearMortalWound(index)
+    notify('Mortal Wound cleared.', 'info')
   }
 
   const handleRest = () => {
     fullRestore()
     setLastRoll(null)
+    notify('Full Restore: all resources restored, wounds cleared.', 'success', 4000)
   }
 
   return (

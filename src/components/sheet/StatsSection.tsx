@@ -2,24 +2,36 @@
  * StatsSection — combat stats, resource pools, and all live-play trackers.
  *
  * In **view mode**, this section is the live-play hub:
- *   - HP bar is clickable to open the DamageDialog
- *   - ResourceTracker for AP/END/FP spend/restore
- *   - RecoverAction button (3 AP → all END)
+ *   - HP bar with inline +/− controls (click label → DamageDialog)
+ *   - FP/AP/END bars with inline +/− controls
+ *   - RecoverAction button (recover all END)
  *   - MortalWoundRoller for wound slots + rolling
  *   - DeathSaveTracker (shown when knocked out: 0 HP + 2 Mortal Wounds)
  *
  * In **edit mode**, all trackers are hidden — only the calculated stats and
  * bars are shown (edit mode is for building the sheet, not playing).
+ *
+ * The six derived stats (Milestones, Evasion, Armor, Movement, Save DC, END
+ * Recovery) are displayed as stylized "stat tokens" with icons and accent
+ * colors for visual flair.
  */
 
 import { useState } from 'react'
+import {
+  Star,
+  Wind,
+  Shield,
+  Footprints,
+  Target,
+  Heart,
+} from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 
 import DamageDialog from '@/components/sheet/DamageDialog'
 import DeathSaveTracker from '@/components/sheet/DeathSaveTracker'
 import MortalWoundRoller from '@/components/sheet/MortalWoundRoller'
 import RecoverAction from '@/components/sheet/RecoverAction'
-import ResourceTracker from '@/components/sheet/ResourceTracker'
-import SegmentedBar from '@/components/ui/SegmentedBar'
+import ResourceBar from '@/components/sheet/ResourceBar'
 import {
   calcArmor,
   calcENDRecovery,
@@ -29,12 +41,19 @@ import {
   calcMovement,
   calcSaveDC,
 } from '@/lib/calculations'
+import { useCharacterStore } from '@/store/characterStore'
 import type { Character } from '@/types'
 import type { SheetMode } from '@/pages/CharacterSheetPage'
 
 export interface StatsSectionProps {
   character: Character
   mode?: SheetMode
+  /**
+   * "section" (default) wraps the stats in a full `.sheet-section` card.
+   * "flat" renders the content without a section wrapper so it can be
+   * embedded inside the hero section.
+   */
+  variant?: 'section' | 'flat'
 }
 
 /** Maximum Action Points, constant per DESIGN.md "Action Points". */
@@ -44,7 +63,21 @@ const MAX_END = 10
 /** Maximum Mortal Wounds a character can sustain. */
 const MAX_MORTAL_WOUNDS = 2
 
-export default function StatsSection({ character, mode = 'view' }: StatsSectionProps) {
+/** Metadata for each derived stat token: icon, label, accent class. */
+interface StatToken {
+  label: string
+  value: number | string
+  sub?: string
+  icon: LucideIcon
+  /** Hex color used for stripe + icon. */
+  color: string
+}
+
+export default function StatsSection({
+  character,
+  mode = 'view',
+  variant = 'section',
+}: StatsSectionProps) {
   const isView = mode === 'view'
   const { attributes, milestones } = character
 
@@ -58,95 +91,115 @@ export default function StatsSection({ character, mode = 'view' }: StatsSectionP
 
   const [showDamageDialog, setShowDamageDialog] = useState(false)
 
+  // Store actions for resource bars
+  const spendAP = useCharacterStore((s) => s.spendAP)
+  const restoreAP = useCharacterStore((s) => s.restoreAP)
+  const spendEND = useCharacterStore((s) => s.spendEND)
+  const restoreEND = useCharacterStore((s) => s.restoreEND)
+  const spendFP = useCharacterStore((s) => s.spendFP)
+  const restoreFP = useCharacterStore((s) => s.restoreFP)
+  const heal = useCharacterStore((s) => s.heal)
+
   // Knocked Out = 0 HP and both mortal wound slots filled.
   const isKnockedOut =
     character.currentHP <= 0 &&
     character.mortalWounds.filter((w) => w != null).length >= MAX_MORTAL_WOUNDS
 
-  return (
-    <section className="sheet-section sheet-section--stats">
-      <h3 className="sheet-section__heading">Combat Stats</h3>
+  const sectionClass =
+    variant === 'flat'
+      ? 'stat-block--flat'
+      : 'sheet-section sheet-section--stats'
+  const headingClass =
+    variant === 'flat'
+      ? 'stat-block__heading'
+      : 'sheet-section__heading'
 
-      <div className="stat-grid">
-        <div className="stat-item">
-          <span className="stat-item__label">Milestones</span>
-          <span className="stat-item__value">
-            {milestones}
-            <span className="stat-item__sub">+{milestoneBonus} bonus</span>
-          </span>
-        </div>
-        <div className="stat-item">
-          <span className="stat-item__label">Evasion</span>
-          <span className="stat-item__value">{evasion}</span>
-        </div>
-        <div className="stat-item">
-          <span className="stat-item__label">Armor</span>
-          <span className="stat-item__value">{armor}</span>
-        </div>
-        <div className="stat-item">
-          <span className="stat-item__label">Movement</span>
-          <span className="stat-item__value">{movement}</span>
-        </div>
-        <div className="stat-item">
-          <span className="stat-item__label">Save DC</span>
-          <span className="stat-item__value">{saveDC}</span>
-        </div>
-        <div className="stat-item">
-          <span className="stat-item__label">END Recovery</span>
-          <span className="stat-item__value">{endRecovery}</span>
-        </div>
+  const colors = character.config.colors
+  const statTokens: StatToken[] = [
+    { label: 'Milestones', value: milestones, sub: `+${milestoneBonus} bonus`, icon: Star, color: colors.tokenMilestone },
+    { label: 'Evasion', value: evasion, icon: Wind, color: colors.tokenEvasion },
+    { label: 'Armor', value: armor, icon: Shield, color: colors.tokenArmor },
+    { label: 'Movement', value: movement, icon: Footprints, color: colors.tokenMovement },
+    { label: 'Save DC', value: saveDC, icon: Target, color: colors.tokenSaveDC },
+    { label: 'END Recovery', value: endRecovery, icon: Heart, color: colors.tokenEndRecovery },
+  ]
+
+  return (
+    <section className={sectionClass}>
+      <h3 className={headingClass}>Combat Stats</h3>
+
+      <div className="stat-tokens">
+        {statTokens.map((token) => {
+          const Icon = token.icon
+          return (
+            <div key={token.label} className="stat-token" style={{ '--token-color': token.color } as React.CSSProperties}>
+              <div className="stat-token__left">
+                <Icon className="stat-token__icon" size={18} strokeWidth={2.2} />
+                <span className="stat-token__value">{token.value}</span>
+              </div>
+              <div className="stat-token__right">
+                <span className="stat-token__label">{token.label}</span>
+                {token.sub && <span className="stat-token__sub">{token.sub}</span>}
+              </div>
+            </div>
+          )
+        })}
       </div>
 
       <div className="stat-bars">
-        <div
-          className={
-            'stat-bars__hp' + (isView ? ' stat-bars__hp--clickable' : '')
-          }
-          onClick={isView ? () => setShowDamageDialog(true) : undefined}
-          role={isView ? 'button' : undefined}
-          title={isView ? 'Click to apply damage or heal' : undefined}
-        >
-          <SegmentedBar
-            label="HP"
-            value={character.currentHP}
-            max={maxHP}
-            color="var(--accent-blush)"
-          />
-        </div>
+        <ResourceBar
+          label="HP"
+          value={character.currentHP}
+          max={maxHP}
+          color="var(--hp-bar-color)"
+          interactive={isView}
+          onSpend={() => {
+            // Spending HP = taking 1 raw damage
+            const store = useCharacterStore.getState()
+            store.takeDamage(1)
+          }}
+          onRestore={() => heal(1)}
+          onLabelClick={isView ? () => setShowDamageDialog(true) : undefined}
+          labelTitle={isView ? 'Click to apply damage or heal' : undefined}
+        />
         {character.tempHP > 0 && (
-          <SegmentedBar
+          <ResourceBar
             label="Temp HP"
             value={character.tempHP}
             max={character.tempHP}
-            color="var(--accent-violet-soft)"
+            color="var(--fp-bar-color)"
           />
         )}
-        <SegmentedBar
+        <ResourceBar
           label="Fate Points"
           value={character.currentFP}
           max={character.maxFP}
-          color="var(--accent-violet-soft)"
+          color="var(--fp-bar-color)"
+          interactive={isView}
+          onSpend={() => spendFP(1)}
+          onRestore={() => restoreFP(1)}
         />
-        <SegmentedBar
+        <ResourceBar
           label="Action Points"
           value={character.currentAP}
           max={MAX_AP}
-          color="var(--accent-violet)"
+          color="var(--ap-bar-color)"
+          interactive={isView}
+          onSpend={() => spendAP(1)}
+          onRestore={() => restoreAP(1)}
         />
-        <SegmentedBar
+        <ResourceBar
           label="Endurance"
           value={character.currentEND}
           max={MAX_END}
-          color="var(--accent-violet)"
+          color="var(--end-bar-color)"
+          interactive={isView}
+          onSpend={() => spendEND(1)}
+          onRestore={() => restoreEND(1)}
         />
       </div>
 
-      {isView && (
-        <>
-          <ResourceTracker character={character} />
-          <RecoverAction />
-        </>
-      )}
+      {isView && <RecoverAction />}
 
       <div className="stat-mortals">
         <span className="stat-item__label">Mortal Wounds</span>

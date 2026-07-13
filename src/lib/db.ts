@@ -1,35 +1,59 @@
 /**
  * IndexedDB storage layer for Grimoire.
  *
- * A thin promise wrapper around the native IndexedDB API. The database holds a
- * single object store of {@link Character} records keyed by their `id`. All
- * functions here are framework-agnostic and safe to call from anywhere.
+ * A thin promise wrapper around the native IndexedDB API. The database holds
+ * two object stores:
+ *   - `characters`: the live {@link Character} records keyed by `id`.
+ *   - `versions`: {@link VersionSnapshot} records for character version
+ *     history, keyed by `id` and indexed by `characterId`.
+ *
+ * All functions here are framework-agnostic and safe to call from anywhere.
  */
 
-import type { Character } from '@/types'
+import type { Character, VersionSnapshot } from '@/types'
 
 const DB_NAME = 'grimoire'
-const DB_VERSION = 1
-const STORE_NAME = 'characters'
+const DB_VERSION = 3
+const CHAR_STORE = 'characters'
+const VERSION_STORE = 'versions'
+const ROLL_LOG_STORE = 'roll_logs'
 
 /**
  * Open (and initialise) the Grimoire IndexedDB database.
  *
- * Creates the `characters` object store on first run / version bump. Resolves
- * with the ready {@link IDBDatabase}; rejects on any open/upgrade error.
+ * Creates the object stores on first run / version bump. Resolves with the
+ * ready {@link IDBDatabase}; rejects on any open/upgrade error.
  */
 export function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION)
 
     request.onerror = () => reject(request.error)
-
     request.onsuccess = () => resolve(request.result)
 
     request.onupgradeneeded = () => {
       const db = request.result
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        db.createObjectStore(STORE_NAME, { keyPath: 'id' })
+
+      if (!db.objectStoreNames.contains(CHAR_STORE)) {
+        db.createObjectStore(CHAR_STORE, { keyPath: 'id' })
+      }
+
+      if (!db.objectStoreNames.contains(VERSION_STORE)) {
+        const versionStore = db.createObjectStore(VERSION_STORE, {
+          keyPath: 'id',
+        })
+        versionStore.createIndex('characterId', 'characterId', {
+          unique: false,
+        })
+      }
+
+      if (!db.objectStoreNames.contains(ROLL_LOG_STORE)) {
+        const rollLogStore = db.createObjectStore(ROLL_LOG_STORE, {
+          keyPath: 'id',
+        })
+        rollLogStore.createIndex('characterId', 'characterId', {
+          unique: false,
+        })
       }
     }
   })
@@ -46,13 +70,11 @@ function promisifyRequest<T>(request: IDBRequest<T>): Promise<T> {
   })
 }
 
-/**
- * Load every stored character, ordered by creation date (oldest first).
- */
+/** Load every stored character, ordered by creation date (oldest first). */
 export async function getAllCharacters(): Promise<Character[]> {
   const db = await openDB()
-  const tx = db.transaction(STORE_NAME, 'readonly')
-  const store = tx.objectStore(STORE_NAME)
+  const tx = db.transaction(CHAR_STORE, 'readonly')
+  const store = tx.objectStore(CHAR_STORE)
   const all = await promisifyRequest<Character[]>(store.getAll())
   db.close()
   return all.sort((a, b) => a.createdAt.localeCompare(b.createdAt))
@@ -63,29 +85,130 @@ export async function getAllCharacters(): Promise<Character[]> {
  */
 export async function getCharacter(id: string): Promise<Character | null> {
   const db = await openDB()
-  const tx = db.transaction(STORE_NAME, 'readonly')
-  const store = tx.objectStore(STORE_NAME)
+  const tx = db.transaction(CHAR_STORE, 'readonly')
+  const store = tx.objectStore(CHAR_STORE)
   const result = await promisifyRequest<Character | undefined>(store.get(id))
   db.close()
   return result ?? null
 }
 
-/**
- * Insert or replace a character record.
- */
+/** Insert or replace a character record. */
 export async function putCharacter(char: Character): Promise<void> {
   const db = await openDB()
-  const tx = db.transaction(STORE_NAME, 'readwrite')
-  await promisifyRequest(tx.objectStore(STORE_NAME).put(char))
+  const tx = db.transaction(CHAR_STORE, 'readwrite')
+  await promisifyRequest(tx.objectStore(CHAR_STORE).put(char))
+  db.close()
+}
+
+/** Remove a character record by id. No-op if the id doesn't exist. */
+export async function deleteCharacter(id: string): Promise<void> {
+  const db = await openDB()
+  const tx = db.transaction(CHAR_STORE, 'readwrite')
+  await promisifyRequest(tx.objectStore(CHAR_STORE).delete(id))
+  db.close()
+}
+
+// ---- Version snapshots --------------------------------------------------------
+
+/**
+ * Store a new {@link VersionSnapshot}. Returns the snapshot object as stored.
+ */
+export async function putVersionSnapshot(
+  snapshot: VersionSnapshot,
+): Promise<void> {
+  const db = await openDB()
+  const tx = db.transaction(VERSION_STORE, 'readwrite')
+  await promisifyRequest(tx.objectStore(VERSION_STORE).put(snapshot))
   db.close()
 }
 
 /**
- * Remove a character record by id. No-op if the id doesn't exist.
+ * Fetch every snapshot for a given character, newest first.
  */
-export async function deleteCharacter(id: string): Promise<void> {
+export async function getVersionHistory(
+  characterId: string,
+): Promise<VersionSnapshot[]> {
   const db = await openDB()
-  const tx = db.transaction(STORE_NAME, 'readwrite')
-  await promisifyRequest(tx.objectStore(STORE_NAME).delete(id))
+  const tx = db.transaction(VERSION_STORE, 'readonly')
+  const store = tx.objectStore(VERSION_STORE)
+  const index = store.index('characterId')
+  const all = await promisifyRequest<VersionSnapshot[]>(
+    index.getAll(characterId),
+  )
+  db.close()
+  return all.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+}
+
+/** Delete a single version snapshot by id. */
+export async function deleteVersionSnapshot(id: string): Promise<void> {
+  const db = await openDB()
+  const tx = db.transaction(VERSION_STORE, 'readwrite')
+  await promisifyRequest(tx.objectStore(VERSION_STORE).delete(id))
+  db.close()
+}
+
+// ---- Roll log --------------------------------------------------------
+
+import type { RollLogEntry } from '@/types'
+
+/** Persist a roll-log entry. */
+export async function putRollLogEntry(entry: RollLogEntry): Promise<void> {
+  const db = await openDB()
+  const tx = db.transaction(ROLL_LOG_STORE, 'readwrite')
+  await promisifyRequest(tx.objectStore(ROLL_LOG_STORE).put(entry))
+  db.close()
+}
+
+/** Fetch every roll-log entry for a character, newest first. */
+export async function getRollLogForCharacter(
+  characterId: string,
+): Promise<RollLogEntry[]> {
+  const db = await openDB()
+  const tx = db.transaction(ROLL_LOG_STORE, 'readonly')
+  const store = tx.objectStore(ROLL_LOG_STORE)
+  const index = store.index('characterId')
+  const all = await promisifyRequest<RollLogEntry[]>(
+    index.getAll(characterId),
+  )
+  db.close()
+  return all.sort((a, b) => b.rolledAt.localeCompare(a.rolledAt))
+}
+
+/** Fetch every roll-log entry across all characters, newest first. */
+export async function getAllRollLogEntries(): Promise<RollLogEntry[]> {
+  const db = await openDB()
+  const tx = db.transaction(ROLL_LOG_STORE, 'readonly')
+  const store = tx.objectStore(ROLL_LOG_STORE)
+  const all = await promisifyRequest<RollLogEntry[]>(store.getAll())
+  db.close()
+  return all.sort((a, b) => b.rolledAt.localeCompare(a.rolledAt))
+}
+
+/** Delete a single roll-log entry by id. */
+export async function deleteRollLogEntry(id: string): Promise<void> {
+  const db = await openDB()
+  const tx = db.transaction(ROLL_LOG_STORE, 'readwrite')
+  await promisifyRequest(tx.objectStore(ROLL_LOG_STORE).delete(id))
+  db.close()
+}
+
+/** Delete every roll-log entry for a character. */
+export async function clearRollLogForCharacter(
+  characterId: string,
+): Promise<void> {
+  const db = await openDB()
+  const tx = db.transaction(ROLL_LOG_STORE, 'readwrite')
+  const store = tx.objectStore(ROLL_LOG_STORE)
+  const index = store.index('characterId')
+  const keys = await promisifyRequest<IDBValidKey[]>(
+    index.getAllKeys(characterId),
+  )
+  for (const key of keys) {
+    store.delete(key)
+  }
+  await new Promise<void>((resolve, reject) => {
+    tx.oncomplete = () => resolve()
+    tx.onerror = () => reject(tx.error)
+  })
   db.close()
 }

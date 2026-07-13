@@ -1,7 +1,6 @@
 /**
  * CharacterSheetPage — wraps the CharacterSheet component with a mode toggle
- * (Edit / View) and a back button. Edit mode makes all fields editable;
- * View mode locks editing but allows live-session interactivity.
+ * (Edit / View), a customize panel trigger, and a back button.
  */
 
 import { useState } from 'react'

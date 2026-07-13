@@ -22,10 +22,12 @@ export interface AbilityBlockEditorProps {
   onSave: (ability: AbilityBlock) => void
   /** Called when the user cancels editing. */
   onCancel: () => void
+  /** When true, hide the title row (used when wrapped in a modal with its own title). */
+  hideTitle?: boolean
 }
 
 /** Build a blank AbilityBlock for the "new" case. */
-function blankAbility(): AbilityBlock {
+export function blankAbility(): AbilityBlock {
   return {
     id: generateId(),
     name: '',
@@ -59,6 +61,7 @@ export default function AbilityBlockEditor({
   ability,
   onSave,
   onCancel,
+  hideTitle = false,
 }: AbilityBlockEditorProps) {
   const [draft, setDraft] = useState<AbilityBlock>(ability ?? blankAbility())
   const [traitsText, setTraitsText] = useState(serializeTraits(draft.traits))
@@ -91,9 +94,11 @@ export default function AbilityBlockEditor({
   return (
     <div className="ability-editor">
       <div className="ability-editor__inner">
-        <h4 className="ability-editor__title">
-          {ability ? 'Edit Ability' : 'New Ability'}
-        </h4>
+        {!hideTitle && (
+          <h4 className="ability-editor__title">
+            {ability ? 'Edit Ability' : 'New Ability'}
+          </h4>
+        )}
 
         <label className="ability-editor__field">
           <span className="ability-editor__label">Name</span>

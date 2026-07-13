@@ -9,7 +9,7 @@
  *
  * In edit mode the innate description becomes a textarea; the Innate Ability,
  * Basic Attack, and Fatebreaker each get an Edit button that opens the
- * {@link AbilityBlockEditor}; and an "Add Innate Ability" button appears when
+ * {@link AbilityEditorModal}; and an "Add Innate Ability" button appears when
  * `innateAbility` is null.
  */
 
@@ -17,7 +17,8 @@ import { useState } from 'react'
 
 import AbilityActivation from '@/components/sheet/AbilityActivation'
 import AbilityBlockCard from '@/components/sheet/AbilityBlockCard'
-import AbilityBlockEditor from '@/components/sheet/AbilityBlockEditor'
+import AbilityEditorModal from '@/components/sheet/AbilityEditorModal'
+import MarkdownText from '@/components/ui/MarkdownText'
 import { useCharacterStore } from '@/store/characterStore'
 import type { AbilityBlock } from '@/types'
 import type { SheetMode } from '@/pages/CharacterSheetPage'
@@ -58,7 +59,6 @@ export default function CoreAbilitySection({
         : field === 'basicAttack'
           ? basicAttack
           : fatebreaker
-    if (!current) return
     setEditingField(field)
     setEditingAbility(current)
   }
@@ -100,7 +100,9 @@ export default function CoreAbilitySection({
               rows={3}
             />
           ) : (
-            <p className="core-innate__text">{innateDescription}</p>
+            <MarkdownText className="core-innate__text">
+              {innateDescription}
+            </MarkdownText>
           )}
         </div>
       )}
@@ -109,25 +111,30 @@ export default function CoreAbilitySection({
         {innateAbility ? (
           isEdit ? (
             <div className="ability-card-wrap">
-              <AbilityBlockCard ability={innateAbility} mode={mode} />
-              {isEdit && (
-                <div className="ability-card__actions">
-                  <button
-                    type="button"
-                    className="btn btn--ghost ability-card__action-btn"
-                    onClick={() => openCoreEdit('innateAbility')}
-                  >
-                    Edit
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn--ghost ability-card__action-btn ability-card__action-btn--danger"
-                    onClick={() => updateCoreAbility('innateAbility', null)}
-                  >
-                    Remove
-                  </button>
-                </div>
-              )}
+              <AbilityBlockCard
+                ability={innateAbility}
+                mode={mode}
+                actions={
+                  isEdit ? (
+                    <>
+                      <button
+                        type="button"
+                        className="btn btn--ghost ability-card__action-btn"
+                        onClick={() => openCoreEdit('innateAbility')}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn--ghost ability-card__action-btn ability-card__action-btn--danger"
+                        onClick={() => updateCoreAbility('innateAbility', null)}
+                      >
+                        Remove
+                      </button>
+                    </>
+                  ) : undefined
+                }
+              />
             </div>
           ) : (
             <AbilityActivation ability={innateAbility} />
@@ -146,16 +153,21 @@ export default function CoreAbilitySection({
 
         {isEdit ? (
           <div className="ability-card-wrap">
-            <AbilityBlockCard ability={basicAttack} mode={mode} />
-            <div className="ability-card__actions">
-              <button
-                type="button"
-                className="btn btn--ghost ability-card__action-btn"
-                onClick={() => openCoreEdit('basicAttack')}
-              >
-                Edit
-              </button>
-            </div>
+            <AbilityBlockCard
+              ability={basicAttack}
+              mode={mode}
+              actions={
+                isEdit ? (
+                  <button
+                    type="button"
+                    className="btn btn--ghost ability-card__action-btn"
+                    onClick={() => openCoreEdit('basicAttack')}
+                  >
+                    Edit
+                  </button>
+                ) : undefined
+              }
+            />
           </div>
         ) : (
           <AbilityActivation ability={basicAttack} />
@@ -163,29 +175,33 @@ export default function CoreAbilitySection({
 
         {isEdit ? (
           <div className="ability-card-wrap">
-            <AbilityBlockCard ability={fatebreaker} mode={mode} />
-            <div className="ability-card__actions">
-              <button
-                type="button"
-                className="btn btn--ghost ability-card__action-btn"
-                onClick={() => openCoreEdit('fatebreaker')}
-              >
-                Edit
-              </button>
-            </div>
+            <AbilityBlockCard
+              ability={fatebreaker}
+              mode={mode}
+              actions={
+                isEdit ? (
+                  <button
+                    type="button"
+                    className="btn btn--ghost ability-card__action-btn"
+                    onClick={() => openCoreEdit('fatebreaker')}
+                  >
+                    Edit
+                  </button>
+                ) : undefined
+              }
+            />
           </div>
         ) : (
           <AbilityActivation ability={fatebreaker} />
         )}
       </div>
 
-      {editingField && (
-        <AbilityBlockEditor
-          ability={editingAbility}
-          onSave={handleSave}
-          onCancel={handleCancel}
-        />
-      )}
+      <AbilityEditorModal
+        ability={editingAbility}
+        open={editingField !== null}
+        onSave={handleSave}
+        onClose={handleCancel}
+      />
     </section>
   )
 }

@@ -13,6 +13,7 @@
 
 import { useState } from 'react'
 
+import { useNotification } from '@/context/NotificationContext'
 import { useCharacterStore, type DamageResult } from '@/store/characterStore'
 import { calcArmor } from '@/lib/calculations'
 
@@ -23,6 +24,7 @@ export interface DamageDialogProps {
 export default function DamageDialog({ onClose }: DamageDialogProps) {
   const takeDamage = useCharacterStore((s) => s.takeDamage)
   const character = useCharacterStore((s) => s.currentCharacter)
+  const { notify } = useNotification()
 
   const [amount, setAmount] = useState('')
   const [applyArmor, setApplyArmor] = useState(true)
@@ -37,6 +39,11 @@ export default function DamageDialog({ onClose }: DamageDialogProps) {
     if (!Number.isFinite(n) || n <= 0) return
     const res = takeDamage(n, { applyArmor, resistant, ignoreTempHP })
     setResult(res)
+    if (res.causedMortalWound) {
+      notify(`${res.hpLost} damage taken! Mortal Wound incurred.`, 'error')
+    } else {
+      notify(`Applied ${res.hpLost} damage.`, 'warning')
+    }
   }
 
   const handleHeal = () => {
@@ -45,6 +52,7 @@ export default function DamageDialog({ onClose }: DamageDialogProps) {
     useCharacterStore.getState().heal(n)
     setResult(null)
     setAmount('')
+    notify(`Healed ${n} HP.`, 'success')
   }
 
   const handleSetTempHP = () => {
@@ -53,6 +61,7 @@ export default function DamageDialog({ onClose }: DamageDialogProps) {
     useCharacterStore.getState().setTempHP(n)
     setResult(null)
     setAmount('')
+    notify(`Temp HP set to ${n}.`, 'info')
   }
 
   return (

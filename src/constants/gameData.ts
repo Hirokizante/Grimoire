@@ -11,6 +11,7 @@ import type {
   AttributeKey,
   Character,
   MortalWound,
+  SheetColors,
   SheetConfig,
   SkillName,
   Skills,
@@ -187,6 +188,37 @@ export const MORTAL_WOUNDS: MortalWound[] = [
 ]
 
 /**
+ * Default color palette for {@link SheetConfig}. Mirrored from `index.css` so
+ * the default dark theme looks indistinguishable unless the player customizes.
+ */
+export const DEFAULT_SHEET_COLORS: SheetColors = {
+  bgBase: '#1a1a2e',
+  bgSurface: '#21213a',
+  bgSurfaceRaised: '#2a2a47',
+  bgSurfaceHover: '#323257',
+  textPrimary: '#e6e2ee',
+  textSecondary: '#a9a4c0',
+  textMuted: '#7a7693',
+  border: '#34344f',
+  borderSoft: '#2a2a47',
+  accent: '#9b7ed6',
+  accentSoft: '#c4b1eb',
+  danger: '#e57373',
+  hpBar: '#e8a0bf',
+  fpBar: '#c4b1eb',
+  apBar: '#9b7ed6',
+  endBar: '#9b7ed6',
+  minorAbility: '#9b7ed6',
+  success: '#a9e6a0',
+  tokenMilestone: '#9b7ed6',
+  tokenEvasion: '#e8a0bf',
+  tokenMovement: '#e8a0bf',
+  tokenSaveDC: '#9b7ed6',
+  tokenArmor: '#7bc4d6',
+  tokenEndRecovery: '#7bc4d6',
+}
+
+/**
  * Sensible dark-themed default for {@link SheetConfig}. Per DESIGN.md the
  * default surface is dark because users spend a lot of time workshopping
  * Abilities and lore, where bright white UI would fight the scene.
@@ -200,6 +232,7 @@ export const DEFAULT_SHEET_CONFIG: SheetConfig = {
   helperTextFontFamily: 'system-ui, -apple-system, sans-serif',
   hideSectionBackground: false,
   customCss: '',
+  colors: { ...DEFAULT_SHEET_COLORS },
 }
 
 /**
@@ -305,6 +338,7 @@ export function createDefaultCharacter(): Character {
   return {
     id: generateId(),
     name: 'New Character',
+    playerName: '',
     version: 1,
     milestones: 0,
     attributes,

@@ -38,11 +38,69 @@ export type Attributes = Record<AttributeKey, number>
 export type Skills = Record<SkillName, number>
 
 /**
+ * A configurable color palette covering every sheet element.
+ *
+ * Colors are stored as resolved hex strings (e.g. "#1a1a2e") so CSS
+ * `color-mix()` can derive borders, subtle fills, and hover states directly
+ * from the picked values without requiring the player to write custom CSS.
+ */
+export interface SheetColors {
+  /** Page-level background (behind the sheet card). */
+  bgBase: string
+  /** Card/section surface background. */
+  bgSurface: string
+  /** Raised surfaces — tokens, pills, bar segments. */
+  bgSurfaceRaised: string
+  /** Hover state surface background. */
+  bgSurfaceHover: string
+  /** Primary body text — high emphasis. */
+  textPrimary: string
+  /** Secondary text — labels, lower-emphasis. */
+  textSecondary: string
+  /** Muted / hint text. */
+  textMuted: string
+  /** Hard border lines. */
+  border: string
+  /** Soft, low-contrast separator borders. */
+  borderSoft: string
+  /** Main primary accent — brand color for major elements. */
+  accent: string
+  /** Soft variant of the primary accent — headings, glow, low-emphasis. */
+  accentSoft: string
+  /** Danger / error color. */
+  danger: string
+  /** HP bar color. */
+  hpBar: string
+  /** Fate Points bar color. */
+  fpBar: string
+  /** Action Points bar color. */
+  apBar: string
+  /** Endurance bar color. */
+  endBar: string
+  /** Minor ability card tint. */
+  minorAbility: string
+  /** Success / good color. */
+  success: string
+  /** Milestone token accent. */
+  tokenMilestone: string
+  /** Movement token accent. */
+  tokenMovement: string
+  /** Evasion token accent. */
+  tokenEvasion: string
+  /** Save DC token accent. */
+  tokenSaveDC: string
+  /** Armor token accent. */
+  tokenArmor: string
+  /** END Recovery token accent. */
+  tokenEndRecovery: string
+}
+
+/**
  * User-driven aesthetic configuration for the sheet. There are no prebuilt
  * themes — players fully control the look (see DESIGN.md "Sheet Customization").
  */
 export interface SheetConfig {
-  /** Sheet background color. */
+  /** Sheet background color (overrides colors.bgSurface when set). */
   backgroundColor: string
   /** Font family for section headings. */
   sectionHeadingFontFamily: string
@@ -58,6 +116,8 @@ export interface SheetConfig {
   hideSectionBackground: boolean
   /** Raw custom CSS the player can append to fully override the sheet. */
   customCss: string
+  /** Every configurable color for the sheet. */
+  colors: SheetColors
 }
 
 /**
@@ -73,12 +133,31 @@ export interface MortalWound {
   description: string
 }
 
-/** Death Save progress tracker for a knocked-out character. */
 export interface DeathSaves {
   /** Count of successful death saves (max 3). */
   successes: number
   /** Count of failed death saves (max 3). */
   failures: number
+}
+
+/**
+ * A point-in-time snapshot of a Character for version history.
+ *
+ * Created each time the user exports the sheet (DESIGN.md "Automatic Sheet
+ * Versioning"). Stored alongside the character so previous versions can be
+ * browsed and re-imported.
+ */
+export interface VersionSnapshot {
+  /** Unique identifier for this snapshot. */
+  id: string
+  /** The character id this snapshot belongs to. */
+  characterId: string
+  /** Version number at the time of the snapshot (matches character.version). */
+  version: number
+  /** ISO timestamp of when the snapshot was taken. */
+  createdAt: string
+  /** Character data at snapshot time. */
+  data: Character
 }
 
 /**
@@ -89,6 +168,8 @@ export interface Character {
   id: string
   /** Character's display name. */
   name: string
+  /** Player name (the person playing this character). */
+  playerName: string
   /** Auto-incremented version number for export/versioning (DESIGN.md). */
   version: number
   /** Milestone count — analogous to level; drives milestone bonus & growth. */

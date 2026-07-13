@@ -1,13 +1,6 @@
 /**
  * Dice roller — evaluates a parsed dice expression with character stats.
  *
- * Given a {@link ParsedExpression} from `diceParser.ts` and a `Character`,
- * this module:
- *   1. Rolls each dice term (using `rollDie` from `dice.ts`).
- *   2. Substitutes variable terms (MAR, POW, AGI, VIT, GRT, skill names) with
- *      the character's actual values.
- *   3. Computes the total and produces a human-readable breakdown string.
- *
  * Per DESIGN.md "Variable substitution": stat references are automatically
  * substituted. For `POW/MAR` notation, the player chooses; we default to the
  * higher value for convenience but include both in the breakdown.

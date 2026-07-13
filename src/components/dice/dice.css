@@ -1,8 +1,3 @@
-/**
- * Dice component styles — notation highlighting, roll overlay, and result
- * display for the inline dice rolling system (Phase 8).
- */
-
 /* ---- Dice notation highlighting -------------------------------------------- */
 
 .dice-notation {
@@ -34,27 +29,22 @@
   opacity: 0.7;
 }
 
-/* ---- Dice roll overlay ----------------------------------------------------- */
+/* ---- Dice result modal (replaces the 3D scene) ----------------------------- */
 
-.dice-overlay {
+.dice-modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(10, 8, 16, 0.85);
-  backdrop-filter: blur(4px);
+  background: rgba(10, 8, 16, 0.7);
+  backdrop-filter: blur(6px);
+  z-index: 2000;
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 2000;
   padding: 1.5rem;
-  animation: dice-overlay-fade 0.2s ease;
+  animation: modal-overlay-fade 0.2s ease;
 }
 
-@keyframes dice-overlay-fade {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-.dice-overlay__inner {
+.dice-modal {
   background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: 16px;
@@ -62,129 +52,121 @@
   max-width: 480px;
   width: 100%;
   text-align: center;
+  position: relative;
+  animation: modal-pop 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-/* ---- Dice animation -------------------------------------------------------- */
-
-.dice-overlay__animation {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1.5rem;
-}
-
-.dice-overlay__die {
-  display: inline-block;
-  width: 3rem;
-  height: 3rem;
-  margin: 0 0.3rem;
-  animation: dice-tumble 0.9s ease-out;
-}
-
-.dice-overlay__die-face {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.6rem;
-  font-weight: 700;
-  color: var(--text-primary);
-  background: var(--bg-surface-raised);
-  border: 2px solid var(--accent-violet);
-  border-radius: 8px;
-  box-shadow: 0 2px 12px rgba(155, 126, 214, 0.2);
-}
-
-@keyframes dice-tumble {
-  0% {
-    transform: rotateX(0) rotateY(0) translateY(-40px) scale(0.6);
+@keyframes modal-pop {
+  from {
     opacity: 0;
+    transform: scale(0.92);
   }
-  30% {
+  to {
     opacity: 1;
-  }
-  60% {
-    transform: rotateX(360deg) rotateY(180deg) translateY(0) scale(1.1);
-  }
-  100% {
-    transform: rotateX(720deg) rotateY(360deg) translateY(0) scale(1);
-    opacity: 1;
+    transform: scale(1);
   }
 }
 
-.dice-overlay__rolling-text {
-  font-family: var(--sheet-heading-font, inherit);
-  font-size: 1.1rem;
-  color: var(--accent-violet-soft);
-  letter-spacing: 0.05em;
-  margin: 0;
-}
-
-/* ---- Dice result display --------------------------------------------------- */
-
-.dice-result {
-  display: flex;
-  flex-direction: column;
-  gap: 0.8rem;
-}
-
-.dice-result__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-}
-
-.dice-result__notation {
-  font-family: var(--sheet-heading-font, inherit);
-  font-size: 1.3rem;
-  font-weight: 700;
-  color: var(--accent-violet-soft);
-  letter-spacing: 0.02em;
-}
-
-.dice-result__close {
-  font-size: 1.1rem;
-  padding: 0.2rem 0.5rem;
+.dice-modal__close {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.75rem;
+  font-size: 1.5rem;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0.2rem 0.4rem;
   line-height: 1;
 }
 
-.dice-result__terms {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-  padding: 0.5rem 0;
-  border-top: 1px solid var(--border-soft);
-  border-bottom: 1px solid var(--border-soft);
+.dice-modal__close:hover {
+  color: var(--text-primary);
 }
 
-.dice-result__term {
+.dice-modal__source {
+  font-family: var(--sheet-label-font, inherit);
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin: 0 0 0.5rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.dice-modal__total-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.dice-modal__total {
+  font-family: var(--sheet-heading-font, inherit);
+  font-size: 3rem;
+  font-weight: 700;
+  color: var(--accent-blush);
+  text-shadow: 0 0 24px rgba(232, 160, 191, 0.35);
+  margin: 0;
+}
+
+.dice-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.25rem 0.6rem;
+  border-radius: 4px;
+}
+
+.dice-badge--crit {
+  background: var(--color-success, #4ade80);
+  color: #000;
+}
+
+.dice-badge--fail {
+  background: var(--danger, #ef4444);
+  color: #fff;
+}
+
+.dice-modal__terms {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem 0;
+  border-top: 1px solid var(--border-soft);
+  border-bottom: 1px solid var(--border-soft);
+  margin-bottom: 1rem;
+}
+
+.dice-modal__term {
   display: flex;
   align-items: center;
   gap: 0.5rem;
   font-size: 0.88rem;
   color: var(--text-secondary);
+  flex-wrap: wrap;
 }
 
-.dice-result__term-label {
+.dice-modal__term-label {
   font-family: var(--sheet-label-font, inherit);
   font-size: 0.8rem;
   color: var(--text-muted);
   min-width: 4rem;
+  font-weight: 600;
 }
 
-.dice-result__term--dice {
-  gap: 0.4rem;
+.dice-modal__term--dice .dice-modal__term-label {
+  color: var(--accent-violet-soft);
 }
 
-.dice-result__dice-rolls {
+.dice-modal__rolls {
   display: inline-flex;
-  gap: 0.25rem;
+  gap: 0.3rem;
   flex-wrap: wrap;
 }
 
-.dice-result__die-result {
+.dice-modal__roll {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -194,54 +176,337 @@
   font-weight: 700;
   color: var(--text-primary);
   background: var(--bg-surface-raised);
-  border: 1px solid var(--accent-violet);
+  border: 1px solid var(--border);
   border-radius: 5px;
 }
 
-.dice-result__term-value {
-  font-weight: 600;
+.dice-modal__roll--crit {
+  background: var(--color-success, #4ade80);
+  color: #000;
+  border-color: var(--color-success, #4ade80);
+}
+
+.dice-modal__roll--fumble {
+  background: var(--danger, #ef4444);
+  color: #fff;
+  border-color: var(--danger, #ef4444);
+}
+
+.dice-modal__roll--max {
+  border-color: var(--accent-violet);
+  box-shadow: 0 0 6px rgba(155, 126, 214, 0.3);
+}
+
+.dice-modal__term-value {
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-left: auto;
+}
+
+.dice-modal__breakdown {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  text-align: center;
+  margin: 0 0 1rem;
+  word-break: break-word;
+  font-family: var(--sheet-label-font, inherit);
+}
+
+.dice-modal__dismiss {
+  width: 100%;
+}
+
+/* ---- Roll log tab + drawer ------------------------------------------------- */
+
+.roll-log-tab {
+  position: fixed;
+  bottom: 1.25rem;
+  right: 1.25rem;
+  z-index: 1500;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: var(--bg-surface-raised);
+  border: 1px solid var(--accent-violet);
+  border-radius: 2rem;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  transition: background-color 0.15s ease, transform 0.15s ease;
+}
+
+.roll-log-tab:hover {
+  background: var(--bg-surface-hover);
+  transform: translateY(-2px);
+}
+
+.roll-log-tab__icon {
+  color: var(--accent-violet-soft);
+  flex-shrink: 0;
+}
+
+.roll-log-tab__count {
+  font-family: var(--sheet-label-font, inherit);
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--accent-violet-soft);
+}
+
+.roll-log-drawer {
+  position: fixed;
+  bottom: 4.5rem;
+  right: 1.25rem;
+  width: 320px;
+  max-height: 420px;
+  z-index: 1500;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+  animation: drawer-slide-up 0.2s ease;
+}
+
+@keyframes drawer-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.roll-log-drawer__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.roll-log-drawer__title {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.roll-log-drawer__controls {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.roll-log-drawer__clear--header {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  padding: 0.2rem 0.4rem;
+  line-height: 1;
+}
+
+.roll-log-drawer__clear--header:hover:not(:disabled) {
+  color: var(--danger, #ef4444);
+}
+
+.roll-log-drawer__clear--header:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.roll-log-drawer__close {
+  background: none;
+  border: none;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0.2rem 0.4rem;
+  line-height: 1;
+}
+
+.roll-log-drawer__close:hover {
   color: var(--text-primary);
 }
 
-.dice-result__term--variable .dice-result__term-label,
-.dice-result__term--constant .dice-result__term-label {
-  color: var(--accent-violet-soft);
-  font-weight: 600;
-}
-
-.dice-result__total {
+.roll-log-drawer__filter-menu {
+  margin-top: 0.5rem;
   display: flex;
-  align-items: baseline;
-  justify-content: center;
-  gap: 0.8rem;
-  padding: 0.5rem 0;
+  align-items: center;
+  gap: 0.5rem;
 }
 
-.dice-result__total-label {
-  font-family: var(--sheet-label-font, inherit);
+.roll-log-drawer__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.5rem;
+}
+
+.roll-log-drawer__empty {
   font-size: 0.8rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--text-muted);
-}
-
-.dice-result__total-value {
-  font-family: var(--sheet-heading-font, inherit);
-  font-size: 2.2rem;
-  font-weight: 700;
-  color: var(--accent-blush);
-  text-shadow: 0 0 20px rgba(232, 160, 191, 0.3);
-}
-
-.dice-result__breakdown {
-  font-size: 0.78rem;
   color: var(--text-muted);
   text-align: center;
+  padding: 2rem 0;
+}
+
+.roll-log-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.roll-log-item {
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.roll-log-item--crit {
+  border-left: 3px solid var(--color-success, #4ade80);
+}
+
+.roll-log-item--fumble {
+  border-left: 3px solid var(--danger, #ef4444);
+}
+
+.roll-log-item__head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0.75rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  gap: 0.5rem;
+}
+
+.roll-log-item__head:hover {
+  background: var(--bg-surface-hover);
+}
+
+.roll-log-item__info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.1rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.roll-log-item__notation {
+  font-family: var(--sheet-label-font, inherit);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--accent-violet-soft);
+}
+
+.roll-log-item__src {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.roll-log-item__right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.1rem;
+}
+
+.roll-log-item__total {
+  font-family: var(--sheet-heading-font, inherit);
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--accent-blush);
+}
+
+.roll-log-item__time {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+}
+
+.roll-log-item__detail {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0.5rem 0.75rem;
+  border-top: 1px solid var(--border-soft);
+  background: var(--bg-surface-raised);
+}
+
+.roll-log-item__breakdown {
+  font-size: 0.75rem;
+  color: var(--text-muted);
   margin: 0;
   word-break: break-word;
 }
 
-.dice-result__dismiss {
-  width: 100%;
-  margin-top: 0.3rem;
+.roll-log-item__character {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  font-style: italic;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0.8;
+}
+
+.roll-log-item__delete {
+  align-self: flex-start;
+  font-size: 0.7rem;
+  color: var(--danger, #ef4444);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.15rem 0;
+}
+
+.roll-log-item__delete:hover {
+  text-decoration: underline;
+}
+
+.roll-log-drawer__footer {
+  padding: 0.5rem 1rem;
+  border-top: 1px solid var(--border-soft);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.roll-log-drawer__clear {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.2rem 0.5rem;
+  cursor: pointer;
+}
+
+.roll-log-drawer__clear:hover {
+  color: var(--text-primary);
+  border-color: var(--text-muted);
+}
+
+.roll-log-drawer__clear--confirm {
+  color: var(--danger, #ef4444);
+  border-color: var(--danger, #ef4444);
+}
+
+.roll-log-drawer__clear-confirm {
+  font-size: 0.7rem;
+  color: var(--text-muted);
 }

@@ -1,40 +1,39 @@
 /**
- * DiceRollStore — a small Zustand store for managing the dice roll overlay
- * and result display.
+ * DiceRollStore — manages the dice-roll modal lifecycle.
  *
- * Components call `roll(notation, character)` to trigger a roll. The store
- * sets the overlay to "rolling" (showing the animation), then after a brief
- * delay sets the result for display. This keeps all dice-roll UI state in
- * one place rather than threading it through props.
+ * Responsibilities:
+ *   - Parse + evaluate variables/constants from notation.
+ *   - Evaluate the full roll (variables/dice/constants) immediately.
+ *   - Show modal with the result + breakdown.
+ *   - Forward the completed result + context to the roll-log store.
  */
 
 import { create } from 'zustand'
 
 import { parseDiceNotation } from '@/lib/diceParser'
 import { evaluateExpression, type RollResult } from '@/lib/diceRoller'
-import type { Character } from '@/types'
+import type { Character, RollSource, NewRollLogEntry, AbilityBlock } from '@/types'
+import { useRollLogStore } from '@/store/rollLogStore'
 
-/** Animation duration for the dice roll overlay (ms). */
-const ROLL_ANIMATION_MS = 900
+export interface RollRequest {
+  notation: string
+  character: Character
+  source?: RollSource
+  ability?: AbilityBlock
+  note?: string
+}
 
 export interface DiceRollState {
-  /** Whether the overlay is currently visible. */
   isVisible: boolean
-  /** Whether the dice are currently "rolling" (animating). */
-  isRolling: boolean
-  /** The result of the last roll, shown after animation completes. */
   result: RollResult | null
-  /** The notation that was rolled. */
   notation: string
+  source: RollSource | null
+  ability: AbilityBlock | null
+  rollCharacter: Character | null
 }
 
 export interface DiceRollActions {
-  /**
-   * Roll a dice notation string using the given character's stats.
-   * Triggers the animation overlay, then shows the result.
-   */
-  roll: (notation: string, character: Character) => void
-  /** Dismiss the overlay and clear the result. */
+  roll: (req: RollRequest) => void
   dismiss: () => void
 }
 
@@ -42,25 +41,49 @@ export type DiceRollStore = DiceRollState & DiceRollActions
 
 export const useDiceRollStore = create<DiceRollStore>()((set) => ({
   isVisible: false,
-  isRolling: false,
   result: null,
   notation: '',
+  source: null,
+  ability: null,
+  rollCharacter: null,
 
-  roll: (notation, character) => {
-    // Parse + evaluate immediately (the result is computed in sync).
+  roll: (req) => {
+    const { notation, character, source, ability, note } = req
     const expr = parseDiceNotation(notation)
-    const result = evaluateExpression(expr, character)
+    const finalResult = evaluateExpression(expr, character)
 
-    // Show the rolling animation first.
-    set({ isVisible: true, isRolling: true, result: null, notation })
+    const resolvedSource: RollSource = source ?? (ability
+      ? { type: 'ability-damage', abilityName: ability.name, abilityId: ability.id }
+      : { type: 'manual', note })
 
-    // After the animation duration, reveal the result.
-    setTimeout(() => {
-      set({ isRolling: false, result })
-    }, ROLL_ANIMATION_MS)
+    // Persist to roll-log.
+    const logEntry: NewRollLogEntry = {
+      notation,
+      characterId: character.id,
+      characterName: character.name,
+      source: resolvedSource,
+      result: finalResult,
+    }
+    useRollLogStore.getState().logRoll(logEntry)
+
+    set({
+      isVisible: true,
+      result: finalResult,
+      notation,
+      source: resolvedSource,
+      ability: ability ?? null,
+      rollCharacter: character,
+    })
   },
 
   dismiss: () => {
-    set({ isVisible: false, isRolling: false, result: null, notation: '' })
+    set({
+      isVisible: false,
+      result: null,
+      notation: '',
+      source: null,
+      ability: null,
+      rollCharacter: null,
+    })
   },
 }))

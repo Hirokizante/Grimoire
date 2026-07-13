@@ -12,7 +12,14 @@ export type {
   Attributes,
   Skills,
   SheetConfig,
+  SheetColors,
   MortalWound,
   DeathSaves,
+  VersionSnapshot,
   Character,
 } from './character'
+export type {
+  RollLogEntry,
+  RollSource,
+  NewRollLogEntry,
+} from './rollLog'

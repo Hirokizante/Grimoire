@@ -12,9 +12,8 @@
  * Exhaustion mortal wound: all END costs are 1 more than usual.
  */
 
-import { useState } from 'react'
-
 import AbilityBlockCard from '@/components/sheet/AbilityBlockCard'
+import { useNotification } from '@/context/NotificationContext'
 import { useCharacterStore } from '@/store/characterStore'
 import type { AbilityBlock } from '@/types'
 
@@ -27,7 +26,7 @@ export default function AbilityActivation({ ability }: AbilityActivationProps) {
   const spendAP = useCharacterStore((s) => s.spendAP)
   const spendEND = useCharacterStore((s) => s.spendEND)
   const spendFP = useCharacterStore((s) => s.spendFP)
-  const [message, setMessage] = useState('')
+  const { notify } = useNotification()
 
   if (!character) return null
 
@@ -58,11 +57,10 @@ export default function AbilityActivation({ ability }: AbilityActivationProps) {
     if (fpCost > 0) ok = spendFP(fpCost) && ok
 
     if (ok) {
-      setMessage(`Activated ${ability.name}`)
+      notify(`Activated ${ability.name}`, 'success')
     } else {
-      setMessage('Insufficient resources')
+      notify('Insufficient resources to activate ability.', 'error')
     }
-    setTimeout(() => setMessage(''), 2500)
   }
 
   return (
@@ -76,13 +74,8 @@ export default function AbilityActivation({ ability }: AbilityActivationProps) {
           disabled={!canAfford}
           title={tooltip}
         >
-          {apCost > 0 && `${apCost}AP `}
-          {endCost > 0 && `${endCost}END `}
-          {fpCost > 0 && `${fpCost}FP `}
-          {(apCost === 0 && endCost === 0 && fpCost === 0) && 'Free '}
           Activate
         </button>
-        {message && <span className="ability-activation__msg">{message}</span>}
       </div>
     </div>
   )

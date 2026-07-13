@@ -77,9 +77,7 @@ export default function SortableAbilityCard({
         </button>
       )}
 
-      <AbilityBlockCard ability={ability} mode={mode} />
-
-      {actions && <div className="ability-card__actions">{actions}</div>}
+      <AbilityBlockCard ability={ability} mode={mode} actions={actions} />
     </div>
   )
 }

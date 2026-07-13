@@ -10,7 +10,7 @@
  */
 
 import { useCharacterStore } from '@/store/characterStore'
-import { calcENDRecovery } from '@/lib/calculations'
+import { calcENDRecovery, calcEndTurnENDGain } from '@/lib/calculations'
 import type { Character } from '@/types'
 
 const MAX_AP = 3
@@ -29,14 +29,17 @@ export default function ResourceTracker({ character }: ResourceTrackerProps) {
   const resetEND = useCharacterStore((s) => s.resetEND)
   const spendFP = useCharacterStore((s) => s.spendFP)
   const restoreFP = useCharacterStore((s) => s.restoreFP)
-  const regenerateEND = useCharacterStore((s) => s.regenerateEND)
-  const convertAPtoEND = useCharacterStore((s) => s.convertAPtoEND)
+  const endTurn = useCharacterStore((s) => s.endTurn)
 
   const endRecovery = calcENDRecovery(character.attributes.GRT)
+  const totalGain = calcEndTurnENDGain(
+    character.currentAP,
+    character.currentEND,
+    character.attributes.GRT,
+  )
 
   const handleEndTurn = () => {
-    convertAPtoEND()
-    regenerateEND()
+    endTurn()
   }
 
   return (
@@ -136,9 +139,9 @@ export default function ResourceTracker({ character }: ResourceTrackerProps) {
         type="button"
         className="btn btn--ghost resource-tracker__end-turn"
         onClick={handleEndTurn}
-        title={`Convert AP→END (1:1) + regenerate ${endRecovery} END`}
+        title={`Convert AP→END (1:1) + ${endRecovery} END Recovery`}
       >
-        End Turn (+{endRecovery} END)
+        {totalGain > 0 ? `End Turn (+${totalGain} END)` : 'End Turn'}
       </button>
     </div>
   )

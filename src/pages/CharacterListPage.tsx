@@ -1,3 +1,6 @@
+import { useRef } from 'react'
+import { ArrowDownFromLine } from 'lucide-react'
+
 import { useCharacterStore } from '@/store/characterStore'
 
 import type { Character } from '@/types'
@@ -21,6 +24,25 @@ function handleCreate() {
   void useCharacterStore.getState().createCharacter(name)
 }
 
+function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
+  const file = e.target.files?.[0]
+  // Reset so re-selecting the same file still fires change.
+  e.target.value = ''
+  if (!file) return
+  const isJson =
+    file.type.startsWith('application/json') ||
+    file.type.startsWith('text/') ||
+    file.name.endsWith('.json')
+  if (!isJson) return
+  const reader = new FileReader()
+  reader.onload = () => {
+    if (typeof reader.result === 'string') {
+      void useCharacterStore.getState().importCharacterFile(reader.result)
+    }
+  }
+  reader.readAsText(file)
+}
+
 function handleDelete(character: Character) {
   const confirmed = window.confirm(
     `Delete "${character.name}"? This cannot be undone.`,
@@ -34,6 +56,7 @@ export default function CharacterListPage() {
   const isLoaded = useCharacterStore((s) => s.isLoaded)
   const isSaving = useCharacterStore((s) => s.isSaving)
   const selectCharacter = useCharacterStore((s) => s.selectCharacter)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   if (!isLoaded) {
     return (
@@ -51,9 +74,30 @@ export default function CharacterListPage() {
           <p className="muted">
             Create your first Divergence character to begin.
           </p>
-          <button className="btn btn--primary" type="button" onClick={handleCreate}>
-            Create New Character
-          </button>
+          <div className="empty-state__actions">
+            <button
+              className="btn btn--primary page-head__btn"
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <ArrowDownFromLine size={14} />
+              Import Character
+            </button>
+            <button
+              className="btn btn--primary"
+              type="button"
+              onClick={handleCreate}
+            >
+              Create New Character
+            </button>
+          </div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="application/json,.json"
+            className="visually-hidden"
+            onChange={handleImport}
+          />
         </div>
       </div>
     )
@@ -62,12 +106,36 @@ export default function CharacterListPage() {
   return (
     <div className="page">
       <div className="page-head">
-        <span className="page-count">{characters.length} character{characters.length === 1 ? '' : 's'}</span>
+        <span className="page-count">
+          {characters.length} character{characters.length === 1 ? '' : 's'}
+        </span>
         {isSaving && <span className="muted saving-badge">saving…</span>}
-        <button className="btn btn--primary" type="button" onClick={handleCreate}>
-          + New
-        </button>
+        <div className="page-head__actions">
+          <button
+            className="btn btn--primary page-head__btn"
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <ArrowDownFromLine size={14} />
+            Import
+          </button>
+          <button
+            className="btn btn--primary page-head__btn"
+            type="button"
+            onClick={handleCreate}
+          >
+            + New
+          </button>
+        </div>
       </div>
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="application/json,.json"
+        className="visually-hidden"
+        onChange={handleImport}
+      />
 
       <ul className="card-grid" role="list">
         {characters.map((c) => (
@@ -80,11 +148,15 @@ export default function CharacterListPage() {
               {c.portrait ? (
                 <img className="card-portrait" src={c.portrait} alt={c.name} />
               ) : (
-                <div className="card-portrait card-portrait--empty" aria-hidden />
+                <div
+                  className="card-portrait card-portrait--empty"
+                  aria-hidden
+                />
               )}
               <span className="card-name">{c.name}</span>
               <span className="card-meta">
-                {c.milestones} {c.milestones === 1 ? 'milestone' : 'milestones'} ·{' '}
+                {c.milestones}{' '}
+                {c.milestones === 1 ? 'milestone' : 'milestones'} ·{' '}
                 {formatUpdatedAt(c.updatedAt)}
               </span>
             </button>
