@@ -6,14 +6,13 @@
  * determine which wound from the table they receive. Up to 2 Mortal Wounds can
  * be sustained; a third would knock the character out (Death Save territory).
  *
- * This component shows filled wound slots with their names, a "Roll Mortal
- * Wound" button for any pending rolls, and allows clearing wounds (Rest).
+ * The redesigned Mortal Wound card is large, showing the wound's d20 roll
+ * number, its name, and its game effect in a single self-contained card.
  */
 
-import { useState } from 'react'
-
+import { MORTAL_WOUNDS } from '@/constants/gameData'
 import { useNotification } from '@/context/NotificationContext'
-import { useCharacterStore, type MortalWoundResult } from '@/store/characterStore'
+import { useCharacterStore } from '@/store/characterStore'
 import type { Character } from '@/types'
 
 export interface MortalWoundRollerProps {
@@ -24,99 +23,91 @@ export default function MortalWoundRoller({ character }: MortalWoundRollerProps)
   const rollMortalWound = useCharacterStore((s) => s.rollMortalWound)
   const clearMortalWound = useCharacterStore((s) => s.clearMortalWound)
   const fullRestore = useCharacterStore((s) => s.fullRestore)
-  const [lastRoll, setLastRoll] = useState<MortalWoundResult | null>(null)
   const { notify } = useNotification()
 
   const hasPendingRoll = character.mortalWounds.some((w) => w === 'Pending Roll')
-  const filledWounds = character.mortalWounds.filter((w) => w != null && w !== 'Pending Roll')
+  const filledCount = character.mortalWounds.filter((w) => w != null).length
 
   const handleRoll = () => {
     const result = rollMortalWound()
-    setLastRoll(result)
-    notify(`Rolled ${result.roll}: ${result.woundName}`, 'warning')
     if (result.knockedOut) {
-      setTimeout(() => setLastRoll(null), 5000)
       notify('Character knocked out! Death Saves begin next turn.', 'error', 5000)
     }
   }
 
   const handleClear = (index: number) => {
     clearMortalWound(index)
-    notify('Mortal Wound cleared.', 'info')
+    notify('Mortal Wound cleared.', 'info', 2000)
   }
 
   const handleRest = () => {
     fullRestore()
-    setLastRoll(null)
-    notify('Full Restore: all resources restored, wounds cleared.', 'success', 4000)
+    notify('Full Restore: all resources and wound slots cleared.', 'success', 4000)
   }
 
   return (
     <div className="mortal-wound-roller">
-      <div className="mortal-wound-roller__slots">
-        {character.mortalWounds.map((wound, i) => (
-          <div
-            key={i}
-            className={
-              'mortal-wound-slot' +
-              (wound != null ? ' mortal-wound-slot--filled' : '')
-            }
-            title={wound ?? 'Empty'}
-          >
-            {wound === 'Pending Roll' ? '?' : wound != null ? '✕' : ''}
-          </div>
-        ))}
-      </div>
+      {filledCount > 0 && (
+        <div className="mw-card-grid">
+          {character.mortalWounds.map((woundName, i) => {
+            if (woundName == null) return null
+            const isPending = woundName === 'Pending Roll'
+            const woundData = MORTAL_WOUNDS.find((w) => w.name === woundName)
+            const rollNumber = woundData?.id ?? null
+            const description = woundData?.description ?? ''
 
-      {filledWounds.length > 0 && (
-        <ul className="mortal-wound-roller__list">
-          {character.mortalWounds.map((wound, i) =>
-            wound != null && wound !== 'Pending Roll' ? (
-              <li key={i} className="mortal-wound-roller__entry">
-                <span className="mortal-wound-roller__name">{wound}</span>
-                <button
-                  type="button"
-                  className="btn btn--ghost mortal-wound-roller__clear"
-                  onClick={() => handleClear(i)}
-                  title="Clear this wound"
-                >
-                  Clear
-                </button>
-              </li>
-            ) : null,
-          )}
-        </ul>
+            return (
+              <div key={i} className={`mw-card${isPending ? ' mw-card--pending' : ''}`}>
+                <div className="mw-card__roll">{isPending ? '?' : rollNumber}</div>
+                <div className="mw-card__body">
+                  <div className="mw-card__header">
+                    <span className="mw-card__name">
+                      {isPending ? 'Roll to determine' : woundName}
+                    </span>
+                    {!isPending && (
+                      <button
+                        type="button"
+                        className="mw-card__clear"
+                        onClick={() => handleClear(i)}
+                        title="Clear this wound"
+                        aria-label={`Clear ${woundName}`}
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+                  {!isPending && (
+                    <p className="mw-card__desc">{description}</p>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
       )}
 
       {hasPendingRoll && (
         <button
           type="button"
-          className="btn btn--primary mortal-wound-roller__roll"
+          className="btn btn--primary mw-roll-btn"
           onClick={handleRoll}
         >
           Roll Mortal Wound (d20)
         </button>
       )}
 
-      {lastRoll && (
-        <div className="mortal-wound-result">
-          <p>
-            Rolled <strong>{lastRoll.roll}</strong> —{' '}
-            <strong>{lastRoll.woundName}</strong>
+      {filledCount >= 2 && character.currentHP > 0 && (
+        <div className="mw-card mw-card--ko">
+          <p className="mw-card__ko-text">
+            ⚠ Critical Condition! Reaching 0 HP will cause you to get Knocked Out!
           </p>
-          <p className="mortal-wound-result__desc">{lastRoll.woundDescription}</p>
-          {lastRoll.knockedOut && (
-            <p className="mortal-wound-result--ko">
-              ⚠ Knocked Out! Death Saves begin on your turn.
-            </p>
-          )}
         </div>
       )}
 
-      {character.mortalWounds.some((w) => w != null) && (
+      {filledCount > 0 && (
         <button
           type="button"
-          className="btn btn--ghost mortal-wound-roller__rest"
+          className="btn btn--ghost mw-rest-btn"
           onClick={handleRest}
           title="Full restore: HP, END, AP, FP, clear wounds & death saves"
         >

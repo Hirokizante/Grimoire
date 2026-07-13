@@ -674,6 +674,147 @@
   gap: 0.4rem;
 }
 
+/* ---- Mortal Wound cards -------------------------------------------------- */
+
+.mw-card-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.mortal-wound-roller {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.mw-card {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  padding: 0.7rem 0.85rem;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--danger) 9%, transparent);
+  border: 1px solid color-mix(in srgb, var(--danger) 30%, transparent);
+  transition: background-color 0.2s ease;
+}
+
+.mw-card--pending {
+  background: color-mix(in srgb, var(--accent-violet) 10%, transparent);
+  border-color: color-mix(in srgb, var(--accent-violet) 30%, transparent);
+}
+
+.mw-card--ko {
+  flex-direction: column;
+  text-align: center;
+  background: color-mix(in srgb, var(--danger) 22%, transparent);
+  border-color: var(--danger);
+}
+
+.mw-card__roll {
+  flex: 0 0 auto;
+  min-width: 2.6rem;
+  height: 2.6rem;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--danger) 22%, transparent);
+  border: 1px solid color-mix(in srgb, var(--danger) 35%, transparent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--sheet-heading-font, inherit);
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--danger-hover);
+  line-height: 1;
+}
+
+.mw-card--pending .mw-card__roll {
+  background: color-mix(in srgb, var(--accent-violet) 22%, transparent);
+  border-color: color-mix(in srgb, var(--accent-violet) 35%, transparent);
+  color: var(--accent-violet);
+  font-size: 1.4rem;
+}
+
+.mw-card--ko .mw-card__roll {
+  display: none;
+}
+
+.mw-card__body {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.mw-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.mw-card__name {
+  font-family: var(--sheet-heading-font, inherit);
+  font-weight: 700;
+  font-size: 0.92rem;
+  color: var(--danger-hover);
+}
+
+.mw-card--pending .mw-card__name {
+  color: var(--accent-violet);
+}
+
+.mw-card__clear {
+  flex: 0 0 auto;
+  width: 1.6rem;
+  height: 1.6rem;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--danger) 15%, transparent);
+  color: var(--danger-hover);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.mw-card__clear:hover {
+  background: color-mix(in srgb, var(--danger) 30%, transparent);
+}
+
+.mw-card__desc {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.35;
+  color: var(--text-secondary);
+}
+
+.mw-card__ko-text {
+  margin: 0;
+  color: var(--danger);
+  font-weight: 700;
+  font-size: 0.88rem;
+}
+
+.mw-roll-btn {
+  width: 100%;
+  font-size: 0.85rem;
+  padding: 0.5rem 0.8rem;
+}
+
+.mw-rest-btn {
+  width: 100%;
+  font-size: 0.78rem;
+  padding: 0.35rem 0.6rem;
+}
+
+/* ---- Mortal wound slot indicators (edit mode) ---------------------------- */
+
 .mortal-wounds {
   display: flex;
   gap: 0.5rem;
@@ -698,8 +839,6 @@
   color: var(--danger-hover);
   font-weight: 700;
 }
-
-/* ---- Segmented bar -------------------------------------------------------- */
 
 .seg-bar {
   display: flex;
@@ -1618,86 +1757,6 @@
   color: var(--text-muted);
   margin: 0.3rem 0 0 0;
   text-align: center;
-}
-
-/* ---- Phase 7: mortal wound roller (view mode) ------------------------------ */
-
-.mortal-wound-roller {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-  margin-top: 0.3rem;
-}
-
-.mortal-wound-roller__slots {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.mortal-wound-roller__list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.mortal-wound-roller__entry {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  padding: 0.2rem 0.4rem;
-  background: color-mix(in srgb, var(--danger) 8%, transparent);
-  border-radius: 6px;
-}
-
-.mortal-wound-roller__name {
-  font-size: 0.82rem;
-  color: var(--danger-hover);
-  font-weight: 600;
-}
-
-.mortal-wound-roller__clear {
-  font-size: 0.7rem;
-  padding: 0.15rem 0.4rem;
-}
-
-.mortal-wound-roller__roll {
-  font-size: 0.82rem;
-  padding: 0.4rem 0.8rem;
-  width: 100%;
-}
-
-.mortal-wound-roller__rest {
-  font-size: 0.78rem;
-  padding: 0.3rem 0.6rem;
-  border-color: var(--accent-violet);
-  color: var(--accent-violet-soft);
-}
-
-.mortal-wound-result {
-  padding: 0.4rem 0.5rem;
-  border-radius: 8px;
-  background: var(--bg-surface-raised);
-  border: 1px solid var(--border-soft);
-  font-size: 0.82rem;
-  color: var(--text-primary);
-}
-
-.mortal-wound-result p {
-  margin: 0.15rem 0;
-}
-
-.mortal-wound-result__desc {
-  color: var(--text-secondary) !important;
-  font-size: 0.78rem !important;
-}
-
-.mortal-wound-result--ko {
-  color: var(--danger);
-  font-weight: 700;
 }
 
 /* ---- Phase 7: death save tracker ------------------------------------------- */
