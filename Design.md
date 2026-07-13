@@ -238,7 +238,7 @@
 - **Recover Action**: The player can use the Recover action (3 AP) to regain all END and optionally clear 1 status effect. This is the only standard combat action implemented in Grimoire.
 - **Sheet Customization**: Players can aesthetically overhaul their sheets with full custom color pickers and font selectors for individual elements (background, section headings, labels, body text, helper text). No prebuilt themes are provided — all customization is user-driven.
 - **Guided Level-Ups**: Whenever the player increases their character's Milestones, the system prompts them to select which Attributes/Skills to raise. On every 2 Milestones, they should be prompted to choose between increasing Ability Slots or max FP.
-- **Inline Dice Rolls with 3D Dice**: The system automatically detects and highlights dice notation in any text field on the sheet. When a player clicks dice notation, the system rolls the dice, displays the result, and plays an animation of 3D dice rolling across the screen.
+- **Inline Dice Rolls**: The system automatically detects and highlights dice notation in any text field on the sheet. When a player clicks dice notation, the system rolls the dice and displays the result.
   - **Recognized patterns**: Standard dice notation such as `1d6`, `2d6+POW`, `d20+3`, `1d6+POW/MAR`. Dice notation may appear in Damage fields, Description fields, or any free-text field on the sheet.
   - **Variable substitution**: Character stat references (MAR, POW, AGI, VIT, GRT, and skill names) are automatically substituted with the character's actual values when computing the roll result.
   - **Roll breakdown**: The dice roller displays a full breakdown of the result (e.g., `2d6+POW → 4 + 3 + 4 = 11`), showing each die result, each substituted variable, and the final total.
@@ -253,7 +253,7 @@
 - ✅ HP tracking (input damage, auto-calculate with Armor and Resistance)
 - ✅ Temporary HP tracking
 - ✅ END / AP / FP tracking (spend resources, auto-deduct on ability activation)
-- ✅ Dice rolling (inline notation with 3D dice animation)
+- ✅ Dice rolling (inline notation)
 - ✅ Ability activation (select ability → deduct costs)
 - ✅ Recover action (regain all END, clear 1 status)
 - ✅ Death Save tracking (successes/failures)

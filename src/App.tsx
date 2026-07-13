@@ -11,17 +11,15 @@ import HomePage from '@/pages/HomePage'
 import PlaceholderPage from '@/pages/PlaceholderPage'
 import DiceRollOverlay from '@/components/dice/DiceRollOverlay'
 import RollLogDrawer from '@/components/dice/RollLogDrawer'
+import TitleBar from '@/components/TitleBar'
 import { useCharacterStore } from '@/store/characterStore'
 import { useEffect } from 'react'
-import { Home } from 'lucide-react'
 import { useRollLogStore } from '@/store/rollLogStore'
 import { NotificationProvider } from '@/context/NotificationContext'
 
 function App() {
   const currentCharacter = useCharacterStore((s) => s.currentCharacter)
-  const closeCharacter = useCharacterStore((s) => s.closeCharacter)
   const view = useCharacterStore((s) => s.view)
-  const setView = useCharacterStore((s) => s.setView)
   const loadRollLog = useRollLogStore((s) => s.loadRollLog)
 
   useEffect(() => {
@@ -34,27 +32,7 @@ function App() {
   return (
     <NotificationProvider>
       <div className="app">
-        {!onHome && (
-          <header className="app-header">
-            <button
-              type="button"
-              className="app-menu-btn"
-              onClick={() => {
-                if (onSheet) {
-                  closeCharacter()
-                } else {
-                  setView('home')
-                }
-              }}
-              title="Main Menu"
-              aria-label="Main Menu"
-            >
-              <Home size={18} />
-            </button>
-            <span className="app-header__divider" />
-            <span className="app-title">Grimoire</span>
-          </header>
-        )}
+        {!onHome && <TitleBar />}
 
         <main
           className={

@@ -1,9 +1,11 @@
-import { useRef } from 'react'
-import { ArrowDownFromLine } from 'lucide-react'
+import { useRef, useState } from 'react'
+import { ArrowDownFromLine, LayoutGrid, List } from 'lucide-react'
 
 import { useCharacterStore } from '@/store/characterStore'
 
 import type { Character } from '@/types'
+
+type ViewMode = 'grid' | 'list'
 
 /** Format an ISO timestamp into a short, human-readable relative-ish label. */
 function formatUpdatedAt(iso: string): string {
@@ -57,6 +59,7 @@ export default function CharacterListPage() {
   const isSaving = useCharacterStore((s) => s.isSaving)
   const selectCharacter = useCharacterStore((s) => s.selectCharacter)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [viewMode, setViewMode] = useState<ViewMode>('grid')
 
   if (!isLoaded) {
     return (
@@ -111,6 +114,38 @@ export default function CharacterListPage() {
         </span>
         {isSaving && <span className="muted saving-badge">saving…</span>}
         <div className="page-head__actions">
+          <div
+            className="mode-toggle mode-toggle--compact"
+            role="tablist"
+            aria-label="Character list view"
+          >
+            <button
+              className={
+                'mode-toggle__btn' +
+                (viewMode === 'grid' ? ' mode-toggle__btn--active' : '')
+              }
+              type="button"
+              role="tab"
+              aria-selected={viewMode === 'grid'}
+              aria-label="Grid view"
+              onClick={() => setViewMode('grid')}
+            >
+              <LayoutGrid size={16} />
+            </button>
+            <button
+              className={
+                'mode-toggle__btn' +
+                (viewMode === 'list' ? ' mode-toggle__btn--active' : '')
+              }
+              type="button"
+              role="tab"
+              aria-selected={viewMode === 'list'}
+              aria-label="List view"
+              onClick={() => setViewMode('list')}
+            >
+              <List size={16} />
+            </button>
+          </div>
           <button
             className="btn btn--primary page-head__btn"
             type="button"
@@ -137,40 +172,87 @@ export default function CharacterListPage() {
         onChange={handleImport}
       />
 
-      <ul className="card-grid" role="list">
-        {characters.map((c) => (
-          <li key={c.id} className="card">
-            <button
-              className="card-main"
-              type="button"
-              onClick={() => selectCharacter(c.id)}
-            >
-              {c.portrait ? (
-                <img className="card-portrait" src={c.portrait} alt={c.name} />
-              ) : (
-                <div
-                  className="card-portrait card-portrait--empty"
-                  aria-hidden
-                />
-              )}
-              <span className="card-name">{c.name}</span>
-              <span className="card-meta">
-                {c.milestones}{' '}
-                {c.milestones === 1 ? 'milestone' : 'milestones'} ·{' '}
-                {formatUpdatedAt(c.updatedAt)}
-              </span>
-            </button>
-            <button
-              className="card-delete"
-              type="button"
-              aria-label={`Delete ${c.name}`}
-              onClick={() => handleDelete(c)}
-            >
-              ×
-            </button>
-          </li>
-        ))}
-      </ul>
+      {viewMode === 'grid' ? (
+        <ul className="card-grid" role="list">
+          {characters.map((c) => (
+            <li key={c.id} className="card">
+              <button
+                className="card-main"
+                type="button"
+                onClick={() => selectCharacter(c.id)}
+              >
+                {c.portrait ? (
+                  <img
+                    className="card-portrait"
+                    src={c.portrait}
+                    alt={c.name}
+                  />
+                ) : (
+                  <div
+                    className="card-portrait card-portrait--empty"
+                    aria-hidden
+                  />
+                )}
+                <span className="card-name">{c.name}</span>
+                <span className="card-meta">
+                  {c.milestones}{' '}
+                  {c.milestones === 1 ? 'milestone' : 'milestones'} ·{' '}
+                  {formatUpdatedAt(c.updatedAt)}
+                </span>
+              </button>
+              <button
+                className="card-delete"
+                type="button"
+                aria-label={`Delete ${c.name}`}
+                onClick={() => handleDelete(c)}
+              >
+                ×
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <ul className="character-list" role="list">
+          {characters.map((c) => (
+            <li key={c.id} className="character-list__item">
+              <button
+                className="character-list__main"
+                type="button"
+                onClick={() => selectCharacter(c.id)}
+              >
+                {c.portrait ? (
+                  <img
+                    className="character-list__portrait"
+                    src={c.portrait}
+                    alt={c.name}
+                  />
+                ) : (
+                  <div
+                    className="character-list__portrait character-list__portrait--empty"
+                    aria-hidden
+                  />
+                )}
+                <div className="character-list__info">
+                  <span className="character-list__name">{c.name}</span>
+                  <span className="character-list__meta">
+                    {c.milestones}{' '}
+                    {c.milestones === 1 ? 'milestone' : 'milestones'} ·{' '}
+                    {formatUpdatedAt(c.updatedAt)}
+                  </span>
+                </div>
+              </button>
+              <button
+                className="character-list__delete"
+                type="button"
+                aria-label={`Delete ${c.name}`}
+                onClick={() => handleDelete(c)}
+              >
+                ×
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   )
 }

@@ -49,6 +49,38 @@
   color: var(--accent-violet-soft);
 }
 
+.app-header__nav {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.app-header__nav-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.app-header__nav-btn:hover {
+  background: var(--bg-surface-hover);
+  color: var(--text-primary);
+}
+
+.app-header__nav-btn--active {
+  background: color-mix(in srgb, var(--accent-violet) 15%, transparent);
+  border-color: color-mix(in srgb, var(--accent-violet) 40%, transparent);
+  color: var(--accent-violet-soft);
+}
+
 /* Main */
 .app-main {
   flex: 1;
@@ -167,8 +199,12 @@
   margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  grid-template-columns: repeat(3, 1fr);
   gap: 1rem;
+}
+
+.card-grid .card-portrait {
+  aspect-ratio: 1 / 1;
 }
 
 .card {
@@ -199,7 +235,6 @@
 
 .card-portrait {
   width: 100%;
-  aspect-ratio: 1 / 1;
   object-fit: cover;
   background: var(--border-soft);
 }
@@ -257,6 +292,126 @@
   color: #1a1a2e;
 }
 
+/* View toggle — matches the sheet's mode-toggle but sized for page headers */
+.mode-toggle--compact .mode-toggle__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.1rem;
+  height: 2rem;
+  padding: 0;
+}
+
+.mode-toggle--compact .mode-toggle__btn--active {
+  background: var(--accent-violet);
+  color: #1a1a2e;
+}
+
+/* Character list view */
+.character-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.character-list__item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  padding: 0.5rem 0.75rem;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.character-list__item:hover {
+  border-color: var(--accent-violet);
+  background: var(--bg-surface-raised);
+}
+
+.character-list__main {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex: 1 1 auto;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+}
+
+.character-list__portrait {
+  flex: 0 0 auto;
+  width: 52px;
+  height: 52px;
+  border-radius: 8px;
+  object-fit: cover;
+  background: var(--border-soft);
+}
+
+.character-list__portrait--empty {
+  background: linear-gradient(
+    135deg,
+    var(--bg-surface-raised),
+    var(--border-soft)
+  );
+}
+
+.character-list__info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.character-list__name {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.character-list__meta {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.character-list__delete {
+  flex: 0 0 auto;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 1.1rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.15s ease, background-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.character-list__item:hover .character-list__delete {
+  opacity: 1;
+}
+
+.character-list__delete:hover {
+  background: var(--danger-hover);
+  color: #1a1a2e;
+}
+
 /* Sheet placeholder */
 .sheet-placeholder {
   display: flex;
@@ -301,17 +456,45 @@
 }
 
 /* Responsive */
+@media (max-width: 900px) {
+  .card-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
 @media (max-width: 600px) {
   .app-main {
     padding: 1rem 0.75rem 2.5rem;
   }
 
   .card-grid {
-    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
   }
 
-  .card-delete {
+  .card-delete,
+  .character-list__delete {
     opacity: 1;
+  }
+
+  .mode-toggle--compact .mode-toggle__btn {
+    width: 1.9rem;
+    height: 1.8rem;
+  }
+}
+
+@media (max-width: 400px) {
+  .card-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .page-head__actions {
+    gap: 0.5rem;
+  }
+
+  .page-head__btn {
+    padding: 0.4rem 0.6rem;
+    font-size: 0.8rem;
   }
 }
 
