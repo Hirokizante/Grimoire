@@ -14,8 +14,27 @@ export default function HomePage() {
 
   return (
     <div className="home-page">
+      <div className="home-page__particles" aria-hidden="true">
+        {Array.from({ length: 18 }).map((_, i) => (
+          <span
+            key={i}
+            className="home-page__particle"
+            style={{
+              left: `${Math.random() * 100}%`,
+              animationDuration: `${8 + Math.random() * 10}s`,
+              animationDelay: `${Math.random() * 8}s`,
+              width: `${3 + Math.random() * 3}px`,
+              height: `${3 + Math.random() * 3}px`,
+            }}
+          />
+        ))}
+      </div>
+
       <div className="home-page__content">
-        <h1 className="home-page__title">GRIMOIRE</h1>
+        <div>
+          <h1 className="home-page__title">GRIMOIRE</h1>
+          <span className="home-page__title-line" />
+        </div>
         <p className="home-page__subtitle">
           A character sheet for the world of Divergence
         </p>

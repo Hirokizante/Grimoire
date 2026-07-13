@@ -344,6 +344,7 @@
 }
 
 .home-page {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -351,13 +352,105 @@
   min-height: 100vh;
   text-align: center;
   padding: 2rem 1.5rem;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+/* Ambient background glows */
+.home-page::before,
+.home-page::after {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(120px);
+  opacity: 0.25;
+  pointer-events: none;
+  z-index: -2;
+  animation: homeGlow 12s ease-in-out infinite alternate;
+}
+
+.home-page::before {
+  width: min(60vw, 520px);
+  height: min(60vw, 520px);
+  top: -10%;
+  left: -10%;
+  background: radial-gradient(circle, var(--accent-violet), transparent 70%);
+}
+
+.home-page::after {
+  width: min(55vw, 480px);
+  height: min(55vw, 480px);
+  bottom: -10%;
+  right: -10%;
+  background: radial-gradient(circle, var(--accent-blush), transparent 70%);
+  animation-delay: -6s;
+}
+
+@keyframes homeGlow {
+  0% {
+    transform: scale(1) translate(0, 0);
+    opacity: 0.22;
+  }
+  100% {
+    transform: scale(1.12) translate(5%, 5%);
+    opacity: 0.32;
+  }
+}
+
+/* Floating dust particles */
+.home-page__particles {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+  overflow: hidden;
+}
+
+.home-page__particle {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--accent-violet-soft);
+  opacity: 0;
+  animation: floatUp 10s linear infinite;
+}
+
+@keyframes floatUp {
+  0% {
+    transform: translateY(100vh) scale(0.6);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.45;
+  }
+  90% {
+    opacity: 0.35;
+  }
+  100% {
+    transform: translateY(-10vh) scale(1);
+    opacity: 0;
+  }
 }
 
 .home-page__content {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 2.5rem;
+  animation: homeFadeIn 0.9s ease-out both;
+}
+
+@keyframes homeFadeIn {
+  0% {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .home-page__title {
@@ -371,21 +464,73 @@
   text-shadow: 0 0 30px color-mix(in srgb, var(--accent-violet-soft) 18%, transparent);
 }
 
+.home-page__title-line {
+  display: block;
+  width: min(50%, 220px);
+  height: 1px;
+  margin: 1.25rem auto 0;
+  border: none;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--accent-violet-soft),
+    transparent
+  );
+  opacity: 0.45;
+  animation: lineShimmer 4s ease-in-out infinite;
+}
+
+@keyframes lineShimmer {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
 .home-page__subtitle {
   font-size: 0.9rem;
   letter-spacing: 0.06em;
   color: var(--text-muted);
   margin: -1.5rem 0 0 0;
   font-style: italic;
+  animation: homeSubtitleFade 1.2s ease-out 0.3s both;
+}
+
+@keyframes homeSubtitleFade {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .home-nav {
   display: flex;
   flex-direction: row;
   gap: 1.25rem;
+  animation: homeNavFade 1.2s ease-out 0.55s both;
+}
+
+@keyframes homeNavFade {
+  0% {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .home-nav__btn {
+  --btn-glow: color-mix(in srgb, var(--accent-violet) 18%, transparent);
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -393,45 +538,86 @@
   gap: 0.75rem;
   width: 9.5rem;
   height: 9.5rem;
-  border-radius: 16px;
+  border-radius: 18px;
   border: 1px solid var(--border-soft);
-  background: var(--bg-surface);
+  background: linear-gradient(145deg, var(--bg-surface), var(--bg-surface-raised));
   color: var(--text-primary);
   font-size: 1rem;
   font-weight: 500;
   letter-spacing: 0.03em;
   cursor: pointer;
-  transition: border-color 0.2s ease, background-color 0.2s ease,
-    transform 0.05s ease, box-shadow 0.2s ease;
+  transition: border-color 0.25s ease, background 0.25s ease,
+    transform 0.12s ease, box-shadow 0.25s ease;
   text-align: center;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+/* Subtle moving sheen on hover */
+.home-nav__btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    115deg,
+    transparent 30%,
+    color-mix(in srgb, var(--accent-violet-soft) 10%, transparent) 50%,
+    transparent 70%
+  );
+  transform: translateX(-100%);
+  transition: transform 0.6s ease;
+  pointer-events: none;
+}
+
+.home-nav__btn:hover::before {
+  transform: translateX(100%);
 }
 
 .home-nav__btn:hover {
   border-color: var(--accent-violet);
-  background: var(--bg-surface-raised);
-  box-shadow: 0 0 16px color-mix(in srgb, var(--accent-violet) 12%, transparent);
+  background: linear-gradient(145deg, var(--bg-surface-raised), var(--bg-surface-hover));
+  transform: translateY(-4px) scale(1.02);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.24), 0 0 24px var(--btn-glow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .home-nav__btn:active {
-  transform: translateY(1px);
+  transform: translateY(-1px) scale(0.99);
 }
 
 .home-nav__btn--primary {
-  background: var(--accent-violet);
+  --btn-glow: color-mix(in srgb, var(--accent-violet-soft) 28%, transparent);
+  background: linear-gradient(145deg, var(--accent-violet), #8b70c8);
   color: #1a1a2e;
   font-weight: 600;
   border-color: transparent;
 }
 
+.home-nav__btn--primary::before {
+  background: linear-gradient(
+    115deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.2) 50%,
+    transparent 70%
+  );
+}
+
 .home-nav__btn--primary:hover {
-  background: var(--accent-violet-soft);
+  background: linear-gradient(145deg, #a48ede, var(--accent-violet-soft));
   border-color: transparent;
-  box-shadow: 0 0 20px color-mix(in srgb, var(--accent-violet-soft) 20%, transparent);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.24), 0 0 28px var(--btn-glow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
 }
 
 .home-nav__icon {
   flex-shrink: 0;
-  opacity: 0.8;
+  opacity: 0.85;
+  transition: transform 0.3s ease, opacity 0.2s ease;
+}
+
+.home-nav__btn:hover .home-nav__icon {
+  transform: scale(1.12) translateY(-2px);
+  opacity: 1;
 }
 
 .home-nav__btn--primary .home-nav__icon {
@@ -451,7 +637,7 @@
   .home-nav__btn {
     width: 7rem;
     height: 7rem;
-    border-radius: 14px;
+    border-radius: 16px;
     font-size: 0.9rem;
   }
 }
