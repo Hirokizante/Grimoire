@@ -338,14 +338,19 @@
 
 /* ---- Home Page ---------------------------------------------------------- */
 
+.app-main--home {
+  max-width: 100%;
+  padding: 0;
+}
+
 .home-page {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 70vh;
+  min-height: 100vh;
   text-align: center;
-  padding: 2rem 1rem;
+  padding: 2rem 1.5rem;
 }
 
 .home-page__content {
@@ -376,18 +381,19 @@
 
 .home-nav {
   display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  width: 100%;
-  max-width: 340px;
+  flex-direction: row;
+  gap: 1.25rem;
 }
 
 .home-nav__btn {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 0.85rem;
-  padding: 1rem 1.4rem;
-  border-radius: 12px;
+  justify-content: center;
+  gap: 0.75rem;
+  width: 9.5rem;
+  height: 9.5rem;
+  border-radius: 16px;
   border: 1px solid var(--border-soft);
   background: var(--bg-surface);
   color: var(--text-primary);
@@ -397,7 +403,7 @@
   cursor: pointer;
   transition: border-color 0.2s ease, background-color 0.2s ease,
     transform 0.05s ease, box-shadow 0.2s ease;
-  text-align: left;
+  text-align: center;
 }
 
 .home-nav__btn:hover {
@@ -436,13 +442,29 @@
   flex: 1;
 }
 
-/* Responsive — stack nav tighter on small screens */
-@media (max-width: 600px) {
-  .home-page {
-    min-height: 60vh;
+/* Responsive — smaller squares on narrow screens */
+@media (max-width: 640px) {
+  .home-nav {
+    gap: 0.85rem;
   }
 
+  .home-nav__btn {
+    width: 7rem;
+    height: 7rem;
+    border-radius: 14px;
+    font-size: 0.9rem;
+  }
+}
+
+@media (max-width: 420px) {
   .home-nav {
-    max-width: 100%;
+    gap: 0.6rem;
+  }
+
+  .home-nav__btn {
+    width: 6rem;
+    height: 6rem;
+    border-radius: 12px;
+    font-size: 0.82rem;
   }
 }

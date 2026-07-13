@@ -29,31 +29,40 @@ function App() {
   }, [loadRollLog])
 
   const onSheet = currentCharacter !== null
+  const onHome = !onSheet && view === 'home'
 
   return (
     <NotificationProvider>
       <div className="app">
-        <header className="app-header">
-          <button
-            type="button"
-            className="app-menu-btn"
-            onClick={() => {
-              if (onSheet) {
-                closeCharacter()
-              } else {
-                setView('home')
-              }
-            }}
-            title="Main Menu"
-            aria-label="Main Menu"
-          >
-            <Home size={18} />
-          </button>
-          <span className="app-header__divider" />
-          <span className="app-title">Grimoire</span>
-        </header>
+        {!onHome && (
+          <header className="app-header">
+            <button
+              type="button"
+              className="app-menu-btn"
+              onClick={() => {
+                if (onSheet) {
+                  closeCharacter()
+                } else {
+                  setView('home')
+                }
+              }}
+              title="Main Menu"
+              aria-label="Main Menu"
+            >
+              <Home size={18} />
+            </button>
+            <span className="app-header__divider" />
+            <span className="app-title">Grimoire</span>
+          </header>
+        )}
 
-        <main className={'app-main' + (onSheet ? '' : ' app-main--narrow')}>
+        <main
+          className={
+            'app-main' +
+            (onSheet ? '' : ' app-main--narrow') +
+            (onHome ? ' app-main--home' : '')
+          }
+        >
           {onSheet ? (
             <CharacterSheetPage />
           ) : view === 'home' ? (
