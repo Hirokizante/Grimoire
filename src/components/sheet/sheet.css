@@ -1004,7 +1004,7 @@
 .sheet-page__toolbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 1rem;
   padding: 0.75rem 1.1rem;
   margin-bottom: 0.75rem;
@@ -1018,6 +1018,24 @@
   border: 1px solid var(--border);
   border-radius: 999px;
   overflow: hidden;
+}
+
+/* Floating variant — pinned to the top-right corner of the viewport so the
+ * user can switch between View / Edit from anywhere on the sheet without
+ * scrolling back up. Rendered inside .character-sheet so it inherits the
+ * per-character CSS custom properties (theme colors, fonts). */
+.mode-toggle--floating {
+  position: fixed;
+  top: 4.5rem;
+  right: 1rem;
+  z-index: 100;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
 }
 
 .mode-toggle__btn {
@@ -2768,4 +2786,3 @@
   position: relative;
   z-index: 2;
 }
-

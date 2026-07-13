@@ -40,6 +40,7 @@ import '@/components/sheet/sheet.css'
 export interface CharacterSheetProps {
   character?: Character
   mode?: SheetMode
+  onModeChange?: (mode: SheetMode) => void
 }
 
 /**
@@ -88,6 +89,7 @@ function shift(hex: string, amt: number): string {
 export default function CharacterSheet({
   character,
   mode = 'view',
+  onModeChange,
 }: CharacterSheetProps) {
   const storeCharacter = useCharacterStore((s) => s.currentCharacter)
   const char = character ?? storeCharacter
@@ -122,6 +124,29 @@ export default function CharacterSheet({
         <style
           dangerouslySetInnerHTML={{ __html: config.customCss }}
         />
+      )}
+
+      {onModeChange && (
+        <div className="mode-toggle mode-toggle--floating" role="tablist" aria-label="Sheet mode">
+          <button
+            className={'mode-toggle__btn' + (mode === 'view' ? ' mode-toggle__btn--active' : '')}
+            type="button"
+            role="tab"
+            aria-selected={mode === 'view'}
+            onClick={() => onModeChange('view')}
+          >
+            View
+          </button>
+          <button
+            className={'mode-toggle__btn' + (mode === 'edit' ? ' mode-toggle__btn--active' : '')}
+            type="button"
+            role="tab"
+            aria-selected={mode === 'edit'}
+            onClick={() => onModeChange('edit')}
+          >
+            Edit
+          </button>
+        </div>
       )}
 
       <HeroSection character={char} mode={mode} onLevelUp={() => setShowMilestoneDialog(true)} onCustomize={() => setShowCustomize(true)} onExport={() => setShowExport(true)} />

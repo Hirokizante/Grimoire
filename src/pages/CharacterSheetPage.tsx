@@ -59,30 +59,13 @@ export default function CharacterSheetPage() {
           >
             ← Back
           </button>
-
-          <div className="mode-toggle" role="tablist" aria-label="Sheet mode">
-            <button
-              className={'mode-toggle__btn' + (mode === 'view' ? ' mode-toggle__btn--active' : '')}
-              type="button"
-              role="tab"
-              aria-selected={mode === 'view'}
-              onClick={() => setMode('view')}
-            >
-              View
-            </button>
-            <button
-              className={'mode-toggle__btn' + (mode === 'edit' ? ' mode-toggle__btn--active' : '')}
-              type="button"
-              role="tab"
-              aria-selected={mode === 'edit'}
-              onClick={() => setMode('edit')}
-            >
-              Edit
-            </button>
-          </div>
         </div>
 
-        <CharacterSheet character={currentCharacter} mode={mode} />
+        <CharacterSheet
+          character={currentCharacter}
+          mode={mode}
+          onModeChange={setMode}
+        />
       </div>
     </div>
   )
