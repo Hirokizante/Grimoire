@@ -96,6 +96,7 @@ export default function CharacterSheet({
   const [showMilestoneDialog, setShowMilestoneDialog] = useState(false)
   const [showCustomize, setShowCustomize] = useState(false)
   const [showExport, setShowExport] = useState(false)
+  const [abilitiesViewMode, setAbilitiesViewMode] = useState<'grid' | 'list'>('grid')
 
   if (!char) return null
 
@@ -172,9 +173,16 @@ export default function CharacterSheet({
           abilities={char.slottedAbilities}
           maxSlots={char.maxAbilitySlots}
           mode={mode}
+          viewMode={abilitiesViewMode}
+          onViewModeChange={setAbilitiesViewMode}
         />
 
-        <AbilityPoolSection abilities={char.abilityPool} mode={mode} />
+        <AbilityPoolSection
+          abilities={char.abilityPool}
+          mode={mode}
+          viewMode={abilitiesViewMode}
+          onViewModeChange={setAbilitiesViewMode}
+        />
       </AbilitiesDndContext>
 
       <div className="character-sheet__bottom">

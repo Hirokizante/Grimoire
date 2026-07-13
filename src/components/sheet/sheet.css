@@ -72,11 +72,23 @@
   margin: 0;
 }
 
+.sheet-section__heading-row-right {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .sheet-section__counter {
   font-family: var(--sheet-label-font, inherit);
   font-size: 0.78rem;
   color: var(--text-muted);
   white-space: nowrap;
+}
+
+.sheet-section__heading-row-right .sheet-section__counter {
+  flex-shrink: 0;
 }
 
 .sheet-section__empty {
@@ -920,6 +932,19 @@
 .ability-grid--cards > * {
   break-inside: avoid;
   margin-bottom: 0.7rem;
+}
+
+/* List view — stacked cards, full width like Core Ability section */
+.ability-grid--list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.ability-grid--list > * {
+  break-inside: avoid;
+  margin-bottom: 0;
+  width: 100%;
 }
 
 @media (max-width: 1024px) {

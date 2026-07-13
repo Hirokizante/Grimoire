@@ -16,9 +16,11 @@
  */
 
 import { useState } from 'react'
+import { LayoutGrid, List } from 'lucide-react'
 import {
   SortableContext,
   rectSortingStrategy,
+  verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { useDroppable } from '@dnd-kit/core'
 
@@ -38,15 +40,20 @@ export interface SlottedAbilitiesSectionProps {
   abilities: AbilityBlock[]
   maxSlots: number
   mode?: SheetMode
+  viewMode?: 'grid' | 'list'
+  onViewModeChange?: (mode: 'grid' | 'list') => void
 }
 
 export default function SlottedAbilitiesSection({
   abilities,
   maxSlots,
   mode = 'view',
+  viewMode = 'grid',
+  onViewModeChange,
 }: SlottedAbilitiesSectionProps) {
   const isEdit = mode === 'edit'
   const isView = !isEdit
+  const isListView = viewMode === 'list'
   const addAbilityBlock = useCharacterStore((s) => s.addAbilityBlock)
   const updateAbilityBlock = useCharacterStore((s) => s.updateAbilityBlock)
   const removeAbilityBlock = useCharacterStore((s) => s.removeAbilityBlock)
@@ -88,14 +95,50 @@ export default function SlottedAbilitiesSection({
     <section className="sheet-section sheet-section--slotted">
       <div className="sheet-section__heading-row">
         <h3 className="sheet-section__heading">Slotted Abilities</h3>
-        <span
-          className={
-            'sheet-section__counter' +
-            (overflow ? ' sheet-section__counter--over' : '')
-          }
-        >
-          {usedLabel} / {maxSlots} slots
-        </span>
+        <div className="sheet-section__heading-row-right">
+          {onViewModeChange && (
+            <div
+              className="mode-toggle mode-toggle--compact"
+              role="tablist"
+              aria-label="Slotted abilities view"
+            >
+              <button
+                className={
+                  'mode-toggle__btn' +
+                  (viewMode === 'grid' ? ' mode-toggle__btn--active' : '')
+                }
+                type="button"
+                role="tab"
+                aria-selected={viewMode === 'grid'}
+                aria-label="Grid view"
+                onClick={() => onViewModeChange('grid')}
+              >
+                <LayoutGrid size={16} />
+              </button>
+              <button
+                className={
+                  'mode-toggle__btn' +
+                  (viewMode === 'list' ? ' mode-toggle__btn--active' : '')
+                }
+                type="button"
+                role="tab"
+                aria-selected={viewMode === 'list'}
+                aria-label="List view"
+                onClick={() => onViewModeChange('list')}
+              >
+                <List size={16} />
+              </button>
+            </div>
+          )}
+          <span
+            className={
+              'sheet-section__counter' +
+              (overflow ? ' sheet-section__counter--over' : '')
+            }
+          >
+            {usedLabel} / {maxSlots} slots
+          </span>
+        </div>
       </div>
 
       {isEdit && (
@@ -125,7 +168,13 @@ export default function SlottedAbilitiesSection({
           </p>
         </div>
       ) : isView ? (
-        <div className="ability-grid ability-grid--cards">
+        <div
+          className={
+            isListView
+              ? 'ability-grid ability-grid--list'
+              : 'ability-grid ability-grid--cards'
+          }
+        >
           {abilities.map((ability) => (
             <AbilityActivation key={ability.id} ability={ability} />
           ))}
@@ -134,13 +183,15 @@ export default function SlottedAbilitiesSection({
         <div
           ref={setNodeRef}
           className={
-            'ability-grid ability-grid--cards' +
+            (isListView
+              ? 'ability-grid ability-grid--list'
+              : 'ability-grid ability-grid--cards') +
             (isOver ? ' ability-dropzone--over' : '')
           }
         >
           <SortableContext
             items={abilities.map((a) => a.id)}
-            strategy={rectSortingStrategy}
+            strategy={isListView ? verticalListSortingStrategy : rectSortingStrategy}
           >
             {abilities.map((ability) => (
               <SortableAbilityCard
