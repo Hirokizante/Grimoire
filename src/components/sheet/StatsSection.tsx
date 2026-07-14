@@ -201,31 +201,33 @@ export default function StatsSection({
 
       {isView && <RecoverAction />}
 
-      <div className="stat-mortals">
-        <span className="stat-item__label">Mortal Wounds</span>
-        {isView ? (
-          <MortalWoundRoller character={character} />
-        ) : (
-          <div className="mortal-wounds">
-            {Array.from({ length: MAX_MORTAL_WOUNDS }, (_, i) => {
-              const wound = character.mortalWounds[i]
-              const filled = wound != null
-              return (
-                <div
-                  key={i}
-                  className={
-                    'mortal-wound-slot' +
-                    (filled ? ' mortal-wound-slot--filled' : '')
-                  }
-                  title={filled ? wound ?? '' : 'Empty'}
-                >
-                  {filled ? '✕' : ''}
-                </div>
-              )
-            })}
-          </div>
-        )}
-      </div>
+      {character.mortalWounds.some((w) => w != null) && (
+        <div className="stat-mortals">
+          <span className="stat-item__label">Mortal Wounds</span>
+          {isView ? (
+            <MortalWoundRoller character={character} />
+          ) : (
+            <div className="mortal-wounds">
+              {Array.from({ length: MAX_MORTAL_WOUNDS }, (_, i) => {
+                const wound = character.mortalWounds[i]
+                const filled = wound != null
+                return (
+                  <div
+                    key={i}
+                    className={
+                      'mortal-wound-slot' +
+                      (filled ? ' mortal-wound-slot--filled' : '')
+                    }
+                    title={filled ? wound ?? '' : 'Empty'}
+                  >
+                    {filled ? '✕' : ''}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       {isView && isKnockedOut && (
         <div className="stat-section__death-saves">
