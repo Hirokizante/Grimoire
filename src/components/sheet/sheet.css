@@ -2835,6 +2835,12 @@
    * background layers sit behind the content. */
 }
 
+.sheet-page__bg-color {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+}
+
 .sheet-page__bg-image {
   position: fixed;
   inset: 0;

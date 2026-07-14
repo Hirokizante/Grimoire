@@ -28,6 +28,13 @@ export default function CharacterSheetPage() {
         'sheet-page' + (hasBg ? ' sheet-page--has-bg' : '')
       }
     >
+      {/* Page background color — fixed full-viewport layer. When a background
+       * image is present, it renders after this in DOM order with the same
+       * z-index and paints over it, so the image takes priority. */}
+      <div
+        className="sheet-page__bg-color"
+        style={{ backgroundColor: config.pageBackgroundColor }}
+      />
       {hasBg && (
         <>
           <div

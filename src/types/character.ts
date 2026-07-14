@@ -100,7 +100,9 @@ export interface SheetColors {
  * themes — players fully control the look (see DESIGN.md "Sheet Customization").
  */
 export interface SheetConfig {
-  /** Sheet background color (overrides colors.bgSurface when set). */
+  /** Page background color — the canvas behind the entire sheet. */
+  pageBackgroundColor: string
+  /** Sheet card background color (overrides colors.bgSurface when set). */
   backgroundColor: string
   /** Font family for section headings. */
   sectionHeadingFontFamily: string

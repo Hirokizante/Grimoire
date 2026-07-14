@@ -224,6 +224,7 @@ export const DEFAULT_SHEET_COLORS: SheetColors = {
  * Abilities and lore, where bright white UI would fight the scene.
  */
 export const DEFAULT_SHEET_CONFIG: SheetConfig = {
+  pageBackgroundColor: '#0f0d1a',
   backgroundColor: '#14121b',
   sectionHeadingFontFamily: '"Georgia", "Times New Roman", serif',
   sectionHeadingFontWeight: '600',

@@ -25,7 +25,7 @@ interface ColorField {
 
 /** A color picker bound directly to a top-level SheetConfig field. */
 interface ConfigColorField {
-  key: 'backgroundColor'
+  key: 'backgroundColor' | 'pageBackgroundColor'
   label: string
 }
 
@@ -38,8 +38,8 @@ const COLOR_GROUPS: {
 }[] = [
   {
     title: 'Sheet',
-    blurb: 'Page background — the canvas behind the character sheet.',
-    configFields: [{ key: 'backgroundColor', label: 'Page' }],
+    blurb: 'Sheet card background — the surface behind the character sheet content.',
+    configFields: [{ key: 'backgroundColor', label: 'Card' }],
   },
   {
     title: 'Surfaces',
@@ -103,9 +103,18 @@ const COLOR_GROUPS: {
 ]
 
 /** Preset themes for one-click color replacement. */
-const PRESETS: { name: string; colors: Partial<SheetColors> }[] = [
+interface PresetTheme {
+  name: string
+  pageBackgroundColor?: string
+  backgroundColor?: string
+  colors: Partial<SheetColors>
+}
+
+const PRESETS: PresetTheme[] = [
   {
     name: 'Midnight',
+    pageBackgroundColor: '#08060f',
+    backgroundColor: '#12101f',
     colors: {
       bgBase: '#0f0d1a',
       bgSurface: '#18152b',
@@ -120,21 +129,23 @@ const PRESETS: { name: string; colors: Partial<SheetColors> }[] = [
       accentSoft: '#b09af0',
       danger: '#e8736b',
       success: '#8ce09a',
-      minorAbility: '#7c5fd6',
-      hpBar: '#e8a0bf',
+      minorAbility: '#9b8ad6',
+      hpBar: '#e8736b',
       fpBar: '#b09af0',
-      apBar: '#7c5fd6',
-      endBar: '#7c5fd6',
-      tokenMilestone: '#7c5fd6',
-      tokenEvasion: '#e8a0bf',
-      tokenMovement: '#e8a0bf',
-      tokenSaveDC: '#7c5fd6',
-      tokenArmor: '#7bc4d6',
-      tokenEndRecovery: '#7bc4d6',
+      apBar: '#5eb3d6',
+      endBar: '#8ce09a',
+      tokenMilestone: '#d4a854',
+      tokenEvasion: '#5eb3d6',
+      tokenMovement: '#b09af0',
+      tokenSaveDC: '#e8736b',
+      tokenArmor: '#d4a854',
+      tokenEndRecovery: '#8ce09a',
     },
   },
   {
     name: 'Solar',
+    pageBackgroundColor: '#1e140c',
+    backgroundColor: '#2e1f16',
     colors: {
       bgBase: '#2a1f1a',
       bgSurface: '#382a23',
@@ -149,21 +160,23 @@ const PRESETS: { name: string; colors: Partial<SheetColors> }[] = [
       accentSoft: '#f5c48a',
       danger: '#e05a4a',
       success: '#a0d878',
-      minorAbility: '#e89253',
-      hpBar: '#e89253',
+      minorAbility: '#f0b870',
+      hpBar: '#e05a4a',
       fpBar: '#f5c48a',
-      apBar: '#e89253',
-      endBar: '#e89253',
-      tokenMilestone: '#e89253',
+      apBar: '#e8b04e',
+      endBar: '#a0d878',
+      tokenMilestone: '#e8b04e',
       tokenEvasion: '#f5c48a',
       tokenMovement: '#e89253',
       tokenSaveDC: '#e05a4a',
-      tokenArmor: '#a0d878',
-      tokenEndRecovery: '#f5c48a',
+      tokenArmor: '#c87850',
+      tokenEndRecovery: '#a0d878',
     },
   },
   {
     name: 'Ocean',
+    pageBackgroundColor: '#081420',
+    backgroundColor: '#102530',
     colors: {
       bgBase: '#0d1a22',
       bgSurface: '#162a35',
@@ -177,22 +190,24 @@ const PRESETS: { name: string; colors: Partial<SheetColors> }[] = [
       accent: '#4fb0e8',
       accentSoft: '#a5d8f0',
       danger: '#e57373',
-      success: '#8ce09a',
+      success: '#6dd8a8',
       minorAbility: '#7bc4d6',
-      hpBar: '#7bc4d6',
+      hpBar: '#e57373',
       fpBar: '#a5d8f0',
       apBar: '#4fb0e8',
-      endBar: '#4fb0e8',
-      tokenMilestone: '#4fb0e8',
+      endBar: '#6dd8a8',
+      tokenMilestone: '#5ed4b8',
       tokenEvasion: '#7bc4d6',
       tokenMovement: '#a5d8f0',
       tokenSaveDC: '#4fb0e8',
-      tokenArmor: '#8ce09a',
-      tokenEndRecovery: '#7bc4d6',
+      tokenArmor: '#c8a878',
+      tokenEndRecovery: '#6dd8a8',
     },
   },
   {
     name: 'Sakura',
+    pageBackgroundColor: '#1f1018',
+    backgroundColor: '#2e1925',
     colors: {
       bgBase: '#2a1a26',
       bgSurface: '#3a2435',
@@ -206,22 +221,24 @@ const PRESETS: { name: string; colors: Partial<SheetColors> }[] = [
       accent: '#e88bbb',
       accentSoft: '#f5c4dd',
       danger: '#e57373',
-      success: '#8ce09a',
+      success: '#9ed88a',
       minorAbility: '#e88bbb',
-      hpBar: '#e88bbb',
+      hpBar: '#e57373',
       fpBar: '#f5c4dd',
       apBar: '#e88bbb',
-      endBar: '#e88bbb',
-      tokenMilestone: '#e88bbb',
+      endBar: '#9ed88a',
+      tokenMilestone: '#d4a5c8',
       tokenEvasion: '#f5c4dd',
       tokenMovement: '#e88bbb',
       tokenSaveDC: '#e57373',
-      tokenArmor: '#a0d878',
-      tokenEndRecovery: '#f5c4dd',
+      tokenArmor: '#c8a878',
+      tokenEndRecovery: '#9ed88a',
     },
   },
   {
     name: 'Dracula',
+    pageBackgroundColor: '#1e1f29',
+    backgroundColor: '#282a36',
     colors: {
       bgBase: '#282a36',
       bgSurface: '#343746',
@@ -251,6 +268,8 @@ const PRESETS: { name: string; colors: Partial<SheetColors> }[] = [
   },
   {
     name: 'Nord',
+    pageBackgroundColor: '#222631',
+    backgroundColor: '#2e3440',
     colors: {
       bgBase: '#2e3440',
       bgSurface: '#3b4252',
@@ -280,6 +299,8 @@ const PRESETS: { name: string; colors: Partial<SheetColors> }[] = [
   },
   {
     name: 'Gruvbox',
+    pageBackgroundColor: '#1d1d1d',
+    backgroundColor: '#282828',
     colors: {
       bgBase: '#282828',
       bgSurface: '#32302f',
@@ -309,6 +330,8 @@ const PRESETS: { name: string; colors: Partial<SheetColors> }[] = [
   },
   {
     name: 'Solarized Dark',
+    pageBackgroundColor: '#001a20',
+    backgroundColor: '#002b36',
     colors: {
       bgBase: '#002b36',
       bgSurface: '#073642',
@@ -338,6 +361,8 @@ const PRESETS: { name: string; colors: Partial<SheetColors> }[] = [
   },
   {
     name: 'Tokyo Night',
+    pageBackgroundColor: '#0e0e16',
+    backgroundColor: '#16161e',
     colors: {
       bgBase: '#16161e',
       bgSurface: '#1a1b26',
@@ -367,6 +392,8 @@ const PRESETS: { name: string; colors: Partial<SheetColors> }[] = [
   },
   {
     name: 'Catppuccin',
+    pageBackgroundColor: '#08080f',
+    backgroundColor: '#11111b',
     colors: {
       bgBase: '#11111b',
       bgSurface: '#181825',
@@ -562,9 +589,16 @@ function BackgroundImageSection() {
 
   return (
     <Section
-      title="Background Image"
-      blurb="An image displayed behind the character sheet, with optional darken and blur overlays for readability."
+      title="Background"
+      blurb="Choose a background color or image for the page behind the character sheet. If a background image is set, it takes priority and covers the color."
     >
+      <ColorSwatch
+        label="Page Color"
+        value={config.pageBackgroundColor}
+        onChange={(v) =>
+          updateConfig((c) => ({ ...c, pageBackgroundColor: v }))
+        }
+      />
       <div className="customize__bg-image">
         {config.backgroundImage ? (
           <>
@@ -697,7 +731,16 @@ export default function CustomizationPanel({
                 type="button"
                 className="btn btn--ghost customize__preset-btn"
                 onClick={() =>
-                  updateConfig((c) => ({ ...c, colors: { ...c.colors, ...p.colors } }))
+                  updateConfig((c) => ({
+                    ...c,
+                    ...(p.pageBackgroundColor
+                      ? { pageBackgroundColor: p.pageBackgroundColor }
+                      : {}),
+                    ...(p.backgroundColor
+                      ? { backgroundColor: p.backgroundColor }
+                      : {}),
+                    colors: { ...c.colors, ...p.colors },
+                  }))
                 }
               >
                 {p.name}
