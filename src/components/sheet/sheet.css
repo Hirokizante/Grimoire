@@ -2231,15 +2231,21 @@
   max-width: 860px;
   display: flex;
   flex-direction: column;
+  height: 100%;              /* Fill the .modal-content's max-height */
+  max-height: 80vh;          /* Cap so the panel clears the top nav bar */
 }
 
 .customize-panel__header {
   position: sticky;
   top: 0;
+  z-index: 200;              /* Stay above all scrolling swatches/popovers */
   background: var(--bg-surface);
 }
 
 .customize-panel__body {
+  flex: 1;
+  min-height: 0;             /* Allow flex shrink below content size */
+  overflow-y: auto;          /* Scroll the body, not the outer .modal-content */
   padding: 1rem 1.1rem;
   display: flex;
   flex-direction: column;
