@@ -54,8 +54,7 @@
   font-family: var(--sheet-heading-font, inherit);
   font-size: 3rem;
   font-weight: 700;
-  color: var(--accent-blush);
-  text-shadow: 0 0 24px rgba(232, 160, 191, 0.35);
+  color: var(--text-primary);
   margin: 0;
 }
 
@@ -181,7 +180,7 @@
   padding: 0.5rem 1rem;
   cursor: pointer;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
-  transition: background-color 0.15s ease, transform 0.15s ease;
+  transition: background-color 0.15s ease, transform 0.15s ease, border-color 0.15s ease;
 }
 
 .roll-log-tab:hover {
@@ -230,6 +229,7 @@
 }
 
 .roll-log-drawer__header {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -251,23 +251,98 @@
 }
 
 .roll-log-drawer__clear--header {
-  background: none;
-  border: none;
+  all: unset;
+  box-sizing: border-box;
   color: var(--text-muted);
   cursor: pointer;
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  padding: 0.2rem 0.4rem;
-  line-height: 1;
+  justify-content: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border: 0 !important;
+  border-radius: 6px;
+  padding: 0;
+  margin: 0;
+  background: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.roll-log-drawer__clear--header svg {
+  display: block;
+  flex-shrink: 0;
 }
 
 .roll-log-drawer__clear--header:hover:not(:disabled) {
   color: var(--danger, #ef4444);
+  background: color-mix(in srgb, var(--danger, #ef4444) 12%, transparent) !important;
 }
 
 .roll-log-drawer__clear--header:disabled {
   opacity: 0.4;
   cursor: default;
+}
+
+.roll-log-drawer__confirm-popover {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  right: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--bg-surface-raised);
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  animation: popover-fade 0.15s ease;
+}
+
+@keyframes popover-fade {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.roll-log-drawer__confirm-text {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.roll-log-drawer__confirm-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.roll-log-drawer__confirm-btn {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-soft);
+  border-radius: 6px;
+  padding: 0.3rem 0.55rem;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.roll-log-drawer__confirm-btn:hover {
+  background: var(--bg-surface-hover);
+  border-color: var(--border);
+}
+
+.roll-log-drawer__confirm-btn--danger {
+  color: var(--danger, #ef4444);
+  border-color: color-mix(in srgb, var(--danger, #ef4444) 50%, var(--border-soft));
+}
+
+.roll-log-drawer__confirm-btn--danger:hover {
+  background: color-mix(in srgb, var(--danger, #ef4444) 12%, transparent);
+  border-color: var(--danger, #ef4444);
 }
 
 .roll-log-drawer__close {

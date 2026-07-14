@@ -15,6 +15,7 @@ import type { RollSource } from '@/types'
 
 export interface DiceResultModalProps {
   onClose: () => void
+  style?: React.CSSProperties
 }
 
 /** Friendly label for a roll source. */
@@ -36,7 +37,7 @@ function sourceLabel(source: RollSource | null): string | null {
   }
 }
 
-export default function DiceResultModal({ onClose }: DiceResultModalProps) {
+export default function DiceResultModal({ onClose, style }: DiceResultModalProps) {
   const result = useDiceRollStore((s) => s.result)
   const source = useDiceRollStore((s) => s.source)
 
@@ -60,6 +61,7 @@ export default function DiceResultModal({ onClose }: DiceResultModalProps) {
   return (
     <div
       className="modal-overlay"
+      style={style}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose()
       }}

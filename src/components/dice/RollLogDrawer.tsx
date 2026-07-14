@@ -5,7 +5,37 @@
 import { useRef, useEffect, useState } from 'react'
 import { Dices, Trash2 } from 'lucide-react'
 import { useRollLogStore } from '@/store/rollLogStore'
-import type { RollLogEntry } from '@/types'
+import { useCharacterStore } from '@/store/characterStore'
+import type { RollLogEntry, SheetColors } from '@/types'
+
+/**
+ * Map a SheetColors object onto the CSS custom properties used by the
+ * roll-log drawer. Mirrors the mapping in CharacterSheet so the drawer
+ * inherits the active character's theme.
+ */
+function colorVars(colors: SheetColors): Record<string, string> {
+  return {
+    '--bg-base': colors.bgBase,
+    '--bg-surface': colors.bgSurface,
+    '--bg-surface-raised': colors.bgSurfaceRaised,
+    '--bg-surface-hover': colors.bgSurfaceHover,
+    '--text-primary': colors.textPrimary,
+    '--text-secondary': colors.textSecondary,
+    '--text-muted': colors.textMuted,
+    '--border': colors.border,
+    '--border-soft': colors.borderSoft,
+    '--accent-violet': colors.accent,
+    '--accent-violet-soft': colors.accentSoft,
+    '--accent-blush': colors.hpBar,
+    '--danger': colors.danger,
+    '--color-minor-ability': colors.minorAbility,
+    '--color-success': colors.success,
+    '--hp-bar-color': colors.hpBar,
+    '--fp-bar-color': colors.fpBar,
+    '--ap-bar-color': colors.apBar,
+    '--end-bar-color': colors.endBar,
+  }
+}
 
 /** Friendly label for a roll source. */
 function srcLabel(entry: RollLogEntry): string {
@@ -32,24 +62,31 @@ export default function RollLogDrawer() {
   const closeDrawer = useRollLogStore((s) => s.closeDrawer)
   const deleteEntry = useRollLogStore((s) => s.deleteEntry)
   const clearAll = useRollLogStore((s) => s.clearAll)
+  const character = useCharacterStore((s) => s.currentCharacter)
 
   const drawerRef = useRef<HTMLDivElement>(null)
   const [expanded, setExpanded] = useState<string | null>(null)
   const [clearConfirm, setClearConfirm] = useState(false)
 
+  const themeStyle = character ? colorVars(character.config.colors) : undefined
+
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape' && drawerOpen) closeDrawer()
+      if (e.key === 'Escape') {
+        if (clearConfirm) setClearConfirm(false)
+        else if (drawerOpen) closeDrawer()
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [drawerOpen, closeDrawer])
+  }, [drawerOpen, closeDrawer, clearConfirm])
 
   return (
     <>
       <button
         type="button"
         className="roll-log-tab"
+        style={themeStyle}
         onClick={toggleDrawer}
         aria-expanded={drawerOpen}
         title="Roll history"
@@ -64,6 +101,7 @@ export default function RollLogDrawer() {
           ref={drawerRef}
           role="region"
           aria-label="Dice roll history"
+          style={themeStyle}
         >
           <header className="roll-log-drawer__header">
             <h3 className="roll-log-drawer__title">Rolls</h3>
@@ -74,6 +112,7 @@ export default function RollLogDrawer() {
                 onClick={() => setClearConfirm(true)}
                 disabled={entries.length === 0}
                 title="Clear all rolls"
+                style={{ border: '0', background: 'transparent', outline: 'none', boxShadow: 'none' }}
               >
                 <Trash2 size={14} />
               </button>
@@ -86,28 +125,35 @@ export default function RollLogDrawer() {
                 ×
               </button>
             </div>
+
             {clearConfirm && (
-              <div className="roll-log-drawer__filter-menu">
-                <span className="roll-log-drawer__clear-confirm">
+              <div
+                className="roll-log-drawer__confirm-popover"
+                role="dialog"
+                aria-live="polite"
+              >
+                <span className="roll-log-drawer__confirm-text">
                   Clear all rolls?
                 </span>
-                <button
-                  type="button"
-                  className="roll-log-drawer__clear roll-log-drawer__clear--confirm"
-                  onClick={() => {
-                    void clearAll()
-                    setClearConfirm(false)
-                  }}
-                >
-                  Yes, clear
-                </button>
-                <button
-                  type="button"
-                  className="roll-log-drawer__clear"
-                  onClick={() => setClearConfirm(false)}
-                >
-                  Cancel
-                </button>
+                <div className="roll-log-drawer__confirm-actions">
+                  <button
+                    type="button"
+                    className="roll-log-drawer__confirm-btn roll-log-drawer__confirm-btn--danger"
+                    onClick={() => {
+                      void clearAll()
+                      setClearConfirm(false)
+                    }}
+                  >
+                    Clear
+                  </button>
+                  <button
+                    type="button"
+                    className="roll-log-drawer__confirm-btn"
+                    onClick={() => setClearConfirm(false)}
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
             )}
           </header>

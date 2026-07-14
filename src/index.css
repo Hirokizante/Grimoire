@@ -51,6 +51,20 @@ body {
 button {
   font-family: inherit;
   cursor: pointer;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+}
+
+button:focus,
+button:focus-visible {
+  outline: none;
+}
+
+button::-moz-focus-inner {
+  border: 0;
+  padding: 0;
 }
 
 img {
