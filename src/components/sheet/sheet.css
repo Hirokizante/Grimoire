@@ -2216,13 +2216,72 @@
   min-width: 6rem;
 }
 
+/* Stylized modal variants for character-list interactions (create + delete). */
+
+/* ---- Create character modal ---- */
+.create-character-modal {
+  max-width: 380px;
+}
+
+.create-character-modal__body {
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.create-character-modal__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.create-character-modal__label {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.create-character-modal__body .sheet-input {
+  width: 100%;
+}
+
+/* ---- Confirm delete modal ---- */
+.confirm-delete-modal {
+  max-width: 380px;
+}
+
+.confirm-delete-modal__body {
+  padding: 1rem;
+}
+
+.confirm-delete-modal__message {
+  font-size: 0.95rem;
+  color: var(--text-primary);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.confirm-delete-modal__item-name {
+  color: var(--accent-violet-soft);
+}
+
+/* ---- Generic modal footer (shared by create/delete modals) ---- */
+.modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-top: 1px solid var(--border-soft);
+}
+
+/* ---- Phase 10: customization modal -------------------------------------- */
+
 .ability-activation .ability-card {
   border-bottom-left-radius: 0;
   border-bottom-right-radius: 0;
   border-bottom: none;
 }
-
-/* ---- Phase 10: customization modal -------------------------------------- */
 
 /* Uses the shared .modal-overlay / .modal-content / .modal-header classes.
  * Only the panel-specific overrides live here. */

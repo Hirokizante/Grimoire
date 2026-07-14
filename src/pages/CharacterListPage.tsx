@@ -2,6 +2,8 @@ import { useRef, useState } from 'react'
 import { ArrowDownFromLine, LayoutGrid, List } from 'lucide-react'
 
 import { useCharacterStore } from '@/store/characterStore'
+import CreateCharacterModal from '@/components/sheet/CreateCharacterModal'
+import ConfirmDeleteModal from '@/components/sheet/ConfirmDeleteModal'
 
 import type { Character } from '@/types'
 
@@ -18,12 +20,6 @@ function formatUpdatedAt(iso: string): string {
     hour: '2-digit',
     minute: '2-digit',
   })
-}
-
-function handleCreate() {
-  const name = window.prompt('Character name?')?.trim()
-  if (!name) return
-  void useCharacterStore.getState().createCharacter(name)
 }
 
 function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
@@ -45,14 +41,6 @@ function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
   reader.readAsText(file)
 }
 
-function handleDelete(character: Character) {
-  const confirmed = window.confirm(
-    `Delete "${character.name}"? This cannot be undone.`,
-  )
-  if (!confirmed) return
-  void useCharacterStore.getState().deleteCharacter(character.id)
-}
-
 export default function CharacterListPage() {
   const characters = useCharacterStore((s) => s.characters)
   const isLoaded = useCharacterStore((s) => s.isLoaded)
@@ -60,6 +48,8 @@ export default function CharacterListPage() {
   const selectCharacter = useCharacterStore((s) => s.selectCharacter)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [viewMode, setViewMode] = useState<ViewMode>('grid')
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [characterToDelete, setCharacterToDelete] = useState<Character | null>(null)
 
   if (!isLoaded) {
     return (
@@ -89,7 +79,7 @@ export default function CharacterListPage() {
             <button
               className="btn btn--primary"
               type="button"
-              onClick={handleCreate}
+              onClick={() => setShowCreateModal(true)}
             >
               Create New Character
             </button>
@@ -101,6 +91,15 @@ export default function CharacterListPage() {
             className="visually-hidden"
             onChange={handleImport}
           />
+          {showCreateModal && (
+            <CreateCharacterModal
+              onCreate={(name) => {
+                void useCharacterStore.getState().createCharacter(name)
+                setShowCreateModal(false)
+              }}
+              onClose={() => setShowCreateModal(false)}
+            />
+          )}
         </div>
       </div>
     )
@@ -157,7 +156,7 @@ export default function CharacterListPage() {
           <button
             className="btn btn--primary page-head__btn"
             type="button"
-            onClick={handleCreate}
+            onClick={() => setShowCreateModal(true)}
           >
             + New
           </button>
@@ -204,7 +203,7 @@ export default function CharacterListPage() {
                 className="card-delete"
                 type="button"
                 aria-label={`Delete ${c.name}`}
-                onClick={() => handleDelete(c)}
+                onClick={() => setCharacterToDelete(c)}
               >
                 ×
               </button>
@@ -245,13 +244,34 @@ export default function CharacterListPage() {
                 className="character-list__delete"
                 type="button"
                 aria-label={`Delete ${c.name}`}
-                onClick={() => handleDelete(c)}
+                onClick={() => setCharacterToDelete(c)}
               >
                 ×
               </button>
             </li>
           ))}
         </ul>
+      )}
+
+      {showCreateModal && (
+        <CreateCharacterModal
+          onCreate={(name) => {
+            void useCharacterStore.getState().createCharacter(name)
+            setShowCreateModal(false)
+          }}
+          onClose={() => setShowCreateModal(false)}
+        />
+      )}
+
+      {characterToDelete && (
+        <ConfirmDeleteModal
+          itemName={characterToDelete.name}
+          onConfirm={() => {
+            void useCharacterStore.getState().deleteCharacter(characterToDelete.id)
+            setCharacterToDelete(null)
+          }}
+          onClose={() => setCharacterToDelete(null)}
+        />
       )}
     </div>
   )
