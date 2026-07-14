@@ -57,12 +57,12 @@ export interface CharacterStoreState {
 }
 
 /** Sections that hold a list of AbilityBlocks on a character. */
-type AbilitySection = 'slottedAbilities' | 'abilityPool'
+type AbilitySection = 'slottedAbilities' | 'abilityPool' | 'innateAbilities'
 
 /** Core ability fields editable via {@link CharacterStoreActions.updateCoreAbility}. */
 type CoreAbilityField =
   | 'innateDescription'
-  | 'innateAbility'
+  | 'innateAbilities'
   | 'basicAttack'
   | 'fatebreaker'
 
@@ -162,10 +162,10 @@ export interface CharacterStoreActions {
     fromIndex: number,
     toIndex: number,
   ) => void
-  /** Update a core ability field (innateDescription, innateAbility, basicAttack, fatebreaker). */
+  /** Update a core ability field (innateDescription, innateAbilities, basicAttack, fatebreaker). */
   updateCoreAbility: (
     field: CoreAbilityField,
-    value: string | AbilityBlock | null,
+    value: string | AbilityBlock | AbilityBlock[] | null,
   ) => void
   /** Apply damage to the character (handles temp HP, armor, resistance, mortal wound overflow). */
   takeDamage: (amount: number, opts?: {

@@ -12,6 +12,7 @@
 import { generateId } from '@/constants/gameData'
 import {
   getVersionHistory,
+  normalizeCharacter,
   putVersionSnapshot,
 } from '@/lib/db'
 import type { Character, Semver, VersionSnapshot } from '@/types'
@@ -199,7 +200,8 @@ function isCharacterShape(data: unknown): data is Character {
 export function importCharacter(text: string): Character {
   const parsed = parseCharacterJSON(text)
   // Fresh id so the imported copy is a distinct character.
-  return { ...parsed, id: generateId() }
+  // Normalize in case the JSON uses the old single-ability field.
+  return { ...normalizeCharacter(parsed), id: generateId() }
 }
 
 /**
@@ -211,7 +213,7 @@ export function restoreFromSnapshot(
   snapshot: VersionSnapshot,
 ): Character {
   return {
-    ...structuredClone(snapshot.data),
+    ...normalizeCharacter(structuredClone(snapshot.data)),
     version: bumpSemver(snapshot.version),
     updatedAt: new Date().toISOString(),
   }

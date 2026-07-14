@@ -70,6 +70,25 @@ function promisifyRequest<T>(request: IDBRequest<T>): Promise<T> {
   })
 }
 
+/**
+ * Normalize a freshly-loaded Character record to the latest schema.
+ *
+ * Migrates the old single-ability `innateAbility` field to the new
+ * multi-ability `innateAbilities` array, guaranteeing downstream code never
+ * sees an undefined `innateAbilities`.
+ */
+export function normalizeCharacter(raw: Character): Character {
+  // Already on the latest schema.
+  if (Array.isArray(raw.innateAbilities)) return raw
+
+  // Migrate from the previous single-ability shape.
+  const { innateAbility, ...rest } = raw as unknown as {
+    innateAbility?: import('@/types').AbilityBlock | null
+  } & Record<string, unknown>
+  const innateAbilities = innateAbility ? [innateAbility] : []
+  return { ...rest, innateAbilities } as Character
+}
+
 /** Load every stored character, ordered by creation date (oldest first). */
 export async function getAllCharacters(): Promise<Character[]> {
   const db = await openDB()
@@ -77,7 +96,9 @@ export async function getAllCharacters(): Promise<Character[]> {
   const store = tx.objectStore(CHAR_STORE)
   const all = await promisifyRequest<Character[]>(store.getAll())
   db.close()
-  return all.sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+  return all
+    .map(normalizeCharacter)
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
 }
 
 /**
@@ -89,7 +110,7 @@ export async function getCharacter(id: string): Promise<Character | null> {
   const store = tx.objectStore(CHAR_STORE)
   const result = await promisifyRequest<Character | undefined>(store.get(id))
   db.close()
-  return result ?? null
+  return result ? normalizeCharacter(result) : null
 }
 
 /** Insert or replace a character record. */

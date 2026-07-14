@@ -159,7 +159,7 @@ export default function CharacterSheet({
 
       <CoreAbilitySection
         innateDescription={char.innateDescription}
-        innateAbility={char.innateAbility}
+        innateAbilities={char.innateAbilities}
         basicAttack={char.basicAttack}
         fatebreaker={char.fatebreaker}
         mode={mode}

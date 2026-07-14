@@ -357,7 +357,7 @@ export function createDefaultCharacter(): Character {
     mortalWounds: [null, null],
     deathSaves: { successes: 0, failures: 0 },
     innateDescription: '',
-    innateAbility: null,
+    innateAbilities: [],
     basicAttack: createDefaultBasicAttack(),
     fatebreaker: createDefaultFatebreaker(),
     slottedAbilities: [],

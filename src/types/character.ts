@@ -212,8 +212,8 @@ export interface Character {
   deathSaves: DeathSaves
   /** Prose description of the character's powers / Innate narrative. */
   innateDescription: string
-  /** Mechanical core Ability (optional). Always accessible, unlike slotted. */
-  innateAbility: AbilityBlock | null
+  /** Mechanical core Abilities (optional). Always accessible, unlike slotted. */
+  innateAbilities: AbilityBlock[]
   /** The character's Basic Attack (fixed-shape AbilityBlock). */
   basicAttack: AbilityBlock
   /** The character's Fatebreaker ultimate (costs FP). */

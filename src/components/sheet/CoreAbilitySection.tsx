@@ -3,14 +3,14 @@
  *
  * Renders, in order:
  *   1. The Innate narrative description (free-form prose).
- *   2. The optional Innate Ability as an AbilityBlockCard.
+ *   2. Zero or more Innate Abilities as AbilityBlockCards.
  *   3. The Basic Attack as an AbilityBlockCard.
  *   4. The Fatebreaker ultimate as an AbilityBlockCard.
  *
- * In edit mode the innate description becomes a textarea; the Innate Ability,
+ * In edit mode the innate description becomes a textarea; Innate Abilities,
  * Basic Attack, and Fatebreaker each get an Edit button that opens the
- * {@link AbilityEditorModal}; and an "Add Innate Ability" button appears when
- * `innateAbility` is null.
+ * {@link AbilityEditorModal}; and an "Add Innate Ability" button appends a
+ * new blank ability.
  */
 
 import { useState } from 'react'
@@ -25,18 +25,22 @@ import type { SheetMode } from '@/pages/CharacterSheetPage'
 
 export interface CoreAbilitySectionProps {
   innateDescription: string
-  innateAbility: AbilityBlock | null
+  innateAbilities: AbilityBlock[]
   basicAttack: AbilityBlock
   fatebreaker: AbilityBlock
   mode?: SheetMode
 }
 
 /** Which core ability is currently being edited, if any. */
-type EditingField = 'innateAbility' | 'basicAttack' | 'fatebreaker' | null
+type EditingField =
+  | { field: 'innateAbility'; id: string }
+  | { field: 'basicAttack' }
+  | { field: 'fatebreaker' }
+  | null
 
 export default function CoreAbilitySection({
   innateDescription,
-  innateAbility,
+  innateAbilities,
   basicAttack,
   fatebreaker,
   mode = 'view',
@@ -53,19 +57,32 @@ export default function CoreAbilitySection({
     updateCoreAbility('innateDescription', value)
 
   const openCoreEdit = (field: Exclude<EditingField, null>) => {
-    const current =
-      field === 'innateAbility'
-        ? innateAbility
-        : field === 'basicAttack'
-          ? basicAttack
-          : fatebreaker
+    let current: AbilityBlock | null = null
+    if (field.field === 'innateAbility') {
+      current =
+        innateAbilities.find((a) => a.id === field.id) ?? null
+    } else if (field.field === 'basicAttack') {
+      current = basicAttack
+    } else if (field.field === 'fatebreaker') {
+      current = fatebreaker
+    }
     setEditingField(field)
     setEditingAbility(current)
   }
 
   const handleSave = (ability: AbilityBlock) => {
-    if (editingField) {
-      updateCoreAbility(editingField, ability)
+    if (!editingField) return
+    if (editingField.field === 'innateAbility') {
+      const updated = innateAbilities.map((a) =>
+        a.id === ability.id ? ability : a,
+      )
+      // If this was a brand-new ability (not in the list yet), append it.
+      if (!innateAbilities.some((a) => a.id === ability.id)) {
+        updated.push(ability)
+      }
+      updateCoreAbility('innateAbilities', updated)
+    } else {
+      updateCoreAbility(editingField.field, ability)
     }
     setEditingField(null)
     setEditingAbility(null)
@@ -76,7 +93,14 @@ export default function CoreAbilitySection({
     setEditingAbility(null)
   }
 
-  const hasContent = innateDescription !== '' || innateAbility !== null
+  const removeInnate = (id: string) => {
+    updateCoreAbility(
+      'innateAbilities',
+      innateAbilities.filter((a) => a.id !== id),
+    )
+  }
+
+  const hasContent = innateDescription !== '' || innateAbilities.length > 0
 
   return (
     <section className="sheet-section sheet-section--core">
@@ -108,11 +132,11 @@ export default function CoreAbilitySection({
       )}
 
       <div className="ability-grid ability-grid--core">
-        {innateAbility ? (
+        {innateAbilities.map((ability) =>
           isEdit ? (
-            <div className="ability-card-wrap">
+            <div className="ability-card-wrap" key={ability.id}>
               <AbilityBlockCard
-                ability={innateAbility}
+                ability={ability}
                 mode={mode}
                 actions={
                   isEdit ? (
@@ -120,14 +144,16 @@ export default function CoreAbilitySection({
                       <button
                         type="button"
                         className="btn btn--ghost ability-card__action-btn"
-                        onClick={() => openCoreEdit('innateAbility')}
+                        onClick={() =>
+                          openCoreEdit({ field: 'innateAbility', id: ability.id })
+                        }
                       >
                         Edit
                       </button>
                       <button
                         type="button"
                         className="btn btn--ghost ability-card__action-btn ability-card__action-btn--danger"
-                        onClick={() => updateCoreAbility('innateAbility', null)}
+                        onClick={() => removeInnate(ability.id)}
                       >
                         Remove
                       </button>
@@ -137,18 +163,18 @@ export default function CoreAbilitySection({
               />
             </div>
           ) : (
-            <AbilityActivation ability={innateAbility} />
-          )
-        ) : (
-          isEdit && (
-            <button
-              type="button"
-              className="btn btn--ghost section-add-btn"
-              onClick={() => openCoreEdit('innateAbility')}
-            >
-              + Add Innate Ability
-            </button>
-          )
+            <AbilityActivation key={ability.id} ability={ability} />
+          ),
+        )}
+
+        {isEdit && (
+          <button
+            type="button"
+            className="btn btn--ghost section-add-btn"
+            onClick={() => openCoreEdit({ field: 'innateAbility', id: '' })}
+          >
+            + Add Innate Ability
+          </button>
         )}
 
         {isEdit ? (
@@ -161,7 +187,7 @@ export default function CoreAbilitySection({
                   <button
                     type="button"
                     className="btn btn--ghost ability-card__action-btn"
-                    onClick={() => openCoreEdit('basicAttack')}
+                    onClick={() => openCoreEdit({ field: 'basicAttack' })}
                   >
                     Edit
                   </button>
@@ -183,7 +209,7 @@ export default function CoreAbilitySection({
                   <button
                     type="button"
                     className="btn btn--ghost ability-card__action-btn"
-                    onClick={() => openCoreEdit('fatebreaker')}
+                    onClick={() => openCoreEdit({ field: 'fatebreaker' })}
                   >
                     Edit
                   </button>
