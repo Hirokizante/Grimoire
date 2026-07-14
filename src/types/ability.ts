@@ -7,20 +7,6 @@
  */
 
 /**
- * Categories under which Ability Traits can be organized. Traits are free-form
- * text tags, but the system groups them into categories for UI presentation
- * and validation. See DESIGN.md "Traits" for the non-exhaustive list.
- */
-export type TraitCategory =
-  | 'Activation'
-  | 'Range'
-  | 'AreaOfEffect'
-  | 'Type'
-  | 'Status'
-  | 'SpecialProperty'
-  | 'Other'
-
-/**
  * The resource costs an Ability may require to activate. All fields are
  * optional — an AbilityBlock need only list the resources it actually
  * consumes (e.g. a Basic Attack only costs AP).

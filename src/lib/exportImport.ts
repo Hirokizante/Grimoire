@@ -11,6 +11,7 @@
 
 import { generateId } from '@/constants/gameData'
 import {
+  deleteVersionSnapshot,
   getVersionHistory,
   normalizeCharacter,
   putVersionSnapshot,
@@ -37,13 +38,6 @@ export function parseSemver(v: string): { major: number; minor: number; patch: n
   const m = /^(\d+)\.(\d+)\.(\d+)$/.exec(trimmed)
   if (!m) return null
   return { major: Number(m[1]), minor: Number(m[2]), patch: Number(m[3]) }
-}
-
-/**
- * Normalize a semver string (trims whitespace).
- */
-export function normalizeSemver(v: Semver): Semver {
-  return v.trim()
 }
 
 /**
@@ -217,6 +211,13 @@ export function restoreFromSnapshot(
     version: bumpSemver(snapshot.version),
     updatedAt: new Date().toISOString(),
   }
+}
+
+/**
+ * Delete a version snapshot from history.
+ */
+export async function deleteVersion(snapshotId: string): Promise<void> {
+  await deleteVersionSnapshot(snapshotId)
 }
 
 /**

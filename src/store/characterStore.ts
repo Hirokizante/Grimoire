@@ -8,16 +8,17 @@
  */
 
 import { create } from 'zustand'
-import { createDefaultCharacter, generateId, MORTAL_WOUNDS } from '@/constants/gameData'
+import { createDefaultCharacter, generateId, MORTAL_WOUNDS, MAX_AP, MAX_END, MAX_MORTAL_WOUNDS, DEATH_SAVE_DC } from '@/constants/gameData'
 import {
   deleteCharacter as dbDeleteCharacter,
   getAllCharacters,
   putCharacter,
 } from '@/lib/db'
-import { calcHP } from '@/lib/calculations'
+import { calcHP, calcENDRecovery } from '@/lib/calculations'
 import { rollDie } from '@/lib/dice'
 import {
   bumpSemver,
+  deleteVersion,
   exportCharacter,
   importCharacter as parseImportCharacter,
   listVersions,
@@ -65,15 +66,6 @@ type CoreAbilityField =
   | 'innateAbilities'
   | 'basicAttack'
   | 'fatebreaker'
-
-/** Maximum Action Points, constant per DESIGN.md. */
-const MAX_AP = 3
-/** Maximum Endurance, constant per DESIGN.md. */
-const MAX_END = 10
-/** Maximum Mortal Wounds a character can sustain. */
-const MAX_MORTAL_WOUNDS = 2
-/** Death Save DC (DESIGN.md "Death Saves"). */
-const DEATH_SAVE_DC = 10
 
 /** Result of a damage application, for UI feedback. */
 export interface DamageResult {
@@ -227,10 +219,6 @@ export interface CharacterStoreActions {
   skipMilestone: () => void
   /** Update the sheet configuration (colors, fonts, custom CSS). */
   updateConfig: (updater: (config: SheetConfig) => SheetConfig) => void
-  /**
-   * Create and store a version snapshot of the current character.
-   * Returns the snapshot, or null if there is no current character.
-   */
   /**
    * Create and store a version snapshot of the current character.
    * Returns the snapshot, or null if there is no current character.
@@ -603,7 +591,7 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
     if (!current) return
     // Damaged Throat: unable to regain END passively.
     if (current.mortalWounds.includes('Damaged Throat')) return
-    const recovery = Math.max(1, 1 + Math.floor(current.attributes.GRT / 2))
+    const recovery = calcENDRecovery(current.attributes.GRT)
     get().updateCurrentCharacter((char) => ({
       ...char,
       currentEND: Math.min(MAX_END, char.currentEND + recovery),
@@ -630,7 +618,7 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
       // 2. Apply END Recovery (unless Damaged Throat prevents it).
       let recovery = 0
       if (!char.mortalWounds.includes('Damaged Throat')) {
-        recovery = Math.max(1, 1 + Math.floor(char.attributes.GRT / 2))
+        recovery = calcENDRecovery(char.attributes.GRT)
         newEND = Math.min(MAX_END, newEND + recovery)
       }
       totalGained = apToEND + recovery
@@ -857,8 +845,7 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
   },
 
   deleteVersion: async (snapshotId) => {
-    const { deleteVersionSnapshot } = await import('@/lib/db')
-    await deleteVersionSnapshot(snapshotId)
+    await deleteVersion(snapshotId)
     await get().loadVersions()
   },
 }))

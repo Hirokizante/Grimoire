@@ -11,30 +11,11 @@
 
 import { useEscapeKey } from '@/hooks/useEscapeKey'
 import { useDiceRollStore } from '@/store/diceRollStore'
-import type { RollSource } from '@/types'
+import { sourceLabel } from '@/lib/rollSourceUtils'
 
 export interface DiceResultModalProps {
   onClose: () => void
   style?: React.CSSProperties
-}
-
-/** Friendly label for a roll source. */
-function sourceLabel(source: RollSource | null): string | null {
-  if (!source) return null
-  switch (source.type) {
-    case 'ability-damage':
-      return `Damage: ${source.abilityName}`
-    case 'skill-check':
-      return `Skill check: ${source.skillName}`
-    case 'attribute-check':
-      return `Attribute check: ${source.attributeName}`
-    case 'attack':
-      return `Attack${source.abilityName ? ` (${source.abilityName})` : ''}`
-    case 'saving-throw':
-      return `Save${source.stat ? ` (${source.stat})` : ''}`
-    case 'manual':
-      return source.note || 'Manual roll'
-  }
 }
 
 export default function DiceResultModal({ onClose, style }: DiceResultModalProps) {

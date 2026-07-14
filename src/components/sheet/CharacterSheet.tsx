@@ -22,6 +22,7 @@ import { useState } from 'react'
 import CustomizationPanel from '@/components/sheet/CustomizationPanel'
 
 import { useCharacterStore } from '@/store/characterStore'
+import { colorVars } from '@/lib/themeUtils'
 import type { Character, SheetColors } from '@/types'
 import type { SheetMode } from '@/pages/CharacterSheetPage'
 
@@ -44,35 +45,6 @@ export interface CharacterSheetProps {
 }
 
 /**
- * Map a SheetColors object onto CSS custom properties. This is the single
- * injection point that drives the entire per-character theme.
- */
-function colorVars(colors: SheetColors): Record<string, string> {
-  return {
-    '--bg-base': colors.bgBase,
-    '--bg-surface': colors.bgSurface,
-    '--bg-surface-raised': colors.bgSurfaceRaised,
-    '--bg-surface-hover': colors.bgSurfaceHover,
-    '--text-primary': colors.textPrimary,
-    '--text-secondary': colors.textSecondary,
-    '--text-muted': colors.textMuted,
-    '--border': colors.border,
-    '--border-soft': colors.borderSoft,
-    '--accent-violet': colors.accent,
-    '--accent-violet-soft': colors.accentSoft,
-    '--accent-blush': colors.hpBar,
-    '--danger': colors.danger,
-    '--danger-hover': shift(colors.danger, 16),
-    '--color-minor-ability': colors.minorAbility,
-    '--color-success': colors.success,
-    '--hp-bar-color': colors.hpBar,
-    '--fp-bar-color': colors.fpBar,
-    '--ap-bar-color': colors.apBar,
-    '--end-bar-color': colors.endBar,
-  }
-}
-
-/**
  * Lighten or darken a hex color by `amt` (0-255 each channel cap). Positive
  * lightens toward white, negative darkens toward black.
  */
@@ -84,6 +56,17 @@ function shift(hex: string, amt: number): string {
   const g = Math.min(255, Math.max(0, ((num >> 8) & 0xff) + amt))
   const b = Math.min(255, Math.max(0, (num & 0xff) + amt))
   return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`
+}
+
+/**
+ * Extended color vars for the character sheet — adds `--danger-hover` and
+ * `--sheet-bg` on top of the shared base mapping.
+ */
+function sheetColorVars(colors: SheetColors): Record<string, string> {
+  return {
+    ...colorVars(colors),
+    '--danger-hover': shift(colors.danger, 16),
+  }
 }
 
 export default function CharacterSheet({
@@ -109,7 +92,7 @@ export default function CharacterSheet({
     '--sheet-label-font': config.labelFontFamily,
     '--sheet-text-font': config.textFontFamily,
     '--sheet-helper-font': config.helperTextFontFamily,
-    ...colorVars(c),
+    ...sheetColorVars(c),
   } as React.CSSProperties
 
   return (
@@ -188,8 +171,6 @@ export default function CharacterSheet({
       <div className="character-sheet__bottom">
         <SkillsSection character={char} skills={char.skills} mode={mode} />
         <ProfileSection
-          name={char.name}
-          portrait={char.portrait}
           physicalDescription={char.physicalDescription}
           backstory={char.backstory}
           mode={mode}

@@ -6,54 +6,9 @@ import { useRef, useEffect, useState } from 'react'
 import { Dices, Trash2 } from 'lucide-react'
 import { useRollLogStore } from '@/store/rollLogStore'
 import { useCharacterStore } from '@/store/characterStore'
-import type { RollLogEntry, SheetColors } from '@/types'
-
-/**
- * Map a SheetColors object onto the CSS custom properties used by the
- * roll-log drawer. Mirrors the mapping in CharacterSheet so the drawer
- * inherits the active character's theme.
- */
-function colorVars(colors: SheetColors): Record<string, string> {
-  return {
-    '--bg-base': colors.bgBase,
-    '--bg-surface': colors.bgSurface,
-    '--bg-surface-raised': colors.bgSurfaceRaised,
-    '--bg-surface-hover': colors.bgSurfaceHover,
-    '--text-primary': colors.textPrimary,
-    '--text-secondary': colors.textSecondary,
-    '--text-muted': colors.textMuted,
-    '--border': colors.border,
-    '--border-soft': colors.borderSoft,
-    '--accent-violet': colors.accent,
-    '--accent-violet-soft': colors.accentSoft,
-    '--accent-blush': colors.hpBar,
-    '--danger': colors.danger,
-    '--color-minor-ability': colors.minorAbility,
-    '--color-success': colors.success,
-    '--hp-bar-color': colors.hpBar,
-    '--fp-bar-color': colors.fpBar,
-    '--ap-bar-color': colors.apBar,
-    '--end-bar-color': colors.endBar,
-  }
-}
-
-/** Friendly label for a roll source. */
-function srcLabel(entry: RollLogEntry): string {
-  switch (entry.source.type) {
-    case 'ability-damage':
-      return entry.source.abilityName
-    case 'skill-check':
-      return `Check: ${entry.source.skillName}`
-    case 'attribute-check':
-      return `Check: ${entry.source.attributeName}`
-    case 'manual':
-      return entry.source.note ?? 'Manual'
-    case 'attack':
-      return entry.source.abilityName ?? 'Attack'
-    case 'saving-throw':
-      return 'Save'
-  }
-}
+import { colorVars } from '@/lib/themeUtils'
+import { rollLogSourceLabel } from '@/lib/rollSourceUtils'
+import type { RollLogEntry } from '@/types'
 
 export default function RollLogDrawer() {
   const entries = useRollLogStore((s) => s.entries)
@@ -220,7 +175,7 @@ function RollLogItem({
       >
         <div className="roll-log-item__info">
           <span className="roll-log-item__notation">{entry.notation}</span>
-          <span className="roll-log-item__src">{srcLabel(entry)}</span>
+          <span className="roll-log-item__src">{rollLogSourceLabel(entry)}</span>
           <span className="roll-log-item__character" title={entry.characterName}>
             {entry.characterName}
           </span>

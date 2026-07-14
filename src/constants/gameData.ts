@@ -17,6 +17,15 @@ import type {
   Skills,
 } from '@/types'
 
+/** Maximum Action Points, constant per DESIGN.md "Action Points". */
+export const MAX_AP = 3
+/** Maximum Endurance, constant per DESIGN.md "Endurance". */
+export const MAX_END = 10
+/** Maximum Mortal Wounds a character can sustain. */
+export const MAX_MORTAL_WOUNDS = 2
+/** Death Save DC (DESIGN.md "Death Saves"). */
+export const DEATH_SAVE_DC = 10
+
 /** All fifteen Skills, in display order per DESIGN.md. */
 export const SKILL_LIST: SkillName[] = [
   'Move Quickly',

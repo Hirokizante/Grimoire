@@ -4,7 +4,6 @@
 export type {
   AbilityBlock,
   AbilityCost,
-  TraitCategory,
 } from './ability'
 export type {
   AttributeKey,

@@ -38,15 +38,6 @@ function formatDate(iso: string): string {
   })
 }
 
-/**
- * Parse a raw user input into a valid semver string (MAJOR.MINOR.PATCH).
- * Returns null when the input is empty or invalid (used to disable the
- * Export button).
- */
-function parseVersionInput(text: string): Semver | null {
-  return serializeSemver(text)
-}
-
 export default function ExportDialog({ open, onClose }: ExportDialogProps) {
   const currentCharacter = useCharacterStore((s) => s.currentCharacter)
   const versionHistory = useCharacterStore((s) => s.versionHistory)
@@ -73,7 +64,7 @@ export default function ExportDialog({ open, onClose }: ExportDialogProps) {
 
   if (!currentCharacter || !open) return null
 
-  const parsedOverride = parseVersionInput(versionOverrideText)
+  const parsedOverride = serializeSemver(versionOverrideText)
   const nextVersion = bumpSemver(currentCharacter.version)
 
   const handleExport = async () => {

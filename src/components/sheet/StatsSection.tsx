@@ -41,6 +41,7 @@ import {
   calcMovement,
   calcSaveDC,
 } from '@/lib/calculations'
+import { MAX_AP, MAX_END, MAX_MORTAL_WOUNDS } from '@/constants/gameData'
 import { useCharacterStore } from '@/store/characterStore'
 import type { Character } from '@/types'
 import type { SheetMode } from '@/pages/CharacterSheetPage'
@@ -55,13 +56,6 @@ export interface StatsSectionProps {
    */
   variant?: 'section' | 'flat'
 }
-
-/** Maximum Action Points, constant per DESIGN.md "Action Points". */
-const MAX_AP = 3
-/** Maximum Endurance, constant per DESIGN.md "Endurance". */
-const MAX_END = 10
-/** Maximum Mortal Wounds a character can sustain. */
-const MAX_MORTAL_WOUNDS = 2
 
 /** Metadata for each derived stat token: icon, label, accent class. */
 interface StatToken {

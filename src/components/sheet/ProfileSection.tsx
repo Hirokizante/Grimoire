@@ -16,12 +16,7 @@ import { useCharacterStore } from '@/store/characterStore'
 import MarkdownText from '@/components/ui/MarkdownText'
 import type { SheetMode } from '@/pages/CharacterSheetPage'
 
-/** Portrait and name props are accepted but unused — kept for API compat. */
 export interface ProfileSectionProps {
-  /** Unused — portrait is rendered in HeroSection. */
-  name?: string
-  /** Unused — portrait is rendered in HeroSection. */
-  portrait?: string | null
   physicalDescription: string
   backstory: string
   mode?: SheetMode
