@@ -85,7 +85,7 @@ export default function RollLogDrawer() {
     <>
       <button
         type="button"
-        className="roll-log-tab"
+        className={`roll-log-tab${drawerOpen ? ' roll-log-tab--active' : ''}`}
         style={themeStyle}
         onClick={toggleDrawer}
         aria-expanded={drawerOpen}
