@@ -15,6 +15,7 @@ export type {
   SheetColors,
   MortalWound,
   DeathSaves,
+  Semver,
   VersionSnapshot,
   Character,
 } from './character'

@@ -14,20 +14,86 @@ import {
   getVersionHistory,
   putVersionSnapshot,
 } from '@/lib/db'
-import type { Character, VersionSnapshot } from '@/types'
+import type { Character, Semver, VersionSnapshot } from '@/types'
+
+/** Semantic version increment level. */
+export type SemverBump = 'major' | 'minor' | 'patch'
 
 /**
- * Version-aware filename: "Character Name v1.2.json".
+ * Parse a semver string into its components.
+ * Returns null for invalid input.
+ *
+ * Also handles legacy numeric values (e.g. `1`) by treating them as
+ * `1.0.0`, so characters saved before the semver migration don't crash
+ * the export dialog.
+ */
+export function parseSemver(v: string): { major: number; minor: number; patch: number } | null {
+  const trimmed = String(v).trim()
+  // Legacy numeric-only format → treat as MAJOR.0.0
+  if (/^\d+$/.test(trimmed)) {
+    return { major: Number(trimmed), minor: 0, patch: 0 }
+  }
+  const m = /^(\d+)\.(\d+)\.(\d+)$/.exec(trimmed)
+  if (!m) return null
+  return { major: Number(m[1]), minor: Number(m[2]), patch: Number(m[3]) }
+}
+
+/**
+ * Normalize a semver string (trims whitespace).
+ */
+export function normalizeSemver(v: Semver): Semver {
+  return v.trim()
+}
+
+/**
+ * Validate a semver string against the strict MAJOR.MINOR.PATCH format.
+ * Returns the normalized version, or null if invalid.
+ */
+export function serializeSemver(v: Semver): Semver | null {
+  const parsed = parseSemver(v)
+  if (!parsed) return null
+  return `${parsed.major}.${parsed.minor}.${parsed.patch}`
+}
+
+/**
+ * Bump a semantic version string by the given level.
+ * Default is 'patch', matching the typical "increment the version counter"
+ * behavior. Pass 'minor' or 'major' for non-patch increments.
+ *
+ * @example
+ * bumpSemver('1.0.0')      // '1.0.1'
+ * bumpSemver('1.0.0', 'minor')  // '1.1.0'
+ * bumpSemver('1.0.0', 'major')  // '2.0.0'
+ */
+export function bumpSemver(version: Semver, level: SemverBump = 'patch'): Semver {
+  const parsed = parseSemver(version)
+  if (!parsed) {
+    // Fall back to default if input is invalid
+    return level === 'major' ? '1.0.0'
+      : level === 'minor' ? '0.1.0'
+        : '0.0.1'
+  }
+
+  switch (level) {
+    case 'major':
+      return `${parsed.major + 1}.0.0`
+    case 'minor':
+      return `${parsed.major}.${parsed.minor + 1}.0`
+    case 'patch':
+    default:
+      return `${parsed.major}.${parsed.minor}.${parsed.patch + 1}`
+  }
+}
+
+/**
+ * Version-aware filename: "Character Name v1.2.json" or "Character Name v9.1.2.json".
  *
  * dots/dashes inside the character name are preserved; version is separated
  * by " v" so it parses cleanly.
  */
-export function versionedFilename(
-  name: string,
-  version: number,
-): string {
+export function versionedFilename(name: string, version: Semver): string {
   const safeName = name.trim().replace(/[/\\?%*:|"<>]/g, '_')
-  return `${safeName} v${version}.json`
+  return `${safeName} v${version.trim()}.json`
 }
 
 /**
@@ -68,17 +134,26 @@ export async function listVersions(
 /**
  * Trigger a browser download of a character as JSON.
  *
- * Bumps the character's `.version` counter, then creates a snapshot and
- * downloads the file.
+ * Creates a snapshot and downloads the file. An optional `versionOverride`
+ * can supply a semantic version (e.g. "9.1.2") instead of bumping the
+ * character's current version. The character's version counter is updated
+ * to match.
  */
-export async function exportCharacter(character: Character): Promise<{
+export async function exportCharacter(
+  character: Character,
+  versionOverride?: Semver,
+): Promise<{
   filename: string
   snapshot: VersionSnapshot
 }> {
-  const filename = versionedFilename(character.name, character.version)
-  const snapshot = await storeVersionSnapshot(character)
-  downloadJson(character, filename)
-  return { filename, snapshot }
+  const effectiveVersion = versionOverride ?? bumpSemver(character.version)
+  const filename = versionedFilename(character.name, effectiveVersion)
+  const snap = await storeVersionSnapshot({
+    ...character,
+    version: effectiveVersion,
+  })
+  downloadJson({ ...character, version: effectiveVersion }, filename)
+  return { filename, snapshot: snap }
 }
 
 /**
@@ -106,7 +181,7 @@ function isCharacterShape(data: unknown): data is Character {
   return (
     typeof o.id === 'string' &&
     typeof o.name === 'string' &&
-    typeof o.version === 'number' &&
+    typeof o.version === 'string' &&
     typeof o.milestones === 'number' &&
     typeof o.attributes === 'object' &&
     o.attributes !== null &&
@@ -129,15 +204,15 @@ export function importCharacter(text: string): Character {
 
 /**
  * Re-import a snapshot back into the *same* character — restoring it to that
- * previous version. The character's `.version` counter is bumped to
- * `(previous version + 1)` so history is preserved forward.
+ * previous version. The character's `.version` counter is bumped (patch
+ * increment) so history is preserved forward.
  */
 export function restoreFromSnapshot(
   snapshot: VersionSnapshot,
 ): Character {
   return {
     ...structuredClone(snapshot.data),
-    version: snapshot.version + 1,
+    version: bumpSemver(snapshot.version),
     updatedAt: new Date().toISOString(),
   }
 }

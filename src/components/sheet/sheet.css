@@ -2506,6 +2506,47 @@
   color: var(--text-muted);
 }
 
+.export-dialog__version-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.export-dialog__version-row .export-dialog__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.export-dialog__version-input {
+  flex: 1 1 120px;
+  font-family: var(--sheet-heading-font, inherit);
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+  padding: 0.35rem 0.55rem;
+  border-radius: 6px;
+  border: 1px solid var(--border-soft);
+  background: var(--bg-surface-raised);
+  color: var(--text-primary);
+  max-width: 140px;
+}
+
+.export-dialog__version-input::placeholder {
+  color: var(--text-muted);
+}
+
+.export-dialog__version-input:focus {
+  outline: none;
+  border-color: var(--accent-violet);
+}
+
+.export-dialog__version-error {
+  font-size: 0.7rem;
+  color: var(--color-danger, #e08c8c);
+  flex: 1 1 100%;
+}
+
 .export-dialog__version {
   font-family: var(--sheet-heading-font, inherit);
   font-size: 1.25rem;

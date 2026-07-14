@@ -533,3 +533,33 @@ test('reorderAbility: reorders within slotted', () => {
   const updated = useCharacterStore.getState().currentCharacter!
   expect(updated.slottedAbilities.map((a) => a.id)).toEqual(['a2', 'a3', 'a1'])
 })
+
+// ---- Export / versioning ----------------------------------------------------
+// (saveVersion auto-bumps by patch level)
+
+test('saveVersion: defaults to auto-incrementing patch bump', async () => {
+  setupChar({ version: '5.0.0' })
+  const snap = await useCharacterStore.getState().saveVersion()
+  expect(snap).not.toBeNull()
+  expect(snap!.version).toBe('5.0.1')
+  // Character's internal counter matches the bumped version.
+  const char = useCharacterStore.getState().currentCharacter!
+  expect(char.version).toBe('5.0.1')
+})
+
+test('saveVersion: overrides version counter with the provided value', async () => {
+  setupChar({ version: '3.0.0' })
+  const snap = await useCharacterStore.getState().saveVersion('9.1.2')
+  expect(snap).not.toBeNull()
+  expect(snap!.version).toBe('9.1.2')
+  const char = useCharacterStore.getState().currentCharacter!
+  expect(char.version).toBe('9.1.2')
+})
+
+test('saveVersion: consecutive auto bumps start from the overridden value', async () => {
+  setupChar({ version: '3.0.0' })
+  await useCharacterStore.getState().saveVersion('10.0.0')
+  const snap2 = await useCharacterStore.getState().saveVersion()
+  expect(snap2).not.toBeNull()
+  expect(snap2!.version).toBe('10.0.1')
+})

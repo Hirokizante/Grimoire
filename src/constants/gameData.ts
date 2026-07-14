@@ -343,7 +343,7 @@ export function createDefaultCharacter(): Character {
     id: generateId(),
     name: 'New Character',
     playerName: '',
-    version: 1,
+    version: '1.0.0',
     milestones: 0,
     attributes,
     skills,

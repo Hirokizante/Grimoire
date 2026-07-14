@@ -155,13 +155,19 @@ export interface DeathSaves {
  * Versioning"). Stored alongside the character so previous versions can be
  * browsed and re-imported.
  */
+/**
+ * A semantic version string (MAJOR.MINOR.PATCH, e.g. "1.0.0").
+ * See {@link bumpSemver} for incrementing logic.
+ */
+export type Semver = string
+
 export interface VersionSnapshot {
   /** Unique identifier for this snapshot. */
   id: string
   /** The character id this snapshot belongs to. */
   characterId: string
-  /** Version number at the time of the snapshot (matches character.version). */
-  version: number
+  /** Semantic version string at snapshot time (e.g. "9.1.2"). */
+  version: Semver
   /** ISO timestamp of when the snapshot was taken. */
   createdAt: string
   /** Character data at snapshot time. */
@@ -178,8 +184,8 @@ export interface Character {
   name: string
   /** Player name (the person playing this character). */
   playerName: string
-  /** Auto-incremented version number for export/versioning (DESIGN.md). */
-  version: number
+  /** Auto-incremented semantic version for export/versioning (DESIGN.md). */
+  version: Semver
   /** Milestone count — analogous to level; drives milestone bonus & growth. */
   milestones: number
   /** The five Attributes. */

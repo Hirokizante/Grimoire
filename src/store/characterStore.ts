@@ -17,6 +17,7 @@ import {
 import { calcHP } from '@/lib/calculations'
 import { rollDie } from '@/lib/dice'
 import {
+  bumpSemver,
   exportCharacter,
   importCharacter as parseImportCharacter,
   listVersions,
@@ -26,6 +27,7 @@ import type {
   AbilityBlock,
   AttributeKey,
   Character,
+  Semver,
   SheetConfig,
   SkillName,
   VersionSnapshot,
@@ -229,7 +231,13 @@ export interface CharacterStoreActions {
    * Create and store a version snapshot of the current character.
    * Returns the snapshot, or null if there is no current character.
    */
-  saveVersion: () => Promise<VersionSnapshot | null>
+  /**
+   * Create and store a version snapshot of the current character.
+   * Returns the snapshot, or null if there is no current character.
+   * An optional `versionOverride` lets the user pick a semantic version
+   * (e.g. "9.1.2") instead of bumping the auto-incremented default.
+   */
+  saveVersion: (versionOverride?: Semver) => Promise<VersionSnapshot | null>
   /**
    * Load the version history for the current character into the store.
    * Resets to null if there is no current character.
@@ -800,21 +808,23 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
     }))
   },
 
-  saveVersion: async () => {
+  saveVersion: async (versionOverride?: Semver) => {
     const current = get().currentCharacter
     if (!current) return null
-    // Bump version counter on the character.
+    // Use the override or auto-bump by patch level.
+    const targetVersion = versionOverride ?? bumpSemver(current.version)
+    // Set the character's version counter so the next export continues from there.
     get().updateCurrentCharacter((char) => ({
       ...char,
-      version: char.version + 1,
+      version: targetVersion,
     }))
-    // Snapshot uses the bumped version.
-    const snapshot = await exportCharacter({
+    // Snapshot uses the chosen version.
+    const result = await exportCharacter({
       ...current,
-      version: current.version + 1,
-    })
+      version: targetVersion,
+    }, targetVersion)
     await get().loadVersions()
-    return snapshot.snapshot
+    return result.snapshot
   },
 
   loadVersions: async () => {
