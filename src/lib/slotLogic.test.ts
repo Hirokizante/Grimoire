@@ -20,6 +20,7 @@ function makeAbility(id: string, isMinor = false): AbilityBlock {
     overcharge: '',
     flavorText: '',
     isMinor,
+    showActivate: true,
   }
 }
 

@@ -493,6 +493,7 @@ test('addAbilityBlock: appends to slotted abilities', () => {
     overcharge: '',
     flavorText: '',
     isMinor: false,
+    showActivate: true,
   }
   useCharacterStore.getState().addAbilityBlock('slottedAbilities', newAbility)
   const updated = useCharacterStore.getState().currentCharacter!
@@ -512,6 +513,7 @@ test('moveAbility: moves from pool to slotted', () => {
     overcharge: '',
     flavorText: '',
     isMinor: false,
+    showActivate: true,
   }
   useCharacterStore.getState().addAbilityBlock('abilityPool', ability)
   useCharacterStore.getState().moveAbility('pool-1', 'abilityPool', 'slottedAbilities')
@@ -522,9 +524,9 @@ test('moveAbility: moves from pool to slotted', () => {
 
 test('reorderAbility: reorders within slotted', () => {
   setupChar()
-  const a1 = { id: 'a1', name: 'A1', traits: [], cost: {}, damage: '', description: '', overcharge: '', flavorText: '', isMinor: false }
-  const a2 = { id: 'a2', name: 'A2', traits: [], cost: {}, damage: '', description: '', overcharge: '', flavorText: '', isMinor: false }
-  const a3 = { id: 'a3', name: 'A3', traits: [], cost: {}, damage: '', description: '', overcharge: '', flavorText: '', isMinor: false }
+  const a1 = { id: 'a1', name: 'A1', traits: [], cost: {}, damage: '', description: '', overcharge: '', flavorText: '', isMinor: false, showActivate: true }
+  const a2 = { id: 'a2', name: 'A2', traits: [], cost: {}, damage: '', description: '', overcharge: '', flavorText: '', isMinor: false, showActivate: true }
+  const a3 = { id: 'a3', name: 'A3', traits: [], cost: {}, damage: '', description: '', overcharge: '', flavorText: '', isMinor: false, showActivate: true }
   useCharacterStore.getState().addAbilityBlock('slottedAbilities', a1)
   useCharacterStore.getState().addAbilityBlock('slottedAbilities', a2)
   useCharacterStore.getState().addAbilityBlock('slottedAbilities', a3)

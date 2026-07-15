@@ -55,4 +55,10 @@ export interface AbilityBlock {
    * (see DESIGN.md "Minor Abilities").
    */
   isMinor: boolean
+  /**
+   * Whether the "Activate" button is shown for this Ability on the sheet.
+   * When false, the block renders as a static card (useful for narrative-only
+   * abilities). Defaults to true; the toggle is in AbilityBlockEditor.
+   */
+  showActivate: boolean
 }

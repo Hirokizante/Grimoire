@@ -30,6 +30,10 @@ export default function AbilityActivation({ ability }: AbilityActivationProps) {
 
   if (!character) return null
 
+  if (!ability.showActivate) {
+    return <AbilityBlockCard ability={ability} mode="view" />
+  }
+
   // Exhaustion: +1 END cost
   const exhaustionMod = character.mortalWounds.includes('Exhaustion') ? 1 : 0
   const apCost = ability.cost.ap ?? 0

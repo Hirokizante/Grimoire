@@ -38,6 +38,7 @@ export function blankAbility(): AbilityBlock {
     overcharge: '',
     flavorText: '',
     isMinor: false,
+    showActivate: true,
   }
 }
 
@@ -217,6 +218,17 @@ export default function AbilityBlockEditor({
             }
           />
           <span className="ability-editor__label">Minor Ability (half slot)</span>
+        </label>
+
+        <label className="ability-editor__field ability-editor__field--inline">
+          <input
+            type="checkbox"
+            checked={draft.showActivate}
+            onChange={(e) =>
+              setDraft({ ...draft, showActivate: e.target.checked })
+            }
+          />
+          <span className="ability-editor__label">Show Activate button</span>
         </label>
 
         <div className="ability-editor__actions">

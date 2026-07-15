@@ -306,6 +306,7 @@ export function createDefaultBasicAttack(): AbilityBlock {
     overcharge: '',
     flavorText: '',
     isMinor: false,
+    showActivate: true,
   }
 }
 
@@ -324,6 +325,7 @@ function createDefaultFatebreaker(): AbilityBlock {
     overcharge: '',
     flavorText: '',
     isMinor: false,
+    showActivate: true,
   }
 }
 

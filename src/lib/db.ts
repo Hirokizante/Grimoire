@@ -10,7 +10,7 @@
  * All functions here are framework-agnostic and safe to call from anywhere.
  */
 
-import type { Character, CharacterViewModes, VersionSnapshot } from '@/types'
+import type { AbilityBlock, Character, CharacterViewModes, VersionSnapshot } from '@/types'
 
 const DB_NAME = 'grimoire'
 const DB_VERSION = 3
@@ -99,9 +99,55 @@ export function normalizeCharacter(raw: Character): Character {
     })
   }
 
+  // Ensure every AbilityBlock has `showActivate` (added in this release).
+  // Existing records default to true so every ability keeps its Activate
+  // button until a user explicitly hides it.
+  const blockArrays: (keyof Character)[] = [
+    'innateAbilities',
+    'slottedAbilities',
+    'abilityPool',
+  ]
+  for (const key of blockArrays) {
+    const arr = result[key] as unknown as AbilityBlock[] | undefined
+    if (Array.isArray(arr)) {
+      ;(result as unknown as Record<string, unknown>)[key] = arr.map(
+        (a) => ({
+          ...a,
+          showActivate: a.showActivate ?? true,
+        }),
+      )
+    }
+  }
+  // Also normalize blocks nested inside customTabs[].sections[].abilities[].
+  if (Array.isArray(result.customTabs)) {
+    result.customTabs = result.customTabs.map((tab) => ({
+      ...tab,
+      sections: tab.sections.map((section) => ({
+        ...section,
+        abilities: section.abilities.map((a) => ({
+          ...a,
+          showActivate: a.showActivate ?? true,
+        })),
+      })),
+    }))
+  }
+
   // Ensure customTabs exists (migration for older records without it).
   if (!Array.isArray(result.customTabs)) {
     result.customTabs = []
+  }
+
+  // Ensure scalar AbilityBlock shapes (basicAttack, fatebreaker) carry
+  // showActivate too.
+  const scalarBlocks: (keyof Character)[] = ['basicAttack', 'fatebreaker']
+  for (const key of scalarBlocks) {
+    const block = result[key] as unknown as AbilityBlock | undefined
+    if (block && typeof block === 'object') {
+      ;(result as unknown as Record<string, unknown>)[key] = {
+        ...block,
+        showActivate: block.showActivate ?? true,
+      }
+    }
   }
 
   // Ensure viewModes exists and is complete (migration for records created
