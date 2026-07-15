@@ -1,10 +1,12 @@
-import { useRef, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { ArrowDownFromLine, LayoutGrid, List } from 'lucide-react'
 
 import { useCharacterStore } from '@/store/characterStore'
 import CreateCharacterModal from '@/components/sheet/CreateCharacterModal'
 import ConfirmDeleteModal from '@/components/sheet/ConfirmDeleteModal'
+import UpdateCharacterModal from '@/components/sheet/UpdateCharacterModal'
 
+import { parseCharacterJSON } from '@/lib/exportImport'
 import type { Character } from '@/types'
 
 type ViewMode = 'grid' | 'list'
@@ -22,23 +24,9 @@ function formatUpdatedAt(iso: string): string {
   })
 }
 
-function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
-  const file = e.target.files?.[0]
-  // Reset so re-selecting the same file still fires change.
-  e.target.value = ''
-  if (!file) return
-  const isJson =
-    file.type.startsWith('application/json') ||
-    file.type.startsWith('text/') ||
-    file.name.endsWith('.json')
-  if (!isJson) return
-  const reader = new FileReader()
-  reader.onload = () => {
-    if (typeof reader.result === 'string') {
-      void useCharacterStore.getState().importCharacterFile(reader.result)
-    }
-  }
-  reader.readAsText(file)
+/** Parse imported JSON once to check for conflicts before acting on it. */
+function parseImport(text: string): Character {
+  return parseCharacterJSON(text)
 }
 
 export default function CharacterListPage() {
@@ -46,10 +34,54 @@ export default function CharacterListPage() {
   const isLoaded = useCharacterStore((s) => s.isLoaded)
   const isSaving = useCharacterStore((s) => s.isSaving)
   const selectCharacter = useCharacterStore((s) => s.selectCharacter)
+  const importCharacterFile = useCharacterStore((s) => s.importCharacterFile)
+  const updateExistingCharacterFromImportFile = useCharacterStore(
+    (s) => s.updateExistingCharacterFromImportFile,
+  )
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [viewMode, setViewMode] = useState<ViewMode>('grid')
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [characterToDelete, setCharacterToDelete] = useState<Character | null>(null)
+  /** Pending import JSON file that has a matching character by name. */
+  const [pendingImport, setPendingImport] = useState<{
+    existing: Character
+    imported: Character
+    rawText: string
+  } | null>(null)
+
+  /** Handle file import with conflict detection for existing characters. */
+  const handleImport = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0]
+      // Reset so re-selecting the same file still fires change.
+      e.target.value = ''
+      if (!file) return
+      const isJson =
+        file.type.startsWith('application/json') ||
+        file.type.startsWith('text/') ||
+        file.name.endsWith('.json')
+      if (!isJson) return
+      const reader = new FileReader()
+      reader.onload = () => {
+        if (typeof reader.result !== 'string') return
+        try {
+          const imported = parseImport(reader.result)
+          const existing = characters.find(
+            (c) => c.name.toLowerCase() === imported.name.toLowerCase(),
+          )
+          if (existing) {
+            setPendingImport({ existing, imported, rawText: reader.result })
+          } else {
+            void importCharacterFile(reader.result)
+          }
+        } catch {
+          // Invalid JSON or shape — ignore silently (no toast yet).
+        }
+      }
+      reader.readAsText(file)
+    },
+    [characters, importCharacterFile],
+  )
 
   if (!isLoaded) {
     return (
@@ -271,6 +303,26 @@ export default function CharacterListPage() {
             setCharacterToDelete(null)
           }}
           onClose={() => setCharacterToDelete(null)}
+        />
+      )}
+
+      {pendingImport && (
+        <UpdateCharacterModal
+          characterName={pendingImport.existing.name}
+          existingVersion={pendingImport.existing.version}
+          importedVersion={pendingImport.imported.version}
+          onUpdate={() => {
+            void updateExistingCharacterFromImportFile(
+              pendingImport.existing,
+              pendingImport.rawText,
+            )
+            setPendingImport(null)
+          }}
+          onImportAsNew={() => {
+            void importCharacterFile(pendingImport.rawText)
+            setPendingImport(null)
+          }}
+          onClose={() => setPendingImport(null)}
         />
       )}
     </div>

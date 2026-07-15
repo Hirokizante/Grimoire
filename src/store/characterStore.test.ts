@@ -33,6 +33,7 @@ vi.mock('@/lib/db', () => ({
   getAllRollLogEntries: vi.fn(async () => []),
   deleteRollLogEntry: vi.fn(async () => {}),
   clearRollLogForCharacter: vi.fn(async () => {}),
+  normalizeCharacter: (char: Character) => char,
 }))
 
 // ---- Helpers --------------------------------------------------------------
@@ -628,4 +629,53 @@ test('updateCustomSectionViewMode: overrides a previously-set custom section mod
   useCharacterStore.getState().updateCustomSectionViewMode(tabId, secId, 'grid')
   const char = useCharacterStore.getState().currentCharacter!
   expect(char.viewModes.customTabs[tabId][secId]).toBe('grid')
+})
+
+// ---- Import conflict: updateExistingCharacterFromImportFile ----------------------
+
+test('updateExistingCharacterFromImportFile: updates id/name and preserves live state', async () => {
+  // Existing character "Nacht" in DB.
+  const existing = createDefaultCharacter()
+  existing.name = 'Nacht'
+  existing.version = '1.0.0'
+  existing.currentHP = 12
+  existing.currentEND = 4
+  existing.currentAP = 2
+  existing.currentFP = 1
+  existing.tempHP = 3
+  existing.mortalWounds = ['Sprain', null]
+  existing.deathSaves = { successes: 1, failures: 0 }
+  dbMap.set(existing.id, existing)
+  useCharacterStore.setState({
+    currentCharacter: existing,
+    characters: [existing],
+  })
+
+  // Imported JSON with newer structural data.
+  const imported = createDefaultCharacter()
+  imported.name = 'Nacht'
+  imported.version = '1.2.0'
+  imported.attributes = { ...imported.attributes, POW: 7 }
+  imported.backstory = 'Updated lore'
+
+  await useCharacterStore.getState().updateExistingCharacterFromImportFile(
+    existing,
+    JSON.stringify(imported),
+  )
+
+  const updated = useCharacterStore.getState().currentCharacter!
+  // Preserved:
+  expect(updated.id).toBe(existing.id)
+  expect(updated.name).toBe('Nacht')
+  expect(updated.currentHP).toBe(12)
+  expect(updated.currentEND).toBe(4)
+  expect(updated.currentAP).toBe(2)
+  expect(updated.currentFP).toBe(1)
+  expect(updated.tempHP).toBe(3)
+  expect(updated.mortalWounds).toEqual(['Sprain', null])
+  expect(updated.deathSaves).toEqual({ successes: 1, failures: 0 })
+  // Taken from imported:
+  expect(updated.attributes.POW).toBe(7)
+  expect(updated.backstory).toBe('Updated lore')
+  expect(updated.version).toBe('1.2.0')
 })

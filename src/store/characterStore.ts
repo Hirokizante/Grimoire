@@ -23,6 +23,7 @@ import {
   importCharacter as parseImportCharacter,
   listVersions,
   restoreFromSnapshot,
+  updateExistingCharacterFromImport,
 } from '@/lib/exportImport'
 import type {
   AbilityBlock,
@@ -133,6 +134,8 @@ export interface CharacterStoreActions {
   saveCurrentCharacter: () => Promise<void>
   /** Import a character from JSON text, persist it, and select it as current. */
   importCharacterFile: (text: string) => Promise<void>
+  /** Update an existing character from imported JSON, preserving id and live-play state. */
+  updateExistingCharacterFromImportFile: (existing: Character, text: string) => Promise<void>
   /** Update a single AbilityBlock within a slotted/pool list. */
   updateAbilityBlock: (
     section: AbilitySection,
@@ -371,6 +374,21 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
     set((state) => ({
       characters: [...state.characters, imported],
       currentCharacter: imported,
+      isSaving: false,
+    }))
+  },
+
+  updateExistingCharacterFromImportFile: async (
+    existing: Character,
+    text: string,
+  ) => {
+    const updated = updateExistingCharacterFromImport(existing, text)
+    set({ isSaving: true })
+    await putCharacter(updated)
+    set((state) => ({
+      currentCharacter:
+        state.currentCharacter?.id === existing.id ? updated : state.currentCharacter,
+      characters: state.characters.map((c) => (c.id === existing.id ? updated : c)),
       isSaving: false,
     }))
   },

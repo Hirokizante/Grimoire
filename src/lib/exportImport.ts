@@ -165,9 +165,37 @@ export function parseCharacterJSON(text: string): Character {
   }
   return data
 }
-
 /**
- * Minimal shape check — verifies key fields exist and have the right broad
+ * Compare two semver strings.
+ * Returns >0 if a>b, <0 if a<b, 0 if equal.
+ * Invalid versions are treated as "0.0.0".
+ */
+export function compareSemver(
+   a: Semver,
+   b: Semver,
+ ): number {
+   const pa = parseSemver(a) ?? { major: 0, minor: 0, patch: 0 }
+   const pb = parseSemver(b) ?? { major: 0, minor: 0, patch: 0 }
+   if (pa.major !== pb.major) return pa.major - pb.major
+   if (pa.minor !== pb.minor) return pa.minor - pb.minor
+   return pa.patch - pb.patch
+ }
+
+ /**
+  * Determine the resulting version when updating an existing character from an
+  * imported one. If the imported version is strictly newer, use it.
+  * Otherwise bump the existing version (patch) so history progresses forward.
+  */
+ export function resolveUpdatedVersion(
+   existingVersion: Semver,
+   importedVersion: Semver,
+ ): Semver {
+   return compareSemver(importedVersion, existingVersion) > 0
+     ? importedVersion
+     : bumpSemver(existingVersion)
+ }
+
+ /** Minimal shape check — verifies key fields exist and have the right broad
  * type, but does NOT exhaustively validate the whole object.
  */
 function isCharacterShape(data: unknown): data is Character {
@@ -209,6 +237,45 @@ export function restoreFromSnapshot(
   return {
     ...normalizeCharacter(structuredClone(snapshot.data)),
     version: bumpSemver(snapshot.version),
+    updatedAt: new Date().toISOString(),
+  }
+}
+
+/**
+ * Update an existing character's data from an imported sheet, preserving that
+ * character's id and live-play counters (currentHP/END/AP/FP, mortal wounds,
+ * death saves, etc.) so in-progress combat state isn't lost.
+ *
+ * The imported JSON replaces all structural data (attributes, skills,
+ * abilities, backstory, config, etc.) while the existing character keeps:
+ *   - id, name, playerName
+ *   - all current* / tempHP / mortalWounds / deathSaves
+ *
+ * The version is resolved via {@link resolveUpdatedVersion}: if the imported
+ * version is strictly newer, use it; otherwise bump the existing version so
+ * history always advances forward.
+ */
+export function updateExistingCharacterFromImport(
+  existing: Character,
+  importedText: string,
+): Character {
+  const parsed = parseCharacterJSON(importedText)
+  const normalized = normalizeCharacter(parsed)
+  const newVersion = resolveUpdatedVersion(existing.version, normalized.version)
+  return {
+    ...normalized,
+    id: existing.id,
+    name: existing.name,
+    playerName: existing.playerName,
+    // Preserve live-play state from the current sheet.
+    currentHP: existing.currentHP,
+    tempHP: existing.tempHP,
+    currentEND: existing.currentEND,
+    currentAP: existing.currentAP,
+    currentFP: existing.currentFP,
+    mortalWounds: existing.mortalWounds,
+    deathSaves: existing.deathSaves,
+    version: newVersion,
     updatedAt: new Date().toISOString(),
   }
 }

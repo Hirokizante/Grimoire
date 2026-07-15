@@ -2362,6 +2362,36 @@
   color: var(--accent-violet-soft);
 }
 
+/* ---- Update character modal ---- */
+.update-character-modal {
+  max-width: 420px;
+}
+
+.update-character-modal__body {
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.update-character-modal__message {
+  font-size: 0.95rem;
+  color: var(--text-primary);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.update-character-modal__item-name {
+  color: var(--accent-violet-soft);
+}
+
+.update-character-modal__hint {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin: 0;
+  line-height: 1.5;
+}
+
 /* ---- Generic modal footer (shared by create/delete modals) ---- */
 .modal-footer {
   display: flex;

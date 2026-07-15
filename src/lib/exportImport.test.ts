@@ -1,18 +1,19 @@
 import { test, expect } from 'vitest'
 import {
   bumpSemver,
+  compareSemver,
+  createSnapshot,
+  importCharacter,
+  parseCharacterJSON,
   parseSemver,
+  resolveUpdatedVersion,
   restoreFromSnapshot,
   serializeSemver,
+  updateExistingCharacterFromImport,
   versionedFilename,
 } from '@/lib/exportImport'
 import { createDefaultCharacter } from '@/constants/gameData'
 import type { VersionSnapshot } from '@/types'
-import {
-  importCharacter,
-  parseCharacterJSON,
-  createSnapshot,
-} from '@/lib/exportImport'
 
 // ---- versionedFilename ----------------------------------------------------------------
 
@@ -109,7 +110,49 @@ test('bumpSemver: handles large version numbers', () => {
   expect(bumpSemver('0.0.0')).toBe('0.0.1')
 })
 
-// ---- Character serialization roundtrip --------------------------------------------------
+// ---- compareSemver ----------------------------------------------------------------
+
+test('compareSemver: equal versions return 0', () => {
+  expect(compareSemver('1.0.0', '1.0.0')).toBe(0)
+  expect(compareSemver('5.2.3', '5.2.3')).toBe(0)
+})
+
+test('compareSemver: compares major', () => {
+  expect(compareSemver('2.0.0', '1.0.0')).toBeGreaterThan(0)
+  expect(compareSemver('1.0.0', '2.0.0')).toBeLessThan(0)
+})
+
+test('compareSemver: compares minor when major equal', () => {
+  expect(compareSemver('1.2.0', '1.1.0')).toBeGreaterThan(0)
+  expect(compareSemver('1.1.0', '1.2.0')).toBeLessThan(0)
+})
+
+test('compareSemver: compares patch when major/minor equal', () => {
+  expect(compareSemver('1.1.3', '1.1.2')).toBeGreaterThan(0)
+  expect(compareSemver('1.1.2', '1.1.3')).toBeLessThan(0)
+})
+
+test('compareSemver: treats invalid as 0.0.0', () => {
+  expect(compareSemver('', '1.0.0')).toBeLessThan(0)
+  expect(compareSemver('1.0.0', '')).toBeGreaterThan(0)
+})
+
+// ---- resolveUpdatedVersion ----------------------------------------------------
+
+test('resolveUpdatedVersion: uses imported version when newer', () => {
+  expect(resolveUpdatedVersion('1.0.0', '1.2.0')).toBe('1.2.0')
+  expect(resolveUpdatedVersion('1.0.0', '2.0.0')).toBe('2.0.0')
+})
+
+test('resolveUpdatedVersion: bumps existing version when imported older', () => {
+  expect(resolveUpdatedVersion('1.5.0', '1.2.0')).toBe('1.5.1')
+})
+
+test('resolveUpdatedVersion: bumps existing version when versions equal', () => {
+  expect(resolveUpdatedVersion('1.0.0', '1.0.0')).toBe('1.0.1')
+})
+
+// ---- Character serialization roundtrip --------------------------------------------
 
 test('parseCharacterJSON: valid JSON returns character', () => {
   const char = createDefaultCharacter()
@@ -252,4 +295,93 @@ test('restoreFromSnapshot: deep-clones snapshot data', () => {
   const restored = restoreFromSnapshot(snap)
   restored.name = 'Changed'
   expect(snap.data.name).toBe('Original')
+})
+
+// ---- updateExistingCharacterFromImport ---------------------------------------------
+
+test('updateExistingCharacterFromImport: preserves id, name, and live-play state', () => {
+  const existing = createDefaultCharacter()
+  existing.name = 'Nacht'
+  existing.id = 'persist-this-id'
+  existing.playerName = 'Lucas'
+  existing.version = '1.0.0'
+  existing.currentHP = 5
+  existing.currentEND = 3
+  existing.currentAP = 2
+  existing.currentFP = 1
+  existing.tempHP = 4
+  existing.mortalWounds = ['Sprain', null]
+  existing.deathSaves = { successes: 1, failures: 2 }
+
+  const imported = createDefaultCharacter()
+  imported.version = '1.2.0'
+  imported.attributes = { ...imported.attributes, POW: 8 }
+  imported.skills = { ...imported.skills, Sneak: 6 }
+  imported.backstory = 'Updated lore'
+
+  const updated = updateExistingCharacterFromImport(
+    existing,
+    JSON.stringify(imported),
+  )
+
+  // Preserved from existing:
+  expect(updated.id).toBe('persist-this-id')
+  expect(updated.name).toBe('Nacht')
+  expect(updated.playerName).toBe('Lucas')
+  expect(updated.currentHP).toBe(5)
+  expect(updated.currentEND).toBe(3)
+  expect(updated.currentAP).toBe(2)
+  expect(updated.currentFP).toBe(1)
+  expect(updated.tempHP).toBe(4)
+  expect(updated.mortalWounds).toEqual(['Sprain', null])
+  expect(updated.deathSaves).toEqual({ successes: 1, failures: 2 })
+
+  // Taken from imported:
+  expect(updated.attributes.POW).toBe(8)
+  expect(updated.skills.Sneak).toBe(6)
+  expect(updated.backstory).toBe('Updated lore')
+
+  // Version resolves to imported (newer):
+  expect(updated.version).toBe('1.2.0')
+})
+
+test('updateExistingCharacterFromImport: bumps existing version when imported older', () => {
+  const existing = createDefaultCharacter()
+  existing.version = '2.0.0'
+
+  const imported = createDefaultCharacter()
+  imported.version = '1.5.0'
+
+  const updated = updateExistingCharacterFromImport(
+    existing,
+    JSON.stringify(imported),
+  )
+  expect(updated.version).toBe('2.0.1')
+})
+
+test('updateExistingCharacterFromImport: bumps existing version when versions equal', () => {
+  const existing = createDefaultCharacter()
+  existing.version = '3.0.0'
+
+  const imported = createDefaultCharacter()
+  imported.version = '3.0.0'
+
+  const updated = updateExistingCharacterFromImport(
+    existing,
+    JSON.stringify(imported),
+  )
+  expect(updated.version).toBe('3.0.1')
+})
+
+test('updateExistingCharacterFromImport: sets updatedAt fresh', () => {
+  const existing = createDefaultCharacter()
+  existing.updatedAt = '2020-01-01T00:00:00.000Z'
+  const imported = createDefaultCharacter()
+  imported.version = '5.0.0'
+
+  const updated = updateExistingCharacterFromImport(
+    existing,
+    JSON.stringify(imported),
+  )
+  expect(updated.updatedAt).not.toBe('2020-01-01T00:00:00.000Z')
 })
