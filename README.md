@@ -2,7 +2,7 @@
 
 A character sheet creation and management app for the homebrew TTRPG **Divergence**. Built with React, TypeScript, and Vite — runs entirely in the browser, offline-first.
 
-> Still in beta. Storage format may change between pre-1.0 releases — export your characters regularly.
+> Still in alpha. Storage format may change between pre-1.0 releases — export your characters regularly.
 
 ---
 
