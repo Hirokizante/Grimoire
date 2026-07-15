@@ -1,3 +1,12 @@
+# Dev / agent files (do NOT ship)
+Design.md
+IDEA.md
+Divergence SRD.md
+
+# Hermes agent
+.hermes.md
+.hermes/
+
 # macOS
 .DS_Store
 
