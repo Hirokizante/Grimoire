@@ -19,6 +19,7 @@ export type {
   Character,
   CustomAbilitySection,
   CustomTab,
+  CustomResourceBar,
   CharacterViewModes,
 } from './character'
 export type {

@@ -137,6 +137,11 @@ export function normalizeCharacter(raw: Character): Character {
     result.customTabs = []
   }
 
+  // Ensure customResourceBars exists (migration for records without it).
+  if (!Array.isArray(result.customResourceBars)) {
+    result.customResourceBars = []
+  }
+
   // Ensure scalar AbilityBlock shapes (basicAttack, fatebreaker) carry
   // showActivate too.
   const scalarBlocks: (keyof Character)[] = ['basicAttack', 'fatebreaker']

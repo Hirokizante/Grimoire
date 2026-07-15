@@ -286,4 +286,27 @@ export interface Character {
   createdAt: string
   /** ISO timestamp of last update. */
   updatedAt: string
+  /** User-created custom resource bars rendered below Endurance. */
+  customResourceBars: CustomResourceBar[]
+}
+
+/**
+ * A user-created custom resource bar rendered in the StatsSection below the
+ * built-in Endurance bar. Tracks a named pool of points (current/max) and
+ * optionally refills to max when the character Recovers (DESIGN.md
+ * "Recover").
+ */
+export interface CustomResourceBar {
+  /** Stable unique identifier. */
+  id: string
+  /** Display name of the bar (user-editable). */
+  name: string
+  /** Maximum value of the bar. */
+  max: number
+  /** Current value of the bar (0 ≤ current ≤ max). */
+  current: number
+  /** Hex color for filled segments (e.g. "#e88bbb"). */
+  color: string
+  /** When true, the bar refills to max upon Recover. */
+  refillsOnRecover: boolean
 }

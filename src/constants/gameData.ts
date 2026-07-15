@@ -387,5 +387,6 @@ export function createDefaultCharacter(): Character {
     },
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
+    customResourceBars: [],
   }
 }

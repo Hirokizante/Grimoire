@@ -726,6 +726,56 @@
   display: none;
 }
 
+/* ---- Custom resource bar (wrapper + delete button) ----------------------- */
+
+.resource-bar-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.resource-bar-wrapper .resource-bar {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.resource-bar__delete {
+  flex: 0 0 auto;
+  font-size: 0.75rem;
+  padding: 0.2rem 0.35rem;
+  min-width: 1.8rem;
+  line-height: 1;
+  color: var(--text-muted);
+  border-color: var(--border-soft);
+}
+
+.resource-bar__delete:hover {
+  color: var(--danger);
+  border-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 8%, transparent);
+}
+
+/* ---- Custom resource bar modal --------------------------------------------- */
+
+.custom-resource-bar-modal {
+  max-width: 420px;
+}
+
+.custom-resource-bar-modal__body {
+  padding: 1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.customize__swatch-wrap--inline {
+  width: 120px;
+}
+
+.stat-bars-add {
+  margin-top: 0.75rem;
+}
+
 .stat-mortals {
   margin-top: 0.85rem;
   display: flex;

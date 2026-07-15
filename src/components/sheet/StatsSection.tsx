@@ -24,6 +24,7 @@ import {
   Footprints,
   Target,
   Heart,
+  Trash2,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -32,6 +33,7 @@ import DeathSaveTracker from '@/components/sheet/DeathSaveTracker'
 import MortalWoundRoller from '@/components/sheet/MortalWoundRoller'
 import RecoverAction from '@/components/sheet/RecoverAction'
 import ResourceBar from '@/components/sheet/ResourceBar'
+import CustomResourceBarModal from '@/components/sheet/CustomResourceBarModal'
 import {
   calcArmor,
   calcENDRecovery,
@@ -72,7 +74,6 @@ export default function StatsSection({
   mode = 'view',
   variant = 'section',
 }: StatsSectionProps) {
-  const isView = mode === 'view'
   const { attributes, milestones } = character
 
   const maxHP = calcHP(attributes.VIT)
@@ -83,8 +84,6 @@ export default function StatsSection({
   const saveDC = calcSaveDC(milestones)
   const endRecovery = calcENDRecovery(attributes.GRT)
 
-  const [showDamageDialog, setShowDamageDialog] = useState(false)
-
   // Store actions for resource bars
   const spendAP = useCharacterStore((s) => s.spendAP)
   const restoreAP = useCharacterStore((s) => s.restoreAP)
@@ -93,8 +92,16 @@ export default function StatsSection({
   const spendFP = useCharacterStore((s) => s.spendFP)
   const restoreFP = useCharacterStore((s) => s.restoreFP)
   const heal = useCharacterStore((s) => s.heal)
+  const addCustomResourceBar = useCharacterStore((s) => s.addCustomResourceBar)
+  const removeCustomResourceBar = useCharacterStore((s) => s.removeCustomResourceBar)
+  const spendCustomResourceBar = useCharacterStore((s) => s.spendCustomResourceBar)
+  const restoreCustomResourceBar = useCharacterStore((s) => s.restoreCustomResourceBar)
+  const customResourceBars = useCharacterStore((s) => s.currentCharacter?.customResourceBars ?? [])
 
-  // Knocked Out = 0 HP and both mortal wound slots filled.
+  const [showDamageDialog, setShowDamageDialog] = useState(false)
+  const [showAddBar, setShowAddBar] = useState(false)
+  const isView = mode === 'view'
+  const isEdit = mode === 'edit'
   const isKnockedOut =
     character.currentHP <= 0 &&
     character.mortalWounds.filter((w) => w != null).length >= MAX_MORTAL_WOUNDS
@@ -191,7 +198,49 @@ export default function StatsSection({
           onSpend={() => spendEND(1)}
           onRestore={() => restoreEND(1)}
         />
+        {customResourceBars.map((bar) => (
+          <div key={bar.id} className="resource-bar-wrapper">
+            <ResourceBar
+              label={bar.name}
+              value={bar.current}
+              max={bar.max}
+              color={bar.color}
+              interactive={isView}
+              onSpend={() => spendCustomResourceBar(bar.id)}
+              onRestore={() => restoreCustomResourceBar(bar.id)}
+            />
+            {isEdit && (
+              <button
+                type="button"
+                className="btn btn--ghost resource-bar__delete"
+                onClick={() => removeCustomResourceBar(bar.id)}
+                aria-label={`Remove ${bar.name}`}
+                title={`Remove ${bar.name}`}
+              >
+                <Trash2 size={14} />
+              </button>
+            )}
+          </div>
+        ))}
       </div>
+
+      {isEdit && (
+        <div className="stat-bars-add">
+          <button
+            type="button"
+            className="btn btn--ghost section-add-btn"
+            onClick={() => setShowAddBar(true)}
+          >
+            + Add Resource Bar
+          </button>
+        </div>
+      )}
+
+      <CustomResourceBarModal
+        open={showAddBar}
+        onSave={addCustomResourceBar}
+        onClose={() => setShowAddBar(false)}
+      />
 
       {isView && <RecoverAction />}
 

@@ -28,6 +28,7 @@ import type {
   AbilityBlock,
   AttributeKey,
   Character,
+  CustomResourceBar,
   Semver,
   SheetConfig,
   SkillName,
@@ -243,6 +244,16 @@ export interface CharacterStoreActions {
   reorderCustomAbility: (tabId: string, sectionId: string, fromIndex: number, toIndex: number) => void
   /** Move an ability between custom sections (within the same tab). */
   moveCustomAbility: (tabId: string, fromSectionId: string, toSectionId: string, abilityId: string) => void
+  /** Add a new custom resource bar. */
+  addCustomResourceBar: (bar: CustomResourceBar) => void
+  /** Update an existing custom resource bar by id. */
+  updateCustomResourceBar: (id: string, updater: (bar: CustomResourceBar) => CustomResourceBar) => void
+  /** Remove a custom resource bar by id. */
+  removeCustomResourceBar: (id: string) => void
+  /** Spend 1 from a custom resource bar; returns false if insufficient. */
+  spendCustomResourceBar: (id: string, amount?: number) => boolean
+  /** Restore 1 to a custom resource bar (capped at max). */
+  restoreCustomResourceBar: (id: string, amount?: number) => void
   /** Update the view mode of a single ability section (builtin or custom). */
   updateSectionViewMode: (key: 'slottedAbilities' | 'abilityPool', mode: 'grid' | 'list') => void
   /** Update the view mode of a custom-tab section. */
@@ -610,6 +621,10 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
     get().updateCurrentCharacter((char) => ({
       ...char,
       currentEND: restoredEND,
+      // Refill any custom bars that opt in to refill on Recover.
+      customResourceBars: char.customResourceBars.map((bar) =>
+        bar.refillsOnRecover ? { ...bar, current: bar.max } : bar,
+      ),
     }))
     return true
   },
@@ -773,6 +788,7 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
         currentFP: char.maxFP,
         mortalWounds: [null, null],
         deathSaves: { successes: 0, failures: 0 },
+        customResourceBars: char.customResourceBars.map((bar) => ({ ...bar, current: bar.max })),
       }
     })
   },
@@ -1124,6 +1140,54 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
   deleteVersion: async (snapshotId) => {
     await deleteVersion(snapshotId)
     await get().loadVersions()
+  },
+
+  // ---- Custom resource bars ----------------------------------------------------
+
+  addCustomResourceBar: (bar) => {
+    get().updateCurrentCharacter((char) => ({
+      ...char,
+      customResourceBars: [...char.customResourceBars, bar],
+    }))
+  },
+
+  updateCustomResourceBar: (id, updater) => {
+    get().updateCurrentCharacter((char) => ({
+      ...char,
+      customResourceBars: char.customResourceBars.map((bar) =>
+        bar.id === id ? updater(bar) : bar,
+      ),
+    }))
+  },
+
+  removeCustomResourceBar: (id) => {
+    get().updateCurrentCharacter((char) => ({
+      ...char,
+      customResourceBars: char.customResourceBars.filter((bar) => bar.id !== id),
+    }))
+  },
+
+  spendCustomResourceBar: (id, amount = 1) => {
+    const current = get().currentCharacter
+    if (!current) return false
+    const bar = current.customResourceBars.find((b) => b.id === id)
+    if (!bar || bar.current < amount) return false
+    get().updateCurrentCharacter((char) => ({
+      ...char,
+      customResourceBars: char.customResourceBars.map((b) =>
+        b.id === id ? { ...b, current: b.current - amount } : b,
+      ),
+    }))
+    return true
+  },
+
+  restoreCustomResourceBar: (id, amount = 1) => {
+    get().updateCurrentCharacter((char) => ({
+      ...char,
+      customResourceBars: char.customResourceBars.map((bar) =>
+        bar.id === id ? { ...bar, current: Math.min(bar.max, bar.current + amount) } : bar,
+      ),
+    }))
   },
 }))
 
