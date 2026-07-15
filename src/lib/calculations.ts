@@ -16,7 +16,7 @@
  * @returns The character's maximum HP.
  */
 export function calcHP(vit: number): number {
-  return 20 + vit * 5
+  return Math.max(20, 20 + vit * 5)
 }
 
 /**
@@ -40,7 +40,7 @@ export function calcEvasion(agi: number): number {
  * @returns The character's Armor value.
  */
 export function calcArmor(vit: number): number {
-  return Math.floor(vit / 2)
+  return Math.max(0, Math.floor(vit / 2))
 }
 
 /**

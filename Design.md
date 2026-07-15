@@ -73,6 +73,7 @@
 - If a character takes enough damage, they can incur multiple Mortal Wounds at once.
 - Characters are returned to max HP at the end of an encounter. Mortal Wounds are cleared when a character Rests.
 - HP is calculated as follows: 20 + (VIT * 5)
+- The minimum max HP is 20.
 - When taking a Mortal Wound, the player must roll a D20 to determine which one they get from the list below:
   - (1) Grave Danger: Character is knocked out, immediately starting off with 1 failure.
   - (2) Muscle Rupture: Automatically take 1d6 physical damage for performing MAR related actions.

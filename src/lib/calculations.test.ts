@@ -16,6 +16,12 @@ test('calcHP: 20 + VIT * 5', () => {
   expect(calcHP(2)).toBe(30)
 })
 
+test('calcHP: floor at 20 for negative VIT', () => {
+  expect(calcHP(-1)).toBe(20)
+  expect(calcHP(-4)).toBe(20)
+  expect(calcHP(-10)).toBe(20)
+})
+
 test('calcEvasion: 10 + AGI', () => {
   expect(calcEvasion(0)).toBe(10)
   expect(calcEvasion(1)).toBe(11)
@@ -28,6 +34,12 @@ test('calcArmor: floor(VIT / 2)', () => {
   expect(calcArmor(2)).toBe(1)
   expect(calcArmor(3)).toBe(1)
   expect(calcArmor(4)).toBe(2)
+})
+
+test('calcArmor: floor at 0 for negative VIT', () => {
+  expect(calcArmor(-1)).toBe(0)
+  expect(calcArmor(-2)).toBe(0)
+  expect(calcArmor(-10)).toBe(0)
 })
 
 test('calcMovement: 5 + floor(AGI / 2)', () => {
