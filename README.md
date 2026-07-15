@@ -125,7 +125,7 @@ No other dependencies, databases, or services are required. The app runs entirel
 
 ```bash
 # 1. Clone the repo
-git clone https://github.com/<you>/grimoire.git
+git clone https://github.com/hirokizante/grimoire.git
 cd grimoire
 
 # 2. Install dependencies
