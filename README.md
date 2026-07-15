@@ -411,4 +411,4 @@ Unit tests cover the pure logic modules (`calculations`, `diceParser`, `diceRoll
 
 ## License
 
-[Add your license here]
+This project is licensed under the MIT license.
