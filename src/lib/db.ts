@@ -10,7 +10,7 @@
  * All functions here are framework-agnostic and safe to call from anywhere.
  */
 
-import type { Character, VersionSnapshot } from '@/types'
+import type { Character, CharacterViewModes, VersionSnapshot } from '@/types'
 
 const DB_NAME = 'grimoire'
 const DB_VERSION = 3
@@ -78,22 +78,59 @@ function promisifyRequest<T>(request: IDBRequest<T>): Promise<T> {
  * sees an undefined `innateAbilities`.
  */
 export function normalizeCharacter(raw: Character): Character {
-  // Already on the latest schema.
-  if (Array.isArray(raw.innateAbilities)) {
-    // Ensure customTabs exists (migration for older records without it).
-    if (!Array.isArray((raw as unknown as Record<string, unknown>).customTabs)) {
-      return { ...raw, customTabs: [] }
-    }
-    return raw
+  const result = { ...raw }
+
+  // Migrate from old single-ability shape (field rename innateAbility →
+  // innateAbilities). We still need to DROP the old key even when it
+  // overlaps — the shallow spread above copies it onto `result`.
+  if (!Array.isArray(result.innateAbilities)) {
+    const rawObj = raw as unknown as {
+      innateAbility?: import('@/types').AbilityBlock | null
+    } & Record<string, unknown>
+    const { innateAbility } = rawObj
+    // Drop the legacy key and set the new array r/place.
+    const rest = { ...result } as Record<string, unknown>
+    delete rest.innateAbility
+    Object.assign(result, rest, {
+      innateAbilities:
+        innateAbility && typeof innateAbility === 'object'
+          ? [innateAbility]
+          : [],
+    })
   }
 
-  // Migrate from the previous single-ability shape.
-  const { innateAbility, ...rest } = raw as unknown as {
-    innateAbility?: import('@/types').AbilityBlock | null
-  } & Record<string, unknown>
-  const innateAbilities = innateAbility ? [innateAbility] : []
-  const customTabs = Array.isArray(rest.customTabs) ? rest.customTabs : []
-  return { ...rest, innateAbilities, customTabs } as Character
+  // Ensure customTabs exists (migration for older records without it).
+  if (!Array.isArray(result.customTabs)) {
+    result.customTabs = []
+  }
+
+  // Ensure viewModes exists and is complete (migration for records created
+  // before view-modes were persisted). Build a full shape so any tabs or
+  // sections present in customTabs get an entry — existing choices preserved,
+  // new ones default to 'grid'.
+  const rawRecord = result as unknown as Record<string, unknown>
+  const existing =
+    rawRecord.viewModes && typeof rawRecord.viewModes === 'object'
+      ? (rawRecord.viewModes as Partial<CharacterViewModes>)
+      : null
+  const customTabModes: Record<string, Record<string, 'grid' | 'list'>> = {
+    ...(existing?.customTabs ?? {}),
+  }
+  for (const tab of result.customTabs) {
+    if (!customTabModes[tab.id]) customTabModes[tab.id] = {}
+    for (const section of tab.sections) {
+      if (!customTabModes[tab.id][section.id]) {
+        customTabModes[tab.id][section.id] = 'grid'
+      }
+    }
+  }
+  result.viewModes = {
+    slottedAbilities: existing?.slottedAbilities ?? 'grid',
+    abilityPool: existing?.abilityPool ?? 'grid',
+    customTabs: customTabModes,
+  } satisfies CharacterViewModes
+
+  return result as Character
 }
 
 /** Load every stored character, ordered by creation date (oldest first). */

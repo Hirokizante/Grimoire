@@ -77,15 +77,19 @@ export default function CharacterSheet({
   onModeChange,
 }: CharacterSheetProps) {
   const storeCharacter = useCharacterStore((s) => s.currentCharacter)
+  const updateSectionViewMode = useCharacterStore((s) => s.updateSectionViewMode)
+  const setSlottedViewMode = (m: 'grid' | 'list') => updateSectionViewMode('slottedAbilities', m)
+  const setPoolViewMode = (m: 'grid' | 'list') => updateSectionViewMode('abilityPool', m)
   const char = character ?? storeCharacter
   const [showMilestoneDialog, setShowMilestoneDialog] = useState(false)
   const [showCustomize, setShowCustomize] = useState(false)
   const [showExport, setShowExport] = useState(false)
-  const [slottedViewMode, setSlottedViewMode] = useState<'grid' | 'list'>('grid')
-  const [poolViewMode, setPoolViewMode] = useState<'grid' | 'list'>('grid')
   const [activeTab, setActiveTab] = useState('main')
 
   if (!char) return null
+
+  const slottedViewMode = char.viewModes.slottedAbilities
+  const poolViewMode = char.viewModes.abilityPool
 
   const { config } = char
   const c = config.colors

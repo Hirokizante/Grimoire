@@ -6,8 +6,6 @@
  * an "Add Section" button (edit mode only).
  */
 
-import { useState } from 'react'
-
 import CustomAbilitySection from '@/components/sheet/CustomAbilitySection'
 import CustomTabDndContext from '@/components/sheet/CustomTabDndContext'
 import { useCharacterStore } from '@/store/characterStore'
@@ -25,10 +23,13 @@ export default function CustomTabContent({
 }: CustomTabContentProps) {
   const isEdit = mode === 'edit'
   const addCustomSection = useCharacterStore((s) => s.addCustomSection)
-  const [viewModes, setViewModes] = useState<Record<string, 'grid' | 'list'>>({})
+  const updateCustomSectionViewMode = useCharacterStore((s) => s.updateCustomSectionViewMode)
+  const tabViewModes = useCharacterStore(
+    (s) => s.currentCharacter?.viewModes.customTabs[tab.id] ?? {},
+  )
 
   const handleViewModeChange = (sectionId: string, mode: 'grid' | 'list') => {
-    setViewModes((prev) => ({ ...prev, [sectionId]: mode }))
+    updateCustomSectionViewMode(tab.id, sectionId, mode)
   }
 
   return (
@@ -49,7 +50,7 @@ export default function CustomTabContent({
                 tabId={tab.id}
                 section={section}
                 mode={mode}
-                viewMode={viewModes[section.id] ?? 'grid'}
+                viewMode={tabViewModes[section.id] ?? 'grid'}
                 onViewModeChange={(m) => handleViewModeChange(section.id, m)}
               />
             ))

@@ -175,6 +175,25 @@ export interface VersionSnapshot {
 }
 
 /**
+ * Section-level view-mode preferences, persisted on the Character. Each
+ * ability-displaying section remembers whether it was last shown as a grid or
+ * a list — across page reloads, tab switches, sheet switches, server
+ * restarts, and JSON export/import (so a shared sheet renders the sender's
+ * choices).
+ *
+ * The two built-in sections are flat keys; custom-tab sections are nested
+ * `customTabs[tabId][sectionId]` because tabs/sections are created at runtime.
+ */
+export interface CharacterViewModes {
+  /** Slotted Abilities section — grid (cards) or list (rows). */
+  slottedAbilities: 'grid' | 'list'
+  /** Ability Pool section — grid (cards) or list (rows). */
+  abilityPool: 'grid' | 'list'
+  /** Custom-tab ability sections — tabId → sectionId → grid|list. */
+  customTabs: Record<string, Record<string, 'grid' | 'list'>>
+}
+
+/**
  * A user-created ability section within a custom tab. Mirrors the visual
  * structure of the built-in Slotted Abilities and Ability Pool sections but
  * has no slot limit — it's a free-form grouping of AbilityBlocks that the
@@ -261,6 +280,8 @@ export interface Character {
   customTabs: CustomTab[]
   /** Aesthetic configuration for the sheet. */
   config: SheetConfig
+  /** Persisted grid|list view-mode preference per ability section. */
+  viewModes: CharacterViewModes
   /** ISO timestamp of creation. */
   createdAt: string
   /** ISO timestamp of last update. */

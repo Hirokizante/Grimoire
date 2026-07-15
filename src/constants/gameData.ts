@@ -378,6 +378,11 @@ export function createDefaultCharacter(): Character {
     backstory: '',
     customTabs: [],
     config: { ...DEFAULT_SHEET_CONFIG },
+    viewModes: {
+      slottedAbilities: 'grid',
+      abilityPool: 'grid',
+      customTabs: {},
+    },
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   }

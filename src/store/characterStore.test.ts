@@ -563,3 +563,67 @@ test('saveVersion: consecutive auto bumps start from the overridden value', asyn
   expect(snap2).not.toBeNull()
   expect(snap2!.version).toBe('10.0.1')
 })
+
+// ---- View-mode persistence ---------------------------------------------------
+
+test('updateSectionViewMode: sets slotted view mode to list', () => {
+  setupChar()
+  useCharacterStore.getState().updateSectionViewMode('slottedAbilities', 'list')
+  const char = useCharacterStore.getState().currentCharacter!
+  expect(char.viewModes.slottedAbilities).toBe('list')
+  // Pool untouched.
+  expect(char.viewModes.abilityPool).toBe('grid')
+})
+
+test('updateSectionViewMode: sets pool view mode to list', () => {
+  setupChar()
+  useCharacterStore.getState().updateSectionViewMode('abilityPool', 'list')
+  const char = useCharacterStore.getState().currentCharacter!
+  expect(char.viewModes.abilityPool).toBe('list')
+})
+
+test('updateCustomSectionViewMode: sets a custom section view mode', () => {
+  setupChar()
+  const tabId = useCharacterStore.getState().addCustomTab('Powers')
+  const secId = useCharacterStore.getState().addCustomSection(tabId, 'Offense')
+  useCharacterStore.getState().updateCustomSectionViewMode(tabId, secId, 'list')
+  const char = useCharacterStore.getState().currentCharacter!
+  expect(char.viewModes.customTabs[tabId][secId]).toBe('list')
+})
+
+test('addCustomSection: seeds viewModes with grid by default', () => {
+  setupChar()
+  const tabId = useCharacterStore.getState().addCustomTab('Powers')
+  const secId = useCharacterStore.getState().addCustomSection(tabId, 'Offense')
+  const char = useCharacterStore.getState().currentCharacter!
+  expect(char.viewModes.customTabs[tabId][secId]).toBe('grid')
+})
+
+test('removeCustomSection: cleans up viewModes entry', () => {
+  setupChar()
+  const tabId = useCharacterStore.getState().addCustomTab('Powers')
+  const secId = useCharacterStore.getState().addCustomSection(tabId, 'Offense')
+  useCharacterStore.getState().updateCustomSectionViewMode(tabId, secId, 'list')
+  useCharacterStore.getState().removeCustomSection(tabId, secId)
+  const char = useCharacterStore.getState().currentCharacter!
+  expect(char.viewModes.customTabs[tabId]?.[secId]).toBeUndefined()
+})
+
+test('removeCustomTab: cleans up viewModes entry for the whole tab', () => {
+  setupChar()
+  const tabId = useCharacterStore.getState().addCustomTab('Powers')
+  useCharacterStore.getState().addCustomSection(tabId, 'Offense')
+  useCharacterStore.getState().removeCustomTab(tabId)
+  const char = useCharacterStore.getState().currentCharacter!
+  expect(char.viewModes.customTabs[tabId]).toBeUndefined()
+})
+
+test('updateCustomSectionViewMode: overrides a previously-set custom section mode', () => {
+  setupChar()
+  const tabId = useCharacterStore.getState().addCustomTab('Powers')
+  const secId = useCharacterStore.getState().addCustomSection(tabId, 'Defense')
+  useCharacterStore.getState().updateCustomSectionViewMode(tabId, secId, 'list')
+  useCharacterStore.getState().updateCustomSectionViewMode(tabId, secId, 'grid')
+  const char = useCharacterStore.getState().currentCharacter!
+  expect(char.viewModes.customTabs[tabId][secId]).toBe('grid')
+})

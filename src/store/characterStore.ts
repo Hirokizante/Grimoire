@@ -243,6 +243,10 @@ export interface CharacterStoreActions {
   reorderCustomAbility: (tabId: string, sectionId: string, fromIndex: number, toIndex: number) => void
   /** Move an ability between custom sections (within the same tab). */
   moveCustomAbility: (tabId: string, fromSectionId: string, toSectionId: string, abilityId: string) => void
+  /** Update the view mode of a single ability section (builtin or custom). */
+  updateSectionViewMode: (key: 'slottedAbilities' | 'abilityPool', mode: 'grid' | 'list') => void
+  /** Update the view mode of a custom-tab section. */
+  updateCustomSectionViewMode: (tabId: string, sectionId: string, mode: 'grid' | 'list') => void
   /**
    * Create and store a version snapshot of the current character.
    * Returns the snapshot, or null if there is no current character.
@@ -846,10 +850,15 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
   },
 
   removeCustomTab: (tabId) => {
-    get().updateCurrentCharacter((char) => ({
-      ...char,
-      customTabs: char.customTabs.filter((t) => t.id !== tabId),
-    }))
+    get().updateCurrentCharacter((char) => {
+      const customTabs = { ...char.viewModes.customTabs }
+      delete customTabs[tabId]
+      return {
+        ...char,
+        customTabs: char.customTabs.filter((t) => t.id !== tabId),
+        viewModes: { ...char.viewModes, customTabs },
+      }
+    })
   },
 
   reorderCustomTab: (fromIndex, toIndex) => {
@@ -879,6 +888,16 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
             }
           : t,
       ),
+      viewModes: {
+        ...char.viewModes,
+        customTabs: {
+          ...char.viewModes.customTabs,
+          [tabId]: {
+            ...(char.viewModes.customTabs[tabId] ?? {}),
+            [id]: 'grid',
+          },
+        },
+      },
     }))
     return id
   },
@@ -900,14 +919,22 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
   },
 
   removeCustomSection: (tabId, sectionId) => {
-    get().updateCurrentCharacter((char) => ({
-      ...char,
-      customTabs: char.customTabs.map((t) =>
-        t.id === tabId
-          ? { ...t, sections: t.sections.filter((s) => s.id !== sectionId) }
-          : t,
-      ),
-    }))
+    get().updateCurrentCharacter((char) => {
+      const tabSections = { ...(char.viewModes.customTabs[tabId] ?? {}) }
+      delete tabSections[sectionId]
+      return {
+        ...char,
+        customTabs: char.customTabs.map((t) =>
+          t.id === tabId
+            ? { ...t, sections: t.sections.filter((s) => s.id !== sectionId) }
+            : t,
+        ),
+        viewModes: {
+          ...char.viewModes,
+          customTabs: { ...char.viewModes.customTabs, [tabId]: tabSections },
+        },
+      }
+    })
   },
 
   addCustomAbility: (tabId, sectionId, ability) => {
@@ -1018,6 +1045,32 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
       })
       return { ...char, customTabs: tabs }
     })
+  },
+
+  updateSectionViewMode: (key, mode) => {
+    get().updateCurrentCharacter((char) => ({
+      ...char,
+      viewModes: {
+        ...char.viewModes,
+        [key]: mode,
+      },
+    }))
+  },
+
+  updateCustomSectionViewMode: (tabId, sectionId, mode) => {
+    get().updateCurrentCharacter((char) => ({
+      ...char,
+      viewModes: {
+        ...char.viewModes,
+        customTabs: {
+          ...char.viewModes.customTabs,
+          [tabId]: {
+            ...(char.viewModes.customTabs[tabId] ?? {}),
+            [sectionId]: mode,
+          },
+        },
+      },
+    }))
   },
 
   saveVersion: async (versionOverride?: Semver) => {

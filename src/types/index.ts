@@ -19,6 +19,7 @@ export type {
   Character,
   CustomAbilitySection,
   CustomTab,
+  CharacterViewModes,
 } from './character'
 export type {
   RollLogEntry,
