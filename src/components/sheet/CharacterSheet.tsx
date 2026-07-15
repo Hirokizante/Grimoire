@@ -23,6 +23,7 @@ import CustomizationPanel from '@/components/sheet/CustomizationPanel'
 
 import { useCharacterStore } from '@/store/characterStore'
 import { colorVars } from '@/lib/themeUtils'
+import { useImportedFonts } from '@/hooks/useImportedFonts'
 import type { Character, SheetColors } from '@/types'
 import type { SheetMode } from '@/pages/CharacterSheetPage'
 
@@ -80,6 +81,11 @@ export default function CharacterSheet({
   const updateSectionViewMode = useCharacterStore((s) => s.updateSectionViewMode)
   const setSlottedViewMode = (m: 'grid' | 'list') => updateSectionViewMode('slottedAbilities', m)
   const setPoolViewMode = (m: 'grid' | 'list') => updateSectionViewMode('abilityPool', m)
+
+  const EMPTY_FONTS: never[] = []
+  const importedFonts = useCharacterStore((s) => s.currentCharacter?.config.importedFonts ?? EMPTY_FONTS)
+  useImportedFonts(importedFonts)
+
   const char = character ?? storeCharacter
   const [showMilestoneDialog, setShowMilestoneDialog] = useState(false)
   const [showCustomize, setShowCustomize] = useState(false)

@@ -142,6 +142,16 @@ export function normalizeCharacter(raw: Character): Character {
     result.customResourceBars = []
   }
 
+  // Ensure importedFonts exists inside config (migration for characters created
+  // before the Google Fonts import feature was added).
+  if (
+    !Array.isArray(
+      (result.config as unknown as Record<string, unknown>).importedFonts,
+    )
+  ) {
+    ;(result.config as unknown as Record<string, unknown>).importedFonts = []
+  }
+
   // Ensure scalar AbilityBlock shapes (basicAttack, fatebreaker) carry
   // showActivate too.
   const scalarBlocks: (keyof Character)[] = ['basicAttack', 'fatebreaker']

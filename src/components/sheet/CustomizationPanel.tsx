@@ -15,6 +15,7 @@ import { HexColorPicker } from 'react-colorful'
 import { processImage } from '@/lib/imageProcessing'
 import { useEscapeKey } from '@/hooks/useEscapeKey'
 import { useCharacterStore } from '@/store/characterStore'
+import { FontImportSection } from '@/components/sheet/FontImportSection'
 import type { SheetColors, SheetConfig } from '@/types'
 
 /** A label+key used for each color picker. */
@@ -487,6 +488,8 @@ function ColorSwatch({
   )
 }
 
+const EMPTY_FONT_ARRAY: never[] = []
+
 /** Generic font-picker: label + dropdown + font-quick-picks. */
 function FontPicker({
   field,
@@ -498,7 +501,19 @@ function FontPicker({
   const currentValue = useCharacterStore(
     (s) => (s.currentCharacter?.config[field] ?? '') as string,
   )
+  const importedFonts = useCharacterStore(
+    (s) => s.currentCharacter?.config.importedFonts ?? EMPTY_FONT_ARRAY,
+  )
   const updateConfig = useCharacterStore((s) => s.updateConfig)
+
+  // Build the full list of options: built-in + imported.
+  const allOptions = [
+    ...FONT_OPTIONS,
+    ...importedFonts.map((f) => ({
+      label: f.family,
+      value: `"${f.family}", ${f.category === 'mono' ? 'monospace' : f.category === 'serif' ? 'serif' : f.category === 'display' ? 'serif' : 'sans-serif'}`,
+    })),
+  ]
 
   return (
     <label className="customize__field">
@@ -510,15 +525,15 @@ function FontPicker({
           updateConfig((c) => ({ ...c, [field]: e.target.value }))
         }
       >
-        <option value="">— Custom —</option>
-        {FONT_OPTIONS.map((f) => (
+        <option value="">— Inherit —</option>
+        {allOptions.map((f) => (
           <option key={f.value} value={f.value}>
             {f.label}
           </option>
         ))}
       </select>
       <div className="customize__font-picks">
-        {FONT_OPTIONS.map((f) => (
+        {allOptions.map((f) => (
           <button
             key={f.value}
             type="button"
@@ -783,6 +798,7 @@ export default function CustomizationPanel({
             <FontPicker field="labelFontFamily" label="Labels" />
             <FontPicker field="textFontFamily" label="Body" />
             <FontPicker field="helperTextFontFamily" label="Helpers" />
+            <FontImportSection />
           </Section>
 
           {/* Heading weight + hide bg */}

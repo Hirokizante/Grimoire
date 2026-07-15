@@ -124,8 +124,26 @@ export interface SheetConfig {
   backgroundImage: string | null
   /** Darken overlay opacity over the background image (0–1, 0 = none). */
   backgroundImageDarken: number
-  /** Blur applied to the background image in px (0–20, 0 = none). */
+  /** Background image blur applied to the background image in px (0–20, 0 = none). */
   backgroundImageBlur: number
+  /** User-imported fonts (e.g. from Google Fonts) available in font pickers. */
+  importedFonts: ImportedFont[]
+}
+
+/**
+ * An imported font (e.g. from Google Fonts) wired into the sheet at runtime via
+ * a dynamically injected `<link>` tag from {@link CharacterSheet}. Stored in
+ * SheetConfig so it persists across sessions, tabs, and exports.
+ */
+export interface ImportedFont {
+  /** Stable unique identifier. */
+  id: string
+  /** Display name (e.g. "Playfair Display"). */
+  family: string
+  /** Google Fonts CSS2 API family string (e.g. "family=Playfair+Display:wght@400;600;700"). */
+  apiParams: string
+  /** Category hint for quick-pick styling: 'serif' | 'sans' | 'mono' | 'display'. */
+  category: 'serif' | 'sans' | 'mono' | 'display'
 }
 
 /**

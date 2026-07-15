@@ -12,6 +12,7 @@ export type {
   Skills,
   SheetConfig,
   SheetColors,
+  ImportedFont,
   MortalWound,
   DeathSaves,
   Semver,

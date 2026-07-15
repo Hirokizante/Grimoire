@@ -248,6 +248,7 @@ export const DEFAULT_SHEET_CONFIG: SheetConfig = {
   backgroundImage: null,
   backgroundImageDarken: 0.5,
   backgroundImageBlur: 0,
+  importedFonts: [],
 }
 
 /**
