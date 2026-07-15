@@ -17,6 +17,9 @@ export interface CustomTabContentProps {
   mode?: SheetMode
 }
 
+/** Stable empty object so the selector below returns a consistent reference. */
+const EMPTY_TAB_VIEW_MODES: Record<string, 'grid' | 'list'> = {}
+
 export default function CustomTabContent({
   tab,
   mode = 'view',
@@ -25,7 +28,7 @@ export default function CustomTabContent({
   const addCustomSection = useCharacterStore((s) => s.addCustomSection)
   const updateCustomSectionViewMode = useCharacterStore((s) => s.updateCustomSectionViewMode)
   const tabViewModes = useCharacterStore(
-    (s) => s.currentCharacter?.viewModes.customTabs[tab.id] ?? {},
+    (s) => s.currentCharacter?.viewModes.customTabs[tab.id] ?? EMPTY_TAB_VIEW_MODES,
   )
 
   const handleViewModeChange = (sectionId: string, mode: 'grid' | 'list') => {
