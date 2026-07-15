@@ -79,14 +79,21 @@ function promisifyRequest<T>(request: IDBRequest<T>): Promise<T> {
  */
 export function normalizeCharacter(raw: Character): Character {
   // Already on the latest schema.
-  if (Array.isArray(raw.innateAbilities)) return raw
+  if (Array.isArray(raw.innateAbilities)) {
+    // Ensure customTabs exists (migration for older records without it).
+    if (!Array.isArray((raw as unknown as Record<string, unknown>).customTabs)) {
+      return { ...raw, customTabs: [] }
+    }
+    return raw
+  }
 
   // Migrate from the previous single-ability shape.
   const { innateAbility, ...rest } = raw as unknown as {
     innateAbility?: import('@/types').AbilityBlock | null
   } & Record<string, unknown>
   const innateAbilities = innateAbility ? [innateAbility] : []
-  return { ...rest, innateAbilities } as Character
+  const customTabs = Array.isArray(rest.customTabs) ? rest.customTabs : []
+  return { ...rest, innateAbilities, customTabs } as Character
 }
 
 /** Load every stored character, ordered by creation date (oldest first). */

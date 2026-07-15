@@ -25,6 +25,8 @@ export const MAX_END = 10
 export const MAX_MORTAL_WOUNDS = 2
 /** Death Save DC (DESIGN.md "Death Saves"). */
 export const DEATH_SAVE_DC = 10
+/** Hard limit on the number of user-created custom tabs. */
+export const MAX_CUSTOM_TABS = 6
 
 /** All fifteen Skills, in display order per DESIGN.md. */
 export const SKILL_LIST: SkillName[] = [
@@ -374,6 +376,7 @@ export function createDefaultCharacter(): Character {
     portrait: null,
     physicalDescription: '',
     backstory: '',
+    customTabs: [],
     config: { ...DEFAULT_SHEET_CONFIG },
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),

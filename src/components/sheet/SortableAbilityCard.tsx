@@ -19,7 +19,7 @@ import type { AbilityBlock } from '@/types'
 import type { SheetMode } from '@/pages/CharacterSheetPage'
 
 /** Which ability list a sortable card belongs to. */
-export type AbilitySectionId = 'slottedAbilities' | 'abilityPool'
+export type AbilitySectionId = 'slottedAbilities' | 'abilityPool' | string
 
 export interface SortableAbilityCardProps {
   ability: AbilityBlock

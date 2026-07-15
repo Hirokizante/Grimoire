@@ -8,7 +8,7 @@
  */
 
 import { create } from 'zustand'
-import { createDefaultCharacter, generateId, MORTAL_WOUNDS, MAX_AP, MAX_END, MAX_MORTAL_WOUNDS, DEATH_SAVE_DC } from '@/constants/gameData'
+import { createDefaultCharacter, generateId, MORTAL_WOUNDS, MAX_AP, MAX_END, MAX_MORTAL_WOUNDS, DEATH_SAVE_DC, MAX_CUSTOM_TABS } from '@/constants/gameData'
 import {
   deleteCharacter as dbDeleteCharacter,
   getAllCharacters,
@@ -219,6 +219,30 @@ export interface CharacterStoreActions {
   skipMilestone: () => void
   /** Update the sheet configuration (colors, fonts, custom CSS). */
   updateConfig: (updater: (config: SheetConfig) => SheetConfig) => void
+  /** Add a new custom tab with a default name. Returns the new tab id. */
+  addCustomTab: (name?: string) => string
+  /** Rename a custom tab by id. */
+  renameCustomTab: (tabId: string, name: string) => void
+  /** Remove a custom tab by id. */
+  removeCustomTab: (tabId: string) => void
+  /** Reorder a custom tab to a new position. */
+  reorderCustomTab: (fromIndex: number, toIndex: number) => void
+  /** Add a new ability section to a custom tab. Returns the new section id. */
+  addCustomSection: (tabId: string, name?: string) => string
+  /** Rename a custom ability section. */
+  renameCustomSection: (tabId: string, sectionId: string, name: string) => void
+  /** Remove a custom ability section. */
+  removeCustomSection: (tabId: string, sectionId: string) => void
+  /** Add an ability block to a custom section. */
+  addCustomAbility: (tabId: string, sectionId: string, ability: AbilityBlock) => void
+  /** Update an ability block within a custom section. */
+  updateCustomAbility: (tabId: string, sectionId: string, abilityId: string, updated: AbilityBlock) => void
+  /** Remove an ability block from a custom section. */
+  removeCustomAbility: (tabId: string, sectionId: string, abilityId: string) => void
+  /** Reorder an ability within a custom section. */
+  reorderCustomAbility: (tabId: string, sectionId: string, fromIndex: number, toIndex: number) => void
+  /** Move an ability between custom sections (within the same tab). */
+  moveCustomAbility: (tabId: string, fromSectionId: string, toSectionId: string, abilityId: string) => void
   /**
    * Create and store a version snapshot of the current character.
    * Returns the snapshot, or null if there is no current character.
@@ -794,6 +818,206 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
       ...char,
       config: updater(char.config),
     }))
+  },
+
+  // ---- Custom tabs & sections ------------------------------------------------
+
+  addCustomTab: (name) => {
+    const current = get().currentCharacter?.customTabs ?? []
+    if (current.length >= MAX_CUSTOM_TABS) return ''
+    const id = generateId()
+    get().updateCurrentCharacter((char) => ({
+      ...char,
+      customTabs: [
+        ...char.customTabs,
+        { id, name: name ?? 'New Tab', sections: [] },
+      ],
+    }))
+    return id
+  },
+
+  renameCustomTab: (tabId, name) => {
+    get().updateCurrentCharacter((char) => ({
+      ...char,
+      customTabs: char.customTabs.map((t) =>
+        t.id === tabId ? { ...t, name } : t,
+      ),
+    }))
+  },
+
+  removeCustomTab: (tabId) => {
+    get().updateCurrentCharacter((char) => ({
+      ...char,
+      customTabs: char.customTabs.filter((t) => t.id !== tabId),
+    }))
+  },
+
+  reorderCustomTab: (fromIndex, toIndex) => {
+    if (fromIndex === toIndex) return
+    get().updateCurrentCharacter((char) => {
+      const tabs = [...char.customTabs]
+      if (fromIndex < 0 || fromIndex >= tabs.length) return char
+      if (toIndex < 0 || toIndex >= tabs.length) return char
+      const [moved] = tabs.splice(fromIndex, 1)
+      tabs.splice(toIndex, 0, moved)
+      return { ...char, customTabs: tabs }
+    })
+  },
+
+  addCustomSection: (tabId, name) => {
+    const id = generateId()
+    get().updateCurrentCharacter((char) => ({
+      ...char,
+      customTabs: char.customTabs.map((t) =>
+        t.id === tabId
+          ? {
+              ...t,
+              sections: [
+                ...t.sections,
+                { id, name: name ?? 'New Section', abilities: [] },
+              ],
+            }
+          : t,
+      ),
+    }))
+    return id
+  },
+
+  renameCustomSection: (tabId, sectionId, name) => {
+    get().updateCurrentCharacter((char) => ({
+      ...char,
+      customTabs: char.customTabs.map((t) =>
+        t.id === tabId
+          ? {
+              ...t,
+              sections: t.sections.map((s) =>
+                s.id === sectionId ? { ...s, name } : s,
+              ),
+            }
+          : t,
+      ),
+    }))
+  },
+
+  removeCustomSection: (tabId, sectionId) => {
+    get().updateCurrentCharacter((char) => ({
+      ...char,
+      customTabs: char.customTabs.map((t) =>
+        t.id === tabId
+          ? { ...t, sections: t.sections.filter((s) => s.id !== sectionId) }
+          : t,
+      ),
+    }))
+  },
+
+  addCustomAbility: (tabId, sectionId, ability) => {
+    get().updateCurrentCharacter((char) => ({
+      ...char,
+      customTabs: char.customTabs.map((t) =>
+        t.id === tabId
+          ? {
+              ...t,
+              sections: t.sections.map((s) =>
+                s.id === sectionId
+                  ? { ...s, abilities: [...s.abilities, ability] }
+                  : s,
+              ),
+            }
+          : t,
+      ),
+    }))
+  },
+
+  updateCustomAbility: (tabId, sectionId, abilityId, updated) => {
+    get().updateCurrentCharacter((char) => ({
+      ...char,
+      customTabs: char.customTabs.map((t) =>
+        t.id === tabId
+          ? {
+              ...t,
+              sections: t.sections.map((s) =>
+                s.id === sectionId
+                  ? {
+                      ...s,
+                      abilities: s.abilities.map((a) =>
+                        a.id === abilityId ? updated : a,
+                      ),
+                    }
+                  : s,
+              ),
+            }
+          : t,
+      ),
+    }))
+  },
+
+  removeCustomAbility: (tabId, sectionId, abilityId) => {
+    get().updateCurrentCharacter((char) => ({
+      ...char,
+      customTabs: char.customTabs.map((t) =>
+        t.id === tabId
+          ? {
+              ...t,
+              sections: t.sections.map((s) =>
+                s.id === sectionId
+                  ? {
+                      ...s,
+                      abilities: s.abilities.filter((a) => a.id !== abilityId),
+                    }
+                  : s,
+              ),
+            }
+          : t,
+      ),
+    }))
+  },
+
+  reorderCustomAbility: (tabId, sectionId, fromIndex, toIndex) => {
+    if (fromIndex === toIndex) return
+    get().updateCurrentCharacter((char) => {
+      const tabs = char.customTabs.map((t) => {
+        if (t.id !== tabId) return t
+        return {
+          ...t,
+          sections: t.sections.map((s) => {
+            if (s.id !== sectionId) return s
+            const list = [...s.abilities]
+            if (fromIndex < 0 || fromIndex >= list.length) return s
+            if (toIndex < 0 || toIndex >= list.length) return s
+            const [moved] = list.splice(fromIndex, 1)
+            list.splice(toIndex, 0, moved)
+            return { ...s, abilities: list }
+          })
+        }
+      })
+      return { ...char, customTabs: tabs }
+    })
+  },
+
+  moveCustomAbility: (tabId, fromSectionId, toSectionId, abilityId) => {
+    if (fromSectionId === toSectionId) return
+    get().updateCurrentCharacter((char) => {
+      const tabs = char.customTabs.map((t) => {
+        if (t.id !== tabId) return t
+        return {
+          ...t,
+          sections: t.sections.map((s) => {
+            if (s.id === fromSectionId) {
+              return { ...s, abilities: s.abilities.filter((a) => a.id !== abilityId) }
+            }
+            if (s.id === toSectionId) {
+              const moved = t.sections
+                .find((sec) => sec.id === fromSectionId)
+                ?.abilities.find((a) => a.id === abilityId)
+              if (!moved) return s
+              return { ...s, abilities: [...s.abilities, moved] }
+            }
+            return s
+          })
+        }
+      })
+      return { ...char, customTabs: tabs }
+    })
   },
 
   saveVersion: async (versionOverride?: Semver) => {

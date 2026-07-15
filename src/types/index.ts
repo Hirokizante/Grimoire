@@ -17,6 +17,8 @@ export type {
   Semver,
   VersionSnapshot,
   Character,
+  CustomAbilitySection,
+  CustomTab,
 } from './character'
 export type {
   RollLogEntry,

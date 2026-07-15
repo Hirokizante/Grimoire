@@ -29,12 +29,14 @@ import type { SheetMode } from '@/pages/CharacterSheetPage'
 import AbilitiesDndContext from '@/components/sheet/AbilitiesDndContext'
 import AbilityPoolSection from '@/components/sheet/AbilityPoolSection'
 import CoreAbilitySection from '@/components/sheet/CoreAbilitySection'
+import CustomTabContent from '@/components/sheet/CustomTabContent'
 import ExportDialog from '@/components/sheet/ExportDialog'
 import HeroSection from '@/components/sheet/HeroSection'
 import MilestoneDialog from '@/components/sheet/MilestoneDialog'
 import ProfileSection from '@/components/sheet/ProfileSection'
 import SkillsSection from '@/components/sheet/SkillsSection'
 import SlottedAbilitiesSection from '@/components/sheet/SlottedAbilitiesSection'
+import TabBar from '@/components/sheet/TabBar'
 
 import '@/components/sheet/sheet.css'
 
@@ -79,7 +81,9 @@ export default function CharacterSheet({
   const [showMilestoneDialog, setShowMilestoneDialog] = useState(false)
   const [showCustomize, setShowCustomize] = useState(false)
   const [showExport, setShowExport] = useState(false)
-  const [abilitiesViewMode, setAbilitiesViewMode] = useState<'grid' | 'list'>('grid')
+  const [slottedViewMode, setSlottedViewMode] = useState<'grid' | 'list'>('grid')
+  const [poolViewMode, setPoolViewMode] = useState<'grid' | 'list'>('grid')
+  const [activeTab, setActiveTab] = useState('main')
 
   if (!char) return null
 
@@ -133,49 +137,68 @@ export default function CharacterSheet({
         </div>
       )}
 
-      <HeroSection character={char} mode={mode} onLevelUp={() => setShowMilestoneDialog(true)} onCustomize={() => setShowCustomize(true)} onExport={() => setShowExport(true)} />
+      <TabBar activeTab={activeTab} onTabChange={setActiveTab} mode={mode} />
 
-      <CustomizationPanel
-        open={showCustomize}
-        onClose={() => setShowCustomize(false)}
-      />
+      {activeTab === 'main' ? (
+        <>
+          <HeroSection character={char} mode={mode} onLevelUp={() => setShowMilestoneDialog(true)} onCustomize={() => setShowCustomize(true)} onExport={() => setShowExport(true)} />
 
-      <CoreAbilitySection
-        innateDescription={char.innateDescription}
-        innateAbilities={char.innateAbilities}
-        basicAttack={char.basicAttack}
-        fatebreaker={char.fatebreaker}
-        mode={mode}
-      />
+          <CustomizationPanel
+            open={showCustomize}
+            onClose={() => setShowCustomize(false)}
+          />
 
-      <AbilitiesDndContext
-        maxSlots={char.maxAbilitySlots}
-        slottedAbilities={char.slottedAbilities}
-      >
-        <SlottedAbilitiesSection
-          abilities={char.slottedAbilities}
-          maxSlots={char.maxAbilitySlots}
-          mode={mode}
-          viewMode={abilitiesViewMode}
-          onViewModeChange={setAbilitiesViewMode}
-        />
+          <CoreAbilitySection
+            innateDescription={char.innateDescription}
+            innateAbilities={char.innateAbilities}
+            basicAttack={char.basicAttack}
+            fatebreaker={char.fatebreaker}
+            mode={mode}
+          />
 
-        <AbilityPoolSection
-          abilities={char.abilityPool}
-          mode={mode}
-          viewMode={abilitiesViewMode}
-          onViewModeChange={setAbilitiesViewMode}
-        />
-      </AbilitiesDndContext>
+          <AbilitiesDndContext
+            maxSlots={char.maxAbilitySlots}
+            slottedAbilities={char.slottedAbilities}
+          >
+            <SlottedAbilitiesSection
+              abilities={char.slottedAbilities}
+              maxSlots={char.maxAbilitySlots}
+              mode={mode}
+              viewMode={slottedViewMode}
+              onViewModeChange={setSlottedViewMode}
+            />
 
-      <div className="character-sheet__bottom">
-        <SkillsSection character={char} skills={char.skills} mode={mode} />
-        <ProfileSection
-          physicalDescription={char.physicalDescription}
-          backstory={char.backstory}
-          mode={mode}
-        />
-      </div>
+            <AbilityPoolSection
+              abilities={char.abilityPool}
+              mode={mode}
+              viewMode={poolViewMode}
+              onViewModeChange={setPoolViewMode}
+            />
+          </AbilitiesDndContext>
+
+          <div className="character-sheet__bottom">
+            <SkillsSection character={char} skills={char.skills} mode={mode} />
+            <ProfileSection
+              physicalDescription={char.physicalDescription}
+              backstory={char.backstory}
+              mode={mode}
+            />
+          </div>
+        </>
+      ) : (
+        (() => {
+          const tab = char.customTabs.find((t) => t.id === activeTab)
+          if (!tab) {
+            // Tab was deleted — fall back to main.
+            return (
+              <p className="sheet-section__empty muted">
+                Tab not found.
+              </p>
+            )
+          }
+          return <CustomTabContent tab={tab} mode={mode} />
+        })()
+      )}
 
       {showMilestoneDialog && (
         <MilestoneDialog onClose={() => setShowMilestoneDialog(false)} />

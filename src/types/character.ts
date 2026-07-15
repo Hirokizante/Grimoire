@@ -175,6 +175,35 @@ export interface VersionSnapshot {
 }
 
 /**
+ * A user-created ability section within a custom tab. Mirrors the visual
+ * structure of the built-in Slotted Abilities and Ability Pool sections but
+ * has no slot limit — it's a free-form grouping of AbilityBlocks that the
+ * player fully controls.
+ */
+export interface CustomAbilitySection {
+  /** Stable unique identifier. */
+  id: string
+  /** Display name of the section (user-editable). */
+  name: string
+  /** Ability blocks within this section. */
+  abilities: AbilityBlock[]
+}
+
+/**
+ * A user-created tab on the character sheet. Each tab contains one or more
+ * custom ability sections. The built-in "Main" tab is implicit (it renders
+ * the default sheet layout); all user-created tabs are stored here.
+ */
+export interface CustomTab {
+  /** Stable unique identifier. */
+  id: string
+  /** Display name of the tab (user-editable). */
+  name: string
+  /** Ability sections within this tab. */
+  sections: CustomAbilitySection[]
+}
+
+/**
  * The full persisted state of a single Divergence character sheet.
  */
 export interface Character {
@@ -228,6 +257,8 @@ export interface Character {
   physicalDescription: string
   /** The character's backstory / origins. */
   backstory: string
+  /** User-created custom tabs (each containing ability sections). */
+  customTabs: CustomTab[]
   /** Aesthetic configuration for the sheet. */
   config: SheetConfig
   /** ISO timestamp of creation. */
