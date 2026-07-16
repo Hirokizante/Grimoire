@@ -29,8 +29,6 @@ A character sheet creation and management app for the homebrew TTRPG **Divergenc
 
 Divergence is a DIY tabletop RPG system — there is no compendium of spells or items. Players build their characters' abilities and equipment from scratch, using the system as a creative framework. Grimoire is built to support that freedom: structured text fields for abilities, full creative control over look and feel, and live-play tools for tracking resources and rolling dice.
 
-For the full ruleset, see [`Divergence SRD.md`](Divergence SRD.md). For the product and UI design, see [`DESIGN.md`](DESIGN.md).
-
 ---
 
 ## Features
