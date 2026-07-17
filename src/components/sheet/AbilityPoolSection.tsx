@@ -22,6 +22,7 @@ import {
 import { useDroppable } from '@dnd-kit/core'
 
 import AbilityEditorModal from '@/components/sheet/AbilityEditorModal'
+import ConfirmModal from '@/components/sheet/ConfirmModal'
 import SortableAbilityCard, {
   type AbilitySectionId,
 } from '@/components/sheet/SortableAbilityCard'
@@ -53,6 +54,7 @@ export default function AbilityPoolSection({
 
   const [editing, setEditing] = useState<AbilityBlock | null>(null)
   const [showEditor, setShowEditor] = useState(false)
+  const [abilityToRemove, setAbilityToRemove] = useState<{ id: string; name: string } | null>(null)
 
   const { setNodeRef, isOver } = useDroppable({ id: SECTION, data: { section: SECTION } })
 
@@ -76,6 +78,18 @@ export default function AbilityPoolSection({
   const handleCancel = () => {
     setShowEditor(false)
     setEditing(null)
+  }
+
+  const handleRemoveRequest = (abilityId: string) => {
+    const ability = abilities.find((a) => a.id === abilityId)
+    if (!ability) return
+    setAbilityToRemove({ id: abilityId, name: ability.name })
+  }
+
+  const handleConfirmRemove = () => {
+    if (!abilityToRemove) return
+    removeAbilityBlock('abilityPool', abilityToRemove.id)
+    setAbilityToRemove(null)
   }
 
   return (
@@ -188,7 +202,7 @@ export default function AbilityPoolSection({
                       <button
                         type="button"
                         className="btn btn--ghost ability-card__action-btn ability-card__action-btn--danger"
-                        onClick={() => removeAbilityBlock('abilityPool', ability.id)}
+                        onClick={() => handleRemoveRequest(ability.id)}
                       >
                         Remove
                       </button>
@@ -207,6 +221,24 @@ export default function AbilityPoolSection({
         onSave={handleSave}
         onClose={handleCancel}
       />
+
+      {abilityToRemove && (
+        <ConfirmModal
+          title="Remove Ability?"
+          message={
+            <>
+              Are you sure you want to remove{' '}
+              <strong>{abilityToRemove.name || 'Untitled Ability'}</strong> from
+              the ability pool? This cannot be undone.
+            </>
+          }
+          confirmLabel="Remove"
+          cancelLabel="Cancel"
+          variant="danger"
+          onConfirm={handleConfirmRemove}
+          onClose={() => setAbilityToRemove(null)}
+        />
+      )}
     </section>
   )
 }

@@ -20,6 +20,7 @@ import { useEscapeKey } from '@/hooks/useEscapeKey'
 import { useNotification } from '@/context/NotificationContext'
 import { useCharacterStore } from '@/store/characterStore'
 import { bumpSemver, downloadJson, serializeSemver, versionedFilename } from '@/lib/exportImport'
+import ConfirmModal from '@/components/sheet/ConfirmModal'
 import type { Semver } from '@/types'
 
 export interface ExportDialogProps {
@@ -51,8 +52,10 @@ export default function ExportDialog({ open, onClose }: ExportDialogProps) {
   const { notify } = useNotification()
 
   const [versionOverrideText, setVersionOverrideText] = useState('')
+  const [pendingRestore, setPendingRestore] = useState<{ id: string; version: Semver } | null>(null)
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; version: Semver } | null>(null)
 
-  useEscapeKey(onClose, open)
+  useEscapeKey(onClose, open && !pendingRestore && !pendingDelete)
 
   // Reload history whenever the dialog opens.
   useEffect(() => {
@@ -78,13 +81,25 @@ export default function ExportDialog({ open, onClose }: ExportDialogProps) {
   }
 
   const handleRestore = async (snapshotId: string, version: Semver) => {
-    await restoreVersion(snapshotId)
-    notify(`Restored v${version}.`, 'success')
+    setPendingRestore({ id: snapshotId, version })
   }
 
-  const handleDelete = async (snapshotId: string) => {
-    await deleteVersion(snapshotId)
-    notify('Version deleted.', 'warning')
+  const handleConfirmRestore = async () => {
+    if (!pendingRestore) return
+    await restoreVersion(pendingRestore.id)
+    notify(`Restored v${pendingRestore.version}.`, 'success')
+    setPendingRestore(null)
+  }
+
+  const handleDelete = async (snapshotId: string, version: Semver) => {
+    setPendingDelete({ id: snapshotId, version })
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!pendingDelete) return
+    await deleteVersion(pendingDelete.id)
+    notify(`Deleted v${pendingDelete.version}.`, 'warning')
+    setPendingDelete(null)
   }
 
   const handleDownload = (snap: { data: { name: string }, version: Semver }) => {
@@ -198,7 +213,7 @@ export default function ExportDialog({ open, onClose }: ExportDialogProps) {
                       <button
                         type="button"
                         className="btn btn--ghost version-row__btn"
-                        onClick={() => handleDelete(snap.id)}
+                        onClick={() => handleDelete(snap.id, snap.version)}
                         title="Delete this version"
                       >
                         <Trash2 size={12} />
@@ -211,6 +226,42 @@ export default function ExportDialog({ open, onClose }: ExportDialogProps) {
           </div>
         </div>
       </div>
+
+      {pendingRestore && (
+        <ConfirmModal
+          title="Restore Version?"
+          message={
+            <span>
+              Restoring <strong>v{pendingRestore.version}</strong> will replace
+              the current character data. This creates a new version snapshot —
+              the current version will remain in history.
+            </span>
+          }
+          confirmLabel="Restore"
+          cancelLabel="Cancel"
+          variant="warning"
+          onConfirm={() => void handleConfirmRestore()}
+          onClose={() => setPendingRestore(null)}
+        />
+      )}
+
+      {pendingDelete && (
+        <ConfirmModal
+          title="Delete Version?"
+          message={
+            <span>
+              Are you sure you want to delete version{' '}
+              <strong>v{pendingDelete.version}</strong>? This snapshot and its
+              data will be permanently removed.
+            </span>
+          }
+          confirmLabel="Delete"
+          cancelLabel="Cancel"
+          variant="danger"
+          onConfirm={() => void handleConfirmDelete()}
+          onClose={() => setPendingDelete(null)}
+        />
+      )}
     </div>
   )
 }

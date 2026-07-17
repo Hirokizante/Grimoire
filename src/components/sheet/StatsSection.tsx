@@ -34,6 +34,7 @@ import MortalWoundRoller from '@/components/sheet/MortalWoundRoller'
 import RecoverAction from '@/components/sheet/RecoverAction'
 import ResourceBar from '@/components/sheet/ResourceBar'
 import CustomResourceBarModal from '@/components/sheet/CustomResourceBarModal'
+import ConfirmModal from '@/components/sheet/ConfirmModal'
 import {
   calcArmor,
   calcENDRecovery,
@@ -100,6 +101,7 @@ export default function StatsSection({
 
   const [showDamageDialog, setShowDamageDialog] = useState(false)
   const [showAddBar, setShowAddBar] = useState(false)
+  const [barToRemove, setBarToRemove] = useState<{ id: string; name: string } | null>(null)
   const isView = mode === 'view'
   const isEdit = mode === 'edit'
   const isKnockedOut =
@@ -213,7 +215,7 @@ export default function StatsSection({
               <button
                 type="button"
                 className="btn btn--ghost resource-bar__delete"
-                onClick={() => removeCustomResourceBar(bar.id)}
+                onClick={() => setBarToRemove({ id: bar.id, name: bar.name })}
                 aria-label={`Remove ${bar.name}`}
                 title={`Remove ${bar.name}`}
               >
@@ -281,6 +283,27 @@ export default function StatsSection({
 
       {showDamageDialog && (
         <DamageDialog onClose={() => setShowDamageDialog(false)} />
+      )}
+
+      {barToRemove && (
+        <ConfirmModal
+          title="Remove Resource Bar?"
+          message={
+            <>
+              Are you sure you want to remove{' '}
+              <strong>"{barToRemove.name}"</strong>? This resource bar and its
+              data will be permanently removed.
+            </>
+          }
+          confirmLabel="Remove"
+          cancelLabel="Cancel"
+          variant="danger"
+          onConfirm={() => {
+            removeCustomResourceBar(barToRemove.id)
+            setBarToRemove(null)
+          }}
+          onClose={() => setBarToRemove(null)}
+        />
       )}
     </section>
   )

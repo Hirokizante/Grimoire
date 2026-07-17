@@ -13,6 +13,7 @@
 import { useState } from 'react'
 import { Plus, X, Check, Pencil } from 'lucide-react'
 import { useCharacterStore } from '@/store/characterStore'
+import ConfirmModal from '@/components/sheet/ConfirmModal'
 import type { SheetMode } from '@/pages/CharacterSheetPage'
 
 export interface TabBarProps {
@@ -36,6 +37,7 @@ export default function TabBar({
 
   const [editingId, setEditingId] = useState<string | null>(null)
   const [draftName, setDraftName] = useState('')
+  const [tabToDelete, setTabToDelete] = useState<{ id: string; name: string } | null>(null)
 
   // Hide tab bar entirely when there are no custom tabs and not in edit mode.
   if (customTabs.length === 0 && !isEdit) return null
@@ -68,10 +70,18 @@ export default function TabBar({
   }
 
   const handleRemoveTab = (tabId: string) => {
-    removeCustomTab(tabId)
-    if (activeTab === tabId) {
+    const tab = customTabs.find((t) => t.id === tabId)
+    if (!tab) return
+    setTabToDelete({ id: tabId, name: tab.name })
+  }
+
+  const handleConfirmDeleteTab = () => {
+    if (!tabToDelete) return
+    removeCustomTab(tabToDelete.id)
+    if (activeTab === tabToDelete.id) {
       onTabChange('main')
     }
+    setTabToDelete(null)
   }
 
   return (
@@ -168,6 +178,24 @@ export default function TabBar({
         >
           <Plus size={16} />
         </button>
+      )}
+
+      {tabToDelete && (
+        <ConfirmModal
+          title="Delete Tab?"
+          message={
+            <>
+              Are you sure you want to delete{' '}
+              <strong>"{tabToDelete.name}"</strong>? This removes the tab and
+              all its content. This cannot be undone.
+            </>
+          }
+          confirmLabel="Delete"
+          cancelLabel="Cancel"
+          variant="danger"
+          onConfirm={handleConfirmDeleteTab}
+          onClose={() => setTabToDelete(null)}
+        />
       )}
     </div>
   )

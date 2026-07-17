@@ -3,11 +3,13 @@
  *
  * Wraps AbilityBlockEditor in a full-screen overlay, providing a large, focused
  * workspace for ability creation without the cramped inline panel feel. Overlay
- * clicks and the Esc key both cancel.
+ * clicks and the Esc key both cancel. When there are unsaved changes, a
+ * confirmation dialog is shown before discarding.
  */
-import { useMemo } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 
 import AbilityBlockEditor from '@/components/sheet/AbilityBlockEditor'
+import ConfirmModal from '@/components/sheet/ConfirmModal'
 import { useEscapeKey } from '@/hooks/useEscapeKey'
 import type { AbilityBlock } from '@/types'
 
@@ -34,12 +36,48 @@ export default function AbilityEditorModal({
     [ability],
   )
 
-  useEscapeKey(onClose, open)
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+  const [showDiscardConfirm, setShowDiscardConfirm] = useState(false)
+
+  const handleCancel = useCallback(() => {
+    if (hasUnsavedChanges) {
+      setShowDiscardConfirm(true)
+    } else {
+      onClose()
+    }
+  }, [hasUnsavedChanges, onClose])
+
+  const handleConfirmDiscard = useCallback(() => {
+    setShowDiscardConfirm(false)
+    onClose()
+  }, [onClose])
+
+  // Pass a stable onClose to the editor's cancel button.
+  const editorCancelHandler = useCallback(() => {
+    handleCancel()
+  }, [handleCancel])
+
+  // Track dirty state from the editor.
+  const handleDirtyChange = useCallback((isDirty: boolean) => {
+    setHasUnsavedChanges(isDirty)
+  }, [])
+
+  // If there are unsaved changes, intercept Esc too.
+  useEscapeKey(
+    () => {
+      if (hasUnsavedChanges) {
+        setShowDiscardConfirm(true)
+      } else {
+        onClose()
+      }
+    },
+    open && !showDiscardConfirm,
+  )
 
   if (!open) return null
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onClick={handleCancel}>
       <div
         className="modal-content ability-editor-dialog"
         role="dialog"
@@ -56,11 +94,28 @@ export default function AbilityEditorModal({
             key={editorKey}
             ability={ability}
             onSave={onSave}
-            onCancel={onClose}
+            onCancel={editorCancelHandler}
             hideTitle
+            onDirtyChange={handleDirtyChange}
           />
         </div>
       </div>
+
+      {showDiscardConfirm && (
+        <ConfirmModal
+          title="Discard Changes?"
+          message={
+           ability
+              ? 'You have unsaved changes to this ability. Discard them?'
+              : 'You have unsaved changes to the new ability. Discard them?'
+          }
+          confirmLabel="Discard"
+          cancelLabel="Keep Editing"
+          variant="danger"
+          onConfirm={handleConfirmDiscard}
+          onClose={() => setShowDiscardConfirm(false)}
+        />
+      )}
     </div>
   )
 }

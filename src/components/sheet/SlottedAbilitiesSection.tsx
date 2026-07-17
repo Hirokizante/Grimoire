@@ -26,6 +26,7 @@ import { useDroppable } from '@dnd-kit/core'
 
 import AbilityActivation from '@/components/sheet/AbilityActivation'
 import AbilityEditorModal from '@/components/sheet/AbilityEditorModal'
+import ConfirmModal from '@/components/sheet/ConfirmModal'
 import SortableAbilityCard, {
   type AbilitySectionId,
 } from '@/components/sheet/SortableAbilityCard'
@@ -61,6 +62,7 @@ export default function SlottedAbilitiesSection({
 
   const [editing, setEditing] = useState<AbilityBlock | null>(null)
   const [showEditor, setShowEditor] = useState(false)
+  const [abilityToRemove, setAbilityToRemove] = useState<{ id: string; name: string } | null>(null)
 
   // Droppable — makes the section a drop target for cross-section drags.
   const { setNodeRef, isOver } = useDroppable({ id: SECTION, data: { section: SECTION } })
@@ -85,6 +87,18 @@ export default function SlottedAbilitiesSection({
   const handleCancel = () => {
     setShowEditor(false)
     setEditing(null)
+  }
+
+  const handleRemoveRequest = (abilityId: string) => {
+    const ability = abilities.find((a) => a.id === abilityId)
+    if (!ability) return
+    setAbilityToRemove({ id: abilityId, name: ability.name })
+  }
+
+  const handleConfirmRemove = () => {
+    if (!abilityToRemove) return
+    removeAbilityBlock('slottedAbilities', abilityToRemove.id)
+    setAbilityToRemove(null)
   }
 
   const used = slotsUsed(abilities)
@@ -220,9 +234,7 @@ export default function SlottedAbilitiesSection({
                     <button
                       type="button"
                       className="btn btn--ghost ability-card__action-btn ability-card__action-btn--danger"
-                      onClick={() =>
-                        removeAbilityBlock('slottedAbilities', ability.id)
-                      }
+                      onClick={() => handleRemoveRequest(ability.id)}
                     >
                       Remove
                     </button>
@@ -240,6 +252,24 @@ export default function SlottedAbilitiesSection({
         onSave={handleSave}
         onClose={handleCancel}
       />
+
+      {abilityToRemove && (
+        <ConfirmModal
+          title="Remove Ability?"
+          message={
+            <>
+              Are you sure you want to remove{' '}
+              <strong>{abilityToRemove.name || 'Untitled Ability'}</strong> from
+              the slotted abilities? This cannot be undone.
+            </>
+          }
+          confirmLabel="Remove"
+          cancelLabel="Cancel"
+          variant="danger"
+          onConfirm={handleConfirmRemove}
+          onClose={() => setAbilityToRemove(null)}
+        />
+      )}
     </section>
   )
 }

@@ -18,6 +18,7 @@ import { useState } from 'react'
 import AbilityActivation from '@/components/sheet/AbilityActivation'
 import AbilityBlockCard from '@/components/sheet/AbilityBlockCard'
 import AbilityEditorModal from '@/components/sheet/AbilityEditorModal'
+import ConfirmModal from '@/components/sheet/ConfirmModal'
 import MarkdownText from '@/components/ui/MarkdownText'
 import { useCharacterStore } from '@/store/characterStore'
 import type { AbilityBlock } from '@/types'
@@ -52,6 +53,7 @@ export default function CoreAbilitySection({
   const [editingAbility, setEditingAbility] = useState<AbilityBlock | null>(
     null,
   )
+  const [innateToRemove, setInnateToRemove] = useState<{ id: string; name: string } | null>(null)
 
   const setInnateDescription = (value: string) =>
     updateCoreAbility('innateDescription', value)
@@ -98,6 +100,18 @@ export default function CoreAbilitySection({
       'innateAbilities',
       innateAbilities.filter((a) => a.id !== id),
     )
+  }
+
+  const handleRemoveRequest = (abilityId: string) => {
+    const ability = innateAbilities.find((a) => a.id === abilityId)
+    if (!ability) return
+    setInnateToRemove({ id: abilityId, name: ability.name })
+  }
+
+  const handleConfirmRemove = () => {
+    if (!innateToRemove) return
+    removeInnate(innateToRemove.id)
+    setInnateToRemove(null)
   }
 
   const hasContent = innateDescription !== '' || innateAbilities.length > 0
@@ -153,7 +167,7 @@ export default function CoreAbilitySection({
                       <button
                         type="button"
                         className="btn btn--ghost ability-card__action-btn ability-card__action-btn--danger"
-                        onClick={() => removeInnate(ability.id)}
+                        onClick={() => handleRemoveRequest(ability.id)}
                       >
                         Remove
                       </button>
@@ -228,6 +242,24 @@ export default function CoreAbilitySection({
         onSave={handleSave}
         onClose={handleCancel}
       />
+
+      {innateToRemove && (
+        <ConfirmModal
+          title="Remove Innate Ability?"
+          message={
+            <>
+              Are you sure you want to remove{' '}
+              <strong>{innateToRemove.name || 'Untitled Ability'}</strong> from
+              the core abilities? This cannot be undone.
+            </>
+          }
+          confirmLabel="Remove"
+          cancelLabel="Cancel"
+          variant="danger"
+          onConfirm={handleConfirmRemove}
+          onClose={() => setInnateToRemove(null)}
+        />
+      )}
     </section>
   )
 }

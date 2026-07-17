@@ -10,7 +10,7 @@
  * converted to/from the string array on the AbilityBlock.
  */
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 import { generateId } from '@/constants/gameData'
 import type { AbilityBlock, AbilityCost } from '@/types'
@@ -24,6 +24,8 @@ export interface AbilityBlockEditorProps {
   onCancel: () => void
   /** When true, hide the title row (used when wrapped in a modal with its own title). */
   hideTitle?: boolean
+  /** Called whenever the dirty state changes (true = has unsaved changes). */
+  onDirtyChange?: (isDirty: boolean) => void
 }
 
 /** Build a blank AbilityBlock for the "new" case. */
@@ -63,9 +65,29 @@ export default function AbilityBlockEditor({
   onSave,
   onCancel,
   hideTitle = false,
+  onDirtyChange,
 }: AbilityBlockEditorProps) {
   const [draft, setDraft] = useState<AbilityBlock>(ability ?? blankAbility())
   const [traitsText, setTraitsText] = useState(serializeTraits(draft.traits))
+
+  // Track dirty state and notify parent.
+  useEffect(() => {
+    if (!onDirtyChange) return
+    const original = ability ?? blankAbility()
+    const isDirty =
+      draft.name !== original.name ||
+      traitsText !== serializeTraits(original.traits) ||
+      draft.damage !== original.damage ||
+      draft.description !== original.description ||
+      draft.overcharge !== original.overcharge ||
+      draft.flavorText !== original.flavorText ||
+      draft.isMinor !== original.isMinor ||
+      draft.showActivate !== original.showActivate ||
+      draft.cost.ap !== original.cost.ap ||
+      draft.cost.end !== original.cost.end ||
+      draft.cost.fp !== original.cost.fp
+    onDirtyChange(isDirty)
+  }, [draft, traitsText, ability, onDirtyChange])
 
   // -- cost helpers ----------------------------------------------------------
   const costNum = (key: keyof AbilityCost): string => {
