@@ -18,6 +18,8 @@ export type {
   Semver,
   VersionSnapshot,
   Character,
+  CharacterKind,
+  NPCStats,
   CustomAbilitySection,
   CustomTab,
   CustomResourceBar,

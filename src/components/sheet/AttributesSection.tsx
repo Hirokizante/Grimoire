@@ -26,8 +26,10 @@ export interface AttributesSectionProps {
   /**
    * "section" (default) wraps in a full `.sheet-section` card.
    * "flat" renders without a section wrapper for embedding in the hero.
+   * "cards" renders D&D 5e-style attribute boxes in a responsive grid,
+   *   wrapped in a sheet section — used by the NPC sheet.
    */
-  variant?: 'section' | 'flat'
+  variant?: 'section' | 'flat' | 'cards'
 }
 
 function formatAttr(value: number): string {
@@ -72,11 +74,20 @@ export default function AttributesSection({
       ? 'attr-block__heading'
       : 'sheet-section__heading'
 
-  if (variant === 'flat') {
+  if (variant === 'flat' || variant === 'cards') {
+    const sectionClass =
+      variant === 'cards'
+        ? 'sheet-section sheet-section--attributes'
+        : 'attr-block--flat'
+    const headingClass =
+      variant === 'cards'
+        ? 'sheet-section__heading'
+        : 'attr-block__heading'
+    const listClass = variant === 'cards' ? 'attr-boxes--grid' : undefined
     return (
       <section className={sectionClass}>
         <h3 className={headingClass}>Attributes</h3>
-        <ul className="attr-boxes" role="list">
+        <ul className={'attr-boxes' + (listClass ? ` ${listClass}` : '')} role="list">
           {ATTRIBUTE_LIST.map((attr) => (
             <li
               key={attr.key}

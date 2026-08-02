@@ -1,3 +1,10 @@
+/**
+ * NPCListPage — the NPC gallery list page.
+ *
+ * Mirrors CharacterListPage's structure but filters for NPC records
+ * (kind === 'npc'). Supports grid/list view, create, import, and delete.
+ */
+
 import { useCallback, useRef, useState } from 'react'
 import { ArrowDownFromLine, LayoutGrid, List } from 'lucide-react'
 
@@ -11,7 +18,7 @@ import type { Character } from '@/types'
 
 type ViewMode = 'grid' | 'list'
 
-/** Format an ISO timestamp into a short, human-readable relative-ish label. */
+/** Format an ISO timestamp into a short, human-readable label. */
 function formatUpdatedAt(iso: string): string {
   const date = new Date(iso)
   if (Number.isNaN(date.getTime())) return '—'
@@ -29,33 +36,33 @@ function parseImport(text: string): Character {
   return parseCharacterJSON(text)
 }
 
-export default function CharacterListPage() {
-  const allCharacters = useCharacterStore((s) => s.characters)
-  /** Filter to only player character records (exclude NPCs). */
-  const characters = allCharacters.filter((c) => c.kind !== 'npc')
+export default function NPCListPage() {
+  const characters = useCharacterStore((s) => s.characters)
   const isLoaded = useCharacterStore((s) => s.isLoaded)
   const isSaving = useCharacterStore((s) => s.isSaving)
   const selectCharacter = useCharacterStore((s) => s.selectCharacter)
-  const importCharacterFile = useCharacterStore((s) => s.importCharacterFile)
-  const updateExistingCharacterFromImportFile = useCharacterStore(
-    (s) => s.updateExistingCharacterFromImportFile,
+  const importNPCFile = useCharacterStore((s) => s.importNPCFile)
+  const updateExistingNPCFromImportFile = useCharacterStore(
+    (s) => s.updateExistingNPCFromImportFile,
   )
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [viewMode, setViewMode] = useState<ViewMode>('grid')
   const [showCreateModal, setShowCreateModal] = useState(false)
-  const [characterToDelete, setCharacterToDelete] = useState<Character | null>(null)
-  /** Pending import JSON file that has a matching character by name. */
+  const [npcToDelete, setNpcToDelete] = useState<Character | null>(null)
+  /** Pending import JSON file that has a matching NPC by name. */
   const [pendingImport, setPendingImport] = useState<{
     existing: Character
     imported: Character
     rawText: string
   } | null>(null)
 
-  /** Handle file import with conflict detection for existing characters. */
+  /** Filter to only NPC records. */
+  const npcs = characters.filter((c) => c.kind === 'npc')
+
+  /** Handle file import with conflict detection for existing NPCs. */
   const handleImport = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0]
-      // Reset so re-selecting the same file still fires change.
       e.target.value = ''
       if (!file) return
       const isJson =
@@ -68,38 +75,38 @@ export default function CharacterListPage() {
         if (typeof reader.result !== 'string') return
         try {
           const imported = parseImport(reader.result)
-          const existing = characters.find(
+          const existing = npcs.find(
             (c) => c.name.toLowerCase() === imported.name.toLowerCase(),
           )
           if (existing) {
             setPendingImport({ existing, imported, rawText: reader.result })
           } else {
-            void importCharacterFile(reader.result)
+            void importNPCFile(reader.result)
           }
         } catch {
-          // Invalid JSON or shape — ignore silently (no toast yet).
+          // Invalid JSON or shape — ignore silently.
         }
       }
       reader.readAsText(file)
     },
-    [characters, importCharacterFile],
+    [npcs, importNPCFile],
   )
 
   if (!isLoaded) {
     return (
       <div className="page">
-        <p className="muted">Loading characters…</p>
+        <p className="muted">Loading NPCs…</p>
       </div>
     )
   }
 
-  if (characters.length === 0) {
+  if (npcs.length === 0) {
     return (
       <div className="page page--empty">
         <div className="empty-state">
-          <h2 className="empty-title">No characters yet</h2>
+          <h2 className="empty-title">No NPCs yet</h2>
           <p className="muted">
-            Create your first Divergence character to begin.
+            Create your first NPC to use as a static reference.
           </p>
           <div className="empty-state__actions">
             <button
@@ -108,14 +115,14 @@ export default function CharacterListPage() {
               onClick={() => fileInputRef.current?.click()}
             >
               <ArrowDownFromLine size={14} />
-              Import Character
+              Import NPC
             </button>
             <button
               className="btn btn--primary"
               type="button"
               onClick={() => setShowCreateModal(true)}
             >
-              Create New Character
+              Create New NPC
             </button>
           </div>
           <input
@@ -128,7 +135,7 @@ export default function CharacterListPage() {
           {showCreateModal && (
             <CreateCharacterModal
               onCreate={(name) => {
-                void useCharacterStore.getState().createCharacter(name)
+                void useCharacterStore.getState().createNPC(name)
                 setShowCreateModal(false)
               }}
               onClose={() => setShowCreateModal(false)}
@@ -143,14 +150,14 @@ export default function CharacterListPage() {
     <div className="page">
       <div className="page-head">
         <span className="page-count">
-          {characters.length} character{characters.length === 1 ? '' : 's'}
+          {npcs.length} NPC{npcs.length === 1 ? '' : 's'}
         </span>
         {isSaving && <span className="muted saving-badge">saving…</span>}
         <div className="page-head__actions">
           <div
             className="mode-toggle mode-toggle--compact"
             role="tablist"
-            aria-label="Character list view"
+            aria-label="NPC list view"
           >
             <button
               className={
@@ -207,7 +214,7 @@ export default function CharacterListPage() {
 
       {viewMode === 'grid' ? (
         <ul className="card-grid" role="list">
-          {characters.map((c) => (
+          {npcs.map((c) => (
             <li key={c.id} className="card">
               <button
                 className="card-main"
@@ -228,8 +235,7 @@ export default function CharacterListPage() {
                 )}
                 <span className="card-name">{c.name}</span>
                 <span className="card-meta">
-                  {c.milestones}{' '}
-                  {c.milestones === 1 ? 'milestone' : 'milestones'} ·{' '}
+                  {c.npcStats?.hp ?? 0} HP ·{' '}
                   {formatUpdatedAt(c.updatedAt)}
                 </span>
               </button>
@@ -237,7 +243,7 @@ export default function CharacterListPage() {
                 className="card-delete"
                 type="button"
                 aria-label={`Delete ${c.name}`}
-                onClick={() => setCharacterToDelete(c)}
+                onClick={() => setNpcToDelete(c)}
               >
                 ×
               </button>
@@ -246,7 +252,7 @@ export default function CharacterListPage() {
         </ul>
       ) : (
         <ul className="character-list" role="list">
-          {characters.map((c) => (
+          {npcs.map((c) => (
             <li key={c.id} className="character-list__item">
               <button
                 className="character-list__main"
@@ -268,8 +274,7 @@ export default function CharacterListPage() {
                 <div className="character-list__info">
                   <span className="character-list__name">{c.name}</span>
                   <span className="character-list__meta">
-                    {c.milestones}{' '}
-                    {c.milestones === 1 ? 'milestone' : 'milestones'} ·{' '}
+                    {c.npcStats?.hp ?? 0} HP ·{' '}
                     {formatUpdatedAt(c.updatedAt)}
                   </span>
                 </div>
@@ -278,7 +283,7 @@ export default function CharacterListPage() {
                 className="character-list__delete"
                 type="button"
                 aria-label={`Delete ${c.name}`}
-                onClick={() => setCharacterToDelete(c)}
+                onClick={() => setNpcToDelete(c)}
               >
                 ×
               </button>
@@ -290,21 +295,21 @@ export default function CharacterListPage() {
       {showCreateModal && (
         <CreateCharacterModal
           onCreate={(name) => {
-            void useCharacterStore.getState().createCharacter(name)
+            void useCharacterStore.getState().createNPC(name)
             setShowCreateModal(false)
           }}
           onClose={() => setShowCreateModal(false)}
         />
       )}
 
-      {characterToDelete && (
+      {npcToDelete && (
         <ConfirmDeleteModal
-          itemName={characterToDelete.name}
+          itemName={npcToDelete.name}
           onConfirm={() => {
-            void useCharacterStore.getState().deleteCharacter(characterToDelete.id)
-            setCharacterToDelete(null)
+            void useCharacterStore.getState().deleteCharacter(npcToDelete.id)
+            setNpcToDelete(null)
           }}
-          onClose={() => setCharacterToDelete(null)}
+          onClose={() => setNpcToDelete(null)}
         />
       )}
 
@@ -314,14 +319,14 @@ export default function CharacterListPage() {
           existingVersion={pendingImport.existing.version}
           importedVersion={pendingImport.imported.version}
           onUpdate={() => {
-            void updateExistingCharacterFromImportFile(
+            void updateExistingNPCFromImportFile(
               pendingImport.existing,
               pendingImport.rawText,
             )
             setPendingImport(null)
           }}
           onImportAsNew={() => {
-            void importCharacterFile(pendingImport.rawText)
+            void importNPCFile(pendingImport.rawText)
             setPendingImport(null)
           }}
           onClose={() => setPendingImport(null)}

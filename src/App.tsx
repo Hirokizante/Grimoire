@@ -7,6 +7,8 @@ import '@/components/dice/dice.css'
 
 import CharacterListPage from '@/pages/CharacterListPage'
 import CharacterSheetPage from '@/pages/CharacterSheetPage'
+import NPCListPage from '@/pages/NPCListPage'
+import NPCSheetPage from '@/pages/NPCSheetPage'
 import HomePage from '@/pages/HomePage'
 import PlaceholderPage from '@/pages/PlaceholderPage'
 import DiceRollOverlay from '@/components/dice/DiceRollOverlay'
@@ -28,6 +30,7 @@ function App() {
 
   const onSheet = currentCharacter !== null
   const onHome = !onSheet && view === 'home'
+  const onNpcSheet = onSheet && currentCharacter?.kind === 'npc'
 
   return (
     <NotificationProvider>
@@ -42,13 +45,17 @@ function App() {
           }
         >
           {onSheet ? (
-            <CharacterSheetPage />
+            onNpcSheet ? (
+              <NPCSheetPage />
+            ) : (
+              <CharacterSheetPage />
+            )
           ) : view === 'home' ? (
             <HomePage />
           ) : view === 'characters' ? (
             <CharacterListPage />
           ) : view === 'npcs' ? (
-            <PlaceholderPage title="NPCs" />
+            <NPCListPage />
           ) : view === 'settings' ? (
             <PlaceholderPage title="Settings" />
           ) : (
@@ -57,7 +64,7 @@ function App() {
         </main>
 
         <DiceRollOverlay />
-        {onSheet && <RollLogDrawer />}
+        {onSheet && !onNpcSheet && <RollLogDrawer />}
       </div>
     </NotificationProvider>
   )

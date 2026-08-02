@@ -8,7 +8,7 @@
  */
 
 import { create } from 'zustand'
-import { createDefaultCharacter, generateId, MORTAL_WOUNDS, MAX_AP, MAX_END, MAX_MORTAL_WOUNDS, DEATH_SAVE_DC, MAX_CUSTOM_TABS } from '@/constants/gameData'
+import { createDefaultCharacter, createDefaultNPC, generateId, MORTAL_WOUNDS, MAX_AP, MAX_END, MAX_MORTAL_WOUNDS, DEATH_SAVE_DC, MAX_CUSTOM_TABS } from '@/constants/gameData'
 import {
   deleteCharacter as dbDeleteCharacter,
   getAllCharacters,
@@ -120,10 +120,14 @@ export interface CharacterStoreActions {
   loadCharacters: () => Promise<void>
   /** Create a fresh default character, persist it, and select it. */
   createCharacter: (name: string) => Promise<void>
+  /** Create a fresh default NPC, persist it, and select it. */
+  createNPC: (name: string) => Promise<void>
   /** Select a loaded character as current by id. */
   selectCharacter: (id: string) => void
   /** Clear current character and return to list view. */
   closeCharacter: () => void
+  /** Clear current NPC and return to NPC list view. */
+  closeNPC: () => void
   /** Navigate to a top-level view (home, characters, npcs, settings). */
   setView: (view: AppView) => void
   /** Apply an updater to the current character, autosave, and sync the list. */
@@ -134,8 +138,12 @@ export interface CharacterStoreActions {
   saveCurrentCharacter: () => Promise<void>
   /** Import a character from JSON text, persist it, and select it as current. */
   importCharacterFile: (text: string) => Promise<void>
+  /** Import an NPC from JSON text, persist it, and select it as current. */
+  importNPCFile: (text: string) => Promise<void>
   /** Update an existing character from imported JSON, preserving id and live-play state. */
   updateExistingCharacterFromImportFile: (existing: Character, text: string) => Promise<void>
+  /** Update an existing NPC from imported JSON, preserving id. */
+  updateExistingNPCFromImportFile: (existing: Character, text: string) => Promise<void>
   /** Update a single AbilityBlock within a slotted/pool list. */
   updateAbilityBlock: (
     section: AbilitySection,
@@ -315,6 +323,18 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
     }))
   },
 
+  createNPC: async (name: string) => {
+    const base = createDefaultNPC()
+    const npc: Character = { ...base, name, id: generateId() }
+    set({ isSaving: true })
+    await putCharacter(npc)
+    set((state) => ({
+      characters: [...state.characters, npc],
+      currentCharacter: npc,
+      isSaving: false,
+    }))
+  },
+
   selectCharacter: (id: string) => {
     const found = get().characters.find((c) => c.id === id) ?? null
     set({ currentCharacter: found })
@@ -322,6 +342,10 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
 
   closeCharacter: () => {
     set({ currentCharacter: null, view: 'characters' })
+  },
+
+  closeNPC: () => {
+    set({ currentCharacter: null, view: 'npcs' })
   },
 
   setView: (view) => {
@@ -378,7 +402,33 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
     }))
   },
 
+  importNPCFile: async (text: string) => {
+    const imported = parseImportCharacter(text)
+    set({ isSaving: true })
+    await putCharacter(imported)
+    set((state) => ({
+      characters: [...state.characters, imported],
+      currentCharacter: imported,
+      isSaving: false,
+    }))
+  },
+
   updateExistingCharacterFromImportFile: async (
+    existing: Character,
+    text: string,
+  ) => {
+    const updated = updateExistingCharacterFromImport(existing, text)
+    set({ isSaving: true })
+    await putCharacter(updated)
+    set((state) => ({
+      currentCharacter:
+        state.currentCharacter?.id === existing.id ? updated : state.currentCharacter,
+      characters: state.characters.map((c) => (c.id === existing.id ? updated : c)),
+      isSaving: false,
+    }))
+  },
+
+  updateExistingNPCFromImportFile: async (
     existing: Character,
     text: string,
   ) => {

@@ -165,6 +165,27 @@ export function normalizeCharacter(raw: Character): Character {
     }
   }
 
+  // Ensure kind is set (migration for records created before the NPC feature).
+  if (!result.kind) {
+    result.kind = 'character'
+  }
+
+  // Ensure npcStats exists for NPCs (migration for records without it).
+  if (result.kind === 'npc' && !result.npcStats) {
+    result.npcStats = {
+      evasion: 10,
+      armor: 0,
+      movement: 5,
+      saveDC: 10,
+      hp: 20,
+    }
+  }
+
+  // Ensure description exists for NPCs (migration for records without it).
+  if (result.kind === 'npc' && result.description == null) {
+    result.description = ''
+  }
+
   // Ensure viewModes exists and is complete (migration for records created
   // before view-modes were persisted). Build a full shape so any tabs or
   // sections present in customTabs get an entry — existing choices preserved,

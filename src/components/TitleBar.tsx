@@ -21,9 +21,11 @@ export default function TitleBar() {
   const currentCharacter = useCharacterStore((s) => s.currentCharacter)
   const view = useCharacterStore((s) => s.view)
   const closeCharacter = useCharacterStore((s) => s.closeCharacter)
+  const closeNPC = useCharacterStore((s) => s.closeNPC)
   const setView = useCharacterStore((s) => s.setView)
 
   const onSheet = currentCharacter !== null
+  const onNpcSheet = onSheet && currentCharacter?.kind === 'npc'
 
   const navButtons: NavButton[] = [
     {
@@ -50,7 +52,11 @@ export default function TitleBar() {
 
   function handleNav(target: AppView) {
     if (onSheet) {
-      closeCharacter()
+      if (onNpcSheet) {
+        closeNPC()
+      } else {
+        closeCharacter()
+      }
     }
     setView(target)
   }

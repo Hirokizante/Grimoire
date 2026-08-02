@@ -127,6 +127,18 @@
   box-shadow: none;
 }
 
+.section-delete-btn {
+  padding: 0.35rem;
+  color: var(--text-muted);
+}
+
+.section-delete-btn:hover,
+.section-delete-btn:focus-visible {
+  color: var(--danger);
+  border-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 8%, transparent);
+}
+
 .sheet-section__counter {
   font-family: var(--sheet-label-font, inherit);
   font-size: 0.78rem;
@@ -355,6 +367,25 @@
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+}
+
+/* Grid variant for NPC sheet — 5 attribute cards in a responsive row */
+.attr-boxes--grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0.6rem;
+}
+
+@media (max-width: 640px) {
+  .attr-boxes--grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 420px) {
+  .attr-boxes--grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 
 .attr-box {
@@ -632,6 +663,91 @@
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--text-muted);
+}
+
+/* ---- NPC Stat Cards ------------------------------------------------------- */
+
+.npc-stat-cards {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0.75rem;
+}
+
+@media (max-width: 640px) {
+  .npc-stat-cards {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 420px) {
+  .npc-stat-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.npc-stat-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 1rem 0.5rem 0.85rem;
+  border-radius: 14px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-soft);
+  position: relative;
+  overflow: hidden;
+  transition: border-color 0.15s ease, background-color 0.15s ease, transform 0.15s ease;
+}
+
+.npc-stat-card:hover {
+  border-color: var(--npc-stat-color);
+  background: var(--bg-surface-hover);
+}
+
+/* Top accent stripe */
+.npc-stat-card__stripe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: var(--npc-stat-color);
+  opacity: 0.8;
+}
+
+.npc-stat-card__icon {
+  color: var(--npc-stat-color);
+  margin-top: 0.15rem;
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--npc-stat-color) 30%, transparent));
+}
+
+.npc-stat-card__value {
+  font-family: var(--sheet-heading-font, inherit);
+  font-weight: 700;
+  font-size: 2.2rem;
+  line-height: 1;
+  color: var(--text-primary);
+  text-align: center;
+  padding: 0.2rem 0;
+}
+
+.npc-stat-card__input {
+  font-family: var(--sheet-heading-font, inherit);
+  font-weight: 700;
+  font-size: 1.6rem;
+  text-align: center;
+  width: 4rem;
+  padding: 0.15rem;
+  margin: 0.2rem 0;
+}
+
+.npc-stat-card__label {
+  font-family: var(--sheet-label-font, inherit);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-muted);
+  text-align: center;
 }
 
 .stat-bars {
@@ -3423,5 +3539,201 @@
 
   .tab-bar__tab {
     flex-shrink: 0;
+  }
+}
+
+/* ---- Character Selector (slide-out left panel) --------------------------- */
+
+.char-selector {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 240px;
+  z-index: 50;
+  background: var(--bg-surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  transform: translateX(-100%);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 4px 0 12px rgba(0, 0, 0, 0.25);
+}
+
+.char-selector--open {
+  transform: translateX(0);
+}
+
+.char-selector__header {
+  flex-shrink: 0;
+  padding: 1rem 1rem 0.75rem;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.char-selector__title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.char-selector__list {
+  list-style: none;
+  margin: 0;
+  padding: 0.5rem;
+  overflow-y: auto;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  scrollbar-width: thin;
+}
+
+.char-selector__item {
+  /* no-op wrapper for semantic list */
+}
+
+.char-selector__btn {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.4rem;
+  border-radius: 8px;
+  text-align: left;
+  color: var(--text-primary);
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+  border: 1px solid transparent;
+}
+
+.char-selector__btn:hover {
+  background: var(--bg-surface-hover);
+}
+
+.char-selector__btn--active {
+  background: color-mix(in srgb, var(--accent-violet) 15%, transparent);
+  border-color: color-mix(in srgb, var(--accent-violet) 40%, transparent);
+}
+
+.char-selector__portrait {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  object-fit: cover;
+  background: var(--border-soft);
+}
+
+.char-selector__portrait--empty {
+  background: linear-gradient(
+    135deg,
+    var(--bg-surface-raised),
+    var(--border-soft)
+  );
+}
+
+.char-selector__name {
+  font-size: 0.85rem;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.char-selector__empty {
+  padding: 1rem 0.5rem;
+  font-size: 0.82rem;
+  text-align: center;
+}
+
+/* Toggle tab — pinned to the panel's right edge, always visible.
+ * Click target for opening/closing the panel. */
+.char-selector__toggle {
+  position: fixed;
+  top: 50%;
+  left: 0;
+  transform: translateY(-50%);
+  z-index: 51;
+  width: 32px;
+  height: 56px;
+  border: 1px solid var(--border);
+  border-left: none;
+  border-radius: 0 10px 10px 0;
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+    background-color 0.15s ease, color 0.15s ease;
+}
+
+.char-selector__toggle:hover {
+  background: var(--bg-surface-hover);
+  color: var(--text-primary);
+}
+
+.char-selector__toggle--open {
+  left: 240px;
+}
+
+/* When the selector is open, shift the page content right to make room.
+ * The transition is synced with the panel's slide-in (0.3s, same easing). */
+.sheet-page--selector-open .sheet-page__content {
+  margin-left: 240px;
+  transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sheet-page .sheet-page__content {
+  transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Background layers also shift so they don't bleed under the panel. */
+.sheet-page--selector-open .sheet-page__bg-color,
+.sheet-page--selector-open .sheet-page__bg-image,
+.sheet-page--selector-open .sheet-page__bg-overlay {
+  left: 240px;
+  transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sheet-page .sheet-page__bg-color,
+.sheet-page .sheet-page__bg-image,
+.sheet-page .sheet-page__bg-overlay {
+  transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Top navigation bar also shifts so nav buttons stay fully visible. */
+body:has(.sheet-page--selector-open) .app-header {
+  padding-left: calc(1.25rem + 240px);
+  transition: padding-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.app-header {
+  transition: padding-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@media (max-width: 600px) {
+  .char-selector {
+    width: 200px;
+  }
+
+  .char-selector__toggle--open {
+    left: 200px;
+  }
+
+  .sheet-page--selector-open .sheet-page__content {
+    margin-left: 200px;
+  }
+
+  .sheet-page--selector-open .sheet-page__bg-color,
+  .sheet-page--selector-open .sheet-page__bg-image,
+  .sheet-page--selector-open .sheet-page__bg-overlay {
+    left: 200px;
+  }
+
+  body:has(.sheet-page--selector-open) .app-header {
+    padding-left: calc(1.25rem + 200px);
   }
 }

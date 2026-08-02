@@ -7,7 +7,7 @@
  */
 
 import { useState } from 'react'
-import { LayoutGrid, List, Pencil, Check } from 'lucide-react'
+import { LayoutGrid, List, Pencil, Check, Trash2 } from 'lucide-react'
 
 import { useDroppable } from '@dnd-kit/core'
 import {
@@ -18,6 +18,7 @@ import {
 
 import AbilityActivation from '@/components/sheet/AbilityActivation'
 import AbilityEditorModal from '@/components/sheet/AbilityEditorModal'
+import ConfirmModal from '@/components/sheet/ConfirmModal'
 import SortableAbilityCard from '@/components/sheet/SortableAbilityCard'
 import { useCharacterStore } from '@/store/characterStore'
 import type { AbilityBlock, CustomAbilitySection } from '@/types'
@@ -42,9 +43,11 @@ export default function CustomAbilitySection({
   const addCustomAbility = useCharacterStore((s) => s.addCustomAbility)
   const updateCustomAbility = useCharacterStore((s) => s.updateCustomAbility)
   const renameCustomSection = useCharacterStore((s) => s.renameCustomSection)
+  const removeCustomSection = useCharacterStore((s) => s.removeCustomSection)
 
   const [editing, setEditing] = useState<AbilityBlock | null>(null)
   const [showEditor, setShowEditor] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   const [renaming, setRenaming] = useState(false)
   const [sectionNameDraft, setSectionNameDraft] = useState('')
@@ -163,6 +166,16 @@ export default function CustomAbilitySection({
                 </button>
               </div>
             )}
+            {isEdit && (
+              <button
+                type="button"
+                className="btn btn--ghost section-delete-btn"
+                onClick={() => setShowDeleteConfirm(true)}
+                aria-label={`Delete ${section.name} section`}
+              >
+                <Trash2 size={16} />
+              </button>
+            )}
           </div>
       </div>
 
@@ -242,6 +255,23 @@ export default function CustomAbilitySection({
         onSave={handleSave}
         onClose={handleCancel}
       />
+
+      {showDeleteConfirm && (
+        <ConfirmModal
+          title="Delete Section?"
+          message={
+            <>
+              Are you sure you want to delete <strong>{section.name}</strong> and
+              all abilities in it? This cannot be undone.
+            </>
+          }
+          confirmLabel="Delete"
+          cancelLabel="Cancel"
+          variant="danger"
+          onConfirm={() => removeCustomSection(tabId, section.id)}
+          onClose={() => setShowDeleteConfirm(false)}
+        />
+      )}
     </section>
   )
 }

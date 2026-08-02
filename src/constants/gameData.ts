@@ -11,6 +11,7 @@ import type {
   AttributeKey,
   Character,
   MortalWound,
+  NPCStats,
   SheetColors,
   SheetConfig,
   SkillName,
@@ -358,6 +359,7 @@ export function createDefaultCharacter(): Character {
     name: 'New Character',
     playerName: '',
     version: '1.0.0',
+    kind: 'character',
     milestones: 0,
     attributes,
     skills,
@@ -389,5 +391,82 @@ export function createDefaultCharacter(): Character {
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     customResourceBars: [],
+  }
+}
+
+/**
+ * Default NPC combat stats — all zeros, ready for manual entry.
+ */
+const DEFAULT_NPC_STATS: NPCStats = {
+  evasion: 10,
+  armor: 0,
+  movement: 5,
+  saveDC: 10,
+  hp: 20,
+}
+
+/**
+ * Construct a freshly-created default NPC.
+ *
+ * NPCs reuse the Character shape (so they share the store, DB, and dice-roll
+ * infrastructure) but carry `npcStats` instead of derived combat stats and
+ * omit live-play trackers. The `description` field holds the long-form NPC
+ * description. All live-play fields (currentHP, currentEND, currentAP,
+ * currentFP, mortalWounds, deathSaves) are zeroed/emptied — they are never
+ * shown or tracked on an NPC sheet.
+ *
+ * NPCs start with all attributes at 0 (no standard array — the GM enters them
+ * manually) and all skills at +0.
+ */
+export function createDefaultNPC(): Character {
+  const attributes: Record<AttributeKey, number> = {
+    MAR: 0,
+    POW: 0,
+    AGI: 0,
+    VIT: 0,
+    GRT: 0,
+  }
+  const skills = createDefaultSkills()
+  const now = new Date().toISOString()
+
+  return {
+    id: generateId(),
+    name: 'New NPC',
+    playerName: '',
+    version: '1.0.0',
+    kind: 'npc',
+    milestones: 0,
+    attributes,
+    skills,
+    maxFP: 0,
+    maxAbilitySlots: 0,
+    currentHP: 0,
+    tempHP: 0,
+    currentEND: 0,
+    currentAP: 0,
+    currentFP: 0,
+    mortalWounds: [null, null],
+    deathSaves: { successes: 0, failures: 0 },
+    innateDescription: '',
+    innateAbilities: [],
+    basicAttack: createDefaultBasicAttack(),
+    fatebreaker: createDefaultFatebreaker(),
+    slottedAbilities: [],
+    abilityPool: [],
+    portrait: null,
+    physicalDescription: '',
+    backstory: '',
+    customTabs: [],
+    config: { ...DEFAULT_SHEET_CONFIG },
+    viewModes: {
+      slottedAbilities: 'grid',
+      abilityPool: 'grid',
+      customTabs: {},
+    },
+    createdAt: now,
+    updatedAt: now,
+    customResourceBars: [],
+    npcStats: { ...DEFAULT_NPC_STATS },
+    description: '',
   }
 }

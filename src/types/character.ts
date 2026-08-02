@@ -241,6 +241,36 @@ export interface CustomTab {
 }
 
 /**
+ * Distinguishes a full player Character from a static-reference NPC.
+ *
+ * NPCs reuse the Character shape (so they share the store, DB, and dice-roll
+ * infrastructure) but carry `npcStats` instead of derived combat stats and
+ * omit live-play trackers. The `kind` field lets components and stores filter
+ * / branch without sniffing for the presence of individual fields.
+ */
+export type CharacterKind = 'character' | 'npc'
+
+/**
+ * Manually-entered combat stats for an NPC.
+ *
+ * Unlike player characters, NPC stats are not derived from attributes — the
+ * user enters them directly. NPCs are static references, so there is no
+ * current/max tracking: `hp` is a single maximum value.
+ */
+export interface NPCStats {
+  /** Evasion — target for attackers to hit. */
+  evasion: number
+  /** Armor — damage reduction per point. */
+  armor: number
+  /** Movement in tiles per turn. */
+  movement: number
+  /** Save DC — target for abilities that allow a saving throw. */
+  saveDC: number
+  /** Maximum Hit Points (single value, no current/max tracking). */
+  hp: number
+}
+
+/**
  * The full persisted state of a single Divergence character sheet.
  */
 export interface Character {
@@ -252,6 +282,8 @@ export interface Character {
   playerName: string
   /** Auto-incremented semantic version for export/versioning (DESIGN.md). */
   version: Semver
+  /** Discriminator: 'character' for player sheets, 'npc' for static references. */
+  kind: CharacterKind
   /** Milestone count — analogous to level; drives milestone bonus & growth. */
   milestones: number
   /** The five Attributes. */
@@ -306,6 +338,10 @@ export interface Character {
   updatedAt: string
   /** User-created custom resource bars rendered below Endurance. */
   customResourceBars: CustomResourceBar[]
+  /** NPC combat stats (only present when kind === 'npc'). */
+  npcStats?: NPCStats
+  /** Long-form description for NPCs (only present when kind === 'npc'). */
+  description?: string
 }
 
 /**

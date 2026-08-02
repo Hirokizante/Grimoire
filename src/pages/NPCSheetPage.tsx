@@ -1,24 +1,20 @@
 /**
- * CharacterSheetPage — wraps the CharacterSheet component with a mode toggle
- * (Edit / View), a customize panel trigger, and background image layers.
- *
- * If the character has a background image configured, it is rendered as a
- * fixed full-viewport layer behind the sheet, with optional darken and blur
- * overlays controlled from the CustomizationPanel.
+ * NPCSheetPage — wraps the NPCSheet component with a mode toggle and
+ * background image layers, mirroring CharacterSheetPage's structure.
  *
  * A CharacterSelector panel slides out from the left, open by default, listing
- * all player characters with portrait + name. When open, the page content
- * shifts right so the sheet stays fully visible.
+ * all NPCs with portrait + name. When open, the page content shifts right so
+ * the sheet stays fully visible.
  */
 
 import { useState } from 'react'
 import { useCharacterStore } from '@/store/characterStore'
-import CharacterSheet from '@/components/sheet/CharacterSheet'
+import NPCSheet from '@/components/sheet/npc/NPCSheet'
 import CharacterSelector from '@/components/sheet/CharacterSelector'
+import RollLogDrawer from '@/components/dice/RollLogDrawer'
+import type { SheetMode } from '@/pages/CharacterSheetPage'
 
-export type SheetMode = 'edit' | 'view'
-
-export default function CharacterSheetPage() {
+export default function NPCSheetPage() {
   const currentCharacter = useCharacterStore((s) => s.currentCharacter)
   const [mode, setMode] = useState<SheetMode>('view')
   const [selectorOpen, setSelectorOpen] = useState(false)
@@ -36,9 +32,7 @@ export default function CharacterSheetPage() {
         (selectorOpen ? ' sheet-page--selector-open' : '')
       }
     >
-      {/* Page background color — fixed full-viewport layer. When a background
-       * image is present, it renders after this in DOM order with the same
-       * z-index and paints over it, so the image takes priority. */}
+      {/* Page background color — fixed full-viewport layer. */}
       <div
         className="sheet-page__bg-color"
         style={{ backgroundColor: config.pageBackgroundColor }}
@@ -65,18 +59,20 @@ export default function CharacterSheetPage() {
       )}
 
       <CharacterSelector
-        kind="character"
+        kind="npc"
         open={selectorOpen}
         onToggle={() => setSelectorOpen((v) => !v)}
       />
 
       <div className="sheet-page__content">
-        <CharacterSheet
-          character={currentCharacter}
+        <NPCSheet
+          npc={currentCharacter}
           mode={mode}
           onModeChange={setMode}
         />
       </div>
+
+      <RollLogDrawer />
     </div>
   )
 }
