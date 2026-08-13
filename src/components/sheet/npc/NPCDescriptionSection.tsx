@@ -44,7 +44,7 @@ export default function NPCDescriptionSection({
               rows={5}
             />
           ) : (
-            <MarkdownText className="profile__text">
+            <MarkdownText className="profile__text" mode={mode} character={npc}>
               {description}
             </MarkdownText>
           )}

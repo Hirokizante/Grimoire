@@ -433,7 +433,7 @@ export default function CustomNPCSection({
               rows={4}
             />
           ) : description ? (
-            <MarkdownText className="custom-npc-section__description">
+            <MarkdownText className="custom-npc-section__description" mode={mode} character={npc}>
               {description}
             </MarkdownText>
           ) : (

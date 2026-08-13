@@ -138,7 +138,7 @@ export default function CoreAbilitySection({
               rows={3}
             />
           ) : (
-            <MarkdownText className="core-innate__text">
+            <MarkdownText className="core-innate__text" mode={mode}>
               {innateDescription}
             </MarkdownText>
           )}

@@ -82,7 +82,7 @@ export default function AbilityBlockCard({ ability, mode = 'view', actions }: Ab
       )}
 
       {description && (
-        <MarkdownText className="ability-card__description">
+        <MarkdownText className="ability-card__description" mode={mode}>
           {description}
         </MarkdownText>
       )}
@@ -90,13 +90,17 @@ export default function AbilityBlockCard({ ability, mode = 'view', actions }: Ab
       {overcharge && (
         <div className="ability-card__overcharge">
           <span className="ability-card__section-label">Overcharge</span>
-          <MarkdownText className="ability-card__overcharge-body">
+          <MarkdownText className="ability-card__overcharge-body" mode={mode}>
             {overcharge}
           </MarkdownText>
         </div>
       )}
 
-      {flavorText && <p className="ability-card__flavor">{flavorText}</p>}
+      {flavorText && (
+        <MarkdownText className="ability-card__flavor" mode={mode}>
+          {flavorText}
+        </MarkdownText>
+      )}
 
       {actions && <div className="ability-card__actions">{actions}</div>}
     </article>

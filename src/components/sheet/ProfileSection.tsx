@@ -54,7 +54,7 @@ export default function ProfileSection({
               rows={3}
             />
           ) : (
-            <MarkdownText className="profile__text">
+            <MarkdownText className="profile__text" mode={mode}>
               {physicalDescription}
             </MarkdownText>
           )}
@@ -73,7 +73,7 @@ export default function ProfileSection({
               rows={5}
             />
           ) : (
-            <MarkdownText className="profile__text">{backstory}</MarkdownText>
+            <MarkdownText className="profile__text" mode={mode}>{backstory}</MarkdownText>
           )}
         </div>
       )}

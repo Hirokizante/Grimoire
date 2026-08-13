@@ -13,6 +13,7 @@
 import { findDiceNotation } from '@/lib/diceParser'
 import { useDiceRollStore } from '@/store/diceRollStore'
 import { useCharacterStore } from '@/store/characterStore'
+import type { Character } from '@/types/character'
 import type { SheetMode } from '@/pages/CharacterSheetPage'
 
 export interface DiceHighlighterProps {
@@ -22,15 +23,24 @@ export interface DiceHighlighterProps {
   mode?: SheetMode
   /** Optional CSS class for the container. */
   className?: string
+  /**
+   * Explicit character whose stats resolve variables when a notation button is
+   * clicked. When omitted, falls back to the store's `currentCharacter`.
+   * Useful for NPC sheets where the rolled NPC may differ from the character
+   * stored in `currentCharacter`.
+   */
+  character?: Character
 }
 
 export default function DiceHighlighter({
   text,
   mode = 'view',
   className,
+  character: explicitCharacter,
 }: DiceHighlighterProps) {
   const roll = useDiceRollStore((s) => s.roll)
-  const character = useCharacterStore((s) => s.currentCharacter)
+  const currentCharacter = useCharacterStore((s) => s.currentCharacter)
+  const character = explicitCharacter ?? currentCharacter
 
   if (!text) return null
 
