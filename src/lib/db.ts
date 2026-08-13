@@ -126,13 +126,14 @@ export function normalizeCharacter(raw: Character): Character {
       ...tab,
       sections: tab.sections.map((rawSection) => {
         const section = rawSection as unknown as {
-          kind?: 'ability' | 'npc'
+          kind?: 'ability' | 'npc' | 'text'
           id: string
           name: string
           npcId?: string
           abilities?: AbilityBlock[]
+          content?: string
         }
-        // Legacy ability sections have no `kind` and always hold abilities.
+        // NPC sections reference a bundled NPC record.
         if (section.kind === 'npc' && typeof section.npcId === 'string') {
           return {
             kind: 'npc' as const,
@@ -141,6 +142,16 @@ export function normalizeCharacter(raw: Character): Character {
             npcId: section.npcId,
           }
         }
+        // Text sections carry a free-form Markdown body.
+        if (section.kind === 'text') {
+          return {
+            kind: 'text' as const,
+            id: section.id,
+            name: section.name,
+            content: section.content ?? '',
+          }
+        }
+        // Legacy ability sections have no `kind` and always hold abilities.
         return {
           kind: 'ability' as const,
           id: section.id,

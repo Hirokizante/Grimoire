@@ -11,6 +11,7 @@ import { useState } from 'react'
 
 import CustomAbilitySection from '@/components/sheet/CustomAbilitySection'
 import CustomNPCSection from '@/components/sheet/CustomNPCSection'
+import CustomTextSection from '@/components/sheet/CustomTextSection'
 import CustomTabDndContext from '@/components/sheet/CustomTabDndContext'
 import AddSectionChoiceModal, {
   type AddSectionChoice,
@@ -35,6 +36,7 @@ export default function CustomTabContent({
 }: CustomTabContentProps) {
   const isEdit = mode === 'edit'
   const addCustomSection = useCharacterStore((s) => s.addCustomSection)
+  const addCustomTextSection = useCharacterStore((s) => s.addCustomTextSection)
   const addCustomNPCReference = useCharacterStore(
     (s) => s.addCustomNPCReference,
   )
@@ -58,6 +60,8 @@ export default function CustomTabContent({
     setShowAddSection(false)
     if (choice === 'ability') {
       addCustomSection(tab.id)
+    } else if (choice === 'text') {
+      addCustomTextSection(tab.id)
     } else {
       setShowNPCPicker(true)
     }
@@ -87,26 +91,37 @@ export default function CustomTabContent({
           </div>
         ) : (
           tab.sections.map((section) => {
-            if (section.kind === 'npc') {
-              return (
-                <CustomNPCSection
-                  key={section.id}
-                  tabId={tab.id}
-                  section={section}
-                  mode={mode}
-                />
-              )
+            switch (section.kind) {
+              case 'npc':
+                return (
+                  <CustomNPCSection
+                    key={section.id}
+                    tabId={tab.id}
+                    section={section}
+                    mode={mode}
+                  />
+                )
+              case 'text':
+                return (
+                  <CustomTextSection
+                    key={section.id}
+                    tabId={tab.id}
+                    section={section}
+                    mode={mode}
+                  />
+                )
+              case 'ability':
+                return (
+                  <CustomAbilitySection
+                    key={section.id}
+                    tabId={tab.id}
+                    section={section}
+                    mode={mode}
+                    viewMode={tabViewModes[section.id] ?? 'grid'}
+                    onViewModeChange={(m) => handleViewModeChange(section.id, m)}
+                  />
+                )
             }
-            return (
-              <CustomAbilitySection
-                key={section.id}
-                tabId={tab.id}
-                section={section}
-                mode={mode}
-                viewMode={tabViewModes[section.id] ?? 'grid'}
-                onViewModeChange={(m) => handleViewModeChange(section.id, m)}
-              />
-            )
           })
         )}
 

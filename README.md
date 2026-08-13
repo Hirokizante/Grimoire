@@ -45,7 +45,7 @@ For the full ruleset, see [`Divergence SRD.md`](Divergence SRD.md). For the prod
 - **Minor Abilities** — flagged abilities that occupy half a slot instead of a full one.
 - **Ability Block editor** — structured fields for name, traits, cost (AP/END/FP), damage, description, overcharge, and flavor text. Supports Markdown in description and overcharge.
 - **Ability templates** — pre-filled starting points for common ability types (melee, ranged, buff, debuff) that remain fully editable.
-- **Custom tabs & sections** — create up to 6 custom tabs, each with named ability sections, for organizing homebrew content. When adding a section, choose between an **Ability Block** group or an **NPC Sheet** (a blank, editable NPC bundled directly into the tab).
+- **Custom tabs & sections** — create up to 6 custom tabs, each with named sections, for organizing homebrew content. When adding a section, choose between an **Ability Block** group, an **NPC Sheet** (a blank, editable NPC bundled directly into the tab), or a **Text** section (a free-form Markdown body for unique mechanics, flavor text, or lore).
 - **NPC sections** — attach a full NPC to a custom tab. NPC sheets show portrait, combat stats, attributes, skills, abilities, and description in a compact inline layout, and are editable in place within the tab. Attached NPCs are exported and re-imported alongside their parent character.
 - **Custom resource bars** — define named point pools (current/max) rendered below Endurance, with optional refill on Recover.
 - **Portrait upload** — images are compressed and stored as base64 dataURLs (max 512px, JPEG 0.85 quality).
@@ -209,7 +209,8 @@ Grimoire/
 │   │   │   ├── CustomTabContent.tsx     # Custom tab renderer
 │   │   │   ├── CustomAbilitySection.tsx # Custom section renderer
 │   │   │   ├── CustomNPCSection.tsx     # Compact bundled-NPC section
-│   │   │   ├── AddSectionChoiceModal.tsx # Ability vs NPC section chooser
+│   │   │   ├── CustomTextSection.tsx    # Free-form Markdown text section
+│   │   │   ├── AddSectionChoiceModal.tsx # Ability / NPC / Text section chooser
 │   │   │   ├── CustomTabDndContext.tsx # DnD for custom sections
 │   │   │   ├── npc/                     # NPC-specific sheet components
 │   │   │   │   ├── NPCSheet.tsx
@@ -331,6 +332,7 @@ The central domain object is a **`Character`**, which holds everything about a s
 | --- | --- |
 | `CustomAbilitySection` (`kind: 'ability'`) | `{ kind, id, name, abilities: AbilityBlock[] }` — a free-form group of abilities |
 | `CustomNPCSection` (`kind: 'npc'`) | `{ kind, id, name, npcId }` — a reference to a bundled NPC `Character` (with `kind: 'npc'`) |
+| `CustomTextSection` (`kind: 'text'`) | `{ kind, id, name, content }` — a free-form Markdown body (mechanics, flavor text, lore) |
 
 ---
 

@@ -7,12 +7,12 @@
  * closes via useEscapeKey, footer has Cancel + the two action buttons.
  */
 
-import { ScrollText, User } from 'lucide-react'
+import { ScrollText, User, FileText } from 'lucide-react'
 
 import { useEscapeKey } from '@/hooks/useEscapeKey'
 import type { LucideIcon } from 'lucide-react'
 
-export type AddSectionChoice = 'ability' | 'npc'
+export type AddSectionChoice = 'ability' | 'npc' | 'text'
 
 export interface AddSectionChoiceModalProps {
   open: boolean
@@ -41,6 +41,13 @@ const OPTIONS: ChoiceOption[] = [
     description:
       'A bundled NPC record with portrait, stats, attributes, skills, abilities, and description. Use this to attach an NPC directly to this character.',
     icon: User,
+  },
+  {
+    value: 'text',
+    title: 'Text',
+    description:
+      'A free-form Markdown body. Use this to describe unique character mechanics, or add flavor text and lore to your sheet.',
+    icon: FileText,
   },
 ]
 

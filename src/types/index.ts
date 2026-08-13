@@ -22,6 +22,7 @@ export type {
   NPCStats,
   CustomAbilitySection,
   CustomNPCSection,
+  CustomTextSection,
   CustomSection,
   CustomTab,
   CustomResourceBar,

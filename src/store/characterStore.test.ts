@@ -753,6 +753,56 @@ test('createAttachedNPC: falls back to default NPC name when blank', async () =>
   expect(npc!.name).toBe('New NPC')
 })
 
+// ---- Custom text sections ------------------------------------------------------
+
+test('addCustomTextSection: adds a text-kind section with empty content', () => {
+  setupChar()
+  const tabId = useCharacterStore.getState().addCustomTab('Lore')
+  const secId = useCharacterStore.getState().addCustomTextSection(tabId, 'Backstory')
+
+  const char = useCharacterStore.getState().currentCharacter!
+  const section = char.customTabs
+    .find((t) => t.id === tabId)!
+    .sections.find((s) => s.id === secId)!
+
+  expect(section.kind).toBe('text')
+  expect(section.name).toBe('Backstory')
+  expect((section as { content: string }).content).toBe('')
+})
+
+test('updateCustomTextSectionContent: sets the markdown body of a text section', () => {
+  setupChar()
+  const tabId = useCharacterStore.getState().addCustomTab('Lore')
+  const secId = useCharacterStore.getState().addCustomTextSection(tabId, 'Backstory')
+
+  useCharacterStore
+    .getState()
+    .updateCustomTextSectionContent(tabId, secId, 'Born under a blood moon.')
+
+  const char = useCharacterStore.getState().currentCharacter!
+  const section = char.customTabs
+    .find((t) => t.id === tabId)!
+    .sections.find((s) => s.id === secId)!
+  expect((section as { content: string }).content).toBe('Born under a blood moon.')
+})
+
+test('updateCustomTextSectionContent: leaves non-text sections untouched', () => {
+  setupChar()
+  const tabId = useCharacterStore.getState().addCustomTab('Lore')
+  const textSecId = useCharacterStore.getState().addCustomTextSection(tabId, 'Backstory')
+  const abilitySecId = useCharacterStore.getState().addCustomSection(tabId, 'Offense')
+
+  useCharacterStore
+    .getState()
+    .updateCustomTextSectionContent(tabId, abilitySecId, 'should not apply')
+
+  const char = useCharacterStore.getState().currentCharacter!
+  const textSection = char.customTabs
+    .find((t) => t.id === tabId)!
+    .sections.find((s) => s.id === textSecId)!
+  expect((textSection as { content: string }).content).toBe('')
+})
+
 // ---- Import conflict: updateExistingCharacterFromImportFile ----------------------
 
 test('updateExistingCharacterFromImportFile: updates id/name and preserves live state', async () => {

@@ -249,11 +249,34 @@ export interface CustomNPCSection {
 }
 
 /**
- * A section within a user-created tab. Either a free-form group of Ability
- * Blocks (mirrors the built-in Slotted/Pool sections) or a bundled NPC sheet
- * (renders a compact, editable NPC inline).
+ * A user-created free-text section within a custom tab.
+ *
+ * Holds a single Markdown body (rendered with the same click-to-roll dice
+ * highlighting as AbilityBlock descriptions) so players can describe unique
+ * character mechanics or drop in flavor text / lore. Mirrors the structure of
+ * the other custom sections but carries only prose — no ability list and no
+ * NPC reference.
  */
-export type CustomSection = CustomAbilitySection | CustomNPCSection
+export interface CustomTextSection {
+  /** Discriminator: this section holds a free-text Markdown body. */
+  kind: 'text'
+  /** Stable unique identifier for the section. */
+  id: string
+  /** Display name of the section (user-editable). */
+  name: string
+  /** The Markdown body of the section (mechanics, flavor text, lore…). */
+  content: string
+}
+
+/**
+ * A section within a user-created tab. Either a free-form group of Ability
+ * Blocks (mirrors the built-in Slotted/Pool sections), a bundled NPC sheet
+ * (renders a compact, editable NPC inline), or a free-text Markdown body.
+ */
+export type CustomSection =
+  | CustomAbilitySection
+  | CustomNPCSection
+  | CustomTextSection
 
 /**
  * A user-created tab on the character sheet. Each tab contains one or more

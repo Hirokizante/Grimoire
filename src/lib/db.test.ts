@@ -187,3 +187,41 @@ test('normalizeCharacter: preserves kind=npc sections', () => {
   expect(out.customTabs[0].sections[0].kind).toBe('npc')
   expect(out.customTabs[0].sections[1].kind).toBe('ability')
 })
+
+test('normalizeCharacter: preserves kind=text sections with their content', () => {
+  const char = createDefaultCharacter()
+  const textSection = {
+    kind: 'text' as const,
+    id: 'sec-text',
+    name: 'Backstory',
+    content: 'Born under a blood moon.',
+  }
+  const old = {
+    ...char,
+    customTabs: [
+      { id: 'tab-1', name: 'Lore', sections: [textSection] },
+    ],
+  }
+  const out = normalizeCharacter(asCharacter(old as Record<string, unknown>))
+  expect(out.customTabs[0].sections[0].kind).toBe('text')
+  expect((out.customTabs[0].sections[0] as { content: string }).content).toBe(
+    'Born under a blood moon.',
+  )
+})
+
+test('normalizeCharacter: fills an empty content string on a text section missing it', () => {
+  const char = createDefaultCharacter()
+  // A text section that somehow lacks the content field (partial write).
+  const old = {
+    ...char,
+    customTabs: [
+      {
+        id: 'tab-1',
+        name: 'Lore',
+        sections: [{ kind: 'text', id: 'sec-text', name: 'Backstory' }],
+      },
+    ],
+  }
+  const out = normalizeCharacter(asCharacter(old as Record<string, unknown>))
+  expect((out.customTabs[0].sections[0] as { content: string }).content).toBe('')
+})

@@ -249,6 +249,10 @@ export interface CharacterStoreActions {
    * the new section id.
    */
   addCustomNPCSection: (tabId: string, name?: string) => string
+  /** Add a new free-text (Markdown) section to a custom tab. Returns its id. */
+  addCustomTextSection: (tabId: string, name?: string) => string
+  /** Update the Markdown content of a custom text section. */
+  updateCustomTextSectionContent: (tabId: string, sectionId: string, content: string) => void
   /**
    * Attach an existing saved NPC (found in the shared characters store by id)
    * to a custom tab as a new npc-kind section. Returns the new section id.
@@ -1071,6 +1075,48 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
         set({ isSaving: false })
       })
     return sectionId
+  },
+
+  addCustomTextSection: (tabId, name) => {
+    const id = generateId()
+    get().updateCurrentCharacter((char) => ({
+      ...char,
+      customTabs: char.customTabs.map((t) =>
+        t.id === tabId
+          ? {
+              ...t,
+              sections: [
+                ...t.sections,
+                {
+                  kind: 'text' as const,
+                  id,
+                  name: name ?? 'New Section',
+                  content: '',
+                },
+              ],
+            }
+          : t,
+      ),
+    }))
+    return id
+  },
+
+  updateCustomTextSectionContent: (tabId, sectionId, content) => {
+    get().updateCurrentCharacter((char) => ({
+      ...char,
+      customTabs: char.customTabs.map((t) =>
+        t.id === tabId
+          ? {
+              ...t,
+              sections: t.sections.map((s) => {
+                if (s.id !== sectionId) return s
+                if (s.kind !== 'text') return s
+                return { ...s, content }
+              }),
+            }
+          : t,
+      ),
+    }))
   },
 
   addCustomNPCReference: (tabId, npcId) => {
