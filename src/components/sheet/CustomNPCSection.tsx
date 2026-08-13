@@ -13,7 +13,8 @@
  */
 
 import { useState } from 'react'
-import { Pencil, Check, Trash2 } from 'lucide-react'
+import { Trash2, Wind, Shield, Footprints, Target, Heart } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 
 import { useCharacterStore } from '@/store/characterStore'
 import { putCharacter } from '@/lib/db'
@@ -51,14 +52,15 @@ interface StatCardMeta {
   label: string
   key: keyof NPCStats
   color: string
+  icon: LucideIcon
 }
 
 const STATS: StatCardMeta[] = [
-  { label: 'Evasion', key: 'evasion', color: STAT_COLORS.evasion },
-  { label: 'Armor', key: 'armor', color: STAT_COLORS.armor },
-  { label: 'Movement', key: 'movement', color: STAT_COLORS.movement },
-  { label: 'Save DC', key: 'saveDC', color: STAT_COLORS.saveDC },
-  { label: 'HP', key: 'hp', color: STAT_COLORS.hp },
+  { label: 'Evasion', key: 'evasion', icon: Wind, color: STAT_COLORS.evasion },
+  { label: 'Armor', key: 'armor', icon: Shield, color: STAT_COLORS.armor },
+  { label: 'Movement', key: 'movement', icon: Footprints, color: STAT_COLORS.movement },
+  { label: 'Save DC', key: 'saveDC', icon: Target, color: STAT_COLORS.saveDC },
+  { label: 'HP', key: 'hp', icon: Heart, color: STAT_COLORS.hp },
 ]
 
 const DEFAULT_NPC_STATS: NPCStats = {
@@ -102,12 +104,9 @@ export default function CustomNPCSection({
   const isEdit = mode === 'edit'
   const characters = useCharacterStore((s) => s.characters)
   const removeCustomSection = useCharacterStore((s) => s.removeCustomSection)
-  const renameCustomSection = useCharacterStore((s) => s.renameCustomSection)
 
   const npc = characters.find((c) => c.id === section.npcId) ?? null
 
-  const [renaming, setRenaming] = useState(false)
-  const [sectionNameDraft, setSectionNameDraft] = useState('')
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [showAbilityEditor, setShowAbilityEditor] = useState(false)
   const [editingAbility, setEditingAbility] = useState<AbilityBlock | null>(null)
@@ -126,17 +125,6 @@ export default function CustomNPCSection({
         </p>
       </section>
     )
-  }
-
-  const startRename = () => {
-    setSectionNameDraft(section.name)
-    setRenaming(true)
-  }
-  const commitRename = () => {
-    if (sectionNameDraft.trim()) {
-      renameCustomSection(tabId, section.id, sectionNameDraft.trim())
-    }
-    setRenaming(false)
   }
 
   const setNpcField = <K extends keyof Character>(
@@ -228,50 +216,16 @@ export default function CustomNPCSection({
   return (
     <section className="sheet-section sheet-section--custom sheet-section--custom-npc">
       <div className="sheet-section__heading-row">
-        {isEdit && renaming ? (
-          <span className="section-rename">
-            <input
-              type="text"
-              className="sheet-input section-rename__input"
-              value={sectionNameDraft}
-              autoFocus
-              onChange={(e) => setSectionNameDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') commitRename()
-                if (e.key === 'Escape') setRenaming(false)
-              }}
-            />
-            <button
-              type="button"
-              className="btn btn--ghost section-rename__btn"
-              onClick={commitRename}
-              aria-label="Confirm rename"
-            >
-              <Check size={14} />
-            </button>
-          </span>
-        ) : (
-          <span className="section-heading-wrap">
-            <h3 className="sheet-section__heading">{section.name}</h3>
-            {isEdit && (
-              <button
-                type="button"
-                className="btn btn--ghost section-rename__trigger"
-                onClick={startRename}
-                aria-label="Rename section"
-              >
-                <Pencil size={12} />
-              </button>
-            )}
-          </span>
-        )}
+        <span className="section-heading-wrap">
+          <h3 className="sheet-section__heading">{npc.name}</h3>
+        </span>
         <div className="sheet-section__heading-row-right">
           {isEdit && (
             <button
               type="button"
               className="btn btn--ghost section-delete-btn"
               onClick={() => setShowDeleteConfirm(true)}
-              aria-label={`Delete ${section.name} section`}
+              aria-label={`Delete ${npc.name} section`}
             >
               <Trash2 size={16} />
             </button>
@@ -280,8 +234,8 @@ export default function CustomNPCSection({
       </div>
 
       <div className="custom-npc-section">
-        {/* Identity row: portrait + name + version */}
-        <div className="custom-npc-section__identity">
+        {/* Top row: portrait inline with combat stats + attributes */}
+        <div className="custom-npc-section__top">
           <div className="custom-npc-section__portrait-wrap">
             {npc.portrait ? (
               <img
@@ -302,124 +256,79 @@ export default function CustomNPCSection({
               />
             )}
           </div>
-          <div className="custom-npc-section__name-area">
-            {isEdit ? (
-              <input
-                type="text"
-                className="sheet-input custom-npc-section__name-input"
-                value={npc.name}
-                onChange={(e) => setNpcField('name', e.target.value)}
-                placeholder="NPC name"
-              />
-            ) : (
-              <h4 className="custom-npc-section__name">{npc.name}</h4>
-            )}
-            <span className="custom-npc-section__version">v{npc.version}</span>
+
+          <div className="custom-npc-section__top-body">
+            {/* Combat stats — token row matching the main sheet */}
+            <div className="custom-npc-section__stats">
+              {STATS.map((token) => {
+                const Icon = token.icon
+                const value = npc.npcStats?.[token.key] ?? 0
+                return (
+                  <div
+                    key={token.label}
+                    className="custom-npc-stat"
+                    style={
+                      { '--npc-stat-color': token.color } as React.CSSProperties
+                    }
+                  >
+                    <span className="custom-npc-stat__stripe" />
+                    <div className="custom-npc-stat__left">
+                      <Icon className="custom-npc-stat__icon" size={16} strokeWidth={2.2} />
+                      {isEdit ? (
+                        <input
+                          type="number"
+                          className="sheet-input custom-npc-stat__input"
+                          value={value}
+                          onChange={(e) => setNpcStat(token.key, e.target.value)}
+                          min={0}
+                        />
+                      ) : (
+                        <span className="custom-npc-stat__value">{value}</span>
+                      )}
+                    </div>
+                    <span className="custom-npc-stat__label">{token.label}</span>
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Attributes — compact inline list */}
+            <div className="custom-npc-section__block">
+              <h5 className="custom-npc-section__block-heading">Attributes</h5>
+              <ul className="custom-npc-section__attr-list" role="list">
+                {ATTRIBUTE_LIST.map((attr) => {
+                  const value = npc.attributes[attr.key]
+                  return (
+                    <li
+                      key={attr.key}
+                      className="custom-npc-section__attr-item"
+                    >
+                      <span className="custom-npc-section__attr-abbr">
+                        {attr.abbreviation}
+                      </span>
+                      {isEdit ? (
+                        <input
+                          type="number"
+                          className="sheet-input custom-npc-section__attr-input"
+                          min={-1}
+                          max={8}
+                          value={value}
+                          onChange={(e) => setAttr(attr.key, e.target.value)}
+                        />
+                      ) : (
+                        <span
+                          className="custom-npc-section__attr-value"
+                          title={attr.description}
+                        >
+                          {value >= 0 ? `+${value}` : value}
+                        </span>
+                      )}
+                    </li>
+                  )
+                })}
+              </ul>
+            </div>
           </div>
-        </div>
-
-        {/* Combat stats — compact token row */}
-        <div className="custom-npc-section__stats">
-          {STATS.map((token) => {
-            const value = npc.npcStats?.[token.key] ?? 0
-            return (
-              <div
-                key={token.label}
-                className="custom-npc-stat"
-                style={
-                  { '--npc-stat-color': token.color } as React.CSSProperties
-                }
-              >
-                <span className="custom-npc-stat__stripe" />
-                <span className="custom-npc-stat__label">{token.label}</span>
-                {isEdit ? (
-                  <input
-                    type="number"
-                    className="sheet-input custom-npc-stat__input"
-                    value={value}
-                    onChange={(e) => setNpcStat(token.key, e.target.value)}
-                    min={0}
-                  />
-                ) : (
-                  <span className="custom-npc-stat__value">{value}</span>
-                )}
-              </div>
-            )
-          })}
-        </div>
-
-        {/* Attributes — compact inline list */}
-        <div className="custom-npc-section__block">
-          <h5 className="custom-npc-section__block-heading">Attributes</h5>
-          <ul className="custom-npc-section__attr-list" role="list">
-            {ATTRIBUTE_LIST.map((attr) => {
-              const value = npc.attributes[attr.key]
-              return (
-                <li
-                  key={attr.key}
-                  className="custom-npc-section__attr-item"
-                >
-                  <span className="custom-npc-section__attr-abbr">
-                    {attr.abbreviation}
-                  </span>
-                  {isEdit ? (
-                    <input
-                      type="number"
-                      className="sheet-input custom-npc-section__attr-input"
-                      min={-1}
-                      max={8}
-                      value={value}
-                      onChange={(e) => setAttr(attr.key, e.target.value)}
-                    />
-                  ) : (
-                    <span
-                      className="custom-npc-section__attr-value"
-                      title={attr.description}
-                    >
-                      {value >= 0 ? `+${value}` : value}
-                    </span>
-                  )}
-                </li>
-              )
-            })}
-          </ul>
-        </div>
-
-        {/* Skills — compact horizontal list */}
-        <div className="custom-npc-section__block">
-          <h5 className="custom-npc-section__block-heading">Skills</h5>
-          <ul className="custom-npc-section__skill-list" role="list">
-            {SKILL_LIST.map((skill) => {
-              const value = npc.skills[skill]
-              return (
-                <li key={skill} className="custom-npc-section__skill-item">
-                  <span className="custom-npc-section__skill-name">{skill}</span>
-                  {isEdit ? (
-                    <input
-                      type="number"
-                      className="sheet-input custom-npc-section__skill-input"
-                      min={0}
-                      max={6}
-                      step={2}
-                      value={value}
-                      onChange={(e) => setSkill(skill, e.target.value)}
-                    />
-                  ) : (
-                    <span
-                      className={
-                        'custom-npc-section__skill-value' +
-                        (value > 0
-                          ? ' custom-npc-section__skill-value--active'
-                          : '')
-                      }
-                    >
-                      {value > 0 ? `+${value}` : value}
-                    </span>
-                  )}
-                </li>
-              )
-            })}
-          </ul>
         </div>
 
         {/* Abilities — compact cards, no Activate button, edit-mode Edit/Remove */}
@@ -473,6 +382,43 @@ export default function CustomNPCSection({
               ))}
             </div>
           )}
+        </div>
+
+        {/* Skills — compact horizontal list */}
+        <div className="custom-npc-section__block">
+          <h5 className="custom-npc-section__block-heading">Skills</h5>
+          <ul className="custom-npc-section__skill-list" role="list">
+            {SKILL_LIST.map((skill) => {
+              const value = npc.skills[skill]
+              return (
+                <li key={skill} className="custom-npc-section__skill-item">
+                  <span className="custom-npc-section__skill-name">{skill}</span>
+                  {isEdit ? (
+                    <input
+                      type="number"
+                      className="sheet-input custom-npc-section__skill-input"
+                      min={0}
+                      max={6}
+                      step={2}
+                      value={value}
+                      onChange={(e) => setSkill(skill, e.target.value)}
+                    />
+                  ) : (
+                    <span
+                      className={
+                        'custom-npc-section__skill-value' +
+                        (value > 0
+                          ? ' custom-npc-section__skill-value--active'
+                          : '')
+                      }
+                    >
+                      {value > 0 ? `+${value}` : value}
+                    </span>
+                  )}
+                </li>
+              )
+            })}
+          </ul>
         </div>
 
         {/* Description */}
@@ -529,7 +475,7 @@ export default function CustomNPCSection({
           title="Remove NPC Section?"
           message={
             <>
-              Remove <strong>{section.name}</strong> from this tab? This only
+              Remove <strong>{npc.name}</strong> from this tab? This only
               removes the section from the sheet — the NPC record itself will
               be kept and can still be found on the NPC list.
             </>

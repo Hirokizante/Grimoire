@@ -701,7 +701,7 @@ test('addCustomNPCReference: attaches an existing saved NPC by reference', () =>
 
   expect(section.kind).toBe('npc')
   expect((section as { npcId: string }).npcId).toBe('npc-existing')
-  expect(section.name).toBe('NPC: Brigand')
+  expect(section.name).toBe('Brigand')
   // No new record should be created — only the reference is stored.
   const npcCount = useCharacterStore
     .getState()
@@ -730,7 +730,7 @@ test('createAttachedNPC: creates a named NPC and attaches it without navigating'
     .find((t) => t.id === tabId)!
     .sections.find((s) => s.id === secId)!
   expect(section.kind).toBe('npc')
-  expect(section.name).toBe('NPC: Goblin')
+  expect(section.name).toBe('Goblin')
 
   await Promise.resolve()
   const npcId = (section as { npcId: string }).npcId

@@ -1038,7 +1038,7 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
     const sectionId = generateId()
     const npcBase = createDefaultNPC()
     const npc: Character = { ...npcBase, id: generateId() }
-    const sectionName = name ?? `NPC: ${npc.name}`
+    const sectionName = name ?? npc.name
     get().updateCurrentCharacter((char) => ({
       ...char,
       customTabs: char.customTabs.map((t) =>
@@ -1089,7 +1089,7 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
                 {
                   kind: 'npc' as const,
                   id: sectionId,
-                  name: `NPC: ${npc.name}`,
+                  name: npc.name,
                   npcId,
                 },
               ],
@@ -1119,7 +1119,7 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
                 {
                   kind: 'npc' as const,
                   id: sectionId,
-                  name: `NPC: ${npc.name}`,
+                  name: npc.name,
                   npcId: npc.id,
                 },
               ],
