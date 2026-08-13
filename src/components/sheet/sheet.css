@@ -3947,6 +3947,19 @@ body:has(.sheet-page--selector-open) .app-header {
   color: var(--text-primary);
 }
 
+.custom-npc-section__attr-item--clickable {
+  cursor: pointer;
+}
+
+.custom-npc-section__attr-item--clickable:hover {
+  background: var(--bg-surface-hover);
+  border-color: var(--accent-violet);
+}
+
+.custom-npc-section__attr-item--clickable:active {
+  transform: scale(0.96);
+}
+
 .custom-npc-section__attr-input {
   width: 2.4rem;
   padding: 0.05rem 0.2rem;
@@ -3972,6 +3985,19 @@ body:has(.sheet-page--selector-open) .app-header {
   border-radius: 8px;
   background: var(--bg-surface-raised);
   border: 1px solid var(--border-soft);
+}
+
+.custom-npc-section__skill-item--clickable {
+  cursor: pointer;
+}
+
+.custom-npc-section__skill-item--clickable:hover {
+  background: var(--bg-surface-hover);
+  border-color: var(--accent-violet);
+}
+
+.custom-npc-section__skill-item--clickable:active {
+  transform: scale(0.96);
 }
 
 .custom-npc-section__skill-name {

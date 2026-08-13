@@ -17,6 +17,7 @@ import { Trash2, Wind, Shield, Footprints, Target, Heart } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 import { useCharacterStore } from '@/store/characterStore'
+import { useDiceRollStore } from '@/store/diceRollStore'
 import { putCharacter } from '@/lib/db'
 import PortraitUploader from '@/components/sheet/PortraitUploader'
 import AbilityBlockCard from '@/components/sheet/AbilityBlockCard'
@@ -104,6 +105,7 @@ export default function CustomNPCSection({
   const isEdit = mode === 'edit'
   const characters = useCharacterStore((s) => s.characters)
   const removeCustomSection = useCharacterStore((s) => s.removeCustomSection)
+  const roll = useDiceRollStore((s) => s.roll)
 
   const npc = characters.find((c) => c.id === section.npcId) ?? null
 
@@ -163,6 +165,26 @@ export default function CustomNPCSection({
       ...cur,
       skills: { ...cur.skills, [skill]: n },
     }))
+  }
+
+  const onClickAttr = (key: AttributeKey, name: string) => {
+    if (isEdit) return
+    const value = npc.attributes[key]
+    roll({
+      notation: `d20${value >= 0 ? '+' : ''}${value}`,
+      character: npc,
+      source: { type: 'attribute-check', attributeKey: key, attributeName: name },
+    })
+  }
+
+  const onClickSkill = (skill: SkillName) => {
+    if (isEdit) return
+    const value = npc.skills[skill]
+    roll({
+      notation: `d20${value >= 0 ? '+' : ''}${value}`,
+      character: npc,
+      source: { type: 'skill-check', skillName: skill },
+    })
   }
 
   const openNewAbility = () => {
@@ -301,7 +323,12 @@ export default function CustomNPCSection({
                   return (
                     <li
                       key={attr.key}
-                      className="custom-npc-section__attr-item"
+                      className={
+                        'custom-npc-section__attr-item' +
+                        (isEdit ? '' : ' custom-npc-section__attr-item--clickable')
+                      }
+                      title={attr.description}
+                      onClick={isEdit ? undefined : () => onClickAttr(attr.key, attr.name)}
                     >
                       <span className="custom-npc-section__attr-abbr">
                         {attr.abbreviation}
@@ -358,6 +385,7 @@ export default function CustomNPCSection({
                   key={ability.id}
                   ability={ability}
                   mode={mode}
+                  character={npc}
                   actions={
                     isEdit ? (
                       <>
@@ -391,7 +419,14 @@ export default function CustomNPCSection({
             {SKILL_LIST.map((skill) => {
               const value = npc.skills[skill]
               return (
-                <li key={skill} className="custom-npc-section__skill-item">
+                <li
+                  key={skill}
+                  className={
+                    'custom-npc-section__skill-item' +
+                    (isEdit ? '' : ' custom-npc-section__skill-item--clickable')
+                  }
+                  onClick={isEdit ? undefined : () => onClickSkill(skill)}
+                >
                   <span className="custom-npc-section__skill-name">{skill}</span>
                   {isEdit ? (
                     <input

@@ -12,7 +12,7 @@
 
 import DiceHighlighter from '@/components/dice/DiceHighlighter'
 import MarkdownText from '@/components/ui/MarkdownText'
-import type { AbilityBlock } from '@/types'
+import type { AbilityBlock, Character } from '@/types'
 import type { SheetMode } from '@/pages/CharacterSheetPage'
 
 export interface AbilityBlockCardProps {
@@ -20,9 +20,22 @@ export interface AbilityBlockCardProps {
   mode?: SheetMode
   /** Optional action buttons rendered inside the card footer (edit-mode only). */
   actions?: React.ReactNode
+  /**
+   * Explicit character whose stats resolve variables in dice notation (the
+   * damage field and any dice embedded in description/overcharge/flavor text).
+   * Falls back to the store's `currentCharacter` when omitted. Needed for NPC
+   * sheets embedded in a character sheet custom tab, where the rolled entity
+   * is the NPC — not the player character stored in `currentCharacter`.
+   */
+  character?: Character
 }
 
-export default function AbilityBlockCard({ ability, mode = 'view', actions }: AbilityBlockCardProps) {
+export default function AbilityBlockCard({
+  ability,
+  mode = 'view',
+  actions,
+  character,
+}: AbilityBlockCardProps) {
   const {
     name,
     traits,
@@ -75,14 +88,14 @@ export default function AbilityBlockCard({ ability, mode = 'view', actions }: Ab
           {damage && (
             <span className="ability-card__damage">
               <span className="ability-card__meta-label">Dmg</span>{' '}
-              <DiceHighlighter text={damage} mode={mode} />
+              <DiceHighlighter text={damage} mode={mode} character={character} />
             </span>
           )}
         </div>
       )}
 
       {description && (
-        <MarkdownText className="ability-card__description" mode={mode}>
+        <MarkdownText className="ability-card__description" mode={mode} character={character}>
           {description}
         </MarkdownText>
       )}
@@ -90,14 +103,14 @@ export default function AbilityBlockCard({ ability, mode = 'view', actions }: Ab
       {overcharge && (
         <div className="ability-card__overcharge">
           <span className="ability-card__section-label">Overcharge</span>
-          <MarkdownText className="ability-card__overcharge-body" mode={mode}>
+          <MarkdownText className="ability-card__overcharge-body" mode={mode} character={character}>
             {overcharge}
           </MarkdownText>
         </div>
       )}
 
       {flavorText && (
-        <MarkdownText className="ability-card__flavor" mode={mode}>
+        <MarkdownText className="ability-card__flavor" mode={mode} character={character}>
           {flavorText}
         </MarkdownText>
       )}
