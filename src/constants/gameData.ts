@@ -222,12 +222,12 @@ export const DEFAULT_SHEET_COLORS: SheetColors = {
   endBar: '#9b7ed6',
   minorAbility: '#9b7ed6',
   success: '#a9e6a0',
-  tokenMilestone: '#9b7ed6',
+  tokenMilestone: '#e0b054',
   tokenEvasion: '#e8a0bf',
-  tokenMovement: '#e8a0bf',
+  tokenMovement: '#5ec8d8',
   tokenSaveDC: '#9b7ed6',
-  tokenArmor: '#7bc4d6',
-  tokenEndRecovery: '#7bc4d6',
+  tokenArmor: '#7ba7d6',
+  tokenEndRecovery: '#a9e6a0',
 }
 
 /**

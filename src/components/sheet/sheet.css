@@ -1347,7 +1347,7 @@
   color: var(--text-muted);
   margin: 0;
   padding-left: 0.5rem;
-  border-left: 2px solid var(--border-soft);
+  border-left: 2px solid var(--accent-violet-soft);
 }
 
 /* ---- Core innate narrative ------------------------------------------------ */

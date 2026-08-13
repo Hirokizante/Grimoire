@@ -16,6 +16,7 @@ import { processImage } from '@/lib/imageProcessing'
 import { useEscapeKey } from '@/hooks/useEscapeKey'
 import { useCharacterStore } from '@/store/characterStore'
 import { FontImportSection } from '@/components/sheet/FontImportSection'
+import { DEFAULT_SHEET_COLORS, DEFAULT_SHEET_CONFIG } from '@/constants/gameData'
 import type { SheetColors, SheetConfig } from '@/types'
 
 /** A label+key used for each color picker. */
@@ -112,6 +113,12 @@ interface PresetTheme {
 }
 
 const PRESETS: PresetTheme[] = [
+  {
+    name: 'Default',
+    pageBackgroundColor: DEFAULT_SHEET_CONFIG.pageBackgroundColor,
+    backgroundColor: DEFAULT_SHEET_CONFIG.backgroundColor,
+    colors: { ...DEFAULT_SHEET_COLORS },
+  },
   {
     name: 'Midnight',
     pageBackgroundColor: '#08060f',
