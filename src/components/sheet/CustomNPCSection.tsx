@@ -526,15 +526,15 @@ export default function CustomNPCSection({
 
       {showDeleteConfirm && (
         <ConfirmModal
-          title="Delete NPC Section?"
+          title="Remove NPC Section?"
           message={
             <>
-              Are you sure you want to delete <strong>{section.name}</strong>?
-              The attached NPC record will also be removed. This cannot be
-              undone.
+              Remove <strong>{section.name}</strong> from this tab? This only
+              removes the section from the sheet — the NPC record itself will
+              be kept and can still be found on the NPC list.
             </>
           }
-          confirmLabel="Delete"
+          confirmLabel="Remove"
           cancelLabel="Cancel"
           variant="danger"
           onConfirm={() => {

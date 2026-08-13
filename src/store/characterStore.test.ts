@@ -655,7 +655,7 @@ test('addCustomNPCSection: adds an npc-kind section referencing a new NPC record
   expect(npc!.kind).toBe('npc')
 })
 
-test('removeCustomSection: deletes the attached NPC record for an npc section', async () => {
+test('removeCustomSection: keeps the attached NPC record for an npc section', async () => {
   setupChar()
   const tabId = useCharacterStore.getState().addCustomTab('Allies')
   const secId = useCharacterStore.getState().addCustomNPCSection(tabId, 'Goblin')
@@ -674,7 +674,8 @@ test('removeCustomSection: deletes the attached NPC record for an npc section', 
   expect(
     after.customTabs.find((t) => t.id === tabId)!.sections.some((s) => s.id === secId),
   ).toBe(false)
-  expect(useCharacterStore.getState().characters.some((c) => c.id === npcId)).toBe(false)
+  // The NPC record must survive — it can only be deleted from the NPC list.
+  expect(useCharacterStore.getState().characters.some((c) => c.id === npcId)).toBe(true)
 })
 
 test('addCustomNPCReference: attaches an existing saved NPC by reference', () => {

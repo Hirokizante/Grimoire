@@ -263,8 +263,9 @@ export interface CharacterStoreActions {
   /** Rename a custom section (any kind). */
   renameCustomSection: (tabId: string, sectionId: string, name: string) => void
   /**
-   * Remove a custom section. If the section is an NPC section, the attached
-   * NPC record is also deleted from the database.
+   * Remove a custom section. Only the section itself is removed — for an NPC
+   * section, the referenced NPC record is left intact and can only be deleted
+   * from the NPC list page.
    */
   removeCustomSection: (tabId: string, sectionId: string) => Promise<void>
   /** Add an ability block to a custom section (ability sections only). */
@@ -1157,13 +1158,6 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
   },
 
   removeCustomSection: async (tabId, sectionId) => {
-    // Capture the NPC id (if any) BEFORE mutating the character so we can
-    // delete the attached NPC record afterwards.
-    const section = get()
-      .currentCharacter?.customTabs.find((t) => t.id === tabId)
-      ?.sections.find((s) => s.id === sectionId)
-    const npcId = section && section.kind === 'npc' ? section.npcId : null
-
     get().updateCurrentCharacter((char) => {
       const tabSections = { ...(char.viewModes.customTabs[tabId] ?? {}) }
       delete tabSections[sectionId]
@@ -1180,17 +1174,6 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
         },
       }
     })
-
-    if (npcId) {
-      try {
-        await dbDeleteCharacter(npcId)
-      } catch {
-        // Best-effort: continue with in-memory cleanup even if DB delete fails.
-      }
-      set((state) => ({
-        characters: state.characters.filter((c) => c.id !== npcId),
-      }))
-    }
   },
 
   addCustomAbility: (tabId, sectionId, ability) => {
