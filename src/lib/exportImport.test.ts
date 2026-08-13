@@ -1,10 +1,13 @@
 import { test, expect } from 'vitest'
 import {
+  buildExportBundle,
   bumpSemver,
+  collectAttachedNPCs,
   compareSemver,
   createSnapshot,
   importCharacter,
   parseCharacterJSON,
+  parseImportBundle,
   parseSemver,
   resolveUpdatedVersion,
   restoreFromSnapshot,
@@ -12,7 +15,7 @@ import {
   updateExistingCharacterFromImport,
   versionedFilename,
 } from '@/lib/exportImport'
-import { createDefaultCharacter } from '@/constants/gameData'
+import { createDefaultCharacter, createDefaultNPC } from '@/constants/gameData'
 import type { VersionSnapshot } from '@/types'
 
 // ---- versionedFilename ----------------------------------------------------------------
@@ -321,7 +324,7 @@ test('updateExistingCharacterFromImport: preserves id, name, and live-play state
 
   const updated = updateExistingCharacterFromImport(
     existing,
-    JSON.stringify(imported),
+    imported,
   )
 
   // Preserved from existing:
@@ -354,7 +357,7 @@ test('updateExistingCharacterFromImport: bumps existing version when imported ol
 
   const updated = updateExistingCharacterFromImport(
     existing,
-    JSON.stringify(imported),
+    imported,
   )
   expect(updated.version).toBe('2.0.1')
 })
@@ -368,7 +371,7 @@ test('updateExistingCharacterFromImport: bumps existing version when versions eq
 
   const updated = updateExistingCharacterFromImport(
     existing,
-    JSON.stringify(imported),
+    imported,
   )
   expect(updated.version).toBe('3.0.1')
 })
@@ -381,7 +384,89 @@ test('updateExistingCharacterFromImport: sets updatedAt fresh', () => {
 
   const updated = updateExistingCharacterFromImport(
     existing,
-    JSON.stringify(imported),
+    imported,
   )
   expect(updated.updatedAt).not.toBe('2020-01-01T00:00:00.000Z')
+})
+
+// ---- Attached NPC export bundle -----------------------------------------------------
+
+test('collectAttachedNPCs: returns NPCs referenced by npc sections', () => {
+  const char = createDefaultCharacter()
+  const npc = createDefaultNPC()
+  npc.id = 'npc-1'
+  npc.name = 'Goblin'
+  char.customTabs = [
+    {
+      id: 'tab-1',
+      name: 'Allies',
+      sections: [
+        { kind: 'npc', id: 'sec-1', name: 'Goblin', npcId: 'npc-1' },
+        { kind: 'ability', id: 'sec-2', name: 'Moves', abilities: [] },
+      ],
+    },
+  ]
+
+  const npcs = collectAttachedNPCs(char, [char, npc])
+  expect(npcs).toHaveLength(1)
+  expect(npcs[0].name).toBe('Goblin')
+})
+
+test('collectAttachedNPCs: returns empty when no npc sections', () => {
+  const char = createDefaultCharacter()
+  char.customTabs = [
+    { id: 'tab-1', name: 'Moves', sections: [{ kind: 'ability', id: 'sec-1', name: 'Offense', abilities: [] }] },
+  ]
+  const npcs = collectAttachedNPCs(char, [char])
+  expect(npcs).toEqual([])
+})
+
+test('buildExportBundle: wraps character and attached NPCs', () => {
+  const char = createDefaultCharacter()
+  const npc = createDefaultNPC()
+  npc.id = 'npc-1'
+  npc.name = 'Goblin'
+  char.customTabs = [
+    { id: 'tab-1', name: 'Allies', sections: [{ kind: 'npc', id: 'sec-1', name: 'Goblin', npcId: 'npc-1' }] },
+  ]
+  const bundle = buildExportBundle(char, [char, npc])
+  expect(bundle.character).toBe(char)
+  expect(bundle.attachedNpcs).toHaveLength(1)
+  expect(bundle.attachedNpcs[0].id).toBe('npc-1')
+})
+
+test('parseImportBundle: unwraps bundle shape and assigns fresh NPC ids', () => {
+  const char = createDefaultCharacter()
+  char.name = 'Hero'
+  const npc = createDefaultNPC()
+  npc.id = 'npc-1'
+  npc.name = 'Goblin'
+
+  const bundle = {
+    character: char,
+    attachedNpcs: [npc],
+  }
+  const text = JSON.stringify(bundle)
+  const parsed = parseImportBundle(text)
+
+  expect(parsed.character.name).toBe('Hero')
+  expect(parsed.attachedNpcs).toHaveLength(1)
+  expect(parsed.attachedNpcs[0].id).not.toBe('npc-1') // fresh id
+  expect(parsed.attachedNpcs[0].name).toBe('Goblin')
+})
+
+test('parseImportBundle: handles legacy flat shape', () => {
+  const char = createDefaultCharacter()
+  char.name = 'Flat Hero'
+  const parsed = parseImportBundle(JSON.stringify(char))
+  expect(parsed.character.name).toBe('Flat Hero')
+  expect(parsed.attachedNpcs).toEqual([])
+})
+
+test('parseCharacterJSON: unwraps bundle to the character', () => {
+  const char = createDefaultCharacter()
+  char.name = 'Wrapped Hero'
+  const bundle = { character: char, attachedNpcs: [] }
+  const parsed = parseCharacterJSON(JSON.stringify(bundle))
+  expect(parsed.name).toBe('Wrapped Hero')
 })

@@ -77,8 +77,8 @@ test('normalizeCharacter: fills missing sections in an existing partial viewMode
         id: 'tab-1',
         name: 'My Tab',
         sections: [
-          { id: 'sec-1', name: 'Offense', abilities: [] },
-          { id: 'sec-2', name: 'Defense', abilities: [] },
+          { kind: 'ability', id: 'sec-1', name: 'Offense', abilities: [] },
+          { kind: 'ability', id: 'sec-2', name: 'Defense', abilities: [] },
         ],
       },
     ],
@@ -140,4 +140,50 @@ test('normalizeCharacter: empty customTabs still seeds an empty customTabs viewM
   const old = omit({ ...char, customTabs: [] } as Record<string, unknown>, 'viewModes')
   const out = normalizeCharacter(asCharacter(old))
   expect(out.viewModes.customTabs).toEqual({})
+})
+
+test('normalizeCharacter: stamps kind=ability on legacy sections without a discriminator', () => {
+  const char = createDefaultCharacter()
+  // Legacy section shape predates the kind discriminator.
+  const legacyTab = {
+    id: 'tab-1',
+    name: 'My Tab',
+    sections: [
+      { id: 'sec-1', name: 'Offense', abilities: [] },
+    ],
+  }
+  const old = {
+    ...char,
+    customTabs: [legacyTab],
+  }
+  const out = normalizeCharacter(asCharacter(old as Record<string, unknown>))
+  expect(out.customTabs[0].sections[0].kind).toBe('ability')
+  expect(
+    (out.customTabs[0].sections[0] as { abilities?: unknown[] }).abilities,
+  ).toEqual([])
+})
+
+test('normalizeCharacter: preserves kind=npc sections', () => {
+  const char = createDefaultCharacter()
+  const npcSection = {
+    kind: 'npc' as const,
+    id: 'sec-npc',
+    name: 'Goblin',
+    npcId: 'npc-1',
+  }
+  const abilitySection = {
+    kind: 'ability' as const,
+    id: 'sec-ability',
+    name: 'Offense',
+    abilities: [{ id: 'a1', name: 'Slash', traits: [], cost: {}, damage: '', description: '', overcharge: '', flavorText: '', isMinor: false }],
+  }
+  const old = {
+    ...char,
+    customTabs: [
+      { id: 'tab-1', name: 'My Tab', sections: [npcSection, abilitySection] },
+    ],
+  }
+  const out = normalizeCharacter(asCharacter(old as Record<string, unknown>))
+  expect(out.customTabs[0].sections[0].kind).toBe('npc')
+  expect(out.customTabs[0].sections[1].kind).toBe('ability')
 })

@@ -3737,3 +3737,347 @@ body:has(.sheet-page--selector-open) .app-header {
     padding-left: calc(1.25rem + 200px);
   }
 }
+
+
+/* ============================================================================
+   Custom-tab NPC section (compact bundled NPC sheet)
+   ============================================================================ */
+
+.sheet-section--custom-npc {
+  /* The section shell already provides the card surface. */
+}
+
+.sheet-section--npc-missing {
+  opacity: 0.7;
+}
+
+.custom-npc-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* Identity row — portrait + name + version */
+.custom-npc-section__identity {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.custom-npc-section__portrait-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.4rem;
+  flex: 0 0 auto;
+}
+
+.custom-npc-section__portrait {
+  width: 56px;
+  height: 56px;
+  border-radius: 10px;
+  object-fit: cover;
+  border: 1px solid var(--border);
+  background: var(--bg-surface-raised);
+}
+
+.custom-npc-section__portrait--empty {
+  background: var(--bg-surface-raised);
+}
+
+.custom-npc-section__name-area {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.custom-npc-section__name {
+  font-family: var(--sheet-heading-font, inherit);
+  font-weight: var(--sheet-heading-weight, 600);
+  font-size: 1.15rem;
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.custom-npc-section__name-input {
+  font-size: 1.1rem;
+  font-weight: 700;
+  width: 100%;
+  max-width: 320px;
+}
+
+.custom-npc-section__version {
+  font-family: var(--sheet-label-font, inherit);
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+/* Combat stats — compact token strip */
+.custom-npc-section__stats {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0.5rem;
+}
+
+@media (max-width: 640px) {
+  .custom-npc-section__stats {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 420px) {
+  .custom-npc-section__stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.custom-npc-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+  padding: 0.55rem 0.4rem;
+  border-radius: 10px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-soft);
+  position: relative;
+  overflow: hidden;
+}
+
+.custom-npc-stat__stripe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--npc-stat-color);
+  opacity: 0.8;
+}
+
+.custom-npc-stat__label {
+  font-family: var(--sheet-label-font, inherit);
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.custom-npc-stat__value {
+  font-family: var(--sheet-heading-font, inherit);
+  font-weight: 700;
+  font-size: 1.4rem;
+  line-height: 1;
+  color: var(--text-primary);
+}
+
+.custom-npc-stat__input {
+  font-family: var(--sheet-heading-font, inherit);
+  font-weight: 700;
+  font-size: 1.2rem;
+  text-align: center;
+  width: 3rem;
+  padding: 0.1rem;
+}
+
+/* Sub-block headings (Attributes / Skills / Abilities / Description) */
+.custom-npc-section__block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.custom-npc-section__block-heading {
+  font-family: var(--sheet-label-font, inherit);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.custom-npc-section__block-heading--row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.custom-npc-section__block-heading--row .section-add-btn {
+  margin: 0;
+}
+
+/* Attributes — compact inline chips */
+.custom-npc-section__attr-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.custom-npc-section__attr-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 8px;
+  background: var(--bg-surface-raised);
+  border: 1px solid var(--border-soft);
+}
+
+.custom-npc-section__attr-abbr {
+  font-family: var(--sheet-label-font, inherit);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+}
+
+.custom-npc-section__attr-value {
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+}
+
+.custom-npc-section__attr-input {
+  width: 2.4rem;
+  padding: 0.05rem 0.2rem;
+  text-align: center;
+  font-size: 0.85rem;
+}
+
+/* Skills — compact list */
+.custom-npc-section__skill-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.custom-npc-section__skill-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 8px;
+  background: var(--bg-surface-raised);
+  border: 1px solid var(--border-soft);
+}
+
+.custom-npc-section__skill-name {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+.custom-npc-section__skill-value {
+  font-weight: 700;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.custom-npc-section__skill-value--active {
+  color: var(--accent-violet-soft);
+}
+
+.custom-npc-section__skill-input {
+  width: 2rem;
+  padding: 0.05rem 0.2rem;
+  text-align: center;
+  font-size: 0.8rem;
+}
+
+/* Abilities — compact grid */
+.custom-npc-section__abilities {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.6rem;
+}
+
+.custom-npc-section__abilities .ability-card {
+  font-size: 0.9rem;
+}
+
+/* Description */
+.custom-npc-section__description {
+  font-size: 0.9rem;
+  color: var(--text-primary);
+}
+
+/* ============================================================================
+   AddSectionChoiceModal — choice between Ability Block and NPC Sheet
+   ============================================================================ */
+
+.add-section-choice-modal {
+  max-width: 520px;
+}
+
+.add-section-choice-modal__body {
+  padding: 1rem 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.add-section-choice-modal__hint {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.add-section-choice-modal__options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+@media (max-width: 420px) {
+  .add-section-choice-modal__options {
+    grid-template-columns: 1fr;
+  }
+}
+
+.add-section-choice-modal__option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.4rem;
+  padding: 1rem;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  background: var(--bg-surface);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s ease, background-color 0.15s ease, transform 0.1s ease;
+}
+
+.add-section-choice-modal__option:hover {
+  border-color: var(--accent-violet);
+  background: var(--bg-surface-hover);
+}
+
+.add-section-choice-modal__option:active {
+  transform: scale(0.985);
+}
+
+.add-section-choice-modal__option-icon {
+  color: var(--accent-violet-soft);
+}
+
+.add-section-choice-modal__option-title {
+  font-family: var(--sheet-heading-font, inherit);
+  font-weight: var(--sheet-heading-weight, 600);
+  font-size: 1rem;
+  color: var(--text-primary);
+}
+
+.add-section-choice-modal__option-description {
+  font-family: var(--sheet-helper-font, inherit);
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}

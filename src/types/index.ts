@@ -21,6 +21,8 @@ export type {
   CharacterKind,
   NPCStats,
   CustomAbilitySection,
+  CustomNPCSection,
+  CustomSection,
   CustomTab,
   CustomResourceBar,
   CharacterViewModes,

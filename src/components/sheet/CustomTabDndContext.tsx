@@ -54,6 +54,7 @@ export default function CustomTabDndContext({
     const tab = char.customTabs.find((t: CustomTab) => t.id === tabId)
     if (!tab) return
     for (const section of tab.sections) {
+      if (section.kind !== 'ability') continue
       const found = section.abilities.find((a: AbilityBlock) => a.id === id)
       if (found) {
         setActiveAbility(found)
@@ -70,20 +71,29 @@ export default function CustomTabDndContext({
     const activeId = active.id as string
     const overId = over.id as string
 
+    const fromSectionKind = active.data.current?.sectionKind as
+      | 'ability'
+      | 'npc'
+      | undefined
     const fromSection = active.data.current?.section as string | undefined
     const overSection = (over.data.current?.section as string | undefined) ??
       (typeof overId === 'string' ? overId : undefined)
 
+    // Only ability sections participate in drag-and-drop.
     if (!fromSection || !overSection) return
+    if (fromSectionKind !== 'ability') return
 
     const char = useCharacterStore.getState().currentCharacter
     if (!char) return
     const tab = char.customTabs.find((t) => t.id === tabId)
     if (!tab) return
 
+    // Don't drop into an NPC section.
+    const targetSection = tab.sections.find((s) => s.id === overSection)
+    if (!targetSection || targetSection.kind !== 'ability') return
+
     if (fromSection === overSection) {
-      const section = tab.sections.find((s) => s.id === fromSection)
-      if (!section) return
+      const section = targetSection
       const fromIndex = section.abilities.findIndex((a) => a.id === activeId)
       const toIndex =
         overId === section.id

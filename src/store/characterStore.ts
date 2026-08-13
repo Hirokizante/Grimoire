@@ -12,6 +12,7 @@ import { createDefaultCharacter, createDefaultNPC, generateId, MORTAL_WOUNDS, MA
 import {
   deleteCharacter as dbDeleteCharacter,
   getAllCharacters,
+  normalizeCharacter,
   putCharacter,
 } from '@/lib/db'
 import { calcHP, calcENDRecovery } from '@/lib/calculations'
@@ -22,6 +23,7 @@ import {
   exportCharacter,
   importCharacter as parseImportCharacter,
   listVersions,
+  parseImportBundle,
   restoreFromSnapshot,
   updateExistingCharacterFromImport,
 } from '@/lib/exportImport'
@@ -241,17 +243,26 @@ export interface CharacterStoreActions {
   reorderCustomTab: (fromIndex: number, toIndex: number) => void
   /** Add a new ability section to a custom tab. Returns the new section id. */
   addCustomSection: (tabId: string, name?: string) => string
-  /** Rename a custom ability section. */
+  /**
+   * Add a new NPC section to a custom tab. Creates a blank NPC record in the
+   * shared characters store and attaches it to the tab via reference. Returns
+   * the new section id.
+   */
+  addCustomNPCSection: (tabId: string, name?: string) => string
+  /** Rename a custom section (any kind). */
   renameCustomSection: (tabId: string, sectionId: string, name: string) => void
-  /** Remove a custom ability section. */
-  removeCustomSection: (tabId: string, sectionId: string) => void
-  /** Add an ability block to a custom section. */
+  /**
+   * Remove a custom section. If the section is an NPC section, the attached
+   * NPC record is also deleted from the database.
+   */
+  removeCustomSection: (tabId: string, sectionId: string) => Promise<void>
+  /** Add an ability block to a custom section (ability sections only). */
   addCustomAbility: (tabId: string, sectionId: string, ability: AbilityBlock) => void
-  /** Update an ability block within a custom section. */
+  /** Update an ability block within a custom section (ability sections only). */
   updateCustomAbility: (tabId: string, sectionId: string, abilityId: string, updated: AbilityBlock) => void
-  /** Remove an ability block from a custom section. */
+  /** Remove an ability block from a custom section (ability sections only). */
   removeCustomAbility: (tabId: string, sectionId: string, abilityId: string) => void
-  /** Reorder an ability within a custom section. */
+  /** Reorder an ability within a custom section (ability sections only). */
   reorderCustomAbility: (tabId: string, sectionId: string, fromIndex: number, toIndex: number) => void
   /** Move an ability between custom sections (within the same tab). */
   moveCustomAbility: (tabId: string, fromSectionId: string, toSectionId: string, abilityId: string) => void
@@ -392,11 +403,21 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
   },
 
   importCharacterFile: async (text: string) => {
-    const imported = parseImportCharacter(text)
+    const bundle = parseImportBundle(text)
+    // Fresh id so the imported copy is a distinct character.
+    const imported: Character = {
+      ...normalizeCharacter(bundle.character),
+      id: generateId(),
+    }
     set({ isSaving: true })
     await putCharacter(imported)
+    // Persist any attached NPCs as their own records so the bundle
+    // round-trips through the IndexedDB store.
+    for (const npc of bundle.attachedNpcs) {
+      await putCharacter(npc)
+    }
     set((state) => ({
-      characters: [...state.characters, imported],
+      characters: [...state.characters, imported, ...bundle.attachedNpcs],
       currentCharacter: imported,
       isSaving: false,
     }))
@@ -417,13 +438,22 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
     existing: Character,
     text: string,
   ) => {
-    const updated = updateExistingCharacterFromImport(existing, text)
+    const bundle = parseImportBundle(text)
+    const updated = updateExistingCharacterFromImport(existing, bundle.character)
     set({ isSaving: true })
     await putCharacter(updated)
+    for (const npc of bundle.attachedNpcs) {
+      await putCharacter(npc)
+    }
     set((state) => ({
       currentCharacter:
         state.currentCharacter?.id === existing.id ? updated : state.currentCharacter,
-      characters: state.characters.map((c) => (c.id === existing.id ? updated : c)),
+      characters: [
+        ...state.characters.map((c) => (c.id === existing.id ? updated : c)),
+        ...bundle.attachedNpcs.filter(
+          (npc) => !state.characters.some((c) => c.id === npc.id),
+        ),
+      ],
       isSaving: false,
     }))
   },
@@ -432,7 +462,8 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
     existing: Character,
     text: string,
   ) => {
-    const updated = updateExistingCharacterFromImport(existing, text)
+    const parsed = parseImportCharacter(text)
+    const updated = updateExistingCharacterFromImport(existing, parsed)
     set({ isSaving: true })
     await putCharacter(updated)
     set((state) => ({
@@ -967,7 +998,12 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
               ...t,
               sections: [
                 ...t.sections,
-                { id, name: name ?? 'New Section', abilities: [] },
+                {
+                  kind: 'ability' as const,
+                  id,
+                  name: name ?? 'New Section',
+                  abilities: [],
+                },
               ],
             }
           : t,
@@ -986,6 +1022,45 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
     return id
   },
 
+  addCustomNPCSection: (tabId, name) => {
+    const sectionId = generateId()
+    const npcBase = createDefaultNPC()
+    const npc: Character = { ...npcBase, id: generateId() }
+    const sectionName = name ?? `NPC: ${npc.name}`
+    get().updateCurrentCharacter((char) => ({
+      ...char,
+      customTabs: char.customTabs.map((t) =>
+        t.id === tabId
+          ? {
+              ...t,
+              sections: [
+                ...t.sections,
+                {
+                  kind: 'npc' as const,
+                  id: sectionId,
+                  name: sectionName,
+                  npcId: npc.id,
+                },
+              ],
+            }
+          : t,
+      ),
+    }))
+    // Persist the blank NPC as its own record so it can be edited and exported.
+    set({ isSaving: true })
+    void putCharacter(npc)
+      .then(() => {
+        set((state) => ({
+          characters: [...state.characters, npc],
+          isSaving: false,
+        }))
+      })
+      .catch(() => {
+        set({ isSaving: false })
+      })
+    return sectionId
+  },
+
   renameCustomSection: (tabId, sectionId, name) => {
     get().updateCurrentCharacter((char) => ({
       ...char,
@@ -1002,7 +1077,14 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
     }))
   },
 
-  removeCustomSection: (tabId, sectionId) => {
+  removeCustomSection: async (tabId, sectionId) => {
+    // Capture the NPC id (if any) BEFORE mutating the character so we can
+    // delete the attached NPC record afterwards.
+    const section = get()
+      .currentCharacter?.customTabs.find((t) => t.id === tabId)
+      ?.sections.find((s) => s.id === sectionId)
+    const npcId = section && section.kind === 'npc' ? section.npcId : null
+
     get().updateCurrentCharacter((char) => {
       const tabSections = { ...(char.viewModes.customTabs[tabId] ?? {}) }
       delete tabSections[sectionId]
@@ -1019,6 +1101,17 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
         },
       }
     })
+
+    if (npcId) {
+      try {
+        await dbDeleteCharacter(npcId)
+      } catch {
+        // Best-effort: continue with in-memory cleanup even if DB delete fails.
+      }
+      set((state) => ({
+        characters: state.characters.filter((c) => c.id !== npcId),
+      }))
+    }
   },
 
   addCustomAbility: (tabId, sectionId, ability) => {
@@ -1028,11 +1121,11 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
         t.id === tabId
           ? {
               ...t,
-              sections: t.sections.map((s) =>
-                s.id === sectionId
-                  ? { ...s, abilities: [...s.abilities, ability] }
-                  : s,
-              ),
+              sections: t.sections.map((s) => {
+                if (s.id !== sectionId) return s
+                if (s.kind !== 'ability') return s
+                return { ...s, abilities: [...s.abilities, ability] }
+              }),
             }
           : t,
       ),
@@ -1046,16 +1139,16 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
         t.id === tabId
           ? {
               ...t,
-              sections: t.sections.map((s) =>
-                s.id === sectionId
-                  ? {
-                      ...s,
-                      abilities: s.abilities.map((a) =>
-                        a.id === abilityId ? updated : a,
-                      ),
-                    }
-                  : s,
-              ),
+              sections: t.sections.map((s) => {
+                if (s.id !== sectionId) return s
+                if (s.kind !== 'ability') return s
+                return {
+                  ...s,
+                  abilities: s.abilities.map((a) =>
+                    a.id === abilityId ? updated : a,
+                  ),
+                }
+              }),
             }
           : t,
       ),
@@ -1069,14 +1162,14 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
         t.id === tabId
           ? {
               ...t,
-              sections: t.sections.map((s) =>
-                s.id === sectionId
-                  ? {
-                      ...s,
-                      abilities: s.abilities.filter((a) => a.id !== abilityId),
-                    }
-                  : s,
-              ),
+              sections: t.sections.map((s) => {
+                if (s.id !== sectionId) return s
+                if (s.kind !== 'ability') return s
+                return {
+                  ...s,
+                  abilities: s.abilities.filter((a) => a.id !== abilityId),
+                }
+              }),
             }
           : t,
       ),
@@ -1092,6 +1185,7 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
           ...t,
           sections: t.sections.map((s) => {
             if (s.id !== sectionId) return s
+            if (s.kind !== 'ability') return s
             const list = [...s.abilities]
             if (fromIndex < 0 || fromIndex >= list.length) return s
             if (toIndex < 0 || toIndex >= list.length) return s
@@ -1114,12 +1208,16 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
           ...t,
           sections: t.sections.map((s) => {
             if (s.id === fromSectionId) {
+              if (s.kind !== 'ability') return s
               return { ...s, abilities: s.abilities.filter((a) => a.id !== abilityId) }
             }
             if (s.id === toSectionId) {
-              const moved = t.sections
-                .find((sec) => sec.id === fromSectionId)
-                ?.abilities.find((a) => a.id === abilityId)
+              if (s.kind !== 'ability') return s
+              const fromSection = t.sections.find(
+                (sec) => sec.id === fromSectionId,
+              )
+              if (!fromSection || fromSection.kind !== 'ability') return s
+              const moved = fromSection.abilities.find((a) => a.id === abilityId)
               if (!moved) return s
               return { ...s, abilities: [...s.abilities, moved] }
             }
@@ -1167,11 +1265,17 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
       ...char,
       version: targetVersion,
     }))
-    // Snapshot uses the chosen version.
-    const result = await exportCharacter({
-      ...current,
-      version: targetVersion,
-    }, targetVersion)
+    // Snapshot uses the chosen version. Pass the full character list so any
+    // NPCs attached via custom-tab NPC sections are exported alongside the
+    // parent character.
+    const result = await exportCharacter(
+      {
+        ...current,
+        version: targetVersion,
+      },
+      targetVersion,
+      get().characters,
+    )
     await get().loadVersions()
     return result.snapshot
   },

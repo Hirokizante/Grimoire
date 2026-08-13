@@ -631,6 +631,52 @@ test('updateCustomSectionViewMode: overrides a previously-set custom section mod
   expect(char.viewModes.customTabs[tabId][secId]).toBe('grid')
 })
 
+// ---- Custom NPC sections ------------------------------------------------------
+
+test('addCustomNPCSection: adds an npc-kind section referencing a new NPC record', async () => {
+  setupChar()
+  const tabId = useCharacterStore.getState().addCustomTab('Allies')
+  const secId = useCharacterStore.getState().addCustomNPCSection(tabId, 'Goblin')
+
+  const char = useCharacterStore.getState().currentCharacter!
+  const section = char.customTabs
+    .find((t) => t.id === tabId)!
+    .sections.find((s) => s.id === secId)!
+
+  expect(section.kind).toBe('npc')
+  expect(section.name).toBe('Goblin')
+
+  // The NPC record should have been persisted to the characters list.
+  const npcId = (section as { npcId: string }).npcId
+  // Wait a tick for the async putCharacter to resolve.
+  await Promise.resolve()
+  const npc = useCharacterStore.getState().characters.find((c) => c.id === npcId)
+  expect(npc).toBeDefined()
+  expect(npc!.kind).toBe('npc')
+})
+
+test('removeCustomSection: deletes the attached NPC record for an npc section', async () => {
+  setupChar()
+  const tabId = useCharacterStore.getState().addCustomTab('Allies')
+  const secId = useCharacterStore.getState().addCustomNPCSection(tabId, 'Goblin')
+  await Promise.resolve()
+
+  const char = useCharacterStore.getState().currentCharacter!
+  const section = char.customTabs
+    .find((t) => t.id === tabId)!
+    .sections.find((s) => s.id === secId)!
+  const npcId = (section as { npcId: string }).npcId
+  expect(useCharacterStore.getState().characters.some((c) => c.id === npcId)).toBe(true)
+
+  await useCharacterStore.getState().removeCustomSection(tabId, secId)
+
+  const after = useCharacterStore.getState().currentCharacter!
+  expect(
+    after.customTabs.find((t) => t.id === tabId)!.sections.some((s) => s.id === secId),
+  ).toBe(false)
+  expect(useCharacterStore.getState().characters.some((c) => c.id === npcId)).toBe(false)
+})
+
 // ---- Import conflict: updateExistingCharacterFromImportFile ----------------------
 
 test('updateExistingCharacterFromImportFile: updates id/name and preserves live state', async () => {

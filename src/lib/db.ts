@@ -118,17 +118,39 @@ export function normalizeCharacter(raw: Character): Character {
       )
     }
   }
-  // Also normalize blocks nested inside customTabs[].sections[].abilities[].
+  // Also normalize custom-tab sections: stamp the `kind` discriminator on
+  // legacy sections (which predate NPC sections and lack the field) and
+  // normalize nested ability blocks' `showActivate` flag.
   if (Array.isArray(result.customTabs)) {
     result.customTabs = result.customTabs.map((tab) => ({
       ...tab,
-      sections: tab.sections.map((section) => ({
-        ...section,
-        abilities: section.abilities.map((a) => ({
-          ...a,
-          showActivate: a.showActivate ?? true,
-        })),
-      })),
+      sections: tab.sections.map((rawSection) => {
+        const section = rawSection as unknown as {
+          kind?: 'ability' | 'npc'
+          id: string
+          name: string
+          npcId?: string
+          abilities?: AbilityBlock[]
+        }
+        // Legacy ability sections have no `kind` and always hold abilities.
+        if (section.kind === 'npc' && typeof section.npcId === 'string') {
+          return {
+            kind: 'npc' as const,
+            id: section.id,
+            name: section.name,
+            npcId: section.npcId,
+          }
+        }
+        return {
+          kind: 'ability' as const,
+          id: section.id,
+          name: section.name,
+          abilities: (section.abilities ?? []).map((a) => ({
+            ...a,
+            showActivate: a.showActivate ?? true,
+          })),
+        }
+      }),
     }))
   }
 

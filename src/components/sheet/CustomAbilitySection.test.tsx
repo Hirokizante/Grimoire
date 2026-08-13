@@ -15,6 +15,7 @@ vi.mock('@/store/characterStore', () => ({
       updateCustomAbility: vi.fn(),
       renameCustomSection: vi.fn(),
       removeCustomSection,
+      addCustomNPCSection: vi.fn(() => 'npc-section'),
     }),
 }))
 
@@ -27,6 +28,7 @@ vi.mock('@dnd-kit/core', async (importOriginal) => {
 })
 
 const section: CustomAbilitySectionType = {
+  kind: 'ability',
   id: 'section-1',
   name: 'Offense',
   abilities: [],

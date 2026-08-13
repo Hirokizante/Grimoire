@@ -7,6 +7,11 @@
  *     into the existing one when re-importing a previous version).
  *   - Version snapshots are stored in the IndexedDB versions store, so the
  *     player can browse history.
+ *
+ * Custom-tab NPC sections: when a character has any NPC sections, the export
+ * bundle includes the attached NPCs as a separate `attachedNpcs` array so
+ * they round-trip across import. The legacy flat character shape is
+ * preserved when no NPCs are attached so older import flows stay compatible.
  */
 
 import { generateId } from '@/constants/gameData'
@@ -107,6 +112,53 @@ export function createSnapshot(character: Character): VersionSnapshot {
 }
 
 /**
+ * Collect every NPC attached to a character via custom-tab NPC sections.
+ *
+ * An attached NPC is a Character record with `kind === 'npc'` whose id
+ * matches a `kind: 'npc'` section's `npcId` somewhere in the character's
+ * custom tabs. The NPCs are looked up against the provided character list
+ * (the canonical source of NPC records in the same IndexedDB store).
+ *
+ * Returns an empty array if the character has no NPC sections or the
+ * referenced NPC records cannot be found.
+ */
+export function collectAttachedNPCs(
+  character: Character,
+  allCharacters: Character[],
+): Character[] {
+  const ids = new Set<string>()
+  for (const tab of character.customTabs) {
+    for (const section of tab.sections) {
+      if (section.kind === 'npc') ids.add(section.npcId)
+    }
+  }
+  if (ids.size === 0) return []
+  return allCharacters.filter(
+    (c) => ids.has(c.id) && c.kind === 'npc',
+  )
+}
+
+/**
+ * Build a JSON-serializable export bundle that includes the parent character
+ * plus every NPC attached via custom-tab NPC sections. The shape is:
+ *
+ *   { character: Character; attachedNpcs: Character[] }
+ *
+ * If the parent character has no attached NPCs, `attachedNpcs` is an empty
+ * array. The bundle is forward-compatible: import utilities that don't
+ * recognize the wrapper can still read the `character` field.
+ */
+export function buildExportBundle(
+  character: Character,
+  allCharacters: Character[],
+): { character: Character; attachedNpcs: Character[] } {
+  return {
+    character,
+    attachedNpcs: collectAttachedNPCs(character, allCharacters),
+  }
+}
+
+/**
  * Persist a snapshot to the IndexedDB versions store.
  */
 export async function storeVersionSnapshot(
@@ -133,69 +185,36 @@ export async function listVersions(
  * can supply a semantic version (e.g. "9.1.2") instead of bumping the
  * character's current version. The character's version counter is updated
  * to match.
+ *
+ * If `allCharacters` is provided, any NPCs attached to this character via
+ * custom-tab NPC sections are included in the exported bundle as
+ * `attachedNpcs`. The legacy flat character shape is preserved when no
+ * NPCs are attached so existing import utilities stay compatible.
  */
 export async function exportCharacter(
   character: Character,
   versionOverride?: Semver,
+  allCharacters?: Character[],
 ): Promise<{
   filename: string
   snapshot: VersionSnapshot
 }> {
   const effectiveVersion = versionOverride ?? bumpSemver(character.version)
   const filename = versionedFilename(character.name, effectiveVersion)
-  const snap = await storeVersionSnapshot({
-    ...character,
-    version: effectiveVersion,
-  })
-  downloadJson({ ...character, version: effectiveVersion }, filename)
+  const versioned = { ...character, version: effectiveVersion }
+  const snap = await storeVersionSnapshot(versioned)
+  const attached = allCharacters
+    ? collectAttachedNPCs(versioned, allCharacters)
+    : []
+  const payload =
+    attached.length > 0
+      ? { character: versioned, attachedNpcs: attached }
+      : versioned
+  downloadJson(payload, filename)
   return { filename, snapshot: snap }
 }
 
-/**
- * Parse a JSON string back into a Character, with basic shape validation.
- *
- * Throws if the data is missing required fields.
- */
-export function parseCharacterJSON(text: string): Character {
-  const data = JSON.parse(text) as unknown
-  if (!isCharacterShape(data)) {
-    throw new Error(
-      'Invalid character sheet JSON: missing required fields',
-    )
-  }
-  return data
-}
-/**
- * Compare two semver strings.
- * Returns >0 if a>b, <0 if a<b, 0 if equal.
- * Invalid versions are treated as "0.0.0".
- */
-export function compareSemver(
-   a: Semver,
-   b: Semver,
- ): number {
-   const pa = parseSemver(a) ?? { major: 0, minor: 0, patch: 0 }
-   const pb = parseSemver(b) ?? { major: 0, minor: 0, patch: 0 }
-   if (pa.major !== pb.major) return pa.major - pb.major
-   if (pa.minor !== pb.minor) return pa.minor - pb.minor
-   return pa.patch - pb.patch
- }
-
- /**
-  * Determine the resulting version when updating an existing character from an
-  * imported one. If the imported version is strictly newer, use it.
-  * Otherwise bump the existing version (patch) so history progresses forward.
-  */
- export function resolveUpdatedVersion(
-   existingVersion: Semver,
-   importedVersion: Semver,
- ): Semver {
-   return compareSemver(importedVersion, existingVersion) > 0
-     ? importedVersion
-     : bumpSemver(existingVersion)
- }
-
- /** Minimal shape check — verifies key fields exist and have the right broad
+/** Minimal shape check — verifies key fields exist and have the right broad
  * type, but does NOT exhaustively validate the whole object.
  */
 function isCharacterShape(data: unknown): data is Character {
@@ -213,6 +232,110 @@ function isCharacterShape(data: unknown): data is Character {
     typeof o.config === 'object' &&
     o.config !== null
   )
+}
+
+/**
+ * Detect the bundle export shape `{ character, attachedNpcs }`. Returns
+ * `true` only when the object has a `character` field with a valid shape.
+ */
+function isBundleShape(data: unknown): data is {
+  character: Character
+  attachedNpcs?: Character[]
+} {
+  if (typeof data !== 'object' || data === null) return false
+  const o = data as Record<string, unknown>
+  return (
+    'character' in o &&
+    typeof o.character === 'object' &&
+    o.character !== null &&
+    isCharacterShape(o.character)
+  )
+}
+
+/**
+ * Parse a JSON string back into a Character, with basic shape validation.
+ *
+ * Accepts both the legacy flat character shape and the bundle shape
+ * `{ character, attachedNpcs }` produced by {@link exportCharacter}.
+ * When given a bundle, only the `character` field is parsed and returned
+ * — use {@link parseImportBundle} to read attached NPCs as well.
+ *
+ * Throws if the data is missing required fields.
+ */
+export function parseCharacterJSON(text: string): Character {
+  const data = JSON.parse(text) as unknown
+  if (isBundleShape(data)) {
+    return data.character
+  }
+  if (!isCharacterShape(data)) {
+    throw new Error(
+      'Invalid character sheet JSON: missing required fields',
+    )
+  }
+  return data
+}
+
+/**
+ * Parse a JSON string into an export bundle, returning both the parent
+ * character and any attached NPCs. Each attached NPC is normalized and
+ * assigned a fresh id so it can coexist with existing records.
+ */
+export function parseImportBundle(
+  text: string,
+): { character: Character; attachedNpcs: Character[] } {
+  const data = JSON.parse(text) as unknown
+  if (isBundleShape(data)) {
+    const npcs = Array.isArray(data.attachedNpcs)
+      ? data.attachedNpcs
+        .filter((n): n is Character => isCharacterShape(n))
+        .map((npc) => ({
+          ...normalizeCharacter(npc),
+          // Fresh id so the imported NPC is a distinct record.
+          id: generateId(),
+        }))
+      : []
+    return {
+      character: data.character,
+      attachedNpcs: npcs,
+    }
+  }
+  // Legacy flat shape — no attached NPCs.
+  if (!isCharacterShape(data)) {
+    throw new Error(
+      'Invalid character sheet JSON: missing required fields',
+    )
+  }
+  return { character: data, attachedNpcs: [] }
+}
+
+/**
+ * Compare two semver strings.
+ * Returns >0 if a>b, <0 if a<b, 0 if equal.
+ * Invalid versions are treated as "0.0.0".
+ */
+export function compareSemver(
+   a: Semver,
+   b: Semver,
+ ): number {
+  const pa = parseSemver(a) ?? { major: 0, minor: 0, patch: 0 }
+  const pb = parseSemver(b) ?? { major: 0, minor: 0, patch: 0 }
+  if (pa.major !== pb.major) return pa.major - pb.major
+  if (pa.minor !== pb.minor) return pa.minor - pb.minor
+  return pa.patch - pb.patch
+}
+
+/**
+ * Determine the resulting version when updating an existing character from an
+ * imported one. If the imported version is strictly newer, use it.
+ * Otherwise bump the existing version (patch) so history progresses forward.
+ */
+export function resolveUpdatedVersion(
+  existingVersion: Semver,
+  importedVersion: Semver,
+): Semver {
+  return compareSemver(importedVersion, existingVersion) > 0
+    ? importedVersion
+    : bumpSemver(existingVersion)
 }
 
 /**
@@ -246,7 +369,7 @@ export function restoreFromSnapshot(
  * character's id and live-play counters (currentHP/END/AP/FP, mortal wounds,
  * death saves, etc.) so in-progress combat state isn't lost.
  *
- * The imported JSON replaces all structural data (attributes, skills,
+ * The imported character replaces all structural data (attributes, skills,
  * abilities, backstory, config, etc.) while the existing character keeps:
  *   - id, name, playerName
  *   - all current* / tempHP / mortalWounds / deathSaves
@@ -254,13 +377,15 @@ export function restoreFromSnapshot(
  * The version is resolved via {@link resolveUpdatedVersion}: if the imported
  * version is strictly newer, use it; otherwise bump the existing version so
  * history always advances forward.
+ *
+ * `imported` is the parsed Character (already normalized). Callers that have
+ * raw JSON text should call {@link parseCharacterJSON} first.
  */
 export function updateExistingCharacterFromImport(
   existing: Character,
-  importedText: string,
+  imported: Character,
 ): Character {
-  const parsed = parseCharacterJSON(importedText)
-  const normalized = normalizeCharacter(parsed)
+  const normalized = normalizeCharacter(imported)
   const newVersion = resolveUpdatedVersion(existing.version, normalized.version)
   return {
     ...normalized,

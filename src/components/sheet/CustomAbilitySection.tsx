@@ -68,7 +68,7 @@ export default function CustomAbilitySection({
 
   const { setNodeRef, isOver } = useDroppable({
     id: section.id,
-    data: { section: section.id },
+    data: { section: section.id, sectionKind: 'ability' as const },
   })
 
   const openNew = () => {

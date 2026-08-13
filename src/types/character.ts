@@ -218,6 +218,8 @@ export interface CharacterViewModes {
  * player fully controls.
  */
 export interface CustomAbilitySection {
+  /** Discriminator: this section holds an ability group. */
+  kind: 'ability'
   /** Stable unique identifier. */
   id: string
   /** Display name of the section (user-editable). */
@@ -225,6 +227,33 @@ export interface CustomAbilitySection {
   /** Ability blocks within this section. */
   abilities: AbilityBlock[]
 }
+
+/**
+ * A user-created NPC section within a custom tab.
+ *
+ * Stores a reference (npcId) to a fully-fledged NPC record (a Character with
+ * `kind: 'npc'`) in the same IndexedDB `characters` store. The NPC itself
+ * holds attributes, skills, combat stats, abilities, and description — all
+ * editable through the existing character/inventory mutations. The section
+ * only carries its own display name and the reference id.
+ */
+export interface CustomNPCSection {
+  /** Discriminator: this section holds an attached NPC sheet. */
+  kind: 'npc'
+  /** Stable unique identifier for the section. */
+  id: string
+  /** Display name of the section (user-editable). */
+  name: string
+  /** ID of the NPC record (Character with kind='npc') attached to this section. */
+  npcId: string
+}
+
+/**
+ * A section within a user-created tab. Either a free-form group of Ability
+ * Blocks (mirrors the built-in Slotted/Pool sections) or a bundled NPC sheet
+ * (renders a compact, editable NPC inline).
+ */
+export type CustomSection = CustomAbilitySection | CustomNPCSection
 
 /**
  * A user-created tab on the character sheet. Each tab contains one or more
@@ -236,8 +265,8 @@ export interface CustomTab {
   id: string
   /** Display name of the tab (user-editable). */
   name: string
-  /** Ability sections within this tab. */
-  sections: CustomAbilitySection[]
+  /** Sections within this tab (ability groups or attached NPC sheets). */
+  sections: CustomSection[]
 }
 
 /**
