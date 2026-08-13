@@ -29,7 +29,7 @@ A character sheet creation and management app for the homebrew TTRPG **Divergenc
 
 Divergence is a DIY tabletop RPG system — there is no compendium of spells or items. Players build their characters' abilities and equipment from scratch, using the system as a creative framework. Grimoire is built to support that freedom: structured text fields for abilities, full creative control over look and feel, and live-play tools for tracking resources and rolling dice.
 
-For the full ruleset, see [`Divergence SRD.md`](Divergence SRD.md). For the product and UI design, see [`DESIGN.md`](DESIGN.md).
+For the full ruleset, see [`Divergence SRD.md`](Divergence SRD.md). For the product and UI design, see [`Design.md`](Design.md).
 
 ---
 
@@ -45,7 +45,8 @@ For the full ruleset, see [`Divergence SRD.md`](Divergence SRD.md). For the prod
 - **Minor Abilities** — flagged abilities that occupy half a slot instead of a full one.
 - **Ability Block editor** — structured fields for name, traits, cost (AP/END/FP), damage, description, overcharge, and flavor text. Supports Markdown in description and overcharge.
 - **Ability templates** — pre-filled starting points for common ability types (melee, ranged, buff, debuff) that remain fully editable.
-- **Custom tabs & sections** — create up to 6 custom tabs, each with named ability sections, for organizing homebrew content.
+- **Custom tabs & sections** — create up to 6 custom tabs, each with named ability sections, for organizing homebrew content. When adding a section, choose between an **Ability Block** group or an **NPC Sheet** (a blank, editable NPC bundled directly into the tab).
+- **NPC sections** — attach a full NPC to a custom tab. NPC sheets show portrait, combat stats, attributes, skills, abilities, and description in a compact inline layout, and are editable in place within the tab. Attached NPCs are exported and re-imported alongside their parent character.
 - **Custom resource bars** — define named point pools (current/max) rendered below Endurance, with optional refill on Recover.
 - **Portrait upload** — images are compressed and stored as base64 dataURLs (max 512px, JPEG 0.85 quality).
 - **Physical description & backstory** — Markdown-supported bio fields.
@@ -84,6 +85,7 @@ For the full ruleset, see [`Divergence SRD.md`](Divergence SRD.md). For the prod
 - **Import from JSON** — load a previously exported sheet back in.
 - **Update existing** — importing a sheet whose name matches an existing character offers to update in place (preserving live-play state: HP, END, AP, FP, mortal wounds, death saves) or import as a new copy.
 - **Version resolution** — when updating, the imported version is used if strictly newer; otherwise the existing version is bumped forward.
+- **Attached NPCs** — when a character has NPC sections, the export includes those NPCs as a bundle (`attachedNpcs`). On import, each NPC is persisted as its own record and the parent's section references are rewritten to the fresh IDs, so the parent↔NPC link round-trips intact.
 
 ---
 
@@ -177,7 +179,7 @@ npm run preview
 
 ```
 Grimoire/
-├── DESIGN.md              # Full design spec (source of truth)
+├── Design.md               # Full design spec (source of truth)
 ├── Divergence SRD.md       # Full game rules
 ├── IDEA.md                 # Project vision
 ├── package.json            # Dependencies and scripts
@@ -206,7 +208,16 @@ Grimoire/
 │   │   │   ├── AbilitiesDndContext.tsx # Drag-and-drop context
 │   │   │   ├── CustomTabContent.tsx     # Custom tab renderer
 │   │   │   ├── CustomAbilitySection.tsx # Custom section renderer
+│   │   │   ├── CustomNPCSection.tsx     # Compact bundled-NPC section
+│   │   │   ├── AddSectionChoiceModal.tsx # Ability vs NPC section chooser
 │   │   │   ├── CustomTabDndContext.tsx # DnD for custom sections
+│   │   │   ├── npc/                     # NPC-specific sheet components
+│   │   │   │   ├── NPCSheet.tsx
+│   │   │   │   ├── NPCHeroSection.tsx
+│   │   │   │   ├── NPCStatsSection.tsx
+│   │   │   │   ├── NPCAbilitiesSection.tsx
+│   │   │   │   ├── NPCDescriptionSection.tsx
+│   │   │   │   └── NPCExportDialog.tsx
 │   │   │   ├── TabBar.tsx              # Sheet tab navigation
 │   │   │   ├── ProfileSection.tsx      # Physical description, backstory
 │   │   │   ├── ResourceBar.tsx         # Segmented bar +/− controls
@@ -255,7 +266,9 @@ Grimoire/
 │   │   ├── HomePage.tsx          # Landing screen
 │   │   ├── CharacterListPage.tsx # Grid/list of all characters
 │   │   ├── CharacterSheetPage.tsx # Sheet wrapper with mode toggle
-│   │   └── PlaceholderPage.tsx   # Stub page (NPCs, Settings)
+│   │   ├── NPCListPage.tsx       # Grid/list of all NPCs
+│   │   ├── NPCSheetPage.tsx      # NPC sheet wrapper with mode toggle
+│   │   └── PlaceholderPage.tsx   # Stub page (Settings)
 │   ├── store/
 │   │   ├── characterStore.ts  # Zustand store: characters + live play
 │   │   ├── diceRollStore.ts    # Zustand store: dice roll modal lifecycle
@@ -278,6 +291,7 @@ The central domain object is a **`Character`**, which holds everything about a s
 | Field | Purpose |
 | --- | --- |
 | `id`, `name`, `playerName` | Identity |
+| `kind` | Discriminator: `'character'` (player sheet) or `'npc'` (static NPC reference) |
 | `version` | Semantic version (MAJOR.MINOR.PATCH) for export tracking |
 | `milestones` | Character progression level |
 | `attributes` | The five Attributes (MAR, POW, AGI, VIT, GRT) |
@@ -291,10 +305,12 @@ The central domain object is a **`Character`**, which holds everything about a s
 | `slottedAbilities`, `abilityPool` | Active vs. inactive slotted abilities |
 | `portrait` | Base64 data URL |
 | `physicalDescription`, `backstory` | Bio fields |
-| `customTabs` | User-created tabs with custom sections |
+| `customTabs` | User-created tabs with sections (`CustomAbilitySection` or `CustomNPCSection`) |
 | `config` | Full aesthetic configuration (colors, fonts, CSS, background image) |
 | `viewModes` | Per-section grid/list preference |
 | `customResourceBars` | User-defined resource pools |
+| `npcStats` | Manually-entered combat stats (NPCs only: evasion, armor, movement, save DC, HP) |
+| `description` | Long-form NPC description (NPCs only) |
 | `createdAt`, `updatedAt` | Timestamps |
 
 **AbilityBlock** is the structured representation of any ability (Core, Slotted, or Pool):
@@ -308,6 +324,13 @@ The central domain object is a **`Character`**, which holds everything about a s
 | `description`, `overcharge`, `flavorText` | Prose fields (Markdown-supported) |
 | `isMinor` | Half-slot flag |
 | `showActivate` | Whether to show the Activate button in view mode |
+
+**CustomSection** is a discriminated union describing one section inside a custom tab:
+
+| Variant | Shape |
+| --- | --- |
+| `CustomAbilitySection` (`kind: 'ability'`) | `{ kind, id, name, abilities: AbilityBlock[] }` — a free-form group of abilities |
+| `CustomNPCSection` (`kind: 'npc'`) | `{ kind, id, name, npcId }` — a reference to a bundled NPC `Character` (with `kind: 'npc'`) |
 
 ---
 
@@ -368,7 +391,7 @@ A thin promise wrapper around the native IndexedDB API (`src/lib/db.ts`) manages
 - `versions` — `VersionSnapshot` records for export history, indexed by `characterId`.
 - `roll_logs` — `RollLogEntry` records for the dice roll log, indexed by `characterId`.
 
-Schema migrations are handled on read via `normalizeCharacter`, which upgrades older records to the latest shape (e.g. migrating `innateAbility` → `innateAbilities`, adding `showActivate`, ensuring `customTabs` and `customResourceBars` exist). No bulk migration is needed.
+Schema migrations are handled on read via `normalizeCharacter`, which upgrades older records to the latest shape (e.g. migrating `innateAbility` → `innateAbilities`, adding `showActivate`, ensuring `customTabs` and `customResourceBars` exist, and stamping the `kind` discriminator on legacy custom-tab sections). No bulk migration is needed.
 
 ### Theming
 
@@ -376,7 +399,7 @@ Every configurable color lives in `SheetColors`. `themeUtils.colorVars()` maps t
 
 ### Drag and Drop
 
-Built on `@dnd-kit`. The `AbilitiesDndContext` wraps the Slotted Abilities and Ability Pool sections, enabling cross-list moves (slotted ↔ pool) and reordering within a list. Custom sections have their own `CustomTabDndContext`.
+Built on `@dnd-kit`. The `AbilitiesDndContext` wraps the Slotted Abilities and Ability Pool sections, enabling cross-list moves (slotted ↔ pool) and reordering within a list. Custom ability sections have their own `CustomTabDndContext` (NPC sections are excluded from drag-and-drop and render inline instead).
 
 ---
 

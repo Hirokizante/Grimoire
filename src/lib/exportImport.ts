@@ -277,25 +277,39 @@ export function parseCharacterJSON(text: string): Character {
 
 /**
  * Parse a JSON string into an export bundle, returning both the parent
- * character and any attached NPCs. Each attached NPC is normalized and
- * assigned a fresh id so it can coexist with existing records.
+ * character and any attached NPCs.
+ *
+ * Each attached NPC is normalized and assigned a fresh id so it can coexist
+ * with existing records. The parent character's custom-tab NPC-section
+ * `npcId` references are REWRITTEN to point at the fresh ids, so a bundle
+ * round-trips fully: importing a character with attached NPCs relinks the
+ * sections to the newly-created NPC records.
  */
 export function parseImportBundle(
   text: string,
 ): { character: Character; attachedNpcs: Character[] } {
   const data = JSON.parse(text) as unknown
   if (isBundleShape(data)) {
+    // Build a oldId -> newId map from the raw attached NPCs.
+    const idMap = new Map<string, string>()
     const npcs = Array.isArray(data.attachedNpcs)
       ? data.attachedNpcs
         .filter((n): n is Character => isCharacterShape(n))
-        .map((npc) => ({
-          ...normalizeCharacter(npc),
-          // Fresh id so the imported NPC is a distinct record.
-          id: generateId(),
-        }))
+        .map((npc) => {
+          const freshId = generateId()
+          idMap.set(npc.id, freshId)
+          return {
+            ...normalizeCharacter(npc),
+            id: freshId,
+          }
+        })
       : []
+
+    // Rewrite the parent character's NPC-section references to the fresh ids.
+    const character = rewriteNPCSectionReferences(data.character, idMap)
+
     return {
-      character: data.character,
+      character,
       attachedNpcs: npcs,
     }
   }
@@ -306,6 +320,32 @@ export function parseImportBundle(
     )
   }
   return { character: data, attachedNpcs: [] }
+}
+
+/**
+ * Rewrite `kind: 'npc'` section `npcId` references on a character using an
+ * old-id → new-id map. Returns a new character object with updated sections
+ * (or the same character if there are no NPC sections / no remapped ids).
+ */
+function rewriteNPCSectionReferences(
+  character: Character,
+  idMap: Map<string, string>,
+): Character {
+  if (idMap.size === 0) return character
+  let changed = false
+  const customTabs = character.customTabs.map((tab) => {
+    let tabChanged = false
+    const sections = tab.sections.map((section) => {
+      if (section.kind !== 'npc') return section
+      const newId = idMap.get(section.npcId)
+      if (!newId) return section
+      tabChanged = true
+      changed = true
+      return { ...section, npcId: newId }
+    })
+    return tabChanged ? { ...tab, sections } : tab
+  })
+  return changed ? { ...character, customTabs } : character
 }
 
 /**

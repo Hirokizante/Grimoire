@@ -455,6 +455,68 @@ test('parseImportBundle: unwraps bundle shape and assigns fresh NPC ids', () => 
   expect(parsed.attachedNpcs[0].name).toBe('Goblin')
 })
 
+test('parseImportBundle: rewrites parent npcId references to fresh NPC ids', () => {
+  const char = createDefaultCharacter()
+  char.name = 'Hero'
+  const npc = createDefaultNPC()
+  npc.id = 'npc-original'
+  npc.name = 'Goblin'
+  // Attach the NPC via a custom-tab NPC section referencing the ORIGINAL id.
+  char.customTabs = [
+    {
+      id: 'tab-1',
+      name: 'Allies',
+      sections: [
+        { kind: 'npc', id: 'sec-1', name: 'Goblin', npcId: 'npc-original' },
+      ],
+    },
+  ]
+
+  const bundle = { character: char, attachedNpcs: [npc] }
+  const parsed = parseImportBundle(JSON.stringify(bundle))
+
+  // The imported NPC got a fresh id…
+  const freshNpcId = parsed.attachedNpcs[0].id
+  expect(freshNpcId).not.toBe('npc-original')
+
+  // …and the parent character's section reference now points to it.
+  const section = parsed.character.customTabs[0].sections[0]
+  expect(section.kind).toBe('npc')
+  if (section.kind === 'npc') {
+    expect(section.npcId).toBe(freshNpcId)
+  }
+})
+
+test('round-trip: buildExportBundle -> parseImportBundle relinks references', () => {
+  const char = createDefaultCharacter()
+  char.name = 'Hero'
+  const npc = createDefaultNPC()
+  npc.id = 'npc-original'
+  npc.name = 'Guard'
+  char.customTabs = [
+    {
+      id: 'tab-1',
+      name: 'Allies',
+      sections: [
+        { kind: 'npc', id: 'sec-1', name: 'Guard', npcId: 'npc-original' },
+      ],
+    },
+  ]
+
+  // Export: produces { character, attachedNpcs } with original ids.
+  const exported = buildExportBundle(char, [char, npc])
+  expect(exported.attachedNpcs[0].id).toBe('npc-original')
+
+  // Import: fresh ids, references rewritten.
+  const imported = parseImportBundle(JSON.stringify(exported))
+  expect(imported.attachedNpcs[0].id).not.toBe('npc-original')
+
+  const section = imported.character.customTabs[0].sections[0]
+  if (section.kind === 'npc') {
+    expect(section.npcId).toBe(imported.attachedNpcs[0].id)
+  }
+})
+
 test('parseImportBundle: handles legacy flat shape', () => {
   const char = createDefaultCharacter()
   char.name = 'Flat Hero'
