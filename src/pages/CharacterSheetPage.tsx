@@ -72,6 +72,7 @@ export default function CharacterSheetPage() {
 
       <div className="sheet-page__content">
         <CharacterSheet
+          key={currentCharacter.id}
           character={currentCharacter}
           mode={mode}
           onModeChange={setMode}
