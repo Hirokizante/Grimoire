@@ -677,6 +677,81 @@ test('removeCustomSection: deletes the attached NPC record for an npc section', 
   expect(useCharacterStore.getState().characters.some((c) => c.id === npcId)).toBe(false)
 })
 
+test('addCustomNPCReference: attaches an existing saved NPC by reference', () => {
+  const current = setupChar()
+  // Seed a pre-existing NPC in the store (simulating an already-saved record).
+  const existingNpc: Character = {
+    ...createDefaultCharacter(),
+    id: 'npc-existing',
+    name: 'Brigand',
+    kind: 'npc',
+  }
+  useCharacterStore.setState({ characters: [current, existingNpc] })
+
+  const tabId = useCharacterStore.getState().addCustomTab('Encounters')
+  const secId = useCharacterStore
+    .getState()
+    .addCustomNPCReference(tabId, existingNpc.id)
+
+  const char = useCharacterStore.getState().currentCharacter!
+  const section = char.customTabs
+    .find((t) => t.id === tabId)!
+    .sections.find((s) => s.id === secId)!
+
+  expect(section.kind).toBe('npc')
+  expect((section as { npcId: string }).npcId).toBe('npc-existing')
+  expect(section.name).toBe('NPC: Brigand')
+  // No new record should be created — only the reference is stored.
+  const npcCount = useCharacterStore
+    .getState()
+    .characters.filter((c) => c.kind === 'npc').length
+  expect(npcCount).toBe(1)
+})
+
+test('addCustomNPCReference: returns empty string when NPC is not found', () => {
+  setupChar()
+  const tabId = useCharacterStore.getState().addCustomTab('Encounters')
+  const secId = useCharacterStore
+    .getState()
+    .addCustomNPCReference(tabId, 'does-not-exist')
+  expect(secId).toBe('')
+})
+
+test('createAttachedNPC: creates a named NPC and attaches it without navigating', async () => {
+  const current = setupChar()
+  const tabId = useCharacterStore.getState().addCustomTab('Encounters')
+  const secId = useCharacterStore.getState().createAttachedNPC(tabId, 'Goblin')
+
+  const char = useCharacterStore.getState().currentCharacter!
+  expect(char.id).toBe(current.id) // currentCharacter is NOT changed
+
+  const section = char.customTabs
+    .find((t) => t.id === tabId)!
+    .sections.find((s) => s.id === secId)!
+  expect(section.kind).toBe('npc')
+  expect(section.name).toBe('NPC: Goblin')
+
+  await Promise.resolve()
+  const npcId = (section as { npcId: string }).npcId
+  const npc = useCharacterStore.getState().characters.find((c) => c.id === npcId)
+  expect(npc).toBeDefined()
+  expect(npc!.kind).toBe('npc')
+  expect(npc!.name).toBe('Goblin')
+})
+
+test('createAttachedNPC: falls back to default NPC name when blank', async () => {
+  setupChar()
+  const tabId = useCharacterStore.getState().addCustomTab('Encounters')
+  useCharacterStore.getState().createAttachedNPC(tabId, '   ')
+
+  await Promise.resolve()
+  const npc = useCharacterStore
+    .getState()
+    .characters.find((c) => c.kind === 'npc')
+  expect(npc).toBeDefined()
+  expect(npc!.name).toBe('New NPC')
+})
+
 // ---- Import conflict: updateExistingCharacterFromImportFile ----------------------
 
 test('updateExistingCharacterFromImportFile: updates id/name and preserves live state', async () => {

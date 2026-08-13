@@ -249,6 +249,17 @@ export interface CharacterStoreActions {
    * the new section id.
    */
   addCustomNPCSection: (tabId: string, name?: string) => string
+  /**
+   * Attach an existing saved NPC (found in the shared characters store by id)
+   * to a custom tab as a new npc-kind section. Returns the new section id.
+   */
+  addCustomNPCReference: (tabId: string, npcId: string) => string
+  /**
+   * Create a brand-new blank NPC (named `name`) and attach it to a custom tab
+   * as a new npc-kind section, without changing the current character. Returns
+   * the new section id.
+   */
+  createAttachedNPC: (tabId: string, name: string) => string
   /** Rename a custom section (any kind). */
   renameCustomSection: (tabId: string, sectionId: string, name: string) => void
   /**
@@ -1047,6 +1058,74 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
       ),
     }))
     // Persist the blank NPC as its own record so it can be edited and exported.
+    set({ isSaving: true })
+    void putCharacter(npc)
+      .then(() => {
+        set((state) => ({
+          characters: [...state.characters, npc],
+          isSaving: false,
+        }))
+      })
+      .catch(() => {
+        set({ isSaving: false })
+      })
+    return sectionId
+  },
+
+  addCustomNPCReference: (tabId, npcId) => {
+    const npc = get().characters.find((c) => c.id === npcId)
+    // Fail soft — an empty id signals "not attached" to the caller.
+    if (!npc) return ''
+    const sectionId = generateId()
+    get().updateCurrentCharacter((char) => ({
+      ...char,
+      customTabs: char.customTabs.map((t) =>
+        t.id === tabId
+          ? {
+              ...t,
+              sections: [
+                ...t.sections,
+                {
+                  kind: 'npc' as const,
+                  id: sectionId,
+                  name: `NPC: ${npc.name}`,
+                  npcId,
+                },
+              ],
+            }
+          : t,
+      ),
+    }))
+    return sectionId
+  },
+
+  createAttachedNPC: (tabId, name) => {
+    const sectionId = generateId()
+    const npcBase = createDefaultNPC()
+    const npc: Character = {
+      ...npcBase,
+      id: generateId(),
+      name: name.trim() || npcBase.name,
+    }
+    get().updateCurrentCharacter((char) => ({
+      ...char,
+      customTabs: char.customTabs.map((t) =>
+        t.id === tabId
+          ? {
+              ...t,
+              sections: [
+                ...t.sections,
+                {
+                  kind: 'npc' as const,
+                  id: sectionId,
+                  name: `NPC: ${npc.name}`,
+                  npcId: npc.id,
+                },
+              ],
+            }
+          : t,
+      ),
+    }))
     set({ isSaving: true })
     void putCharacter(npc)
       .then(() => {

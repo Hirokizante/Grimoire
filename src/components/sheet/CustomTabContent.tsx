@@ -15,6 +15,8 @@ import CustomTabDndContext from '@/components/sheet/CustomTabDndContext'
 import AddSectionChoiceModal, {
   type AddSectionChoice,
 } from '@/components/sheet/AddSectionChoiceModal'
+import CreateCharacterModal from '@/components/sheet/CreateCharacterModal'
+import NPCSelectorModal from '@/components/sheet/NPCSelectorModal'
 import { useCharacterStore } from '@/store/characterStore'
 import type { CustomTab } from '@/types'
 import type { SheetMode } from '@/pages/CharacterSheetPage'
@@ -33,7 +35,10 @@ export default function CustomTabContent({
 }: CustomTabContentProps) {
   const isEdit = mode === 'edit'
   const addCustomSection = useCharacterStore((s) => s.addCustomSection)
-  const addCustomNPCSection = useCharacterStore((s) => s.addCustomNPCSection)
+  const addCustomNPCReference = useCharacterStore(
+    (s) => s.addCustomNPCReference,
+  )
+  const createAttachedNPC = useCharacterStore((s) => s.createAttachedNPC)
   const updateCustomSectionViewMode = useCharacterStore(
     (s) => s.updateCustomSectionViewMode,
   )
@@ -42,6 +47,8 @@ export default function CustomTabContent({
   )
 
   const [showAddSection, setShowAddSection] = useState(false)
+  const [showNPCPicker, setShowNPCPicker] = useState(false)
+  const [showCreateNPC, setShowCreateNPC] = useState(false)
 
   const handleViewModeChange = (sectionId: string, mode: 'grid' | 'list') => {
     updateCustomSectionViewMode(tab.id, sectionId, mode)
@@ -52,8 +59,19 @@ export default function CustomTabContent({
     if (choice === 'ability') {
       addCustomSection(tab.id)
     } else {
-      addCustomNPCSection(tab.id)
+      setShowNPCPicker(true)
     }
+  }
+
+  const handleSelectNPC = (npcId: string) => {
+    addCustomNPCReference(tab.id, npcId)
+    setShowNPCPicker(false)
+  }
+
+  const handleCreateNewNPC = (name: string) => {
+    createAttachedNPC(tab.id, name)
+    setShowCreateNPC(false)
+    setShowNPCPicker(false)
   }
 
   return (
@@ -108,6 +126,23 @@ export default function CustomTabContent({
         onChoose={handleSectionChoice}
         onClose={() => setShowAddSection(false)}
       />
+
+      <NPCSelectorModal
+        open={showNPCPicker}
+        onSelect={handleSelectNPC}
+        onCreateNew={() => {
+          setShowNPCPicker(false)
+          setShowCreateNPC(true)
+        }}
+        onClose={() => setShowNPCPicker(false)}
+      />
+
+      {showCreateNPC && (
+        <CreateCharacterModal
+          onCreate={handleCreateNewNPC}
+          onClose={() => setShowCreateNPC(false)}
+        />
+      )}
     </CustomTabDndContext>
   )
 }
