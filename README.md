@@ -2,7 +2,7 @@
 
 A character sheet creation and management app for the homebrew TTRPG **Divergence**. Built with React, TypeScript, and Vite — runs entirely in the browser, offline-first.
 
-> Still in beta. Storage format may change between pre-1.0 releases — export your characters regularly.
+> Still in alpha. Storage format may change between pre-1.0 releases — export your characters regularly.
 
 ---
 
@@ -28,8 +28,6 @@ A character sheet creation and management app for the homebrew TTRPG **Divergenc
 ## About Divergence
 
 Divergence is a DIY tabletop RPG system — there is no compendium of spells or items. Players build their characters' abilities and equipment from scratch, using the system as a creative framework. Grimoire is built to support that freedom: structured text fields for abilities, full creative control over look and feel, and live-play tools for tracking resources and rolling dice.
-
-For the full ruleset, see [`Divergence SRD.md`](Divergence SRD.md). For the product and UI design, see [`Design.md`](Design.md).
 
 ---
 
@@ -127,7 +125,7 @@ No other dependencies, databases, or services are required. The app runs entirel
 
 ```bash
 # 1. Clone the repo
-git clone https://github.com/<you>/grimoire.git
+git clone https://github.com/hirokizante/grimoire.git
 cd grimoire
 
 # 2. Install dependencies
@@ -436,4 +434,4 @@ Unit tests cover the pure logic modules (`calculations`, `diceParser`, `diceRoll
 
 ## License
 
-[Add your license here]
+This project is licensed under the MIT license.
