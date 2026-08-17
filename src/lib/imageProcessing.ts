@@ -75,3 +75,51 @@ export async function processImage(
   ctx.drawImage(img, 0, 0, width, height)
   return canvas.toDataURL(mimeType, quality)
 }
+
+/**
+ * A crop rectangle expressed in the *natural* pixel coordinates of the
+ * source image (i.e. relative to `img.naturalWidth`/`naturalHeight`).
+ */
+export interface CropRect {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+/**
+ * Draw a rectangular crop of an uploaded image to a square `outSize`-pixel
+ * canvas and export as a compressed JPEG data URL. The caller is responsible
+ * for computing `rect` in natural-image coordinates and clamping it within
+ * the image bounds (values outside are clamped by the browser's drawImage,
+ * but keeping them in range guarantees no transparent padding).
+ *
+ * `outSize` should be the smaller of the desired maximum and the crop's
+ * natural width/height so tiny source images are never upscaled.
+ */
+export async function processImageCrop(
+  file: File,
+  rect: CropRect,
+  outSize: number,
+  quality: number,
+  mimeType = 'image/jpeg',
+): Promise<string> {
+  const img = await loadImage(file)
+
+  // Clamp the source rect to the image bounds so a mis-measured rect can't
+  // leave transparent slivers at the crop edges.
+  const x = Math.max(0, Math.min(img.naturalWidth - rect.width, rect.x))
+  const y = Math.max(0, Math.min(img.naturalHeight - rect.height, rect.y))
+  const width = Math.min(rect.width, img.naturalWidth - x)
+  const height = Math.min(rect.height, img.naturalHeight - y)
+
+  const canvas = document.createElement('canvas')
+  canvas.width = outSize
+  canvas.height = outSize
+
+  const ctx = canvas.getContext('2d')
+  if (!ctx) throw new Error('Canvas 2D context unavailable')
+
+  ctx.drawImage(img, x, y, width, height, 0, 0, outSize, outSize)
+  return canvas.toDataURL(mimeType, quality)
+}

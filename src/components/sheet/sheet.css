@@ -2518,6 +2518,87 @@
   border-top: 1px solid var(--border-soft);
 }
 
+/* ---- Portrait crop modal ------------------------------------------------ */
+
+.portrait-crop-modal {
+  max-width: 480px;
+}
+
+.portrait-crop-modal__body {
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.portrait-crop-modal__viewport {
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--bg-surface-raised);
+  border: 1px solid var(--border-soft);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.portrait-crop-modal__viewport:active {
+  cursor: grabbing;
+}
+
+.portrait-crop-modal__guide {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border: 1px dashed var(--accent-violet-soft);
+  opacity: 0.55;
+}
+
+.portrait-crop-modal__img {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  max-width: none;
+}
+
+.portrait-crop-modal__zoom {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  max-width: 360px;
+}
+
+.portrait-crop-modal__zoom-label {
+  font-family: var(--sheet-label-font, inherit);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.portrait-crop-modal__slider {
+  flex: 1;
+  accent-color: var(--accent-violet);
+}
+
+.portrait-crop-modal__error {
+  text-align: center;
+  line-height: 1.5;
+}
+
+.portrait-crop-modal__footer {
+  justify-content: space-between;
+}
+
+.portrait-crop-modal__footer-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+
 /* ---- Phase 10: customization modal -------------------------------------- */
 
 .ability-activation .ability-card {

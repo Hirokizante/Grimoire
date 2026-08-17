@@ -1,22 +1,21 @@
 /**
- * PortraitUploader — a minimal file-input component that converts an uploaded
- * image to a compressed base64 data URL and hands it to the parent via
+ * PortraitUploader — a file-input component for portrait uploads (character
+ * and NPC portraits). Selecting a file opens a crop modal so the user can
+ * frame the image before it's stored; the final result (cropped, or the
+ * original if the user opts out) is compressed and handed to the parent via
  * `onUpdate`.
  *
  * Per DESIGN.md, portraits are stored locally as base64 data URLs (offline-
  * first, no server uploads). We validate the selected file is an image type
  * before processing; non-image selections are ignored.
- *
- * Images are resized and compressed via {@link processImage} before storage:
- * max 512px on the longest edge, JPEG quality 0.85. This keeps the resulting
- * data URL to ~30–60 KB instead of multi-megabyte raw files.
  */
 
 import { useRef, useState } from 'react'
-import { processImage } from '@/lib/imageProcessing'
+
+import PortraitCropModal from '@/components/sheet/PortraitCropModal'
 
 export interface PortraitUploaderProps {
-  /** Called with a base64 data URL string when a valid image is selected. */
+  /** Called with a base64 data URL string when a valid image is confirmed. */
   onUpdate: (dataUrl: string) => void
   /** Optional label for the upload button. */
   label?: string
@@ -27,28 +26,16 @@ export default function PortraitUploader({
   label = 'Upload Portrait',
 }: PortraitUploaderProps) {
   const inputRef = useRef<HTMLInputElement>(null)
-  const [processing, setProcessing] = useState(false)
+  const [pendingFile, setPendingFile] = useState<File | null>(null)
 
-  const handleChange = async (
-    e: React.ChangeEvent<HTMLInputElement>,
-  ) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     // Reset so selecting the same file twice still fires change.
     e.target.value = ''
     if (!file || !file.type.startsWith('image/')) return
 
-    setProcessing(true)
-    try {
-      const dataUrl = await processImage(file, {
-        maxDim: 512,
-        quality: 0.85,
-      })
-      onUpdate(dataUrl)
-    } catch {
-      // Silently ignore decode errors — non-image files are already filtered.
-    } finally {
-      setProcessing(false)
-    }
+    // Open the crop modal; the actual upload happens on confirm.
+    setPendingFile(file)
   }
 
   return (
@@ -57,9 +44,8 @@ export default function PortraitUploader({
         type="button"
         className="btn btn--ghost portrait-uploader__btn"
         onClick={() => inputRef.current?.click()}
-        disabled={processing}
       >
-        {processing ? 'Processing…' : label}
+        {label}
       </button>
       <input
         ref={inputRef}
@@ -67,6 +53,14 @@ export default function PortraitUploader({
         accept="image/*"
         className="portrait-uploader__input"
         onChange={handleChange}
+      />
+      <PortraitCropModal
+        file={pendingFile}
+        onUpdate={(dataUrl) => {
+          setPendingFile(null)
+          onUpdate(dataUrl)
+        }}
+        onClose={() => setPendingFile(null)}
       />
     </div>
   )
