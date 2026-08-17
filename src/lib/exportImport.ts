@@ -19,9 +19,11 @@ import {
   deleteVersionSnapshot,
   getVersionHistory,
   normalizeCharacter,
+  normalizeStatus,
   putVersionSnapshot,
 } from '@/lib/db'
-import type { Character, Semver, VersionSnapshot } from '@/types'
+import { collectReferencedStatuses } from '@/lib/statusReference'
+import type { Character, Semver, StatusCondition, VersionSnapshot } from '@/types'
 
 /** Semantic version increment level. */
 export type SemverBump = 'major' | 'minor' | 'patch'
@@ -151,10 +153,18 @@ export function collectAttachedNPCs(
 export function buildExportBundle(
   character: Character,
   allCharacters: Character[],
-): { character: Character; attachedNpcs: Character[] } {
+  allStatuses?: StatusCondition[],
+): {
+  character: Character
+  attachedNpcs: Character[]
+  attachedStatuses: StatusCondition[]
+} {
   return {
     character,
     attachedNpcs: collectAttachedNPCs(character, allCharacters),
+    attachedStatuses: allStatuses
+      ? collectReferencedStatuses(character, allStatuses)
+      : [],
   }
 }
 
@@ -195,6 +205,7 @@ export async function exportCharacter(
   character: Character,
   versionOverride?: Semver,
   allCharacters?: Character[],
+  allStatuses?: StatusCondition[],
 ): Promise<{
   filename: string
   snapshot: VersionSnapshot
@@ -203,12 +214,15 @@ export async function exportCharacter(
   const filename = versionedFilename(character.name, effectiveVersion)
   const versioned = { ...character, version: effectiveVersion }
   const snap = await storeVersionSnapshot(versioned)
-  const attached = allCharacters
+  const attachedNpcs = allCharacters
     ? collectAttachedNPCs(versioned, allCharacters)
     : []
+  const attachedStatuses = allStatuses
+    ? collectReferencedStatuses(versioned, allStatuses)
+    : []
   const payload =
-    attached.length > 0
-      ? { character: versioned, attachedNpcs: attached }
+    attachedNpcs.length > 0 || attachedStatuses.length > 0
+      ? { character: versioned, attachedNpcs, attachedStatuses }
       : versioned
   downloadJson(payload, filename)
   return { filename, snapshot: snap }
@@ -241,6 +255,7 @@ function isCharacterShape(data: unknown): data is Character {
 function isBundleShape(data: unknown): data is {
   character: Character
   attachedNpcs?: Character[]
+  attachedStatuses?: StatusCondition[]
 } {
   if (typeof data !== 'object' || data === null) return false
   const o = data as Record<string, unknown>
@@ -250,6 +265,16 @@ function isBundleShape(data: unknown): data is {
     o.character !== null &&
     isCharacterShape(o.character)
   )
+}
+
+/**
+ * Minimal shape check for a status condition. Requires an id and a name; the
+ * remaining fields are optional (normalizeStatus back-fills them).
+ */
+function isStatusShape(data: unknown): data is StatusCondition {
+  if (typeof data !== 'object' || data === null) return false
+  const o = data as Record<string, unknown>
+  return typeof o.id === 'string' && typeof o.name === 'string'
 }
 
 /**
@@ -276,18 +301,23 @@ export function parseCharacterJSON(text: string): Character {
 }
 
 /**
- * Parse a JSON string into an export bundle, returning both the parent
- * character and any attached NPCs.
+ * Parse a JSON string into an export bundle, returning the parent character,
+ * any attached NPCs, and any attached status conditions.
  *
  * Each attached NPC is normalized and assigned a fresh id so it can coexist
  * with existing records. The parent character's custom-tab NPC-section
  * `npcId` references are REWRITTEN to point at the fresh ids, so a bundle
  * round-trips fully: importing a character with attached NPCs relinks the
  * sections to the newly-created NPC records.
+ *
+ * Attached statuses keep their ids — status references resolve by name, not
+ * id — and are normalized. The import store action resolves name conflicts.
  */
-export function parseImportBundle(
-  text: string,
-): { character: Character; attachedNpcs: Character[] } {
+export function parseImportBundle(text: string): {
+  character: Character
+  attachedNpcs: Character[]
+  attachedStatuses: StatusCondition[]
+} {
   const data = JSON.parse(text) as unknown
   if (isBundleShape(data)) {
     // Build a oldId -> newId map from the raw attached NPCs.
@@ -305,21 +335,28 @@ export function parseImportBundle(
         })
       : []
 
+    const statuses = Array.isArray(data.attachedStatuses)
+      ? data.attachedStatuses
+        .filter((s): s is StatusCondition => isStatusShape(s))
+        .map((s) => normalizeStatus(s))
+      : []
+
     // Rewrite the parent character's NPC-section references to the fresh ids.
     const character = rewriteNPCSectionReferences(data.character, idMap)
 
     return {
       character,
       attachedNpcs: npcs,
+      attachedStatuses: statuses,
     }
   }
-  // Legacy flat shape — no attached NPCs.
+  // Legacy flat shape — no attached NPCs or statuses.
   if (!isCharacterShape(data)) {
     throw new Error(
       'Invalid character sheet JSON: missing required fields',
     )
   }
-  return { character: data, attachedNpcs: [] }
+  return { character: data, attachedNpcs: [], attachedStatuses: [] }
 }
 
 /**

@@ -5,7 +5,7 @@
  * buttons: Characters, NPCs, and Settings.
  */
 
-import { Users, Ghost, Settings } from 'lucide-react'
+import { Users, Ghost, Sparkles, Settings } from 'lucide-react'
 
 import { useCharacterStore } from '@/store/characterStore'
 
@@ -59,6 +59,17 @@ export default function HomePage() {
             <span className="home-nav__btn-inner">
               <Ghost size={48} className="home-nav__icon" />
               <span className="home-nav__label">NPCs</span>
+            </span>
+          </button>
+
+          <button
+            type="button"
+            className="home-nav__btn"
+            onClick={() => setView('statuses')}
+          >
+            <span className="home-nav__btn-inner">
+              <Sparkles size={48} className="home-nav__icon" />
+              <span className="home-nav__label">Statuses</span>
             </span>
           </button>
 

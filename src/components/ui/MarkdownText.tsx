@@ -21,7 +21,8 @@ import rehypeRaw from 'rehype-raw'
 import remarkGfm from 'remark-gfm'
 import type { Components } from 'react-markdown'
 
-import DiceHighlighter from '@/components/dice/DiceHighlighter'
+import StatusHighlighter from '@/components/status/StatusHighlighter'
+import { hasStatusCandidate } from '@/lib/statusReference'
 import type { Character } from '@/types/character'
 import type { SheetMode } from '@/pages/CharacterSheetPage'
 
@@ -61,8 +62,10 @@ function highlightChildren(
   if (children == null) return null
 
   if (typeof children === 'string') {
-    if (hasDiceCandidate(children)) {
-      return <DiceHighlighter text={children} mode={mode} character={character} />
+    if (hasDiceCandidate(children) || hasStatusCandidate(children)) {
+      return (
+        <StatusHighlighter text={children} mode={mode} character={character} />
+      )
     }
     return children
   }

@@ -34,6 +34,11 @@ vi.mock('@/lib/db', () => ({
   deleteRollLogEntry: vi.fn(async () => {}),
   clearRollLogForCharacter: vi.fn(async () => {}),
   normalizeCharacter: (char: Character) => char,
+  getAllStatuses: vi.fn(async () => []),
+  getStatus: vi.fn(async () => null),
+  putStatus: vi.fn(async () => {}),
+  deleteStatus: vi.fn(async () => {}),
+  normalizeStatus: (s: Character) => s,
 }))
 
 // ---- Helpers --------------------------------------------------------------

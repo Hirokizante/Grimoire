@@ -9,6 +9,7 @@
 
 import { create } from 'zustand'
 import { createDefaultCharacter, createDefaultNPC, generateId, MORTAL_WOUNDS, MAX_AP, MAX_END, MAX_MORTAL_WOUNDS, DEATH_SAVE_DC, MAX_CUSTOM_TABS } from '@/constants/gameData'
+import { useStatusStore } from '@/store/statusStore'
 import {
   deleteCharacter as dbDeleteCharacter,
   getAllCharacters,
@@ -21,7 +22,6 @@ import {
   bumpSemver,
   deleteVersion,
   exportCharacter,
-  importCharacter as parseImportCharacter,
   listVersions,
   parseImportBundle,
   restoreFromSnapshot,
@@ -42,7 +42,7 @@ import type {
 const AUTOSAVE_DEBOUNCE_MS = 500
 
 /** Top-level navigation view (home screen sections). */
-export type AppView = 'home' | 'characters' | 'npcs' | 'settings'
+export type AppView = 'home' | 'characters' | 'npcs' | 'statuses' | 'settings'
 
 export interface CharacterStoreState {
   /** All characters loaded from IndexedDB. */
@@ -432,6 +432,8 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
     for (const npc of bundle.attachedNpcs) {
       await putCharacter(npc)
     }
+    // Merge any statuses referenced by the sheet into the compendium.
+    await useStatusStore.getState().importStatuses(bundle.attachedStatuses)
     set((state) => ({
       characters: [...state.characters, imported, ...bundle.attachedNpcs],
       currentCharacter: imported,
@@ -440,9 +442,14 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
   },
 
   importNPCFile: async (text: string) => {
-    const imported = parseImportCharacter(text)
+    const bundle = parseImportBundle(text)
+    const imported: Character = {
+      ...normalizeCharacter(bundle.character),
+      id: generateId(),
+    }
     set({ isSaving: true })
     await putCharacter(imported)
+    await useStatusStore.getState().importStatuses(bundle.attachedStatuses)
     set((state) => ({
       characters: [...state.characters, imported],
       currentCharacter: imported,
@@ -461,6 +468,7 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
     for (const npc of bundle.attachedNpcs) {
       await putCharacter(npc)
     }
+    await useStatusStore.getState().importStatuses(bundle.attachedStatuses)
     set((state) => ({
       currentCharacter:
         state.currentCharacter?.id === existing.id ? updated : state.currentCharacter,
@@ -478,10 +486,11 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
     existing: Character,
     text: string,
   ) => {
-    const parsed = parseImportCharacter(text)
-    const updated = updateExistingCharacterFromImport(existing, parsed)
+    const bundle = parseImportBundle(text)
+    const updated = updateExistingCharacterFromImport(existing, bundle.character)
     set({ isSaving: true })
     await putCharacter(updated)
+    await useStatusStore.getState().importStatuses(bundle.attachedStatuses)
     set((state) => ({
       currentCharacter:
         state.currentCharacter?.id === existing.id ? updated : state.currentCharacter,
@@ -1383,6 +1392,7 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
       },
       targetVersion,
       get().characters,
+      useStatusStore.getState().statuses,
     )
     await get().loadVersions()
     return result.snapshot

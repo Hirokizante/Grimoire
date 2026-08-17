@@ -11,6 +11,8 @@ import NPCListPage from '@/pages/NPCListPage'
 import NPCSheetPage from '@/pages/NPCSheetPage'
 import HomePage from '@/pages/HomePage'
 import PlaceholderPage from '@/pages/PlaceholderPage'
+import StatusCompendiumPage from '@/pages/StatusCompendiumPage'
+import StatusModal from '@/components/status/StatusModal'
 import DiceRollOverlay from '@/components/dice/DiceRollOverlay'
 import RollLogDrawer from '@/components/dice/RollLogDrawer'
 import TitleBar from '@/components/TitleBar'
@@ -56,6 +58,8 @@ function App() {
             <CharacterListPage />
           ) : view === 'npcs' ? (
             <NPCListPage />
+          ) : view === 'statuses' ? (
+            <StatusCompendiumPage />
           ) : view === 'settings' ? (
             <PlaceholderPage title="Settings" />
           ) : (
@@ -64,6 +68,7 @@ function App() {
         </main>
 
         <DiceRollOverlay />
+        <StatusModal />
         {onSheet && !onNpcSheet && <RollLogDrawer />}
       </div>
     </NotificationProvider>

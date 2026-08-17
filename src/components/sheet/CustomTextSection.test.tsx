@@ -19,6 +19,17 @@ vi.mock('@/store/characterStore', () => ({
     }),
 }))
 
+vi.mock('@/store/statusStore', () => ({
+  useStatusStore: (selector: (state: Record<string, unknown>) => unknown) =>
+    selector({
+      statuses: [],
+      isLoaded: true,
+      modal: { statusId: null, startInEdit: false },
+      openStatus: vi.fn(),
+      closeStatus: vi.fn(),
+    }),
+}))
+
 const section: CustomTextSectionType = {
   kind: 'text',
   id: 'section-1',

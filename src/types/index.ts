@@ -33,3 +33,7 @@ export type {
   RollSource,
   NewRollLogEntry,
 } from './rollLog'
+export type {
+  StatusCondition,
+  StatusIconType,
+} from './status'

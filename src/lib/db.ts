@@ -10,13 +10,15 @@
  * All functions here are framework-agnostic and safe to call from anywhere.
  */
 
-import type { AbilityBlock, Character, CharacterViewModes, VersionSnapshot } from '@/types'
+import type { AbilityBlock, Character, CharacterViewModes, StatusCondition, VersionSnapshot } from '@/types'
+import { createDefaultStatuses } from '@/constants/statuses'
 
 const DB_NAME = 'grimoire'
-const DB_VERSION = 3
+const DB_VERSION = 4
 const CHAR_STORE = 'characters'
 const VERSION_STORE = 'versions'
 const ROLL_LOG_STORE = 'roll_logs'
+const STATUS_STORE = 'statuses'
 
 /**
  * Open (and initialise) the Grimoire IndexedDB database.
@@ -54,6 +56,18 @@ export function openDB(): Promise<IDBDatabase> {
         rollLogStore.createIndex('characterId', 'characterId', {
           unique: false,
         })
+      }
+
+      if (!db.objectStoreNames.contains(STATUS_STORE)) {
+        const statusStore = db.createObjectStore(STATUS_STORE, {
+          keyPath: 'id',
+        })
+        // Seed the built-in Divergence status conditions exactly once, when
+        // the store is first created. Later upgrades never re-seed, so a user
+        // who deletes a default won't have it resurrected.
+        for (const status of createDefaultStatuses()) {
+          statusStore.put(status)
+        }
       }
     }
   })
@@ -390,5 +404,65 @@ export async function clearRollLogForCharacter(
     tx.oncomplete = () => resolve()
     tx.onerror = () => reject(tx.error)
   })
+  db.close()
+}
+
+// ---- Status conditions --------------------------------------------------------
+
+/**
+ * Normalize a status condition to the latest schema, back-filling any missing
+ * fields so downstream code never sees `undefined` for `icon`, `tags`, or
+ * timestamps. Idempotent.
+ */
+export function normalizeStatus(raw: StatusCondition): StatusCondition {
+  return {
+    id: raw.id,
+    name: raw.name ?? '',
+    icon: raw.icon ?? '',
+    iconType: raw.iconType ?? 'emoji',
+    description: raw.description ?? '',
+    tags: Array.isArray(raw.tags) ? raw.tags : [],
+    createdAt: raw.createdAt ?? new Date().toISOString(),
+    updatedAt: raw.updatedAt ?? raw.createdAt ?? new Date().toISOString(),
+  }
+}
+
+/** Load every stored status condition, ordered by name. */
+export async function getAllStatuses(): Promise<StatusCondition[]> {
+  const db = await openDB()
+  const tx = db.transaction(STATUS_STORE, 'readonly')
+  const store = tx.objectStore(STATUS_STORE)
+  const all = await promisifyRequest<StatusCondition[]>(store.getAll())
+  db.close()
+  return all
+    .map(normalizeStatus)
+    .sort((a, b) => a.name.localeCompare(b.name))
+}
+
+/** Fetch a single status condition by id, or `null` if not found. */
+export async function getStatus(id: string): Promise<StatusCondition | null> {
+  const db = await openDB()
+  const tx = db.transaction(STATUS_STORE, 'readonly')
+  const store = tx.objectStore(STATUS_STORE)
+  const result = await promisifyRequest<StatusCondition | undefined>(
+    store.get(id),
+  )
+  db.close()
+  return result ? normalizeStatus(result) : null
+}
+
+/** Insert or replace a status condition record. */
+export async function putStatus(status: StatusCondition): Promise<void> {
+  const db = await openDB()
+  const tx = db.transaction(STATUS_STORE, 'readwrite')
+  await promisifyRequest(tx.objectStore(STATUS_STORE).put(status))
+  db.close()
+}
+
+/** Remove a status condition record by id. No-op if the id doesn't exist. */
+export async function deleteStatus(id: string): Promise<void> {
+  const db = await openDB()
+  const tx = db.transaction(STATUS_STORE, 'readwrite')
+  await promisifyRequest(tx.objectStore(STATUS_STORE).delete(id))
   db.close()
 }

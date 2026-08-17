@@ -16,6 +16,7 @@ import {
   versionedFilename,
 } from '@/lib/exportImport'
 import { createDefaultCharacter, createDefaultNPC } from '@/constants/gameData'
+import { createDefaultStatuses } from '@/constants/statuses'
 import type { VersionSnapshot } from '@/types'
 
 // ---- versionedFilename ----------------------------------------------------------------
@@ -531,4 +532,33 @@ test('parseCharacterJSON: unwraps bundle to the character', () => {
   const bundle = { character: char, attachedNpcs: [] }
   const parsed = parseCharacterJSON(JSON.stringify(bundle))
   expect(parsed.name).toBe('Wrapped Hero')
+})
+
+test('buildExportBundle: includes referenced statuses only', () => {
+  const char = createDefaultCharacter()
+  char.innateDescription = 'Inflicts [Poisoned].'
+  const defaults = createDefaultStatuses()
+  const poisoned = defaults.find((s) => s.name === 'Poisoned')!
+  const bundled = buildExportBundle(char, [char], [poisoned, defaults.find((s) => s.name === 'Hidden')!])
+  expect(bundled.attachedStatuses).toHaveLength(1)
+  expect(bundled.attachedStatuses[0].name).toBe('Poisoned')
+})
+
+test('parseImportBundle: returns attached statuses with preserved ids', () => {
+  const status = createDefaultStatuses().find((s) => s.name === 'Poisoned')!
+  const bundle = {
+    character: createDefaultCharacter(),
+    attachedNpcs: [],
+    attachedStatuses: [status],
+  }
+  const parsed = parseImportBundle(JSON.stringify(bundle))
+  expect(parsed.attachedStatuses).toHaveLength(1)
+  expect(parsed.attachedStatuses[0].name).toBe('Poisoned')
+  expect(parsed.attachedStatuses[0].id).toBe(status.id)
+})
+
+test('parseImportBundle: legacy flat shape yields empty attachedStatuses', () => {
+  const char = createDefaultCharacter()
+  const parsed = parseImportBundle(JSON.stringify(char))
+  expect(parsed.attachedStatuses).toEqual([])
 })
