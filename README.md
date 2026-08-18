@@ -196,7 +196,6 @@ The repo ships a GitHub Actions workflow (`.github/workflows/deploy.yml`) that p
 
 ```
 Grimoire/
-├── Design.md               # Full design spec (source of truth)
 ├── Divergence SRD.md       # Full game rules
 ├── IDEA.md                 # Project vision
 ├── package.json            # Dependencies and scripts
