@@ -98,7 +98,7 @@ export default function StatusModal() {
           <h3>{editing ? 'Edit Status' : 'Status'}</h3>
           <button
             type="button"
-            className="btn btn--ghost modal-close"
+            className="btn btn--icon modal-close"
             onClick={handleClose}
             aria-label="Close"
           >

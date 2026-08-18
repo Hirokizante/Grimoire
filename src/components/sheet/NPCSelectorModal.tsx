@@ -53,7 +53,7 @@ export default function NPCSelectorModal({
           <h3>Choose an NPC</h3>
           <button
             type="button"
-            className="btn btn--ghost modal-close"
+            className="btn btn--icon modal-close"
             onClick={onClose}
             aria-label="Close"
           >

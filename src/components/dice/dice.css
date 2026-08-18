@@ -403,13 +403,6 @@
   color: var(--text-primary);
 }
 
-.roll-log-drawer__filter-menu {
-  margin-top: 0.5rem;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
 .roll-log-drawer__body {
   flex: 1;
   overflow-y: auto;
@@ -545,15 +538,6 @@
   text-decoration: underline;
 }
 
-.roll-log-drawer__footer {
-  padding: 0.5rem 1rem;
-  border-top: 1px solid var(--border-soft);
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 0.5rem;
-}
-
 .roll-log-drawer__clear {
   font-size: 0.75rem;
   color: var(--text-muted);
@@ -567,14 +551,4 @@
 .roll-log-drawer__clear:hover {
   color: var(--text-primary);
   border-color: var(--text-muted);
-}
-
-.roll-log-drawer__clear--confirm {
-  color: var(--danger, #ef4444);
-  border-color: var(--danger, #ef4444);
-}
-
-.roll-log-drawer__clear-confirm {
-  font-size: 0.7rem;
-  color: var(--text-muted);
 }

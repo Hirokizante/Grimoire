@@ -123,7 +123,7 @@ export default function TabBar({
               />
               <button
                 type="button"
-                className="btn btn--ghost tab-bar__rename-btn"
+                className="btn btn--icon tab-bar__rename-btn"
                 onClick={commitRename}
                 aria-label="Confirm rename"
               >
@@ -145,7 +145,7 @@ export default function TabBar({
                 <span className="tab-bar__tab-actions">
                   <button
                     type="button"
-                    className="btn btn--ghost tab-bar__tab-action-btn"
+                    className="btn btn--icon tab-bar__tab-action-btn"
                     onClick={() => startRename(tab.id, tab.name)}
                     aria-label="Rename tab"
                   >
@@ -153,7 +153,7 @@ export default function TabBar({
                   </button>
                   <button
                     type="button"
-                    className="btn btn--ghost tab-bar__tab-action-btn tab-bar__tab-action-btn--danger"
+                    className="btn btn--icon tab-bar__tab-action-btn tab-bar__tab-action-btn--danger"
                     onClick={() => handleRemoveTab(tab.id)}
                     aria-label="Delete tab"
                   >

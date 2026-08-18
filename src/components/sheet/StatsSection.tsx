@@ -214,7 +214,7 @@ export default function StatsSection({
             {isEdit && (
               <button
                 type="button"
-                className="btn btn--ghost resource-bar__delete"
+                className="btn btn--icon resource-bar__delete"
                 onClick={() => setBarToRemove({ id: bar.id, name: bar.name })}
                 aria-label={`Remove ${bar.name}`}
                 title={`Remove ${bar.name}`}

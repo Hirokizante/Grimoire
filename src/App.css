@@ -17,24 +17,6 @@
   z-index: 10;
 }
 
-.app-menu-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-  border: none;
-  padding: 0.35rem;
-  border-radius: 8px;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: background-color 0.15s ease, color 0.15s ease;
-}
-
-.app-menu-btn:hover {
-  background: var(--bg-surface-hover);
-  color: var(--text-primary);
-}
-
 .app-header__divider {
   width: 1px;
   height: 1.4rem;
@@ -189,6 +171,21 @@
 }
 
 .btn--ghost:hover {
+  background: var(--bg-surface-hover);
+  color: var(--text-primary);
+}
+
+/* Icon-only buttons (modal close, +/− controls, delete, drag handles, etc.)
+   are ghost/frameless — never a visible border (see .hermes.md conventions).
+   Transparent border keeps size consistent with .btn; no !important needed
+   because no component rule declares a border-color for these elements. */
+.btn--icon {
+  border-color: transparent;
+  background: transparent;
+  color: var(--text-secondary);
+}
+
+.btn--icon:hover:not(:disabled) {
   background: var(--bg-surface-hover);
   color: var(--text-primary);
 }
@@ -421,49 +418,6 @@
 .character-list__delete:hover {
   background: var(--danger-hover);
   color: #1a1a2e;
-}
-
-/* Sheet placeholder */
-.sheet-placeholder {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1rem;
-  text-align: center;
-  padding: 2rem 1rem;
-}
-
-.sheet-portrait {
-  width: 160px;
-  aspect-ratio: 1 / 1;
-  object-fit: cover;
-  border-radius: 12px;
-  border: 1px solid var(--border-soft);
-}
-
-.sheet-portrait--empty {
-  background: linear-gradient(
-    135deg,
-    var(--bg-surface-raised),
-    var(--border-soft)
-  );
-}
-
-.sheet-name {
-  margin: 0;
-  font-size: 1.6rem;
-  color: var(--accent-violet-soft);
-}
-
-.sheet-meta {
-  margin: 0;
-  color: var(--text-secondary);
-}
-
-.sheet-note {
-  margin: 0;
-  color: var(--text-muted);
-  font-style: italic;
 }
 
 /* Responsive */
@@ -1039,10 +993,6 @@
   background: color-mix(in srgb, var(--accent-violet) 22%, transparent);
 }
 
-.status-ref__icon {
-  line-height: 1;
-}
-
 .status-ref__tooltip {
   display: none;
   position: absolute;
@@ -1065,11 +1015,6 @@
 .status-ref:hover .status-ref__tooltip,
 .status-ref:focus-within .status-ref__tooltip {
   display: flex;
-}
-
-.status-ref__tooltip-icon {
-  font-size: 1.3rem;
-  line-height: 1;
 }
 
 .status-ref__tooltip-body {
@@ -1116,11 +1061,6 @@
 .status-modal__label {
   font-size: 0.85rem;
   color: var(--text-secondary);
-}
-
-.status-modal__icon-input {
-  max-width: 6rem;
-  text-align: center;
 }
 
 .status-modal__identity {

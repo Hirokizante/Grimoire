@@ -120,7 +120,7 @@ export default function ExportDialog({ open, onClose }: ExportDialogProps) {
           <h3>Export &amp; Version History</h3>
           <button
             type="button"
-            className="btn btn--ghost modal-close"
+            className="btn btn--icon modal-close"
             onClick={onClose}
           >
             ✕
@@ -195,7 +195,7 @@ export default function ExportDialog({ open, onClose }: ExportDialogProps) {
                     <div className="version-row__actions">
                       <button
                         type="button"
-                        className="btn btn--ghost version-row__btn"
+                        className="btn btn--icon version-row__btn"
                         onClick={() => handleDownload(snap)}
                         title="Download this version as JSON"
                         >
@@ -203,7 +203,7 @@ export default function ExportDialog({ open, onClose }: ExportDialogProps) {
                       </button>
                       <button
                         type="button"
-                        className="btn btn--ghost version-row__btn"
+                        className="btn btn--icon version-row__btn"
                         onClick={() => handleRestore(snap.id, snap.version)}
                         disabled={isRestoring}
                         title="Restore this version (creates a new version with this data)"
@@ -212,7 +212,7 @@ export default function ExportDialog({ open, onClose }: ExportDialogProps) {
                       </button>
                       <button
                         type="button"
-                        className="btn btn--ghost version-row__btn"
+                        className="btn btn--icon version-row__btn"
                         onClick={() => handleDelete(snap.id, snap.version)}
                         title="Delete this version"
                       >

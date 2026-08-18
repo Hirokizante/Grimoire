@@ -79,7 +79,7 @@ export default function DeathSaveTracker({ character }: DeathSaveTrackerProps) {
           ))}
           <button
             type="button"
-            className="btn btn--ghost pip-btn"
+            className="btn btn--icon pip-btn"
             onClick={() => adjustSuccess(-1)}
             disabled={successes <= 0}
           >
@@ -87,7 +87,7 @@ export default function DeathSaveTracker({ character }: DeathSaveTrackerProps) {
           </button>
           <button
             type="button"
-            className="btn btn--ghost pip-btn"
+            className="btn btn--icon pip-btn"
             onClick={() => adjustSuccess(1)}
             disabled={successes >= 3}
           >
@@ -109,7 +109,7 @@ export default function DeathSaveTracker({ character }: DeathSaveTrackerProps) {
           ))}
           <button
             type="button"
-            className="btn btn--ghost pip-btn"
+            className="btn btn--icon pip-btn"
             onClick={() => adjustFailure(-1)}
             disabled={failures <= 0}
           >
@@ -117,7 +117,7 @@ export default function DeathSaveTracker({ character }: DeathSaveTrackerProps) {
           </button>
           <button
             type="button"
-            className="btn btn--ghost pip-btn"
+            className="btn btn--icon pip-btn"
             onClick={() => adjustFailure(1)}
             disabled={failures >= 3}
           >

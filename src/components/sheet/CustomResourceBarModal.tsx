@@ -69,7 +69,7 @@ export default function CustomResourceBarModal({
           <h3>Add Resource Bar</h3>
           <button
             type="button"
-            className="btn btn--ghost modal-close"
+            className="btn btn--icon modal-close"
             onClick={onClose}
             aria-label="Close"
           >

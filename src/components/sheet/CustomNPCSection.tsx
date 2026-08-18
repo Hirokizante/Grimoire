@@ -245,7 +245,7 @@ export default function CustomNPCSection({
           {isEdit && (
             <button
               type="button"
-              className="btn btn--ghost section-delete-btn"
+              className="btn btn--icon section-delete-btn"
               onClick={() => setShowDeleteConfirm(true)}
               aria-label={`Delete ${npc.name} section`}
             >

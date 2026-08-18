@@ -69,7 +69,7 @@ export default function ResourceBar({
         {interactive && (
           <button
             type="button"
-            className="btn btn--ghost resource-bar__btn"
+            className="btn btn--icon resource-bar__btn"
             onClick={onSpend}
             disabled={!canSpend}
             aria-label={`Spend ${label}`}
@@ -88,7 +88,7 @@ export default function ResourceBar({
         {interactive && (
           <button
             type="button"
-            className="btn btn--ghost resource-bar__btn"
+            className="btn btn--icon resource-bar__btn"
             onClick={onRestore}
             disabled={!canRestore}
             aria-label={`Restore ${label}`}

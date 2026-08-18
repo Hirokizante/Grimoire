@@ -736,7 +736,7 @@ export default function CustomizationPanel({
           <h3>Customize Sheet</h3>
           <button
             type="button"
-            className="btn btn--ghost modal-close"
+            className="btn btn--icon modal-close"
             onClick={onClose}
           >
             ✕

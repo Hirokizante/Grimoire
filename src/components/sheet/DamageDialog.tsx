@@ -72,7 +72,7 @@ export default function DamageDialog({ onClose }: DamageDialogProps) {
       <div className="modal-content damage-dialog" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h3>Apply Damage</h3>
-          <button type="button" className="btn btn--ghost modal-close" onClick={onClose}>✕</button>
+          <button type="button" className="btn btn--icon modal-close" onClick={onClose}>✕</button>
         </div>
 
         <div className="damage-dialog__body">

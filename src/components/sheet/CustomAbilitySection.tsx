@@ -109,7 +109,7 @@ export default function CustomAbilitySection({
             />
             <button
               type="button"
-              className="btn btn--ghost section-rename__btn"
+              className="btn btn--icon section-rename__btn"
               onClick={commitRenameSection}
               aria-label="Confirm rename"
             >
@@ -122,7 +122,7 @@ export default function CustomAbilitySection({
             {isEdit && (
               <button
                 type="button"
-                className="btn btn--ghost section-rename__trigger"
+                className="btn btn--icon section-rename__trigger"
                 onClick={startRenameSection}
                 aria-label="Rename section"
               >
@@ -169,7 +169,7 @@ export default function CustomAbilitySection({
             {isEdit && (
               <button
                 type="button"
-                className="btn btn--ghost section-delete-btn"
+                className="btn btn--icon section-delete-btn"
                 onClick={() => setShowDeleteConfirm(true)}
                 aria-label={`Delete ${section.name} section`}
               >
