@@ -5,7 +5,7 @@
  * buttons: Characters, NPCs, and Settings.
  */
 
-import { Users, Ghost, Sparkles, Settings } from 'lucide-react'
+import { Users, Swords, Sparkles, Settings } from 'lucide-react'
 
 import { useCharacterStore } from '@/store/characterStore'
 
@@ -36,7 +36,7 @@ export default function HomePage() {
           <span className="home-page__title-line" />
         </div>
         <p className="home-page__subtitle">
-          A character sheet for the world of Divergence
+          A companion for the Divergence TTRPG.
         </p>
 
         <nav className="home-nav">
@@ -57,7 +57,7 @@ export default function HomePage() {
             onClick={() => setView('npcs')}
           >
             <span className="home-nav__btn-inner">
-              <Ghost size={48} className="home-nav__icon" />
+              <Swords size={48} className="home-nav__icon" />
               <span className="home-nav__label">NPCs</span>
             </span>
           </button>
