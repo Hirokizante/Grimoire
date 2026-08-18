@@ -9,6 +9,7 @@
 
 import { useStatusStore } from '@/store/statusStore'
 import StatusIcon from '@/components/status/StatusIcon'
+import { plainTextFromMarkdown } from '@/lib/markdown'
 import type { StatusCondition } from '@/types'
 
 export interface StatusReferenceProps {
@@ -44,7 +45,7 @@ export default function StatusReference({ status }: StatusReferenceProps) {
           </strong>
           {status.description && (
             <span className="status-ref__tooltip-desc">
-              {status.description}
+              {plainTextFromMarkdown(status.description)}
             </span>
           )}
         </span>

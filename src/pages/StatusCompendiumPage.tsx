@@ -12,6 +12,7 @@ import { useMemo, useState } from 'react'
 import ConfirmModal from '@/components/sheet/ConfirmModal'
 import CreateStatusModal from '@/components/status/CreateStatusModal'
 import StatusIcon from '@/components/status/StatusIcon'
+import { plainTextFromMarkdown } from '@/lib/markdown'
 import { collectCharacterStatusNames, referencingCharacters } from '@/lib/statusReference'
 import { useCharacterStore } from '@/store/characterStore'
 import { useStatusStore } from '@/store/statusStore'
@@ -160,7 +161,9 @@ export default function StatusCompendiumPage() {
                     </span>
                   </span>
                   <span className="status-card__desc">
-                    {status.description || 'No description yet.'}
+                    {status.description
+                      ? plainTextFromMarkdown(status.description)
+                      : 'No description yet.'}
                   </span>
                   {tags.length > 0 && (
                     <span className="status-card__tags">

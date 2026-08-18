@@ -1169,12 +1169,13 @@
   gap: 4px;
 }
 
-.status-modal__description {
+/* Two-class selector out-specifies the global `.md` rule (sheet.css loads
+   after App.css) so the modal keeps its slightly larger body text. */
+.status-modal .status-modal__description {
   margin: 0;
   font-size: 0.92rem;
   line-height: 1.55;
   color: var(--text-primary);
-  white-space: pre-wrap;
 }
 
 /* ---- Create status modal -------------------------------------------------- */

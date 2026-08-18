@@ -11,6 +11,7 @@
 import { useEffect, useState } from 'react'
 
 import ConfirmModal from '@/components/sheet/ConfirmModal'
+import MarkdownText from '@/components/ui/MarkdownText'
 import StatusIcon from '@/components/status/StatusIcon'
 import StatusIconPicker from '@/components/status/StatusIconPicker'
 import { useEscapeKey } from '@/hooks/useEscapeKey'
@@ -139,7 +140,7 @@ export default function StatusModal() {
                 onChange={(e) =>
                   setDraft({ ...draft, description: e.target.value })
                 }
-                placeholder="What this condition does…"
+                placeholder="What this condition does… (Markdown supported)"
                 rows={5}
               />
             </label>
@@ -160,9 +161,13 @@ export default function StatusModal() {
                 <span className="status-tag">Default</span>
               </div>
             )}
-            <p className="status-modal__description">
-              {status.description || 'No description.'}
-            </p>
+            {status.description ? (
+              <MarkdownText className="status-modal__description">
+                {status.description}
+              </MarkdownText>
+            ) : (
+              <p className="status-modal__description">No description.</p>
+            )}
           </div>
         )}
 
