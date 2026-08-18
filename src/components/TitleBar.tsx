@@ -6,7 +6,7 @@
  * character sheet when on the sheet view.
  */
 
-import { Home, Users, Ghost, Sparkles, Settings } from 'lucide-react'
+import { Home, Users, Swords, Sparkles, Settings } from 'lucide-react'
 
 import { useCharacterStore } from '@/store/characterStore'
 import type { AppView } from '@/store/characterStore'
@@ -41,7 +41,7 @@ export default function TitleBar() {
     {
       view: 'npcs',
       label: 'NPCs',
-      icon: <Ghost size={18} />,
+      icon: <Swords size={18} />,
     },
     {
       view: 'statuses',
