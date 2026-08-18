@@ -15,6 +15,7 @@ A character sheet creation and management app for the homebrew TTRPG **Divergenc
 - [Getting Started](#getting-started)
 - [Scripts](#scripts)
 - [Building for Production](#building-for-production)
+- [Deployment](#deployment)
 - [Project Structure](#project-structure)
 - [Data Model Overview](#data-model-overview)
 - [Key Concepts](#key-concepts)
@@ -44,9 +45,9 @@ Divergence is a DIY tabletop RPG system — there is no compendium of spells or 
 - **Ability Block editor** — structured fields for name, traits, cost (AP/END/FP), damage, description, overcharge, and flavor text. Supports Markdown in description and overcharge.
 - **Ability templates** — pre-filled starting points for common ability types (melee, ranged, buff, debuff) that remain fully editable.
 - **Custom tabs & sections** — create up to 6 custom tabs, each with named sections, for organizing homebrew content. When adding a section, choose between an **Ability Block** group, an **NPC Sheet** (a blank, editable NPC bundled directly into the tab), or a **Text** section (a free-form Markdown body for unique mechanics, flavor text, or lore).
-- **NPC sections** — attach a full NPC to a custom tab. NPC sheets show portrait, combat stats, attributes, skills, abilities, and description in a compact inline layout, and are editable in place within the tab. Attached NPCs are exported and re-imported alongside their parent character.
+- **NPC sections** — attach a full NPC to a custom tab. NPC sheets show portrait, combat stats, attributes, skills, abilities, and description in a compact inline layout, and are editable in place within the tab; NPC attributes and skills are click-to-roll, matching the main sheet. Attached NPCs are exported and re-imported alongside their parent character, and removing an NPC section only detaches the reference — the NPC record stays in the NPC list.
 - **Custom resource bars** — define named point pools (current/max) rendered below Endurance, with optional refill on Recover.
-- **Portrait upload** — images are compressed and stored as base64 dataURLs (max 512px, JPEG 0.85 quality).
+- **Portrait upload** — square-crop your portrait first (rule-of-thirds grid overlay with a zoom slider), then it is compressed and stored as a base64 dataURL (max 512px, JPEG 0.85 quality); "Use Original" skips the crop.
 - **Physical description & backstory** — Markdown-supported bio fields.
 
 ### Live Play (View Mode)
@@ -67,8 +68,15 @@ Divergence is a DIY tabletop RPG system — there is no compendium of spells or 
 - **Critical / fumble detection** — nat 20 and nat 1 badges on d20 rolls.
 - **Roll log** — persistent, per-character roll history in a slide-out drawer; entries are saved to IndexedDB and survive reloads.
 
+### Status Compendium
+- **Status conditions** — reference records for game effects like "Poisoned" or "Hidden", each with an icon, rules text, and categorization tags. The compendium ships seeded with the built-in Divergence conditions and supports player-created custom ones.
+- **Inline references** — write `[StatusName]` in any sheet markdown (ability descriptions, overcharge, flavor text, innate description, custom text sections); it renders as a highlighted, clickable reference with a tooltip showing the condition's details. Matching is case-insensitive.
+- **Compendium page** — browse, sort, create, edit, and delete conditions; pick an icon from emoji, the bundled icon pack, or an uploaded image.
+- **Referencing sheets** — the compendium shows which characters reference each condition, and character exports bundle every status the sheet references.
+
 ### Customization
 - **Full color palette** — every sheet element (surfaces, text, borders, accents, resource bars, stat tokens, etc.) exposed as color swatches — no custom CSS required.
+- **Theme presets** — one-click themes (Default, Midnight, Solar, Ocean, Sakura, Dracula, Nord, Gruvbox) that replace the palette in a single click.
 - **Per-element font selection** — independent font families for headings, labels, body text, and helper text.
 - **Google Fonts import** — type any Google Fonts family name to add it to the font pickers.
 - **Background image** — upload an image, with darken and blur overlays.
@@ -84,6 +92,7 @@ Divergence is a DIY tabletop RPG system — there is no compendium of spells or 
 - **Update existing** — importing a sheet whose name matches an existing character offers to update in place (preserving live-play state: HP, END, AP, FP, mortal wounds, death saves) or import as a new copy.
 - **Version resolution** — when updating, the imported version is used if strictly newer; otherwise the existing version is bumped forward.
 - **Attached NPCs** — when a character has NPC sections, the export includes those NPCs as a bundle (`attachedNpcs`). On import, each NPC is persisted as its own record and the parent's section references are rewritten to the fresh IDs, so the parent↔NPC link round-trips intact.
+- **Attached statuses** — statuses referenced by a sheet are bundled into the export (`attachedStatuses`). On import they are restored by id and name conflicts are resolved — references match by name, so they keep working even after a condition is renamed.
 
 ---
 
@@ -125,7 +134,7 @@ No other dependencies, databases, or services are required. The app runs entirel
 
 ```bash
 # 1. Clone the repo
-git clone https://github.com/hirokizante/grimoire.git
+git clone https://github.com/Hirokizante/Grimoire.git
 cd grimoire
 
 # 2. Install dependencies
@@ -163,13 +172,23 @@ The first time you open the app you'll land on the Home screen. Click **Characte
 npm run build
 ```
 
-This runs `tsc -b` (type-checking) followed by `vite build`. Static output lands in `dist/`. Deploy it to any static host (GitHub Pages, Netlify, Vercel, S3, etc.).
+This runs `tsc -b` (type-checking) followed by `vite build`. Static output lands in `dist/` — deployable to any static host (Netlify, Vercel, S3, etc.). See [Deployment](#deployment) for the built-in GitHub Pages setup.
 
 To preview the production build locally:
 
 ```bash
 npm run preview
 ```
+
+---
+
+## Deployment
+
+The repo ships a GitHub Actions workflow (`.github/workflows/deploy.yml`) that publishes the app to GitHub Pages:
+
+- Every push to `main` (and manual runs via the Actions tab) builds the app and deploys `dist/` automatically.
+- Vite's `base` is set to `/Grimoire/` so the app works under the project-page subpath.
+- The live app is hosted at **https://hirokizante.github.io/Grimoire/** — the repo's Pages source must be set to "GitHub Actions" (repo Settings → Pages) for the workflow to be able to deploy.
 
 ---
 
@@ -240,11 +259,20 @@ Grimoire/
 │   │   │   ├── DiceResultModal.tsx     # Full-screen roll breakdown
 │   │   │   ├── RollLogDrawer.tsx       # Persistent roll history
 │   │   │   └── dice.css
+│   │   ├── status/        # Status conditions compendium
+│   │   │   ├── StatusModal.tsx          # View/edit status modal
+│   │   │   ├── CreateStatusModal.tsx    # New-status form
+│   │   │   ├── StatusIconPicker.tsx     # Emoji / icon pack / image picker
+│   │   │   ├── StatusIcon.tsx           # Status icon renderer
+│   │   │   ├── StatusHighlighter.tsx    # Inline [Name] reference highlighting
+│   │   │   └── StatusReference.tsx      # Tooltip popover for references
 │   │   └── ui/            # Low-level UI primitives
 │   │       ├── SegmentedBar.tsx        # Filled/empty segment bar
 │   │       └── MarkdownText.tsx        # Markdown renderer
 │   ├── constants/
-│   │   └── gameData.ts    # Attribute/skill metadata, mortal wounds table, defaults
+│   │   ├── gameData.ts    # Attribute/skill metadata, mortal wounds table, defaults
+│   │   ├── statuses.ts    # Built-in status conditions + defaults
+│   │   └── statusIcons.tsx # Built-in status icon pack
 │   ├── context/
 │   │   └── NotificationContext.tsx # Toast notification system
 │   ├── hooks/
@@ -252,7 +280,7 @@ Grimoire/
 │   │   └── useImportedFonts.ts     # Google Fonts link injection
 │   ├── lib/
 │   │   ├── calculations.ts  # Pure derived-stat formulas (HP, EVA, etc.)
-│   │   ├── db.ts            # IndexedDB wrapper (characters, versions, roll logs)
+│   │   ├── db.ts            # IndexedDB wrapper (characters, versions, roll logs, statuses)
 │   │   ├── dice.ts          # Single die roll utility
 │   │   ├── diceParser.ts    # Tokenizer + parser for dice notation
 │   │   ├── diceRoller.ts    # Evaluates parsed expressions with stats
@@ -260,6 +288,7 @@ Grimoire/
 │   │   ├── imageProcessing.ts # Canvas-based image resize + compression
 │   │   ├── rollSourceUtils.ts # Human-readable roll source labels
 │   │   ├── slotLogic.ts    # Minor/regular slot counting
+│   │   ├── statusReference.ts # [Name] reference parsing + status mapping
 │   │   └── themeUtils.ts   # SheetColors → CSS custom properties
 │   ├── pages/
 │   │   ├── HomePage.tsx          # Landing screen
@@ -267,16 +296,19 @@ Grimoire/
 │   │   ├── CharacterSheetPage.tsx # Sheet wrapper with mode toggle
 │   │   ├── NPCListPage.tsx       # Grid/list of all NPCs
 │   │   ├── NPCSheetPage.tsx      # NPC sheet wrapper with mode toggle
+│   │   ├── StatusCompendiumPage.tsx # Status compendium browser
 │   │   └── PlaceholderPage.tsx   # Stub page (Settings)
 │   ├── store/
 │   │   ├── characterStore.ts  # Zustand store: characters + live play
 │   │   ├── diceRollStore.ts    # Zustand store: dice roll modal lifecycle
-│   │   └── rollLogStore.ts     # Zustand store: persistent roll log
+│   │   ├── rollLogStore.ts     # Zustand store: persistent roll log
+│   │   └── statusStore.ts      # Zustand store: status compendium
 │   ├── types/
 │   │   ├── index.ts       # Barrel re-exports
 │   │   ├── ability.ts     # AbilityBlock, AbilityCost
 │   │   ├── character.ts   # Character, SheetConfig, SheetColors, etc.
-│   │   └── rollLog.ts      # RollLogEntry, RollSource
+│   │   ├── rollLog.ts      # RollLogEntry, RollSource
+│   │   └── status.ts       # StatusCondition, StatusIconType
 │   └── test/
 │       └── setup.ts        # Vitest setup (jest-dom matchers)
 ```
@@ -304,7 +336,7 @@ The central domain object is a **`Character`**, which holds everything about a s
 | `slottedAbilities`, `abilityPool` | Active vs. inactive slotted abilities |
 | `portrait` | Base64 data URL |
 | `physicalDescription`, `backstory` | Bio fields |
-| `customTabs` | User-created tabs with sections (`CustomAbilitySection` or `CustomNPCSection`) |
+| `customTabs` | User-created tabs with sections (`CustomAbilitySection`, `CustomNPCSection`, or `CustomTextSection`) |
 | `config` | Full aesthetic configuration (colors, fonts, CSS, background image) |
 | `viewModes` | Per-section grid/list preference |
 | `customResourceBars` | User-defined resource pools |
@@ -331,6 +363,16 @@ The central domain object is a **`Character`**, which holds everything about a s
 | `CustomAbilitySection` (`kind: 'ability'`) | `{ kind, id, name, abilities: AbilityBlock[] }` — a free-form group of abilities |
 | `CustomNPCSection` (`kind: 'npc'`) | `{ kind, id, name, npcId }` — a reference to a bundled NPC `Character` (with `kind: 'npc'`) |
 | `CustomTextSection` (`kind: 'text'`) | `{ kind, id, name, content }` — a free-form Markdown body (mechanics, flavor text, lore) |
+
+**StatusCondition** is a compendium record referenced from any sheet text:
+
+| Field | Purpose |
+| --- | --- |
+| `id`, `name` | Identity; `[name]` references match case-insensitively |
+| `icon`, `iconType` | Icon payload (`'emoji'`, `'pack'` lucide key, or `'image'` data URL) |
+| `description` | Full rules text for the condition |
+| `tags` | Categorization tags; built-ins carry `'Default'` |
+| `createdAt`, `updatedAt` | Timestamps |
 
 ---
 
@@ -377,11 +419,12 @@ The dice parser supports:
 
 ### State Management
 
-Three Zustand stores manage all application state:
+Four Zustand stores manage all application state:
 
 - **`characterStore`** — the character list, the currently-selected sheet, live-play mutations (damage, healing, resource spending, milestone application), and version history. Mutations made through `updateCurrentCharacter` are debounce-autosaved (500ms) to IndexedDB.
 - **`diceRollStore`** — the dice roll modal lifecycle: parse notation → evaluate with character stats → show result → forward to the roll log.
 - **`rollLogStore`** — persistent roll history across all characters, stored in IndexedDB and filterable by character.
+- **`statusStore`** — the status-condition compendium: CRUD, icon picking, and bundling referenced statuses into character exports. Persisted to IndexedDB.
 
 ### Persistence
 
@@ -390,6 +433,7 @@ A thin promise wrapper around the native IndexedDB API (`src/lib/db.ts`) manages
 - `characters` — live `Character` records keyed by `id`.
 - `versions` — `VersionSnapshot` records for export history, indexed by `characterId`.
 - `roll_logs` — `RollLogEntry` records for the dice roll log, indexed by `characterId`.
+- `statuses` — `StatusCondition` records for the status compendium, seeded with the built-in Divergence conditions on first run.
 
 Schema migrations are handled on read via `normalizeCharacter`, which upgrades older records to the latest shape (e.g. migrating `innateAbility` → `innateAbilities`, adding `showActivate`, ensuring `customTabs` and `customResourceBars` exist, and stamping the `kind` discriminator on legacy custom-tab sections). No bulk migration is needed.
 
