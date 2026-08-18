@@ -8,7 +8,6 @@
  */
 
 import { useMemo, useState } from 'react'
-import { Plus } from 'lucide-react'
 
 import ConfirmModal from '@/components/sheet/ConfirmModal'
 import CreateStatusModal from '@/components/status/CreateStatusModal'
@@ -119,8 +118,7 @@ export default function StatusCompendiumPage() {
             type="button"
             onClick={() => setShowCreate(true)}
           >
-            <Plus size={14} />
-            New Status
+            + New
           </button>
         </div>
       </div>

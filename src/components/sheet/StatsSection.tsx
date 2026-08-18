@@ -155,6 +155,7 @@ export default function StatsSection({
           value={character.currentHP}
           max={maxHP}
           color="var(--hp-bar-color)"
+          continuous={maxHP > 30}
           interactive={isView}
           onSpend={() => {
             // Spending HP = taking 1 raw damage

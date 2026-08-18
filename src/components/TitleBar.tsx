@@ -6,10 +6,11 @@
  * character sheet when on the sheet view.
  */
 
-import { Home, Users, Swords, Sparkles, Settings } from 'lucide-react'
+import { Users, Swords, Sparkles, Settings } from 'lucide-react'
 
 import { useCharacterStore } from '@/store/characterStore'
 import type { AppView } from '@/store/characterStore'
+import faviconUrl from '/favicon.svg'
 
 interface NavButton {
   view: AppView
@@ -28,11 +29,6 @@ export default function TitleBar() {
   const onNpcSheet = onSheet && currentCharacter?.kind === 'npc'
 
   const navButtons: NavButton[] = [
-    {
-      view: 'home',
-      label: 'Home',
-      icon: <Home size={18} />,
-    },
     {
       view: 'characters',
       label: 'Characters',
@@ -68,7 +64,24 @@ export default function TitleBar() {
 
   return (
     <header className="app-header">
-      <span className="app-title">Grimoire</span>
+      <button
+        type="button"
+        className={
+          'app-title' +
+          (!onSheet && view === 'home' ? ' app-title--active' : '')
+        }
+        onClick={() => handleNav('home')}
+        aria-label="Go to home screen"
+        aria-current={!onSheet && view === 'home' ? 'page' : undefined}
+      >
+        <img
+          src={faviconUrl}
+          alt=""
+          aria-hidden="true"
+          className="app-title__icon"
+        />
+        Grimoire
+      </button>
       <span className="app-header__divider" />
       <nav className="app-header__nav" aria-label="Main navigation">
         {navButtons.map((btn) => {
@@ -80,6 +93,7 @@ export default function TitleBar() {
               className={`app-header__nav-btn${isActive ? ' app-header__nav-btn--active' : ''}`}
               onClick={() => handleNav(btn.view)}
               aria-current={isActive ? 'page' : undefined}
+              aria-label={btn.label}
               title={btn.label}
             >
               {btn.icon}

@@ -32,6 +32,11 @@ export interface ResourceBarProps {
   interactive?: boolean
   /** Optional: tooltip for the label area. */
   labelTitle?: string
+  /**
+   * Render a single continuous fill instead of per-point segments.
+   * Use for large pools (e.g. HP > 30) so the bar never overflows.
+   */
+  continuous?: boolean
 }
 
 export default function ResourceBar({
@@ -44,6 +49,7 @@ export default function ResourceBar({
   onLabelClick,
   interactive = false,
   labelTitle,
+  continuous = false,
 }: ResourceBarProps) {
   const canSpend = onSpend && value > 0
   const canRestore = onRestore && value < max
@@ -83,6 +89,7 @@ export default function ResourceBar({
             value={value}
             max={max}
             color={color}
+            continuous={continuous}
           />
         </div>
         {interactive && (

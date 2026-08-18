@@ -1120,6 +1120,24 @@
   border-color: var(--seg-color, var(--accent-violet));
 }
 
+/* Continuous fill variant — one solid fill instead of per-point segments.
+   Used for large pools (e.g. HP > 30) so the track never overflows and the
+   combat stats section never has to expand. */
+.seg-bar__track--continuous {
+  border-radius: 4px;
+  background: var(--bg-surface-hover);
+  border: 1px solid var(--border-soft);
+  padding: 0;
+}
+
+.seg-bar__fill {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--seg-color, var(--accent-violet));
+  transition: width 0.2s ease;
+}
+
 /* ---- Ability cards -------------------------------------------------------- */
 
 .ability-grid {
@@ -1570,12 +1588,29 @@
 
 /* ---- Ability editor modal -------------------------------- */
 
-.ability-editor-dialog {
+/* Two-class selector: must beat the later `.modal-content` base rule
+   (max-width/max-height) in source order with equal specificity. */
+.modal-content.ability-editor-dialog {
   max-width: 540px;
+  /* Column flex: header stays pinned, body scrolls internally. Combined
+     with the dvh-based max-height this keeps the dialog fully on-screen
+     even on short mobile viewports (no top/bottom clipping). */
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100dvh - 2rem);
+}
+
+.ability-editor-dialog .modal-header {
+  flex-shrink: 0;
 }
 
 .ability-editor-dialog__body {
   padding: 1rem 1.25rem;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .ability-editor-dialog .ability-editor {
@@ -1753,6 +1788,15 @@
 
 /* ---- Phase 7: damage dialog (HP clickable now handled by ResourceBar) ----- */
 
+/* Modals are mounted inside the sheet content, which sits in a z-index: 2
+   stacking context. The sticky app title bar (z-index: 10) would paint above
+   them — visible on mobile where the dialog fills the screen and its header
+   runs under the title bar. Lift the content context above the app chrome
+   whenever any modal overlay is open. */
+body:has(.modal-overlay) .sheet-page__content {
+  z-index: 2000;
+}
+
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -1760,6 +1804,9 @@
   backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
+  /* Never clip a tall modal above the viewport: when centered overflow
+     would hide the top edge, fall back to top alignment. */
+  align-items: safe center;
   justify-content: center;
   z-index: 2000;
   padding: 1rem;
@@ -2044,6 +2091,19 @@
   z-index: 5;
 }
 
+/* Mobile: action buttons rejoin the document flow (first row of the
+   identity column, above the portrait) instead of overlapping the centered
+   portrait. Two-class selector so it beats the absolute base rule above
+   regardless of source order. */
+@media (max-width: 768px) {
+  .hero-section__identity .hero-section__actions {
+    position: static;
+    flex-wrap: wrap;
+    justify-content: center;
+    width: 100%;
+  }
+}
+
 /* ---- Phase 11: export dialog & versioning --------------------------------- */
 
 .sheet-levelup-btn,
@@ -2054,6 +2114,7 @@
   gap: 0.4rem;
   font-size: 0.85rem;
   padding: 0.4rem 0.9rem;
+  white-space: nowrap;
 }
 
 /* ---- Phase 9: milestone dialog ------------------------------------------- */
@@ -3627,35 +3688,39 @@
   left: 240px;
 }
 
-/* When the selector is open, shift the page content right to make room.
+/* When the selector is open on wide screens, shift the page content right to
+ * make room so the character list and the sheet stay visible simultaneously.
+ * On narrow screens there isn't enough room, so the panel overlays the sheet
+ * instead (drawer-on-top) — see the max-width: 600px block below.
  * The transition is synced with the panel's slide-in (0.3s, same easing). */
-.sheet-page--selector-open .sheet-page__content {
-  margin-left: 240px;
-  transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+@media (min-width: 601px) {
+  .sheet-page--selector-open .sheet-page__content {
+    margin-left: 240px;
+  }
+
+  /* Background layers also shift so they don't bleed under the panel. */
+  .sheet-page--selector-open .sheet-page__bg-color,
+  .sheet-page--selector-open .sheet-page__bg-image,
+  .sheet-page--selector-open .sheet-page__bg-overlay {
+    left: 240px;
+  }
+
+  /* Top navigation bar also shifts so nav buttons stay fully visible. */
+  body:has(.sheet-page--selector-open) .app-header {
+    padding-left: calc(1.25rem + 240px);
+  }
 }
 
+/* Always-on transitions so both open AND close animate (the transition
+   property must be present before the value change, not only while open). */
 .sheet-page .sheet-page__content {
   transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-/* Background layers also shift so they don't bleed under the panel. */
-.sheet-page--selector-open .sheet-page__bg-color,
-.sheet-page--selector-open .sheet-page__bg-image,
-.sheet-page--selector-open .sheet-page__bg-overlay {
-  left: 240px;
-  transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .sheet-page .sheet-page__bg-color,
 .sheet-page .sheet-page__bg-image,
 .sheet-page .sheet-page__bg-overlay {
   transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-/* Top navigation bar also shifts so nav buttons stay fully visible. */
-body:has(.sheet-page--selector-open) .app-header {
-  padding-left: calc(1.25rem + 240px);
-  transition: padding-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .app-header {
@@ -3671,18 +3736,20 @@ body:has(.sheet-page--selector-open) .app-header {
     left: 200px;
   }
 
+  /* Overlay mode: no content push, no bg shift, no header padding shift.
+     The panel (position: fixed, z-index: 50) simply covers the sheet. */
   .sheet-page--selector-open .sheet-page__content {
-    margin-left: 200px;
+    margin-left: 0;
   }
 
   .sheet-page--selector-open .sheet-page__bg-color,
   .sheet-page--selector-open .sheet-page__bg-image,
   .sheet-page--selector-open .sheet-page__bg-overlay {
-    left: 200px;
+    left: 0;
   }
 
   body:has(.sheet-page--selector-open) .app-header {
-    padding-left: calc(1.25rem + 200px);
+    padding-left: 0.9rem;
   }
 }
 

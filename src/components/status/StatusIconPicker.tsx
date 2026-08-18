@@ -169,7 +169,7 @@ export default function StatusIconPicker({
           <div className="status-icon-picker__upload">
             <button
               type="button"
-              className="btn btn--ghost"
+              className="btn btn--ghost status-icon-picker__file-btn"
               onClick={() => fileRef.current?.click()}
               disabled={processing}
             >
