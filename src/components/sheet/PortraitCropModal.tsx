@@ -253,8 +253,8 @@ export default function PortraitCropModal({
                 onPointerUp={endDrag}
                 onPointerCancel={endDrag}
               >
-                {/* Dashed guide border — a hint at the exact crop frame. */}
-                <div className="portrait-crop-modal__guide" aria-hidden />
+                {/* Rule-of-thirds grid — helps the user center the subject. */}
+                <div className="portrait-crop-modal__grid" aria-hidden />
                 <img
                   className="portrait-crop-modal__img"
                   src={image.url}
