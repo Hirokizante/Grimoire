@@ -5,7 +5,63 @@
  * inherit the active character's theme consistently.
  */
 
-import type { SheetColors } from '@/types'
+import type { SheetColors, SheetConfig } from '@/types'
+import {
+  DEFAULT_SHEET_COLORS,
+  MIKAMI_SHEET_COLORS,
+  PARCHMENT_SHEET_COLORS,
+  PITCH_BLACK_SHEET_COLORS,
+} from '@/constants/gameData'
+import type { AppTheme } from '@/store/appThemeStore'
+
+/**
+ * Sheet palette that follows the app theme. Used by NPC sheets, which have
+ * no per-sheet customization: a standalone NPC sheet matches the app chrome
+ * (Midnight = the built-in defaults, every other theme = its own palette).
+ *
+ * Embedded NPC sections never call this — they inherit the player sheet's
+ * own color variables, so the player sheet theme takes precedence there.
+ */
+export function appThemeSheetColors(theme: AppTheme): SheetColors {
+  switch (theme) {
+    case 'parchment':
+      return PARCHMENT_SHEET_COLORS
+    case 'mikami':
+      return MIKAMI_SHEET_COLORS
+    case 'pitch-black':
+      return PITCH_BLACK_SHEET_COLORS
+    default:
+      return DEFAULT_SHEET_COLORS
+  }
+}
+
+/**
+ * Card background for a standalone sheet that follows the app theme.
+ * Midnight keeps the character's own background (the historical look);
+ * every other theme uses its surface color so the card matches the chrome.
+ */
+export function appThemeSheetCardBackground(
+  theme: AppTheme,
+  config: SheetConfig,
+): string {
+  return theme === 'midnight'
+    ? config.backgroundColor
+    : appThemeSheetColors(theme).bgSurface
+}
+
+/**
+ * Page background for a standalone sheet that follows the app theme.
+ * Midnight keeps the character's own page color; every other theme uses
+ * its base color.
+ */
+export function appThemeSheetPageBackground(
+  theme: AppTheme,
+  config: SheetConfig,
+): string {
+  return theme === 'midnight'
+    ? config.pageBackgroundColor
+    : appThemeSheetColors(theme).bgBase
+}
 
 /**
  * Map a SheetColors object onto CSS custom properties. This is the single

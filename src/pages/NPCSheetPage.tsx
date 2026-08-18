@@ -9,6 +9,8 @@
 
 import { useState } from 'react'
 import { useCharacterStore } from '@/store/characterStore'
+import { useAppThemeStore } from '@/store/appThemeStore'
+import { appThemeSheetPageBackground } from '@/lib/themeUtils'
 import NPCSheet from '@/components/sheet/npc/NPCSheet'
 import CharacterSelector from '@/components/sheet/CharacterSelector'
 import RollLogDrawer from '@/components/dice/RollLogDrawer'
@@ -16,6 +18,9 @@ import type { SheetMode } from '@/pages/CharacterSheetPage'
 
 export default function NPCSheetPage() {
   const currentCharacter = useCharacterStore((s) => s.currentCharacter)
+  // The page canvas behind the NPC sheet follows the app theme, matching the
+  // sheet's palette (NPCs have no per-sheet customization).
+  const appTheme = useAppThemeStore((s) => s.theme)
   const [mode, setMode] = useState<SheetMode>('view')
   const [selectorOpen, setSelectorOpen] = useState(false)
 
@@ -35,7 +40,7 @@ export default function NPCSheetPage() {
       {/* Page background color — fixed full-viewport layer. */}
       <div
         className="sheet-page__bg-color"
-        style={{ backgroundColor: config.pageBackgroundColor }}
+        style={{ backgroundColor: appThemeSheetPageBackground(appTheme, config) }}
       />
       {hasBg && (
         <>

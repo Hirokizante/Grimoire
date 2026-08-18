@@ -84,6 +84,10 @@ Divergence is a DIY tabletop RPG system — there is no compendium of spells or 
 - **Section background toggle** — hide section backgrounds for a flatter layout.
 - **View modes per section** — grid or list layout for Slotted Abilities, Ability Pool, and each custom section, persisted on the character.
 
+### App Settings
+- **App themes** — switch the app's own color scheme (header, list pages, modals, dice UI — everything *around* the sheets) in Settings. Ships with **Midnight** (the default violet-dark palette), **Parchment** (warm charcoal `#262626` with parchment `#c5b8a0` highlights, plus a matching alternate title-bar glyph), **Mikami** (Nord on near-black, from Ghostty), and **Pitch Black** (pure black with cream, gold, and muted teal, from Ghostty). The choice persists in `localStorage` and applies before first paint. Sheet color themes are unaffected — those stay per-character in the Customization panel.
+- **NPC sheets follow the app theme** — standalone NPC sheets (no per-sheet customization) adopt the app's palette, including the page and card backgrounds. NPC sections embedded in a player character sheet never apply colors of their own, so the player sheet's theme takes precedence there.
+
 ### Import / Export
 - **Export as JSON** — downloads a versioned file (`Character Name v1.2.3.json`).
 - **Automatic versioning** — each export bumps the patch version (or a manual override).
@@ -101,7 +105,7 @@ Divergence is a DIY tabletop RPG system — there is no compendium of spells or 
 - **React 19** — UI framework
 - **TypeScript 6** — type-safe codebase
 - **Vite 8** — build tool and dev server with HMR
-- **Zustand** — lightweight state management (character store, dice roll store, roll log store)
+- **Zustand** — lightweight state management (character store, dice roll store, roll log store, status store, app theme store)
 - **@dnd-kit** — drag-and-drop for abilities (sortable lists, cross-list moves)
 - **Lucide Icons** — icon library
 - **react-colorful** — color picker for the customization panel
@@ -296,8 +300,9 @@ Grimoire/
 │   │   ├── NPCListPage.tsx       # Grid/list of all NPCs
 │   │   ├── NPCSheetPage.tsx      # NPC sheet wrapper with mode toggle
 │   │   ├── StatusCompendiumPage.tsx # Status compendium browser
-│   │   └── PlaceholderPage.tsx   # Stub page (Settings)
+│   │   └── SettingsPage.tsx         # App preferences (theme picker)
 │   ├── store/
+│   │   ├── appThemeStore.ts   # Zustand store: app theme (localStorage)
 │   │   ├── characterStore.ts  # Zustand store: characters + live play
 │   │   ├── diceRollStore.ts    # Zustand store: dice roll modal lifecycle
 │   │   ├── rollLogStore.ts     # Zustand store: persistent roll log

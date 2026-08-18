@@ -10,7 +10,7 @@ import CharacterSheetPage from '@/pages/CharacterSheetPage'
 import NPCListPage from '@/pages/NPCListPage'
 import NPCSheetPage from '@/pages/NPCSheetPage'
 import HomePage from '@/pages/HomePage'
-import PlaceholderPage from '@/pages/PlaceholderPage'
+import SettingsPage from '@/pages/SettingsPage'
 import StatusCompendiumPage from '@/pages/StatusCompendiumPage'
 import StatusModal from '@/components/status/StatusModal'
 import DiceRollOverlay from '@/components/dice/DiceRollOverlay'
@@ -61,7 +61,7 @@ function App() {
           ) : view === 'statuses' ? (
             <StatusCompendiumPage />
           ) : view === 'settings' ? (
-            <PlaceholderPage title="Settings" />
+            <SettingsPage />
           ) : (
             <HomePage />
           )}

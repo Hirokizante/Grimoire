@@ -35,6 +35,75 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Alternate app theme — "Parchment": warm charcoal base with parchment
+   highlights. Anchors: #262626 background, #c5b8a0 headers/highlights.
+   Applied via data-app-theme on <html> (see appThemeStore).
+   Sheet-side mirror: PARCHMENT_SHEET_COLORS in constants/gameData.ts — keep
+   the two in sync. */
+:root[data-app-theme='parchment'] {
+  --bg-base: #262626;
+  --bg-surface: #2e2b26;
+  --bg-surface-raised: #37332c;
+  --bg-surface-hover: #423c32;
+  --text-primary: #e8e1d3;
+  --text-secondary: #b3a88f;
+  --text-muted: #7f7768;
+  --border: #464036;
+  --border-soft: #37332c;
+  --accent-blush: #c98f74;
+  --accent-violet: #b3a48a;
+  --accent-violet-soft: #c5b8a0;
+  --danger: #d97070;
+  --danger-hover: #e08888;
+
+  color-scheme: dark;
+}
+
+/* Alternate app theme — "Mikami": Nord palette on near-black. Ghostty's
+   Mikami (Professional detachment). Sheet-side mirror:
+   MIKAMI_SHEET_COLORS in constants/gameData.ts — keep the two in sync. */
+:root[data-app-theme='mikami'] {
+  --bg-base: #141414;
+  --bg-surface: #1b1b1b;
+  --bg-surface-raised: #222222;
+  --bg-surface-hover: #2a2a2a;
+  --text-primary: #ffffff;
+  --text-secondary: #b3bcc7;
+  --text-muted: #6a7380;
+  --border: #323232;
+  --border-soft: #242424;
+  --accent-blush: #b48ead;
+  --accent-violet: #81a1c1;
+  --accent-violet-soft: #88c0d0;
+  --danger: #bf616a;
+  --danger-hover: #cf727b;
+
+  color-scheme: dark;
+}
+
+/* Alternate app theme — "Pitch Black": pure black with cream, gold, and
+   muted teal. Ghostty's Pitch Black (A glimpse into the shadow realm).
+   Sheet-side mirror: PITCH_BLACK_SHEET_COLORS in constants/gameData.ts —
+   keep the two in sync. */
+:root[data-app-theme='pitch-black'] {
+  --bg-base: #000000;
+  --bg-surface: #0d0d0d;
+  --bg-surface-raised: #171717;
+  --bg-surface-hover: #212121;
+  --text-primary: #c1c1c1;
+  --text-secondary: #999999;
+  --text-muted: #5e5e5e;
+  --border: #2c2c2c;
+  --border-soft: #1c1c1c;
+  --accent-blush: #eecc6c;
+  --accent-violet: #f3ecd4;
+  --accent-violet-soft: #f3ecd4;
+  --danger: #9e5a5a;
+  --danger-hover: #b16b6b;
+
+  color-scheme: dark;
+}
+
 * {
   box-sizing: border-box;
 }

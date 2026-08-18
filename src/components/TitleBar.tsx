@@ -10,7 +10,9 @@ import { Users, Swords, Sparkles, Settings } from 'lucide-react'
 
 import { useCharacterStore } from '@/store/characterStore'
 import type { AppView } from '@/store/characterStore'
+import { useAppThemeStore } from '@/store/appThemeStore'
 import faviconUrl from '/favicon.svg'
+import faviconAltUrl from '/favicon_alt.svg'
 
 interface NavButton {
   view: AppView
@@ -24,6 +26,7 @@ export default function TitleBar() {
   const closeCharacter = useCharacterStore((s) => s.closeCharacter)
   const closeNPC = useCharacterStore((s) => s.closeNPC)
   const setView = useCharacterStore((s) => s.setView)
+  const appTheme = useAppThemeStore((s) => s.theme)
 
   const onSheet = currentCharacter !== null
   const onNpcSheet = onSheet && currentCharacter?.kind === 'npc'
@@ -75,7 +78,7 @@ export default function TitleBar() {
         aria-current={!onSheet && view === 'home' ? 'page' : undefined}
       >
         <img
-          src={faviconUrl}
+          src={appTheme === 'parchment' ? faviconAltUrl : faviconUrl}
           alt=""
           aria-hidden="true"
           className="app-title__icon"

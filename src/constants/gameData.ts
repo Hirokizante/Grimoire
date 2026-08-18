@@ -231,6 +231,106 @@ export const DEFAULT_SHEET_COLORS: SheetColors = {
 }
 
 /**
+ * Sheet palette for the Parchment app theme. Mirrored from the
+ * `:root[data-app-theme='parchment']` block in `index.css` — keep in sync.
+ * Used by NPC sheets, which have no per-sheet customization and follow the
+ * app theme instead (see themeUtils.appThemeSheetColors).
+ */
+export const PARCHMENT_SHEET_COLORS: SheetColors = {
+  bgBase: '#262626',
+  bgSurface: '#2e2b26',
+  bgSurfaceRaised: '#37332c',
+  bgSurfaceHover: '#423c32',
+  textPrimary: '#e8e1d3',
+  textSecondary: '#b3a88f',
+  textMuted: '#7f7768',
+  border: '#464036',
+  borderSoft: '#37332c',
+  accent: '#b3a48a',
+  accentSoft: '#c5b8a0',
+  danger: '#d97070',
+  hpBar: '#c98f74',
+  fpBar: '#c5b8a0',
+  apBar: '#b3a48a',
+  endBar: '#b3a48a',
+  minorAbility: '#b3a48a',
+  success: '#a8cfa0',
+  tokenMilestone: '#d9b26a',
+  tokenEvasion: '#c98f74',
+  tokenMovement: '#93b5ad',
+  tokenSaveDC: '#b3a48a',
+  tokenArmor: '#9aa8bd',
+  tokenEndRecovery: '#a8cfa0',
+}
+
+/**
+ * Sheet palette for the Mikami app theme — Nord on near-black. Mirrored
+ * from the `:root[data-app-theme='mikami']` block in `index.css` — keep in
+ * sync. Used by NPC sheets, which follow the app theme (see
+ * themeUtils.appThemeSheetColors).
+ */
+export const MIKAMI_SHEET_COLORS: SheetColors = {
+  bgBase: '#141414',
+  bgSurface: '#1b1b1b',
+  bgSurfaceRaised: '#222222',
+  bgSurfaceHover: '#2a2a2a',
+  textPrimary: '#ffffff',
+  textSecondary: '#b3bcc7',
+  textMuted: '#6a7380',
+  border: '#323232',
+  borderSoft: '#242424',
+  accent: '#81a1c1',
+  accentSoft: '#88c0d0',
+  danger: '#bf616a',
+  hpBar: '#bf616a',
+  fpBar: '#b48ead',
+  apBar: '#ebcb8b',
+  endBar: '#a3be8c',
+  minorAbility: '#88c0d0',
+  success: '#a3be8c',
+  tokenMilestone: '#ebcb8b',
+  tokenEvasion: '#88c0d0',
+  tokenMovement: '#a3be8c',
+  tokenSaveDC: '#b48ead',
+  tokenArmor: '#81a1c1',
+  tokenEndRecovery: '#d8dee9',
+}
+
+/**
+ * Sheet palette for the Pitch Black app theme — pure black with cream,
+ * gold, and muted teal. Mirrored from the
+ * `:root[data-app-theme='pitch-black']` block in `index.css` — keep in
+ * sync. Used by NPC sheets, which follow the app theme (see
+ * themeUtils.appThemeSheetColors).
+ */
+export const PITCH_BLACK_SHEET_COLORS: SheetColors = {
+  bgBase: '#000000',
+  bgSurface: '#0d0d0d',
+  bgSurfaceRaised: '#171717',
+  bgSurfaceHover: '#212121',
+  textPrimary: '#c1c1c1',
+  textSecondary: '#999999',
+  textMuted: '#5e5e5e',
+  border: '#2c2c2c',
+  borderSoft: '#1c1c1c',
+  accent: '#f3ecd4',
+  accentSoft: '#f3ecd4',
+  danger: '#9e5a5a',
+  hpBar: '#eecc6c',
+  fpBar: '#f3ecd4',
+  apBar: '#5f8787',
+  endBar: '#888888',
+  minorAbility: '#aaaaaa',
+  success: '#eecc6c',
+  tokenMilestone: '#eecc6c',
+  tokenEvasion: '#5f8787',
+  tokenMovement: '#aaaaaa',
+  tokenSaveDC: '#f3ecd4',
+  tokenArmor: '#888888',
+  tokenEndRecovery: '#c1c1c1',
+}
+
+/**
  * Sensible dark-themed default for {@link SheetConfig}. Per DESIGN.md the
  * default surface is dark because users spend a lot of time workshopping
  * Abilities and lore, where bright white UI would fight the scene.

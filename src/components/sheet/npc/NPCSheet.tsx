@@ -26,7 +26,12 @@
 import { useState } from 'react'
 
 import { useCharacterStore } from '@/store/characterStore'
-import { colorVars } from '@/lib/themeUtils'
+import { useAppThemeStore } from '@/store/appThemeStore'
+import {
+  appThemeSheetCardBackground,
+  appThemeSheetColors,
+  colorVars,
+} from '@/lib/themeUtils'
 import { useImportedFonts } from '@/hooks/useImportedFonts'
 import type { Character } from '@/types'
 import type { SheetMode } from '@/pages/CharacterSheetPage'
@@ -64,6 +69,13 @@ export default function NPCSheet({
   )
   useImportedFonts(importedFonts)
 
+  // NPC sheets have no per-sheet customization, so the standalone sheet
+  // follows the active app theme. Embedded NPC sections are rendered by
+  // CustomNPCSection, which applies no colors of its own — the player
+  // sheet's theme variables win there.
+  const appTheme = useAppThemeStore((s) => s.theme)
+  const themeColors = appThemeSheetColors(appTheme)
+
   const entity = npc ?? storeNpc
   const [showExport, setShowExport] = useState(false)
 
@@ -72,13 +84,13 @@ export default function NPCSheet({
   const isNPC = entity.kind === 'npc'
   const { config } = entity
   const styleVars = {
-    '--sheet-bg': config.backgroundColor,
+    '--sheet-bg': appThemeSheetCardBackground(appTheme, config),
     '--sheet-heading-font': config.sectionHeadingFontFamily,
     '--sheet-heading-weight': config.sectionHeadingFontWeight,
     '--sheet-label-font': config.labelFontFamily,
     '--sheet-text-font': config.textFontFamily,
     '--sheet-helper-font': config.helperTextFontFamily,
-    ...colorVars(config.colors),
+    ...colorVars(themeColors),
   } as React.CSSProperties
 
   return (
