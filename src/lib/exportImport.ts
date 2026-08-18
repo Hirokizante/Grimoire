@@ -231,7 +231,7 @@ export async function exportCharacter(
 /** Minimal shape check — verifies key fields exist and have the right broad
  * type, but does NOT exhaustively validate the whole object.
  */
-function isCharacterShape(data: unknown): data is Character {
+export function isCharacterShape(data: unknown): data is Character {
   if (typeof data !== 'object' || data === null) return false
   const o = data as Record<string, unknown>
   return (
@@ -271,7 +271,7 @@ function isBundleShape(data: unknown): data is {
  * Minimal shape check for a status condition. Requires an id and a name; the
  * remaining fields are optional (normalizeStatus back-fills them).
  */
-function isStatusShape(data: unknown): data is StatusCondition {
+export function isStatusShape(data: unknown): data is StatusCondition {
   if (typeof data !== 'object' || data === null) return false
   const o = data as Record<string, unknown>
   return typeof o.id === 'string' && typeof o.name === 'string'

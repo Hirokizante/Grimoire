@@ -96,6 +96,7 @@ Divergence is a DIY tabletop RPG system — there is no compendium of spells or 
 - **Update existing** — importing a sheet whose name matches an existing character offers to update in place (preserving live-play state: HP, END, AP, FP, mortal wounds, death saves) or import as a new copy.
 - **Version resolution** — when updating, the imported version is used if strictly newer; otherwise the existing version is bumped forward.
 - **Attached NPCs** — when a character has NPC sections, the export includes those NPCs as a bundle (`attachedNpcs`). On import, each NPC is persisted as its own record and the parent's section references are rewritten to the fresh IDs, so the parent↔NPC link round-trips intact.
+- **Full backup & restore** — Settings → Backup & Restore downloads *everything* (all characters and NPCs, the status compendium, version history, and the roll log) as a single JSON file (`Grimoire Backup YYYY-MM-DD.json`). Restoring from a backup **replaces** all current data in one atomic IndexedDB transaction, after an explicit confirmation. Backups carry a `backupVersion`; newer-version backups are refused with a clear message. Single-character exports are *not* backups — restore points you at the Characters page import instead.
 - **Attached statuses** — statuses referenced by a sheet are bundled into the export (`attachedStatuses`). On import they are restored by id and name conflicts are resolved — references match by name, so they keep working even after a condition is renamed.
 
 ---

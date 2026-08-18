@@ -39,6 +39,8 @@ vi.mock('@/lib/db', () => ({
   putStatus: vi.fn(async () => {}),
   deleteStatus: vi.fn(async () => {}),
   normalizeStatus: (s: Character) => s,
+  getAllVersionSnapshots: vi.fn(async () => []),
+  replaceAllData: vi.fn(async () => {}),
 }))
 
 // ---- Helpers --------------------------------------------------------------

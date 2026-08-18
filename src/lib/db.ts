@@ -466,3 +466,64 @@ export async function deleteStatus(id: string): Promise<void> {
   await promisifyRequest(tx.objectStore(STATUS_STORE).delete(id))
   db.close()
 }
+
+// ---- Full backup / restore --------------------------------------------------
+
+/**
+ * Fetch every version snapshot across ALL characters, oldest first.
+ * Used by the full-backup export (Settings → Backup & Restore).
+ */
+export async function getAllVersionSnapshots(): Promise<VersionSnapshot[]> {
+  const db = await openDB()
+  const tx = db.transaction(VERSION_STORE, 'readonly')
+  const all = await promisifyRequest<VersionSnapshot[]>(
+    tx.objectStore(VERSION_STORE).getAll(),
+  )
+  db.close()
+  return all.sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+}
+
+/** Record payload for a wholesale data replacement ({@link replaceAllData}). */
+export interface ReplaceAllDataInput {
+  characters: Character[]
+  versions: VersionSnapshot[]
+  rollLogs: RollLogEntry[]
+  statuses: StatusCondition[]
+}
+
+/**
+ * Replace the ENTIRE contents of all four object stores with the provided
+ * records — the restore half of the full-backup flow.
+ *
+ * Everything happens in a SINGLE readwrite transaction over all stores: the
+ * clears and puts either all commit or all roll back, so a failed restore can
+ * never leave the database half-old / half-new.
+ */
+export async function replaceAllData(data: ReplaceAllDataInput): Promise<void> {
+  const db = await openDB()
+  const tx = db.transaction(
+    [CHAR_STORE, VERSION_STORE, ROLL_LOG_STORE, STATUS_STORE],
+    'readwrite',
+  )
+  const charStore = tx.objectStore(CHAR_STORE)
+  const versionStore = tx.objectStore(VERSION_STORE)
+  const rollLogStore = tx.objectStore(ROLL_LOG_STORE)
+  const statusStore = tx.objectStore(STATUS_STORE)
+
+  charStore.clear()
+  for (const char of data.characters) charStore.put(char)
+  versionStore.clear()
+  for (const snapshot of data.versions) versionStore.put(snapshot)
+  rollLogStore.clear()
+  for (const entry of data.rollLogs) rollLogStore.put(entry)
+  statusStore.clear()
+  for (const status of data.statuses) statusStore.put(status)
+
+  await new Promise<void>((resolve, reject) => {
+    tx.oncomplete = () => resolve()
+    tx.onabort = () =>
+      reject(tx.error ?? new Error('Restore transaction aborted'))
+    tx.onerror = () => reject(tx.error)
+  })
+  db.close()
+}
