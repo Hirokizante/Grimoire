@@ -16,7 +16,13 @@ import { processImage } from '@/lib/imageProcessing'
 import { useEscapeKey } from '@/hooks/useEscapeKey'
 import { useCharacterStore } from '@/store/characterStore'
 import { FontImportSection } from '@/components/sheet/FontImportSection'
-import { DEFAULT_SHEET_COLORS, DEFAULT_SHEET_CONFIG } from '@/constants/gameData'
+import {
+  DEFAULT_SHEET_COLORS,
+  DEFAULT_SHEET_CONFIG,
+  MIKAMI_SHEET_COLORS,
+  PARCHMENT_SHEET_COLORS,
+  PITCH_BLACK_SHEET_COLORS,
+} from '@/constants/gameData'
 import type { SheetColors, SheetConfig } from '@/types'
 
 /** A label+key used for each color picker. */
@@ -149,6 +155,24 @@ const PRESETS: PresetTheme[] = [
       tokenArmor: '#d4a854',
       tokenEndRecovery: '#8ce09a',
     },
+  },
+  {
+    name: 'Parchment',
+    pageBackgroundColor: PARCHMENT_SHEET_COLORS.bgBase,
+    backgroundColor: PARCHMENT_SHEET_COLORS.bgSurface,
+    colors: { ...PARCHMENT_SHEET_COLORS },
+  },
+  {
+    name: 'Mikami',
+    pageBackgroundColor: MIKAMI_SHEET_COLORS.bgBase,
+    backgroundColor: MIKAMI_SHEET_COLORS.bgSurface,
+    colors: { ...MIKAMI_SHEET_COLORS },
+  },
+  {
+    name: 'Pitch Black',
+    pageBackgroundColor: PITCH_BLACK_SHEET_COLORS.bgBase,
+    backgroundColor: PITCH_BLACK_SHEET_COLORS.bgSurface,
+    colors: { ...PITCH_BLACK_SHEET_COLORS },
   },
   {
     name: 'Solar',

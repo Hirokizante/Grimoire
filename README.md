@@ -76,7 +76,7 @@ Divergence is a DIY tabletop RPG system — there is no compendium of spells or 
 
 ### Customization
 - **Full color palette** — every sheet element (surfaces, text, borders, accents, resource bars, stat tokens, etc.) exposed as color swatches — no custom CSS required.
-- **Theme presets** — one-click themes (Default, Midnight, Solar, Ocean, Sakura, Dracula, Nord, Gruvbox) that replace the palette in a single click.
+- **Theme presets** — one-click themes that replace the palette in a single click, including presets that match each app theme (Parchment, Mikami, Pitch Black) for a cohesive app + sheet look. Full list: Default, Midnight, Parchment, Mikami, Pitch Black, Solar, Ocean, Sakura, Dracula, Nord, Gruvbox, Solarized Dark, Tokyo Night, Catppuccin.
 - **Per-element font selection** — independent font families for headings, labels, body text, and helper text.
 - **Google Fonts import** — type any Google Fonts family name to add it to the font pickers.
 - **Background image** — upload an image, with darken and blur overlays.
