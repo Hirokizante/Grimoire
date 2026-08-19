@@ -2,9 +2,10 @@
  * SettingsPage — app-level preferences.
  *
  * Hosts the app color theme picker (themes the app chrome around the sheets —
- * header, list pages, modals, dice UI) and the full-app Backup & Restore
- * section. Per-sheet color themes live in each sheet's Customization panel
- * and are stored on the character.
+ * header, list pages, modals, dice UI), the home page animation picker
+ * (on/off + which ambient effect plays behind the title), and the full-app
+ * Backup & Restore section. Per-sheet color themes live in each sheet's
+ * Customization panel and are stored on the character.
  *
  * Backup & Restore: downloads EVERYTHING (characters, NPCs, statuses, version
  * history, roll log) as a single JSON file; restoring replaces all current
@@ -27,6 +28,8 @@ import { downloadJson } from '@/lib/exportImport'
 import { useAppThemeStore } from '@/store/appThemeStore'
 import type { AppTheme } from '@/store/appThemeStore'
 import { useCharacterStore } from '@/store/characterStore'
+import { useHomeAnimationStore } from '@/store/homeAnimationStore'
+import type { HomeAnimation } from '@/store/homeAnimationStore'
 import { useRollLogStore } from '@/store/rollLogStore'
 import { useStatusStore } from '@/store/statusStore'
 
@@ -37,6 +40,51 @@ interface ThemeOption {
   /** Representative palette swatches, in paint order. */
   swatches: string[]
 }
+
+interface AnimationOption {
+  id: HomeAnimation
+  name: string
+  description: string
+  /** Tiny inline preview of the effect. */
+  preview: React.ReactNode
+}
+
+const ANIMATION_OPTIONS: AnimationOption[] = [
+  {
+    id: 'arcane',
+    name: 'Arcane Glow',
+    description: 'Drifting light and floating dust particles (the default).',
+    preview: (
+      <>
+        <span
+          className="animation-preview__orb"
+          style={{
+            background:
+              'radial-gradient(circle, var(--accent-violet), transparent 70%)',
+          }}
+        />
+        <span
+          className="animation-preview__orb animation-preview__orb--small"
+          style={{
+            background:
+              'radial-gradient(circle, var(--accent-blush), transparent 70%)',
+          }}
+        />
+      </>
+    ),
+  },
+  {
+    id: 'terminal',
+    name: 'Terminal Boot',
+    description: 'A startup log types itself out, as if launched from a shell.',
+    preview: (
+      <span className="animation-preview__term" aria-hidden="true">
+        <span>$ grimoire launch</span>
+        <span>[ ok ] ready.</span>
+      </span>
+    ),
+  },
+]
 
 const THEME_OPTIONS: ThemeOption[] = [
   {
@@ -81,6 +129,10 @@ function backupSheetSummary(counts: FullBackup['counts']): string {
 export default function SettingsPage() {
   const theme = useAppThemeStore((s) => s.theme)
   const setTheme = useAppThemeStore((s) => s.setTheme)
+  const homeAnimation = useHomeAnimationStore((s) => s.animation)
+  const setHomeAnimation = useHomeAnimationStore((s) => s.setAnimation)
+  const homeAnimationEnabled = useHomeAnimationStore((s) => s.enabled)
+  const setHomeAnimationEnabled = useHomeAnimationStore((s) => s.setEnabled)
   const { notify } = useNotification()
 
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -200,6 +252,81 @@ export default function SettingsPage() {
                       style={{ background: color }}
                     />
                   ))}
+                </span>
+                <span className="theme-option__label">
+                  <span className="theme-option__name">{option.name}</span>
+                  {isActive && (
+                    <span className="theme-option__check" aria-hidden="true">
+                      <Check size={14} />
+                    </span>
+                  )}
+                </span>
+                <span className="theme-option__desc">
+                  {option.description}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      </section>
+
+      <section
+        className="settings-section"
+        aria-labelledby="settings-home-animation-heading"
+      >
+        <h2
+          className="settings-section__title"
+          id="settings-home-animation-heading"
+        >
+          Home Page Animation
+        </h2>
+        <p className="muted settings-section__hint">
+          The ambient effect behind the title on the home page. Turning it off
+          leaves a plain, static page.
+        </p>
+
+        <div className="settings-toggle-row">
+          <span
+            className="settings-toggle-row__label"
+            id="home-animation-toggle-label"
+          >
+            Animations
+          </span>
+          <label className="settings-toggle">
+            <input
+              type="checkbox"
+              checked={homeAnimationEnabled}
+              onChange={(e) => setHomeAnimationEnabled(e.target.checked)}
+              aria-labelledby="home-animation-toggle-label"
+            />
+            <span className="settings-toggle__track" aria-hidden="true" />
+          </label>
+        </div>
+
+        <div
+          className={
+            'theme-picker' +
+            (homeAnimationEnabled ? '' : ' animation-picker--disabled')
+          }
+          role="radiogroup"
+          aria-label="Home page animation"
+        >
+          {ANIMATION_OPTIONS.map((option) => {
+            const isActive = homeAnimation === option.id
+            return (
+              <button
+                key={option.id}
+                type="button"
+                role="radio"
+                aria-checked={isActive}
+                disabled={!homeAnimationEnabled}
+                className={
+                  'theme-option' + (isActive ? ' theme-option--active' : '')
+                }
+                onClick={() => setHomeAnimation(option.id)}
+              >
+                <span className="animation-preview" aria-hidden="true">
+                  {option.preview}
                 </span>
                 <span className="theme-option__label">
                   <span className="theme-option__name">{option.name}</span>

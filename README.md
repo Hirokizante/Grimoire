@@ -86,6 +86,7 @@ Divergence is a DIY tabletop RPG system — there is no compendium of spells or 
 
 ### App Settings
 - **App themes** — switch the app's own color scheme (header, list pages, modals, dice UI — everything *around* the sheets) in Settings. Ships with **Midnight** (the default violet-dark palette), **Parchment** (warm charcoal `#262626` with parchment `#c5b8a0` highlights, plus a matching alternate title-bar glyph), **Mikami** (Nord on near-black, from Ghostty), and **Pitch Black** (pure black with cream, gold, and muted teal, from Ghostty). The choice persists in `localStorage` and applies before first paint. Sheet color themes are unaffected — those stay per-character in the Customization panel.
+- **Home page animation** — pick the ambient effect behind the home page title in Settings: **Arcane Glow** (the default drifting light + floating dust particles) or **Terminal Boot** (a startup log that types itself out, as if Grimoire were launched from a shell, then settles to a dim static trace). Animations can also be switched off entirely for a plain, motion-free home page. The choice persists in `localStorage`.
 - **NPC sheets follow the app theme** — standalone NPC sheets (no per-sheet customization) adopt the app's palette, including the page and card backgrounds. NPC sections embedded in a player character sheet never apply colors of their own, so the player sheet's theme takes precedence there.
 
 ### Import / Export

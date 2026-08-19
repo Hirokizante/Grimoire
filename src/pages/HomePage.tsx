@@ -2,33 +2,51 @@
  * HomePage — the landing screen for Grimoire.
  *
  * Displays the app title "GRIMOIRE" in Camiro font, with three navigation
- * buttons: Characters, NPCs, and Settings.
+ * buttons: Characters, NPCs, and Settings. The ambient background effect
+ * (glow + particles, terminal boot, or none) is chosen in Settings and read
+ * from homeAnimationStore.
  */
 
 import { Users, Swords, Sparkles, Settings } from 'lucide-react'
 
+import TerminalBootAnimation from '@/components/home/TerminalBootAnimation'
 import { useCharacterStore } from '@/store/characterStore'
+import { useHomeAnimationStore } from '@/store/homeAnimationStore'
 
 export default function HomePage() {
   const setView = useCharacterStore((s) => s.setView)
+  const animation = useHomeAnimationStore((s) => s.animation)
+  const animationsEnabled = useHomeAnimationStore((s) => s.enabled)
 
   return (
-    <div className="home-page">
-      <div className="home-page__particles" aria-hidden="true">
-        {Array.from({ length: 18 }).map((_, i) => (
-          <span
-            key={i}
-            className="home-page__particle"
-            style={{
-              left: `${Math.random() * 100}%`,
-              animationDuration: `${8 + Math.random() * 10}s`,
-              animationDelay: `${Math.random() * 8}s`,
-              width: `${3 + Math.random() * 3}px`,
-              height: `${3 + Math.random() * 3}px`,
-            }}
-          />
-        ))}
-      </div>
+    <div
+      className={
+        'home-page' +
+        (animationsEnabled && animation === 'arcane'
+          ? ' home-page--arcane'
+          : '')
+      }
+    >
+      {animationsEnabled && animation === 'arcane' && (
+        <div className="home-page__particles" aria-hidden="true">
+          {Array.from({ length: 18 }).map((_, i) => (
+            <span
+              key={i}
+              className="home-page__particle"
+              style={{
+                left: `${Math.random() * 100}%`,
+                animationDuration: `${8 + Math.random() * 10}s`,
+                animationDelay: `${Math.random() * 8}s`,
+                width: `${3 + Math.random() * 3}px`,
+                height: `${3 + Math.random() * 3}px`,
+              }}
+            />
+          ))}
+        </div>
+      )}
+      {animationsEnabled && animation === 'terminal' && (
+        <TerminalBootAnimation />
+      )}
 
       <div className="home-page__content">
         <div>
