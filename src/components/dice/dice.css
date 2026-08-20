@@ -2,9 +2,9 @@
 
 .dice-notation {
   display: inline;
-  background: rgba(155, 126, 214, 0.14);
+  background: color-mix(in srgb, var(--accent-violet) 16%, transparent);
   color: var(--accent-violet-soft);
-  border: 1px solid rgba(155, 126, 214, 0.3);
+  border: 1px solid color-mix(in srgb, var(--accent-violet) 40%, transparent);
   border-radius: 4px;
   padding: 1px 5px;
   font-size: 0.85em;
@@ -16,7 +16,7 @@
 }
 
 .dice-notation:hover:not(:disabled) {
-  background: rgba(155, 126, 214, 0.24);
+  background: color-mix(in srgb, var(--accent-violet) 24%, transparent);
   border-color: var(--accent-violet);
 }
 
