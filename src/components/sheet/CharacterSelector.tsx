@@ -16,6 +16,7 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 
 import { useCharacterStore } from '@/store/characterStore'
+import { colorVars } from '@/lib/themeUtils'
 import type { Character } from '@/types'
 
 export interface CharacterSelectorProps {
@@ -41,6 +42,16 @@ export default function CharacterSelector({
       ? characters.filter((c) => c.kind === 'npc')
       : characters.filter((c) => c.kind !== 'npc')
 
+  // On a player character sheet, the selector inherits that sheet's color
+  // scheme: inline CSS custom properties shadow the app-theme root vars for
+  // both the panel and its toggle tab. NPC pages stay on the app theme.
+  const paletteStyle =
+    kind === 'character' &&
+    currentCharacter !== null &&
+    currentCharacter.kind !== 'npc'
+      ? (colorVars(currentCharacter.config.colors) as React.CSSProperties)
+      : undefined
+
   return (
     <>
       {/* The panel itself */}
@@ -48,6 +59,7 @@ export default function CharacterSelector({
         className={
           'char-selector' + (open ? ' char-selector--open' : '')
         }
+        style={paletteStyle}
         aria-label={kind === 'npc' ? 'NPC selector' : 'Character selector'}
       >
         <div className="char-selector__header">
@@ -102,6 +114,7 @@ export default function CharacterSelector({
           'char-selector__toggle' +
           (open ? ' char-selector__toggle--open' : '')
         }
+        style={paletteStyle}
         onClick={onToggle}
         aria-expanded={open}
         aria-label={open ? 'Collapse selector' : 'Expand selector'}

@@ -11,6 +11,7 @@ import { Users, Swords, Sparkles, Settings } from 'lucide-react'
 import { useCharacterStore } from '@/store/characterStore'
 import type { AppView } from '@/store/characterStore'
 import { useAppThemeStore } from '@/store/appThemeStore'
+import { colorVars } from '@/lib/themeUtils'
 import faviconUrl from '/favicon.svg'
 import faviconAltUrl from '/favicon_alt.svg'
 
@@ -30,6 +31,13 @@ export default function TitleBar() {
 
   const onSheet = currentCharacter !== null
   const onNpcSheet = onSheet && currentCharacter?.kind === 'npc'
+
+  // While a player character sheet is open, the title bar inherits the
+  // sheet's own color scheme: injecting the sheet's palette as inline CSS
+  // custom properties shadows the app-theme root vars for this subtree.
+  // NPC sheets have no per-sheet customization and stay on the app theme.
+  const headerStyle =
+    onSheet && !onNpcSheet ? (colorVars(currentCharacter.config.colors) as React.CSSProperties) : undefined
 
   const navButtons: NavButton[] = [
     {
@@ -66,7 +74,7 @@ export default function TitleBar() {
   }
 
   return (
-    <header className="app-header">
+    <header className="app-header" style={headerStyle}>
       <button
         type="button"
         className={
