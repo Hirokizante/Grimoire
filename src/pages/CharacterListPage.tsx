@@ -5,6 +5,7 @@ import { useCharacterStore } from '@/store/characterStore'
 import CreateCharacterModal from '@/components/sheet/CreateCharacterModal'
 import ConfirmDeleteModal from '@/components/sheet/ConfirmDeleteModal'
 import UpdateCharacterModal from '@/components/sheet/UpdateCharacterModal'
+import SheetLabelPills from '@/components/sheet/SheetLabelPills'
 
 import { parseCharacterJSON } from '@/lib/exportImport'
 import type { Character } from '@/types'
@@ -232,6 +233,7 @@ export default function CharacterListPage() {
                   {c.milestones === 1 ? 'milestone' : 'milestones'} ·{' '}
                   {formatUpdatedAt(c.updatedAt)}
                 </span>
+                <SheetLabelPills labels={c.labels} size="sm" />
               </button>
               <button
                 className="card-delete"
@@ -272,6 +274,7 @@ export default function CharacterListPage() {
                     {c.milestones === 1 ? 'milestone' : 'milestones'} ·{' '}
                     {formatUpdatedAt(c.updatedAt)}
                   </span>
+                  <SheetLabelPills labels={c.labels} size="sm" />
                 </div>
               </button>
               <button

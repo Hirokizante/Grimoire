@@ -34,6 +34,8 @@ vi.mock('@/lib/db', () => ({
   deleteRollLogEntry: vi.fn(async () => {}),
   clearRollLogForCharacter: vi.fn(async () => {}),
   normalizeCharacter: (char: Character) => char,
+  // Mirrors db.stripLabels for exportImport's export path (saveVersion).
+  stripLabels: ({ labels: _labels, ...rest }: Character) => rest as Character,
   getAllStatuses: vi.fn(async () => []),
   getStatus: vi.fn(async () => null),
   putStatus: vi.fn(async () => {}),
@@ -857,4 +859,33 @@ test('updateExistingCharacterFromImportFile: updates id/name and preserves live 
   expect(updated.attributes.POW).toBe(7)
   expect(updated.backstory).toBe('Updated lore')
   expect(updated.version).toBe('1.2.0')
+})
+
+// ---- Labels -----------------------------------------------------------------
+
+test('setLabels: replaces the current character labels and syncs the list', async () => {
+  const char = setupChar()
+  expect(char.labels).toEqual([])
+
+  const labels = [
+    { id: 'l1', name: 'Party', value: '' },
+    { id: 'l2', name: 'Boss', value: 'Act 2' },
+  ]
+  useCharacterStore.getState().setLabels(labels)
+
+  const updated = useCharacterStore.getState().currentCharacter!
+  expect(updated.labels).toEqual(labels)
+  // The characters list mirrors the update.
+  expect(
+    useCharacterStore.getState().characters.find((c) => c.id === char.id)!
+      .labels,
+  ).toEqual(labels)
+})
+
+test('setLabels: clearing labels yields an empty list', () => {
+  setupChar({
+    labels: [{ id: 'l1', name: 'Old', value: '' }],
+  })
+  useCharacterStore.getState().setLabels([])
+  expect(useCharacterStore.getState().currentCharacter!.labels).toEqual([])
 })

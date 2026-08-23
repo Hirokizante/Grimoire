@@ -36,6 +36,7 @@ Divergence is a DIY tabletop RPG system — there is no compendium of spells or 
 
 ### Character Creation & Editing
 - **Guided character creation** — start with a named sheet and begin filling in attributes, skills, and abilities immediately.
+- **Labels** — tag any character or NPC sheet with custom labels (each with an optional value) from the sheet page; labels also appear on the list pages for at-a-glance organization. Labels are local-only metadata — they are never included in exports. (Sheet filtering by label is coming soon.)
 - **Five Attributes** (MAR, POW, AGI, VIT, GRT) allocated from the standard array (3, 2, 1, 0, -1), each with click-to-roll support.
 - **Fifteen Skills** with selectable proficiencies and click-to-roll support.
 - **Core Ability** — Innate narrative, Innate Abilities, Basic Attack, and Fatebreaker ultimate.

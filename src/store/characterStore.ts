@@ -34,6 +34,7 @@ import type {
   CustomResourceBar,
   Semver,
   SheetConfig,
+  SheetLabel,
   SkillName,
   VersionSnapshot,
 } from '@/types'
@@ -292,6 +293,11 @@ export interface CharacterStoreActions {
   spendCustomResourceBar: (id: string, amount?: number) => boolean
   /** Restore 1 to a custom resource bar (capped at max). */
   restoreCustomResourceBar: (id: string, amount?: number) => void
+  /**
+   * Replace the current character's labels (the Edit Labels modal saves the
+   * whole list). Local-only metadata — never exported.
+   */
+  setLabels: (labels: SheetLabel[]) => void
   /** Update the view mode of a single ability section (builtin or custom). */
   updateSectionViewMode: (key: 'slottedAbilities' | 'abilityPool', mode: 'grid' | 'list') => void
   /** Update the view mode of a custom-tab section. */
@@ -1477,6 +1483,15 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
       customResourceBars: char.customResourceBars.map((bar) =>
         bar.id === id ? { ...bar, current: Math.min(bar.max, bar.current + amount) } : bar,
       ),
+    }))
+  },
+
+  // ---- Labels ------------------------------------------------------------------
+
+  setLabels: (labels) => {
+    get().updateCurrentCharacter((char) => ({
+      ...char,
+      labels,
     }))
   },
 }))

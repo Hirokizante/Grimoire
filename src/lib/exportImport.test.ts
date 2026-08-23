@@ -1,10 +1,11 @@
-import { test, expect } from 'vitest'
+import { test, expect, vi } from 'vitest'
 import {
   buildExportBundle,
   bumpSemver,
   collectAttachedNPCs,
   compareSemver,
   createSnapshot,
+  exportCharacter,
   importCharacter,
   parseCharacterJSON,
   parseImportBundle,
@@ -12,12 +13,24 @@ import {
   resolveUpdatedVersion,
   restoreFromSnapshot,
   serializeSemver,
+  stripLabels,
   updateExistingCharacterFromImport,
   versionedFilename,
 } from '@/lib/exportImport'
 import { createDefaultCharacter, createDefaultNPC } from '@/constants/gameData'
 import { createDefaultStatuses } from '@/constants/statuses'
-import type { VersionSnapshot } from '@/types'
+import type { Character, StatusCondition, VersionSnapshot } from '@/types'
+
+// Keep version-snapshot persistence off the real IndexedDB (exportCharacter
+// stores a snapshot as part of the download flow).
+vi.mock('@/lib/db', () => ({
+  deleteVersionSnapshot: vi.fn(async () => {}),
+  getVersionHistory: vi.fn(async () => []),
+  normalizeCharacter: (char: Character) => char,
+  normalizeStatus: (status: StatusCondition) => status,
+  putVersionSnapshot: vi.fn(async () => {}),
+  stripLabels: ({ labels: _labels, ...rest }: Character) => rest as Character,
+}))
 
 // ---- versionedFilename ----------------------------------------------------------------
 
@@ -561,4 +574,55 @@ test('parseImportBundle: legacy flat shape yields empty attachedStatuses', () =>
   const char = createDefaultCharacter()
   const parsed = parseImportBundle(JSON.stringify(char))
   expect(parsed.attachedStatuses).toEqual([])
+})
+
+// ---- labels are local-only (never exported) --------------------------------
+
+test('stripLabels: removes labels and keeps every other field', () => {
+  const char = createDefaultCharacter()
+  char.labels = [{ id: 'l1', name: 'Party', value: 'Alpha' }]
+  char.backstory = 'Some lore'
+
+  const stripped = stripLabels(char)
+
+  expect('labels' in stripped).toBe(false)
+  expect(stripped.backstory).toBe('Some lore')
+  // Original untouched.
+  expect(char.labels).toHaveLength(1)
+})
+
+test('exportCharacter: downloaded JSON has no labels field', async () => {
+  const char = createDefaultCharacter()
+  char.name = 'Labeled'
+  char.version = '1.0.0'
+  char.labels = [
+    { id: 'l1', name: 'Party', value: '' },
+    { id: 'l2', name: 'Boss', value: 'Act 2' },
+  ]
+
+  // Capture the real Blob BEFORE spying so the factory can delegate to it
+  // without recursing into its own mock. Must be a function expression —
+  // vitest rejects arrow-function mocks for constructable targets.
+  const RealBlob = globalThis.Blob
+  let payload: unknown
+  const blobSpy = vi
+    .spyOn(globalThis, 'Blob')
+    .mockImplementation(function (this: unknown, parts: BlobPart[]) {
+      payload = JSON.parse(String(parts[0]))
+      return new RealBlob(parts)
+    } as unknown as typeof Blob)
+  const urlSpy = vi
+    .spyOn(URL, 'createObjectURL')
+    .mockReturnValue('blob:mock')
+
+  try {
+    await exportCharacter(char)
+  } finally {
+    blobSpy.mockRestore()
+    urlSpy.mockRestore()
+  }
+
+  const exported = payload as Record<string, unknown>
+  expect('labels' in exported).toBe(false)
+  expect(exported.name).toBe('Labeled')
 })

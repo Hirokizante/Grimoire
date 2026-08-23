@@ -488,6 +488,104 @@
   color: var(--text-muted);
 }
 
+/* ---- Sheet labels (segmented pills) -------------------------------------- */
+
+/* Shared by the sheet hero rows and the list pages. Each label renders as a
+   two-segment capsule: NAME on an accent-tinted segment, optional VALUE on a
+   raised segment beside it. */
+.label-pills {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.label-pills--md {
+  gap: 0.4rem;
+}
+
+.label-pills--sm {
+  gap: 0.3rem;
+}
+
+.label-pill {
+  display: inline-flex;
+  align-items: stretch;
+  max-width: 100%;
+  border-radius: 999px;
+  overflow: hidden;
+  border: 1px solid
+    color-mix(in srgb, var(--accent-violet) 45%, transparent);
+  background:
+    color-mix(in srgb, var(--accent-violet) 14%, transparent);
+}
+
+.label-pill__name {
+  padding: 0.18rem 0.6rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text-primary);
+}
+
+.label-pill__value {
+  padding: 0.18rem 0.6rem;
+  font-size: 0.72rem;
+  font-weight: 500;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text-secondary);
+  background: var(--bg-surface-raised);
+  border-left: 1px solid
+    color-mix(in srgb, var(--accent-violet) 45%, transparent);
+}
+
+/* Small variant — list-page cards and rows. */
+.label-pills--sm {
+  gap: 0.25rem;
+}
+
+.label-pills--sm .label-pill__name,
+.label-pills--sm .label-pill__value {
+  font-size: 0.6rem;
+  padding-top: 0.08rem;
+  padding-bottom: 0.08rem;
+}
+
+.label-pills--sm .label-pill__name {
+  padding-left: 0.45rem;
+  padding-right: 0.45rem;
+}
+
+.label-pills--sm .label-pill__value {
+  padding-right: 0.45rem;
+}
+
+/* Placement inside list-page entries: the pills render AFTER .card-meta /
+   .character-list__meta, which own the entry's bottom padding. When pills
+   are present, reclaim most of that padding and let the pills row carry its
+   own bottom clearance so they never clip against the card edge. */
+.card-main .card-meta:has(+ .label-pills) {
+  padding-bottom: 0.3rem;
+}
+
+.card-main .label-pills--sm {
+  padding: 0 0.9rem 0.85rem;
+}
+
+.character-list__main .label-pills--sm {
+  min-width: 0;
+  padding-bottom: 0.2rem;
+}
+
 .character-list__delete {
   flex: 0 0 auto;
   width: 1.6rem;

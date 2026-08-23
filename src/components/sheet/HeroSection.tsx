@@ -2,11 +2,14 @@
  * HeroSection — the top-of-sheet identity panel.
  */
 
+import { useState } from 'react'
 import { Star, Paintbrush, ArrowUpFromLine } from 'lucide-react'
 
 import PortraitUploader from '@/components/sheet/PortraitUploader'
 import AttributesSection from '@/components/sheet/AttributesSection'
 import StatsSection from '@/components/sheet/StatsSection'
+import SheetLabelPills from '@/components/sheet/SheetLabelPills'
+import EditLabelsModal from '@/components/sheet/EditLabelsModal'
 import { useCharacterStore } from '@/store/characterStore'
 import type { Character } from '@/types'
 import type { SheetMode } from '@/pages/CharacterSheetPage'
@@ -21,7 +24,9 @@ export interface HeroSectionProps {
 
 export default function HeroSection({ character, mode = 'view', onLevelUp, onCustomize, onExport }: HeroSectionProps) {
   const update = useCharacterStore((s) => s.updateCurrentCharacter)
+  const setLabels = useCharacterStore((s) => s.setLabels)
   const isEdit = mode === 'edit'
+  const [showLabelEditor, setShowLabelEditor] = useState(false)
 
   const setName = (value: string) =>
     update((c) => ({ ...c, name: value }))
@@ -122,10 +127,40 @@ export default function HeroSection({ character, mode = 'view', onLevelUp, onCus
         </div>
       </div>
 
+      {/* Labels — under the Level Up / Customize / Export buttons. The edit
+          button is edit-mode only (matches the other dashed add buttons). */}
+      {(character.labels.length > 0 || isEdit) && (
+        <div className="hero-section__labels-row">
+          <SheetLabelPills labels={character.labels} />
+          {isEdit && (
+            <button
+              type="button"
+              className="btn btn--ghost section-add-btn"
+              onClick={() => setShowLabelEditor(true)}
+              aria-label={
+                character.labels.length === 0
+                  ? 'Add labels'
+                  : 'Edit labels'
+              }
+            >
+              {character.labels.length === 0 ? '+ Add Label' : 'Edit Labels'}
+            </button>
+          )}
+        </div>
+      )}
+
       <div className="hero-section__stats-row">
         <StatsSection character={character} mode={mode} variant="flat" />
         <AttributesSection character={character} attributes={character.attributes} mode={mode} variant="flat" />
       </div>
+
+      {showLabelEditor && (
+        <EditLabelsModal
+          labels={character.labels}
+          onSave={setLabels}
+          onClose={() => setShowLabelEditor(false)}
+        />
+      )}
     </section>
   )
 }

@@ -491,6 +491,7 @@ export function createDefaultCharacter(): Character {
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     customResourceBars: [],
+    labels: [],
   }
 }
 
@@ -566,6 +567,7 @@ export function createDefaultNPC(): Character {
     createdAt: now,
     updatedAt: now,
     customResourceBars: [],
+    labels: [],
     npcStats: { ...DEFAULT_NPC_STATS },
     description: '',
   }

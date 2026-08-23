@@ -303,6 +303,23 @@ export interface CustomTab {
 export type CharacterKind = 'character' | 'npc'
 
 /**
+ * A user-created organizational label ("tag") on a sheet. Purely local
+ * bookkeeping for filtering sheets in the list pages — labels are NOT part
+ * of the exported/imported sheet data.
+ */
+export interface SheetLabel {
+  /** Stable unique identifier. */
+  id: string
+  /** The label text (e.g. "Party", "Session 4", "Boss"). */
+  name: string
+  /**
+   * Optional qualifier displayed next to the label name (e.g. a color word,
+   * category, or short note). Empty string = no value shown.
+   */
+  value: string
+}
+
+/**
  * Manually-entered combat stats for an NPC.
  *
  * Unlike player characters, NPC stats are not derived from attributes — the
@@ -390,6 +407,11 @@ export interface Character {
   updatedAt: string
   /** User-created custom resource bars rendered below Endurance. */
   customResourceBars: CustomResourceBar[]
+  /**
+   * User-created organizational labels (tags) for filtering sheets in the
+   * list pages. Local-only metadata — never exported with the sheet.
+   */
+  labels: SheetLabel[]
   /** NPC combat stats (only present when kind === 'npc'). */
   npcStats?: NPCStats
   /** Long-form description for NPCs (only present when kind === 'npc'). */

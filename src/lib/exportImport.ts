@@ -21,6 +21,7 @@ import {
   normalizeCharacter,
   normalizeStatus,
   putVersionSnapshot,
+  stripLabels,
 } from '@/lib/db'
 import { collectReferencedStatuses } from '@/lib/statusReference'
 import type { Character, Semver, StatusCondition, VersionSnapshot } from '@/types'
@@ -141,6 +142,11 @@ export function collectAttachedNPCs(
 }
 
 /**
+ * Labels are stripped from exports — see {@link stripLabels} in lib/db.ts.
+ */
+export { stripLabels } from '@/lib/db'
+
+/**
  * Build a JSON-serializable export bundle that includes the parent character
  * plus every NPC attached via custom-tab NPC sections. The shape is:
  *
@@ -212,7 +218,8 @@ export async function exportCharacter(
 }> {
   const effectiveVersion = versionOverride ?? bumpSemver(character.version)
   const filename = versionedFilename(character.name, effectiveVersion)
-  const versioned = { ...character, version: effectiveVersion }
+  // Labels are local-only organizational metadata and never exported.
+  const versioned = { ...stripLabels(character), version: effectiveVersion }
   const snap = await storeVersionSnapshot(versioned)
   const attachedNpcs = allCharacters
     ? collectAttachedNPCs(versioned, allCharacters)

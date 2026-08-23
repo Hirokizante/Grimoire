@@ -19,9 +19,9 @@ import { ArrowUpFromLine, Hash, RotateCcw, Trash2 } from 'lucide-react'
 import { useModalDialog } from '@/hooks/useModalDialog'
 import { useNotification } from '@/context/NotificationContext'
 import { useCharacterStore } from '@/store/characterStore'
-import { bumpSemver, downloadJson, serializeSemver, versionedFilename } from '@/lib/exportImport'
+import { bumpSemver, downloadJson, serializeSemver, stripLabels, versionedFilename } from '@/lib/exportImport'
 import ConfirmModal from '@/components/sheet/ConfirmModal'
-import type { Semver } from '@/types'
+import type { Character, Semver } from '@/types'
 
 export interface ExportDialogProps {
   open: boolean
@@ -104,7 +104,8 @@ export default function ExportDialog({ open, onClose }: ExportDialogProps) {
 
   const handleDownload = (snap: { data: { name: string }, version: Semver }) => {
     const fn = versionedFilename(snap.data.name, snap.version)
-    downloadJson(snap.data, fn)
+    // Labels never travel with an exported sheet.
+    downloadJson(stripLabels(snap.data as unknown as Character), fn)
     notify(`Downloaded v${snap.version}.`, 'info')
   }
 

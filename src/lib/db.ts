@@ -10,8 +10,9 @@
  * All functions here are framework-agnostic and safe to call from anywhere.
  */
 
-import type { AbilityBlock, Character, CharacterViewModes, StatusCondition, VersionSnapshot } from '@/types'
+import type { AbilityBlock, Character, CharacterViewModes, SheetLabel, StatusCondition, VersionSnapshot } from '@/types'
 import { createDefaultStatuses } from '@/constants/statuses'
+import { generateId } from '@/constants/gameData'
 
 const DB_NAME = 'grimoire'
 const DB_VERSION = 4
@@ -189,6 +190,21 @@ export function normalizeCharacter(raw: Character): Character {
     result.customResourceBars = []
   }
 
+  // Ensure labels exists and every entry carries id/name/value (migration
+  // for records created before the labels feature; also guards against
+  // hand-edited JSON missing the value field).
+  if (!Array.isArray(result.labels)) {
+    result.labels = []
+  } else {
+    result.labels = result.labels
+      .filter((l): l is SheetLabel => !!l && typeof l === 'object')
+      .map((l) => ({
+        id: typeof l.id === 'string' ? l.id : generateId(),
+        name: typeof l.name === 'string' ? l.name : '',
+        value: typeof l.value === 'string' ? l.value : '',
+      }))
+  }
+
   // Ensure importedFonts exists inside config (migration for characters created
   // before the Google Fonts import feature was added).
   if (
@@ -260,6 +276,19 @@ export function normalizeCharacter(raw: Character): Character {
   } satisfies CharacterViewModes
 
   return result as Character
+}
+
+/**
+ * Return a copy of the character WITHOUT the `labels` field.
+ *
+ * Labels are local organizational metadata (list-page filter targets) and
+ * deliberately never travel with an exported sheet — see exportImport.
+ */
+export function stripLabels(character: Character): Character {
+  const { labels: _labels, ...rest } = character
+  // Cast is safe: normalizeCharacter guarantees records carry `labels`, so
+  // the only consumer impact of omitting it here is the stripped export.
+  return rest as Character
 }
 
 /** Load every stored character, ordered by creation date (oldest first). */

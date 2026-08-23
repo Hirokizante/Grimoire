@@ -225,3 +225,68 @@ test('normalizeCharacter: fills an empty content string on a text section missin
   const out = normalizeCharacter(asCharacter(old as Record<string, unknown>))
   expect((out.customTabs[0].sections[0] as { content: string }).content).toBe('')
 })
+
+// ---- labels -----------------------------------------------------------------
+
+test('normalizeCharacter: missing labels defaults to []', () => {
+  const char = createDefaultCharacter()
+  const old = omit(char as unknown as Record<string, unknown>, 'labels')
+  const out = normalizeCharacter(asCharacter(old))
+  expect(out.labels).toEqual([])
+})
+
+test('normalizeCharacter: preserves existing labels', () => {
+  const char = createDefaultCharacter()
+  const base: Character = {
+    ...char,
+    labels: [
+      { id: 'l1', name: 'Party', value: '' },
+      { id: 'l2', name: 'Boss', value: 'Act 2' },
+    ],
+  }
+  const out = normalizeCharacter(base)
+  expect(out.labels).toEqual([
+    { id: 'l1', name: 'Party', value: '' },
+    { id: 'l2', name: 'Boss', value: 'Act 2' },
+  ])
+})
+
+test('normalizeCharacter: backfills missing value on label entries', () => {
+  const char = createDefaultCharacter()
+  const old = asCharacter({
+    ...char,
+    labels: [{ id: 'l1', name: 'Party' }, { id: 'l2' }],
+  })
+  const out = normalizeCharacter(old)
+  expect(out.labels).toEqual([
+    { id: 'l1', name: 'Party', value: '' },
+    { id: 'l2', name: '', value: '' },
+  ])
+})
+
+test('normalizeCharacter: drops non-object label entries and assigns ids when missing', () => {
+  const char = createDefaultCharacter()
+  const old = asCharacter({
+    ...char,
+    labels: [
+      'junk',
+      null,
+      { name: 'NoId', value: 'x' },
+    ] as unknown[],
+  })
+  const out = normalizeCharacter(old)
+  expect(out.labels).toHaveLength(1)
+  expect(out.labels[0].name).toBe('NoId')
+  expect(typeof out.labels[0].id).toBe('string')
+  expect(out.labels[0].id.length).toBeGreaterThan(0)
+})
+
+test('normalizeCharacter: labels normalization is idempotent', () => {
+  const char = createDefaultCharacter()
+  const base = asCharacter({
+    ...char,
+    labels: [{ id: 'l1', name: 'Party', value: 'Alpha' }],
+  })
+  const once = normalizeCharacter(base)
+  expect(normalizeCharacter(once)).toEqual(once)
+})

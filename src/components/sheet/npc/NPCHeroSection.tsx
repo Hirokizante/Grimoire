@@ -9,9 +9,12 @@
  *   - Portrait + Name only
  */
 
+import { useState } from 'react'
 import { ArrowUpFromLine } from 'lucide-react'
 
 import PortraitUploader from '@/components/sheet/PortraitUploader'
+import SheetLabelPills from '@/components/sheet/SheetLabelPills'
+import EditLabelsModal from '@/components/sheet/EditLabelsModal'
 import { useCharacterStore } from '@/store/characterStore'
 import type { Character } from '@/types'
 import type { SheetMode } from '@/pages/CharacterSheetPage'
@@ -28,7 +31,9 @@ export default function NPCHeroSection({
   onExport,
 }: NPCHeroSectionProps) {
   const update = useCharacterStore((s) => s.updateCurrentCharacter)
+  const setLabels = useCharacterStore((s) => s.setLabels)
   const isEdit = mode === 'edit'
+  const [showLabelEditor, setShowLabelEditor] = useState(false)
 
   const setName = (value: string) =>
     update((c) => ({ ...c, name: value }))
@@ -89,6 +94,34 @@ export default function NPCHeroSection({
           </div>
         </div>
       </div>
+
+      {/* Labels — under the Export button. The edit button is edit-mode only
+          (matches the other dashed add buttons). */}
+      {(npc.labels.length > 0 || isEdit) && (
+        <div className="hero-section__labels-row">
+          <SheetLabelPills labels={npc.labels} />
+          {isEdit && (
+            <button
+              type="button"
+              className="btn btn--ghost section-add-btn"
+              onClick={() => setShowLabelEditor(true)}
+              aria-label={
+                npc.labels.length === 0 ? 'Add labels' : 'Edit labels'
+              }
+            >
+              {npc.labels.length === 0 ? '+ Add Label' : 'Edit Labels'}
+            </button>
+          )}
+        </div>
+      )}
+
+      {showLabelEditor && (
+        <EditLabelsModal
+          labels={npc.labels}
+          onSave={setLabels}
+          onClose={() => setShowLabelEditor(false)}
+        />
+      )}
     </section>
   )
 }

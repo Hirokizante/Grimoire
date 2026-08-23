@@ -271,6 +271,30 @@
   align-items: start;
 }
 
+/* ---- Hero labels row ------------------------------------------------------ */
+
+/* Sits under the identity block (and therefore under the floating
+   Level Up / Customize / Export buttons), above the stats row. Hidden
+   entirely in view mode when the sheet has no labels. */
+.hero-section__labels-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin: -0.25rem 0 0.9rem;
+}
+
+.hero-section__labels-row:empty {
+  display: none;
+}
+
+/* The Add/Edit Labels button keeps .section-add-btn's look but drops its
+   default bottom margin (a two-class selector beats the later single-class
+   rule) so it centers flush with the pills in this row. */
+.hero-section__labels-row .section-add-btn {
+  margin-bottom: 0;
+}
+
 @media (max-width: 768px) {
   .hero-section__stats-row {
     grid-template-columns: 1fr;
@@ -1192,6 +1216,12 @@
   gap: 0.7rem;
 }
 
+/* The innate add button lives inside this column grid — keep it content-sized
+   like every other section's add button instead of stretching full width. */
+.ability-grid--core > .section-add-btn {
+  align-self: flex-start;
+}
+
 .ability-card {
   display: flex;
   flex-direction: column;
@@ -1502,15 +1532,31 @@
   font-size: 0.95rem;
 }
 
+/* ---- Edit-mode sheet buttons ---------------------------------------------- */
+
+/* Convention: text buttons that appear ON the sheet in edit mode (portrait
+   upload, section add buttons, ability card Edit/Remove) share a dashed
+   border. Modal footers and view-mode/live-play controls stay solid; icon
+   buttons are frameless. Keep new edit-mode buttons in this group. */
+.portrait-uploader__btn,
+.section-add-btn,
+.custom-tab-content__add-section,
+.ability-card__action-btn {
+  border-style: dashed;
+}
+
+/* Uniform sizing for the small on-sheet edit buttons that appear next to
+   each other (Upload Portrait ↔ Add/Edit Labels). */
+.portrait-uploader__btn,
+.section-add-btn {
+  font-size: 0.8rem;
+  padding: 0.35rem 0.75rem;
+}
+
 /* ---- Phase 5: portrait uploader ------------------------------------------ */
 
 .portrait-uploader {
   margin-top: 0.5rem;
-}
-
-.portrait-uploader__btn {
-  font-size: 0.75rem;
-  padding: 0.3rem 0.6rem;
 }
 
 .portrait-uploader__input {
@@ -1687,10 +1733,7 @@
 /* ---- Phase 5: section add button ------------------------------------------ */
 
 .section-add-btn {
-  font-size: 0.8rem;
-  padding: 0.35rem 0.75rem;
   margin-bottom: 0.6rem;
-  border-style: dashed;
 }
 
 /* ---- Phase 6: drag-and-drop ----------------------------------------------- */
@@ -2115,6 +2158,96 @@
   font-size: 0.85rem;
   padding: 0.4rem 0.9rem;
   white-space: nowrap;
+}
+
+/* ---- Edit Labels modal ----------------------------------------------------- */
+
+.edit-labels-modal {
+  max-width: 480px;
+}
+
+.edit-labels-modal__body {
+  padding: 1rem 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.edit-labels-modal__hint {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.edit-labels-modal__empty {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.edit-labels-modal__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  max-height: 40vh;
+  overflow-y: auto;
+}
+
+.edit-labels-modal__row {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr) auto;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.edit-labels-modal__name-input {
+  font-size: 0.85rem;
+}
+
+.edit-labels-modal__value-input {
+  font-size: 0.85rem;
+}
+
+.edit-labels-modal__delete {
+  color: var(--text-muted);
+}
+
+.edit-labels-modal__delete:hover {
+  color: var(--danger);
+}
+
+.edit-labels-modal__add-btn {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.82rem;
+}
+
+@media (max-width: 480px) {
+  /* Stack name above value on narrow phones; keep the delete button beside
+     them via a two-row grid so touch targets stay comfortable. */
+  .edit-labels-modal__row {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-areas:
+      'name name delete'
+      'value value delete';
+    row-gap: 0.3rem;
+  }
+
+  .edit-labels-modal__row .edit-labels-modal__name-input {
+    grid-area: name;
+  }
+
+  .edit-labels-modal__row .edit-labels-modal__value-input {
+    grid-area: value;
+  }
+
+  .edit-labels-modal__row .edit-labels-modal__delete {
+    grid-area: delete;
+  }
 }
 
 /* ---- Phase 9: milestone dialog ------------------------------------------- */
@@ -3522,7 +3655,8 @@
   align-items: center;
   gap: 0.35rem;
   padding: 0.5rem 0.85rem;
-  border: 1px dashed var(--border-soft);
+  /* Color only — dash pattern comes from the edit-mode button group above. */
+  border-color: var(--border-soft);
   border-radius: 8px;
   font-size: 0.85rem;
 }
