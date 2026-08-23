@@ -14,7 +14,10 @@
   border-bottom: 1px solid var(--border-soft);
   position: sticky;
   top: 0;
-  z-index: 10;
+  /* Sits above ALL overlay layers (modals 2000, roll-log chrome 1500,
+     selector drawer 50): the persistent app chrome must never be covered
+     by sheet-mounted modals or floating controls. */
+  z-index: 3000;
 }
 
 .app-header__divider {

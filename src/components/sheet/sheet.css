@@ -1788,15 +1788,12 @@
 
 /* ---- Phase 7: damage dialog (HP clickable now handled by ResourceBar) ----- */
 
-/* Modals are mounted inside the sheet content, which sits in a z-index: 2
-   stacking context. The sticky app title bar (z-index: 10) would paint above
-   them — visible on mobile where the dialog fills the screen and its header
-   runs under the title bar. Lift the content context above the app chrome
-   whenever any modal overlay is open. */
-body:has(.modal-overlay) .sheet-page__content {
-  z-index: 2000;
-}
-
+/* Modals are mounted inline inside the sheet content (no portal), so they
+   inherit the sheet's CSS custom properties (per-character theme colors).
+   The overlay is position: fixed and participates in the root stacking
+   context via .sheet-page__content's z-index: 2 layer, where it sits above
+   all in-sheet UI but BELOW the app title bar (z-index: 3000) — the app
+   chrome always stays on top of modal overlays. */
 .modal-overlay {
   position: fixed;
   inset: 0;
