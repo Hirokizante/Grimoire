@@ -7,7 +7,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react'
-import { useEscapeKey } from '@/hooks/useEscapeKey'
+import { useModalDialog } from '@/hooks/useModalDialog'
 
 export interface CreateStatusModalProps {
   /** Called with the non-empty name on confirm. */
@@ -23,7 +23,7 @@ export default function CreateStatusModal({
   const [name, setName] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
 
-  useEscapeKey(onClose)
+  const dialogRef = useModalDialog(onClose)
 
   useEffect(() => {
     inputRef.current?.focus()
@@ -40,6 +40,8 @@ export default function CreateStatusModal({
     <div className="modal-overlay" onClick={onClose}>
       <div
         className="modal-content create-status-modal"
+        ref={dialogRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-label="Create new status"

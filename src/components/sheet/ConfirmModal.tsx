@@ -8,7 +8,7 @@
  * Used by ExportDialog, TabBar, AbilityPoolSection, SlottedAbilitiesSection,
  * and AbilityEditorModal for consistent confirmation UX.
  */
-import { useEscapeKey } from '@/hooks/useEscapeKey'
+import { useModalDialog } from '@/hooks/useModalDialog'
 
 export type ConfirmVariant = 'danger' | 'warning' | 'info'
 
@@ -38,12 +38,14 @@ export default function ConfirmModal({
   onConfirm,
   onClose,
 }: ConfirmModalProps) {
-  useEscapeKey(onClose)
+  const dialogRef = useModalDialog(onClose)
 
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div
         className="modal-content confirm-delete-modal"
+        ref={dialogRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-label={title}

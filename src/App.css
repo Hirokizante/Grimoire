@@ -27,6 +27,18 @@
   flex-shrink: 0;
 }
 
+/* When any modal is open, the title bar recedes behind it like every other
+ * chrome layer (mirrors the floating-control treatment in dice.css): blurred
+ * and dimmed so only the dialog reads as interactive, and pointer-events
+ * disabled so nav can't be triggered while a dialog is pending. The bar
+ * keeps its z-index: 3000 stacking position — this is purely a state change,
+ * not a re-order. */
+.app:has(.modal-overlay) .app-header {
+  filter: blur(4px);
+  opacity: 0.4;
+  pointer-events: none;
+}
+
 .app-title {
   /* Rendered as a button: it doubles as the Home navigation target. */
   display: inline-flex;

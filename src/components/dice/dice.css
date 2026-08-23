@@ -209,9 +209,11 @@
 }
 
 /* When any modal is open, blur + dim both floating controls so the modal
- * backdrop-filter blur effect is consistent across the chrome. Without this
- * the opaque roll-log-tab doesn't inherit the overlay's blur and looks fully
- * sharp while the mode toggle shows the 4px backdrop-filter beneath it. */
+ * backdrop-filter blur effect is consistent across the chrome (title bar:
+ * App.css; selector toggle: sheet.css). Without this the opaque roll-log-tab
+ * doesn't inherit the overlay's blur and looks fully sharp while the mode
+ * toggle shows the 4px backdrop-filter beneath it. All chrome is also
+ * pointer-events: none so nothing outside the dialog is interactable. */
 .app:has(.modal-overlay) .roll-log-tab,
 .app:has(.modal-overlay) .mode-toggle--floating {
   filter: blur(4px);

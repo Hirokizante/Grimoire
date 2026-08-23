@@ -281,7 +281,7 @@ Grimoire/
 │   ├── context/
 │   │   └── NotificationContext.tsx # Toast notification system
 │   ├── hooks/
-│   │   ├── useEscapeKey.ts        # Esc-to-close for modals
+│   │   ├── useModalDialog.ts      # Shared modal behavior: scroll lock, Esc, focus trap/restore
 │   │   └── useImportedFonts.ts     # Google Fonts link injection
 │   ├── lib/
 │   │   ├── calculations.ts  # Pure derived-stat formulas (HP, EVA, etc.)

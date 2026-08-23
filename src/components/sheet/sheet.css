@@ -1793,7 +1793,10 @@
    The overlay is position: fixed and participates in the root stacking
    context via .sheet-page__content's z-index: 2 layer, where it sits above
    all in-sheet UI but BELOW the app title bar (z-index: 3000) — the app
-   chrome always stays on top of modal overlays. */
+   chrome always stays on top of modal overlays. While a modal is open, all
+   chrome layers (title bar, floating controls, selector toggle) are blurred,
+   dimmed, and non-interactive — see App.css and the rule below; body scroll
+   is locked by useModalDialog. */
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -3683,6 +3686,15 @@
 
 .char-selector__toggle--open {
   left: 240px;
+}
+
+/* When any modal is open, the selector toggle recedes behind it like every
+ * other chrome layer (title bar: App.css; floating dice controls: dice.css):
+ * blurred, dimmed, and non-interactive so only the dialog is reachable. */
+.app:has(.modal-overlay) .char-selector__toggle {
+  filter: blur(4px);
+  opacity: 0.4;
+  pointer-events: none;
 }
 
 /* When the selector is open on wide screens, shift the page content right to

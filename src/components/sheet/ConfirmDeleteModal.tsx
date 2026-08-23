@@ -6,7 +6,7 @@
  * Overlay click or ✕ dismisses as "cancel".
  */
 
-import { useEscapeKey } from '@/hooks/useEscapeKey'
+import { useModalDialog } from '@/hooks/useModalDialog'
 
 export interface ConfirmDeleteModalProps {
   /** The character/item name being deleted (shown in the message). */
@@ -22,12 +22,14 @@ export default function ConfirmDeleteModal({
   onConfirm,
   onClose,
 }: ConfirmDeleteModalProps) {
-  useEscapeKey(onClose)
+  const dialogRef = useModalDialog(onClose)
 
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div
         className="modal-content confirm-delete-modal"
+        ref={dialogRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-label="Confirm deletion"

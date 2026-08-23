@@ -11,7 +11,7 @@
  * via useEscapeKey, footer has the action buttons.
  */
 
-import { useEscapeKey } from '@/hooks/useEscapeKey'
+import { useModalDialog } from '@/hooks/useModalDialog'
 import { compareSemver } from '@/lib/exportImport'
 
 export interface UpdateCharacterModalProps {
@@ -37,7 +37,7 @@ export default function UpdateCharacterModal({
   onImportAsNew,
   onClose,
 }: UpdateCharacterModalProps) {
-  useEscapeKey(onClose)
+  const dialogRef = useModalDialog(onClose)
 
   const comparison = compareSemver(importedVersion, existingVersion)
   const isNewer = comparison > 0
@@ -52,6 +52,8 @@ export default function UpdateCharacterModal({
     <div className="modal-overlay" onClick={onClose}>
       <div
         className="modal-content update-character-modal"
+        ref={dialogRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-label="Import existing character"

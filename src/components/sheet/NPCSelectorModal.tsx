@@ -8,12 +8,12 @@
  * name and create a fresh blank NPC instead.
  *
  * Follows the project's modal convention: overlay click or ✕ closes, Esc
- * closes via useEscapeKey, footer has Cancel.
+ * closes via useModalDialog, footer has Cancel.
  */
 
 import { User, UserPlus } from 'lucide-react'
 
-import { useEscapeKey } from '@/hooks/useEscapeKey'
+import { useModalDialog } from '@/hooks/useModalDialog'
 import { useCharacterStore } from '@/store/characterStore'
 import type { Character } from '@/types'
 
@@ -32,7 +32,7 @@ export default function NPCSelectorModal({
   onCreateNew,
   onClose,
 }: NPCSelectorModalProps) {
-  useEscapeKey(onClose, open)
+  const dialogRef = useModalDialog(onClose, open)
 
   const npcs = useCharacterStore((s) => s.characters).filter(
     (c) => c.kind === 'npc',
@@ -44,6 +44,8 @@ export default function NPCSelectorModal({
     <div className="modal-overlay" onClick={onClose}>
       <div
         className="modal-content npc-selector-modal"
+        ref={dialogRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-label="Choose an NPC"

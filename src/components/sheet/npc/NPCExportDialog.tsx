@@ -11,7 +11,7 @@
 import { useState } from 'react'
 import { ArrowUpFromLine, Hash } from 'lucide-react'
 
-import { useEscapeKey } from '@/hooks/useEscapeKey'
+import { useModalDialog } from '@/hooks/useModalDialog'
 import { useNotification } from '@/context/NotificationContext'
 import { useCharacterStore } from '@/store/characterStore'
 import {
@@ -34,7 +34,7 @@ export default function NPCExportDialog({
 
   const [versionOverrideText, setVersionOverrideText] = useState('')
 
-  useEscapeKey(onClose, open)
+  const dialogRef = useModalDialog(onClose, open)
 
   if (!currentCharacter || !open) return null
 
@@ -58,6 +58,8 @@ export default function NPCExportDialog({
     <div className="modal-overlay" onClick={onClose}>
       <div
         className="modal-content export-dialog"
+        ref={dialogRef}
+        tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="modal-header">

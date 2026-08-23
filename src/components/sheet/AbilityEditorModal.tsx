@@ -10,7 +10,7 @@ import { useCallback, useMemo, useState } from 'react'
 
 import AbilityBlockEditor from '@/components/sheet/AbilityBlockEditor'
 import ConfirmModal from '@/components/sheet/ConfirmModal'
-import { useEscapeKey } from '@/hooks/useEscapeKey'
+import { useModalDialog } from '@/hooks/useModalDialog'
 import type { AbilityBlock } from '@/types'
 
 export interface AbilityEditorModalProps {
@@ -65,8 +65,9 @@ export default function AbilityEditorModal({
     setHasUnsavedChanges(isDirty)
   }, [])
 
-  // If there are unsaved changes, intercept Esc too.
-  useEscapeKey(
+  // If there are unsaved changes, intercept Esc too. Scroll lock, focus trap
+  // and focus restore come from useModalDialog.
+  const dialogRef = useModalDialog(
     () => {
       if (hasUnsavedChanges) {
         setShowDiscardConfirm(true)
@@ -83,6 +84,8 @@ export default function AbilityEditorModal({
     <div className="modal-overlay" onClick={handleCancel}>
       <div
         className="modal-content ability-editor-dialog"
+        ref={dialogRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-label={ability ? 'Edit Ability' : 'New Ability'}

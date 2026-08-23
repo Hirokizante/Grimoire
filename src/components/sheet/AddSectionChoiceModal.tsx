@@ -9,7 +9,7 @@
 
 import { ScrollText, User, FileText } from 'lucide-react'
 
-import { useEscapeKey } from '@/hooks/useEscapeKey'
+import { useModalDialog } from '@/hooks/useModalDialog'
 import type { LucideIcon } from 'lucide-react'
 
 export type AddSectionChoice = 'ability' | 'npc' | 'text'
@@ -56,7 +56,7 @@ export default function AddSectionChoiceModal({
   onChoose,
   onClose,
 }: AddSectionChoiceModalProps) {
-  useEscapeKey(onClose, open)
+  const dialogRef = useModalDialog(onClose, open)
 
   if (!open) return null
 
@@ -64,6 +64,8 @@ export default function AddSectionChoiceModal({
     <div className="modal-overlay" onClick={onClose}>
       <div
         className="modal-content add-section-choice-modal"
+        ref={dialogRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-label="Add a section"

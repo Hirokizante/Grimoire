@@ -12,7 +12,7 @@
 
 import { useState } from 'react'
 import { ATTRIBUTE_LIST, SKILL_LIST } from '@/constants/gameData'
-import { useEscapeKey } from '@/hooks/useEscapeKey'
+import { useModalDialog } from '@/hooks/useModalDialog'
 import { useNotification } from '@/context/NotificationContext'
 import { useCharacterStore } from '@/store/characterStore'
 import type { AttributeKey, SkillName } from '@/types'
@@ -34,7 +34,7 @@ export default function MilestoneDialog({ onClose }: MilestoneDialogProps) {
   const [selectedSkill, setSelectedSkill] = useState<SkillName | null>(null)
   const [choice, setChoice] = useState<'slot' | 'fp' | null>(null)
 
-  useEscapeKey(onClose)
+  const dialogRef = useModalDialog(onClose)
 
   if (!character) return null
 
@@ -93,6 +93,8 @@ export default function MilestoneDialog({ onClose }: MilestoneDialogProps) {
     <div className="modal-overlay" onClick={onClose}>
       <div
         className="modal-content milestone-dialog"
+        ref={dialogRef}
+        tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="modal-header">

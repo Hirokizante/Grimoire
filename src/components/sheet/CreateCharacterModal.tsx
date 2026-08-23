@@ -7,7 +7,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react'
-import { useEscapeKey } from '@/hooks/useEscapeKey'
+import { useModalDialog } from '@/hooks/useModalDialog'
 
 export interface CreateCharacterModalProps {
   /** Called when the user confirms the name. Empty/blank names are not passed. */
@@ -23,7 +23,7 @@ export default function CreateCharacterModal({
   const [name, setName] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
 
-  useEscapeKey(onClose)
+  const dialogRef = useModalDialog(onClose)
 
   useEffect(() => {
     // Auto-focus the input when the modal opens.
@@ -41,6 +41,8 @@ export default function CreateCharacterModal({
     <div className="modal-overlay" onClick={onClose}>
       <div
         className="modal-content create-character-modal"
+        ref={dialogRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-label="Create new character"

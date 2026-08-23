@@ -16,7 +16,7 @@
 import { useEffect, useState } from 'react'
 import { ArrowUpFromLine, Hash, RotateCcw, Trash2 } from 'lucide-react'
 
-import { useEscapeKey } from '@/hooks/useEscapeKey'
+import { useModalDialog } from '@/hooks/useModalDialog'
 import { useNotification } from '@/context/NotificationContext'
 import { useCharacterStore } from '@/store/characterStore'
 import { bumpSemver, downloadJson, serializeSemver, versionedFilename } from '@/lib/exportImport'
@@ -55,7 +55,7 @@ export default function ExportDialog({ open, onClose }: ExportDialogProps) {
   const [pendingRestore, setPendingRestore] = useState<{ id: string; version: Semver } | null>(null)
   const [pendingDelete, setPendingDelete] = useState<{ id: string; version: Semver } | null>(null)
 
-  useEscapeKey(onClose, open && !pendingRestore && !pendingDelete)
+  const dialogRef = useModalDialog(onClose, open && !pendingRestore && !pendingDelete)
 
   // Reload history whenever the dialog opens.
   useEffect(() => {
@@ -114,6 +114,8 @@ export default function ExportDialog({ open, onClose }: ExportDialogProps) {
     <div className="modal-overlay" onClick={onClose}>
       <div
         className="modal-content export-dialog"
+        ref={dialogRef}
+        tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="modal-header">

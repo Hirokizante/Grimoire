@@ -9,7 +9,7 @@
  *   - Done button + click-outside-to-dismiss + Esc to dismiss
  */
 
-import { useEscapeKey } from '@/hooks/useEscapeKey'
+import { useModalDialog } from '@/hooks/useModalDialog'
 import { useDiceRollStore } from '@/store/diceRollStore'
 import { sourceLabel } from '@/lib/rollSourceUtils'
 
@@ -22,7 +22,7 @@ export default function DiceResultModal({ onClose, style }: DiceResultModalProps
   const result = useDiceRollStore((s) => s.result)
   const source = useDiceRollStore((s) => s.source)
 
-  useEscapeKey(onClose)
+  const dialogRef = useModalDialog(onClose)
 
   if (!result) return null
 
@@ -51,6 +51,8 @@ export default function DiceResultModal({ onClose, style }: DiceResultModalProps
     >
       <div
         className="modal-content dice-modal"
+        ref={dialogRef}
+        tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="modal-header">

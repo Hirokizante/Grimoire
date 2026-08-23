@@ -14,7 +14,7 @@ import ConfirmModal from '@/components/sheet/ConfirmModal'
 import MarkdownText from '@/components/ui/MarkdownText'
 import StatusIcon from '@/components/status/StatusIcon'
 import StatusIconPicker from '@/components/status/StatusIconPicker'
-import { useEscapeKey } from '@/hooks/useEscapeKey'
+import { useModalDialog } from '@/hooks/useModalDialog'
 import { useStatusStore } from '@/store/statusStore'
 import { DEFAULT_STATUS_TAG } from '@/types/status'
 import type { StatusCondition } from '@/types'
@@ -82,7 +82,7 @@ export default function StatusModal() {
     setEditing(false)
   }
 
-  useEscapeKey(handleClose, open && !showDiscard)
+  const dialogRef = useModalDialog(handleClose, open && !showDiscard)
 
   if (!open || !status) return null
 
@@ -90,6 +90,8 @@ export default function StatusModal() {
     <div className="modal-overlay" onClick={handleClose}>
       <div
         className="modal-content status-modal"
+        ref={dialogRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-label={editing ? 'Edit status' : 'Status details'}

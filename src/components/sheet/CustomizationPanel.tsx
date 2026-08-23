@@ -13,7 +13,7 @@
 import { useRef, useState } from 'react'
 import { HexColorPicker } from 'react-colorful'
 import { processImage } from '@/lib/imageProcessing'
-import { useEscapeKey } from '@/hooks/useEscapeKey'
+import { useModalDialog } from '@/hooks/useModalDialog'
 import { useCharacterStore } from '@/store/characterStore'
 import { FontImportSection } from '@/components/sheet/FontImportSection'
 import {
@@ -746,7 +746,7 @@ export default function CustomizationPanel({
   const config = useCharacterStore((s) => s.currentCharacter?.config)
   const updateConfig = useCharacterStore((s) => s.updateConfig)
 
-  useEscapeKey(onClose, open)
+  const dialogRef = useModalDialog(onClose, open)
 
   if (!config || !open) return null
 
@@ -754,6 +754,11 @@ export default function CustomizationPanel({
     <div className="modal-overlay" onClick={onClose}>
       <div
         className="modal-content customize-modal"
+        ref={dialogRef}
+        tabIndex={-1}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Customize Sheet"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="modal-header customize-panel__header">

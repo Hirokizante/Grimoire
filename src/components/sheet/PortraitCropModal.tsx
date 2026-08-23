@@ -19,7 +19,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 
-import { useEscapeKey } from '@/hooks/useEscapeKey'
+import { useModalDialog } from '@/hooks/useModalDialog'
 import { processImage, processImageCrop } from '@/lib/imageProcessing'
 
 export interface PortraitCropModalProps {
@@ -78,7 +78,7 @@ export default function PortraitCropModal({
   const onUpdateRef = useRef(onUpdate)
   onUpdateRef.current = onUpdate
 
-  useEscapeKey(onClose, !!file)
+  const dialogRef = useModalDialog(onClose, !!file)
 
   // Track the viewport size on window resize.
   useEffect(() => {
@@ -219,6 +219,8 @@ export default function PortraitCropModal({
     <div className="modal-overlay" onClick={onClose}>
       <div
         className="modal-content portrait-crop-modal"
+        ref={dialogRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-label="Crop portrait"
