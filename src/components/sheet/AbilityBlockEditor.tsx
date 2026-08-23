@@ -8,6 +8,10 @@
  * Cost fields (ap / end / fp) are optional — empty inputs are stored as
  * `undefined`. Traits are edited as a single comma-separated text input and
  * converted to/from the string array on the AbilityBlock.
+ *
+ * In `npcMode` (NPC sheets), character-only controls are hidden: NPCs have no
+ * END or FP pools (so no END/FP cost inputs), no Ability Slots (so no Minor
+ * Ability toggle), and no Activate button (so no "Show Activate" toggle).
  */
 
 import { useState, useEffect } from 'react'
@@ -26,6 +30,11 @@ export interface AbilityBlockEditorProps {
   hideTitle?: boolean
   /** Called whenever the dirty state changes (true = has unsaved changes). */
   onDirtyChange?: (isDirty: boolean) => void
+  /**
+   * When true (NPC sheet context), hide character-only controls:
+   * END/FP cost inputs, "Minor Ability" toggle, "Show Activate button" toggle.
+   */
+  npcMode?: boolean
 }
 
 /** Build a blank AbilityBlock for the "new" case. */
@@ -66,6 +75,7 @@ export default function AbilityBlockEditor({
   onCancel,
   hideTitle = false,
   onDirtyChange,
+  npcMode = false,
 }: AbilityBlockEditorProps) {
   const [draft, setDraft] = useState<AbilityBlock>(ability ?? blankAbility())
   const [traitsText, setTraitsText] = useState(serializeTraits(draft.traits))
@@ -157,28 +167,32 @@ export default function AbilityBlockEditor({
               placeholder="—"
             />
           </label>
-          <label className="ability-editor__field">
-            <span className="ability-editor__label">END Cost</span>
-            <input
-              type="number"
-              className="sheet-input sheet-input--num"
-              min={0}
-              value={costNum('end')}
-              onChange={(e) => setCost('end', e.target.value)}
-              placeholder="—"
-            />
-          </label>
-          <label className="ability-editor__field">
-            <span className="ability-editor__label">FP Cost</span>
-            <input
-              type="number"
-              className="sheet-input sheet-input--num"
-              min={0}
-              value={costNum('fp')}
-              onChange={(e) => setCost('fp', e.target.value)}
-              placeholder="—"
-            />
-          </label>
+          {!npcMode && (
+            <>
+              <label className="ability-editor__field">
+                <span className="ability-editor__label">END Cost</span>
+                <input
+                  type="number"
+                  className="sheet-input sheet-input--num"
+                  min={0}
+                  value={costNum('end')}
+                  onChange={(e) => setCost('end', e.target.value)}
+                  placeholder="—"
+                />
+              </label>
+              <label className="ability-editor__field">
+                <span className="ability-editor__label">FP Cost</span>
+                <input
+                  type="number"
+                  className="sheet-input sheet-input--num"
+                  min={0}
+                  value={costNum('fp')}
+                  onChange={(e) => setCost('fp', e.target.value)}
+                  placeholder="—"
+                />
+              </label>
+            </>
+          )}
         </div>
 
         <label className="ability-editor__field">
@@ -231,27 +245,31 @@ export default function AbilityBlockEditor({
           />
         </label>
 
-        <label className="ability-editor__field ability-editor__field--inline">
-          <input
-            type="checkbox"
-            checked={draft.isMinor}
-            onChange={(e) =>
-              setDraft({ ...draft, isMinor: e.target.checked })
-            }
-          />
-          <span className="ability-editor__label">Minor Ability (half slot)</span>
-        </label>
+        {!npcMode && (
+          <label className="ability-editor__field ability-editor__field--inline">
+            <input
+              type="checkbox"
+              checked={draft.isMinor}
+              onChange={(e) =>
+                setDraft({ ...draft, isMinor: e.target.checked })
+              }
+            />
+            <span className="ability-editor__label">Minor Ability (half slot)</span>
+          </label>
+        )}
 
-        <label className="ability-editor__field ability-editor__field--inline">
-          <input
-            type="checkbox"
-            checked={draft.showActivate}
-            onChange={(e) =>
-              setDraft({ ...draft, showActivate: e.target.checked })
-            }
-          />
-          <span className="ability-editor__label">Show Activate button</span>
-        </label>
+        {!npcMode && (
+          <label className="ability-editor__field ability-editor__field--inline">
+            <input
+              type="checkbox"
+              checked={draft.showActivate}
+              onChange={(e) =>
+                setDraft({ ...draft, showActivate: e.target.checked })
+              }
+            />
+            <span className="ability-editor__label">Show Activate button</span>
+          </label>
+        )}
 
         <div className="ability-editor__actions">
           <button

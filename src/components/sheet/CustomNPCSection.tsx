@@ -485,6 +485,7 @@ export default function CustomNPCSection({
           setShowAbilityEditor(false)
           setEditingAbility(null)
         }}
+        npcMode
       />
 
       {abilityToRemove && (

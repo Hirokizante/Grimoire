@@ -196,6 +196,7 @@ export default function NPCAbilitiesSection({
         open={showEditor}
         onSave={handleSave}
         onClose={handleCancel}
+        npcMode
       />
 
       {abilityToRemove && (

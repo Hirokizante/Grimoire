@@ -22,6 +22,8 @@ export interface AbilityEditorModalProps {
   onSave: (ability: AbilityBlock) => void
   /** Called when the user closes (Esc, overlay, cancel, or close button). */
   onClose: () => void
+  /** NPC variant: hide character-only controls in the editor form. */
+  npcMode?: boolean
 }
 
 export default function AbilityEditorModal({
@@ -29,6 +31,7 @@ export default function AbilityEditorModal({
   open,
   onSave,
   onClose,
+  npcMode = false,
 }: AbilityEditorModalProps) {
   // Stable key so a fresh AbilityBlockEditor mounts on every open (clean state).
   const editorKey = useMemo(
@@ -97,6 +100,7 @@ export default function AbilityEditorModal({
             onCancel={editorCancelHandler}
             hideTitle
             onDirtyChange={handleDirtyChange}
+            npcMode={npcMode}
           />
         </div>
       </div>
