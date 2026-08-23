@@ -3,7 +3,7 @@
  */
 
 import DiceResultModal from '@/components/dice/DiceResultModal'
-import { useDiceRollStore } from '@/store/diceRollStore'
+import { useDiceRollStore, themeEntity } from '@/store/diceRollStore'
 import { colorVars } from '@/lib/themeUtils'
 
 export default function DiceRollOverlay() {
@@ -13,7 +13,11 @@ export default function DiceRollOverlay() {
 
   if (!isVisible) return null
 
-  const style = rollCharacter ? colorVars(rollCharacter.config.colors) : undefined
+  // themeEntity resolves whose palette the modal renders with: player sheets
+  // use their own colors; standalone NPC sheets follow the app theme;
+  // embedded NPC sections inherit the host player sheet's palette.
+  const entity = rollCharacter ? (themeEntity() ?? rollCharacter) : null
+  const style = entity ? colorVars(entity.config.colors) : undefined
 
   return <DiceResultModal onClose={dismiss} style={style} />
 }

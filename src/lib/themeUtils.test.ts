@@ -2,6 +2,7 @@ import { test, expect } from 'vitest'
 import {
   appThemeSheetCardBackground,
   appThemeSheetColors,
+  appThemeColorVars,
   appThemeSheetPageBackground,
   colorVars,
 } from '@/lib/themeUtils'
@@ -52,6 +53,12 @@ test('colorVars maps the parchment palette onto the shared sheet variables', () 
   expect(vars['--bg-base']).toBe('#262626')
   expect(vars['--accent-violet-soft']).toBe('#c5b8a0')
   expect(vars['--accent-blush']).toBe(PARCHMENT_SHEET_COLORS.hpBar)
+})
+
+test('appThemeColorVars matches colorVars of the theme palette', () => {
+  for (const theme of ['midnight', 'parchment', 'mikami', 'pitch-black'] as const) {
+    expect(appThemeColorVars(theme)).toEqual(colorVars(appThemeSheetColors(theme)))
+  }
 })
 
 test('sheet card/page backgrounds follow the theme except in midnight', () => {

@@ -6,7 +6,8 @@ import { useRef, useEffect, useState } from 'react'
 import { Dices, Trash2 } from 'lucide-react'
 import { useRollLogStore } from '@/store/rollLogStore'
 import { useCharacterStore } from '@/store/characterStore'
-import { colorVars } from '@/lib/themeUtils'
+import { useAppThemeStore } from '@/store/appThemeStore'
+import { colorVars, appThemeColorVars } from '@/lib/themeUtils'
 import { rollLogSourceLabel } from '@/lib/rollSourceUtils'
 import type { RollLogEntry } from '@/types'
 
@@ -18,12 +19,21 @@ export default function RollLogDrawer() {
   const deleteEntry = useRollLogStore((s) => s.deleteEntry)
   const clearAll = useRollLogStore((s) => s.clearAll)
   const character = useCharacterStore((s) => s.currentCharacter)
+  const appTheme = useAppThemeStore((s) => s.theme)
 
   const drawerRef = useRef<HTMLDivElement>(null)
   const [expanded, setExpanded] = useState<string | null>(null)
   const [clearConfirm, setClearConfirm] = useState(false)
 
-  const themeStyle = character ? colorVars(character.config.colors) : undefined
+  // Match the dice-result modal's theming: player sheets use their own
+  // colors; standalone NPC sheets follow the app theme. The drawer lives
+  // outside the sheet card, so embedded NPC sections also follow the app
+  // theme rather than the host player's palette.
+  const themeStyle = !character
+    ? undefined
+    : character.kind === 'npc'
+      ? appThemeColorVars(appTheme)
+      : colorVars(character.config.colors)
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {

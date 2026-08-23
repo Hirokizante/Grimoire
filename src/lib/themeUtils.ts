@@ -64,6 +64,16 @@ export function appThemeSheetPageBackground(
 }
 
 /**
+ * CSS custom properties for a standalone sheet that follows the app theme.
+ * NPCs have no per-sheet customization, so overlays that outlive the page
+ * (dice result modal, roll log) use the theme's palette for them instead of
+ * their midnight-default config colors.
+ */
+export function appThemeColorVars(theme: AppTheme): Record<string, string> {
+  return colorVars(appThemeSheetColors(theme))
+}
+
+/**
  * Map a SheetColors object onto CSS custom properties. This is the single
  * injection point that drives the entire per-character theme.
  */
