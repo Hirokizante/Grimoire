@@ -19,7 +19,6 @@
  */
 
 import { useState } from 'react'
-import CustomizationPanel from '@/components/sheet/CustomizationPanel'
 
 import { useCharacterStore } from '@/store/characterStore'
 import { colorVars } from '@/lib/themeUtils'
@@ -45,6 +44,8 @@ export interface CharacterSheetProps {
   character?: Character
   mode?: SheetMode
   onModeChange?: (mode: SheetMode) => void
+  /** Toggles the customization drawer (rendered by the page, not the sheet). */
+  onCustomizeToggle?: () => void
 }
 
 /**
@@ -76,6 +77,7 @@ export default function CharacterSheet({
   character,
   mode = 'view',
   onModeChange,
+  onCustomizeToggle,
 }: CharacterSheetProps) {
   const storeCharacter = useCharacterStore((s) => s.currentCharacter)
   const updateSectionViewMode = useCharacterStore((s) => s.updateSectionViewMode)
@@ -88,7 +90,6 @@ export default function CharacterSheet({
 
   const char = character ?? storeCharacter
   const [showMilestoneDialog, setShowMilestoneDialog] = useState(false)
-  const [showCustomize, setShowCustomize] = useState(false)
   const [showExport, setShowExport] = useState(false)
   const [activeTab, setActiveTab] = useState('main')
 
@@ -151,12 +152,7 @@ export default function CharacterSheet({
 
       {activeTab === 'main' ? (
         <>
-          <HeroSection character={char} mode={mode} onLevelUp={() => setShowMilestoneDialog(true)} onCustomize={() => setShowCustomize(true)} onExport={() => setShowExport(true)} />
-
-          <CustomizationPanel
-            open={showCustomize}
-            onClose={() => setShowCustomize(false)}
-          />
+          <HeroSection character={char} mode={mode} onLevelUp={() => setShowMilestoneDialog(true)} onCustomize={onCustomizeToggle} onExport={() => setShowExport(true)} />
 
           <CoreAbilitySection
             innateDescription={char.innateDescription}

@@ -1,20 +1,28 @@
 /**
- * CustomizationPanel — a modal dialog for sheet aesthetics.
+ * CustomizationPanel — a slide-out drawer for sheet aesthetics.
  *
  * Exposes every configurable color in `SheetColors` as a simple grid of
  * swatches + optional hex input, organized into named groups. No custom CSS
  * required for theme changes. Custom CSS textarea remains available for
  * advanced users at the bottom.
  *
- * All changes are applied live via CSS variables (CharacterSheet already wires
- * them in) and persisted per-character through the store's updateConfig action.
+ * The drawer docks on the right edge on wide screens (the sheet shifts left
+ * to make room, mirroring CharacterSelector on the left) and rises from the
+ * bottom on phones, so the sheet stays visible and interactive while changes
+ * apply live via CSS variables (CharacterSheet already wires them in) and
+ * persist per-character through the store's updateConfig action.
+ *
+ * Unlike the app's modals this is intentionally NOT a .modal-overlay: the
+ * chrome (title bar, dice controls, selector) stays sharp and the sheet
+ * remains fully usable while the drawer is open.
  */
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { HexColorPicker } from 'react-colorful'
+import { X } from 'lucide-react'
 import { processImage } from '@/lib/imageProcessing'
-import { useModalDialog } from '@/hooks/useModalDialog'
 import { useCharacterStore } from '@/store/characterStore'
+import { colorVars } from '@/lib/themeUtils'
 import { FontImportSection } from '@/components/sheet/FontImportSection'
 import {
   DEFAULT_SHEET_COLORS,
@@ -746,153 +754,178 @@ export default function CustomizationPanel({
   const config = useCharacterStore((s) => s.currentCharacter?.config)
   const updateConfig = useCharacterStore((s) => s.updateConfig)
 
-  const dialogRef = useModalDialog(onClose, open)
+  // Escape closes the drawer (scoped: only when no modal is open above it).
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !document.querySelector('.modal-overlay')) {
+        onClose()
+      }
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [open, onClose])
 
-  if (!config || !open) return null
+  // Deliberately NO click-outside-to-close: the drawer's whole purpose is
+  // that the sheet stays interactive while it's open (live preview, scroll,
+  // live-play). Dismissal is via the ✕ header button, the HeroSection
+  // Customize button (toggle), or Escape — mirroring CharacterSelector,
+  // which only toggles via its tab.
+
+  if (!config) return null
+
+  // Inherit the sheet's own color scheme, mirroring CharacterSelector: inline
+  // CSS custom properties shadow the app-theme root vars so the drawer reads
+  // as part of the sheet being customized.
+  const paletteStyle = colorVars(config.colors) as React.CSSProperties
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div
+      className={
+        'customize-drawer' + (open ? ' customize-drawer--open' : '')
+      }
+      style={paletteStyle}
+      role="dialog"
+      aria-modal="false"
+      aria-label="Customize Sheet"
+      aria-hidden={!open}
+    >
+      <div className="customize-drawer__header">
+        <h3 className="customize-drawer__title">Customize Sheet</h3>
+        <button
+          type="button"
+          className="btn btn--icon modal-close"
+          onClick={onClose}
+          aria-label="Close customization panel"
+          tabIndex={open ? 0 : -1}
+        >
+          <X size={16} />
+        </button>
+      </div>
+
       <div
-        className="modal-content customize-modal"
-        ref={dialogRef}
-        tabIndex={-1}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Customize Sheet"
-        onClick={(e) => e.stopPropagation()}
+        className="customize-panel__body"
+        inert={!open ? true : undefined}
       >
-        <div className="modal-header customize-panel__header">
-          <h3>Customize Sheet</h3>
-          <button
-            type="button"
-            className="btn btn--icon modal-close"
-            onClick={onClose}
-          >
-            ✕
-          </button>
+        {/* Presets row */}
+        <div className="customize__presets">
+          <span className="customize__label-text">Presets</span>
+          {PRESETS.map((p) => (
+            <button
+              key={p.name}
+              type="button"
+              className="btn btn--ghost customize__preset-btn"
+              onClick={() =>
+                updateConfig((c) => ({
+                  ...c,
+                  ...(p.pageBackgroundColor
+                    ? { pageBackgroundColor: p.pageBackgroundColor }
+                    : {}),
+                  ...(p.backgroundColor
+                    ? { backgroundColor: p.backgroundColor }
+                    : {}),
+                  colors: { ...c.colors, ...p.colors },
+                }))
+              }
+            >
+              {p.name}
+            </button>
+          ))}
         </div>
 
-        <div className="customize-panel__body">
-          {/* Presets row */}
-          <div className="customize__presets">
-            <span className="customize__label-text">Presets</span>
-            {PRESETS.map((p) => (
-              <button
-                key={p.name}
-                type="button"
-                className="btn btn--ghost customize__preset-btn"
-                onClick={() =>
+        {/* Color groups */}
+        {COLOR_GROUPS.map((group) => (
+          <Section key={group.title} title={group.title} blurb={group.blurb}>
+            {group.configFields?.map((f) => (
+              <ColorSwatch
+                key={f.key}
+                label={f.label}
+                value={config[f.key]}
+                onChange={(v) =>
+                  updateConfig((c) => ({ ...c, [f.key]: v }))
+                }
+              />
+            ))}
+            {group.fields?.map((f) => (
+              <ColorSwatch
+                key={f.key}
+                label={f.label}
+                value={config.colors[f.key]}
+                onChange={(v) =>
                   updateConfig((c) => ({
                     ...c,
-                    ...(p.pageBackgroundColor
-                      ? { pageBackgroundColor: p.pageBackgroundColor }
-                      : {}),
-                    ...(p.backgroundColor
-                      ? { backgroundColor: p.backgroundColor }
-                      : {}),
-                    colors: { ...c.colors, ...p.colors },
+                    colors: { ...c.colors, [f.key]: v },
                   }))
                 }
-              >
-                {p.name}
-              </button>
+              />
             ))}
-          </div>
-
-          {/* Color groups */}
-          {COLOR_GROUPS.map((group) => (
-            <Section key={group.title} title={group.title} blurb={group.blurb}>
-              {group.configFields?.map((f) => (
-                <ColorSwatch
-                  key={f.key}
-                  label={f.label}
-                  value={config[f.key]}
-                  onChange={(v) =>
-                    updateConfig((c) => ({ ...c, [f.key]: v }))
-                  }
-                />
-              ))}
-              {group.fields?.map((f) => (
-                <ColorSwatch
-                  key={f.key}
-                  label={f.label}
-                  value={config.colors[f.key]}
-                  onChange={(v) =>
-                    updateConfig((c) => ({
-                      ...c,
-                      colors: { ...c.colors, [f.key]: v },
-                    }))
-                  }
-                />
-              ))}
-            </Section>
-          ))}
-
-          {/* Font section */}
-          <Section title="Fonts">
-            <FontPicker field="sectionHeadingFontFamily" label="Headings" />
-            <FontPicker field="labelFontFamily" label="Labels" />
-            <FontPicker field="textFontFamily" label="Body" />
-            <FontPicker field="helperTextFontFamily" label="Helpers" />
-            <FontImportSection />
           </Section>
+        ))}
 
-          {/* Heading weight + hide bg */}
-          <Section title="Layout">
-            <label className="customize__field">
-              <span className="customize__label-text">Heading Weight</span>
-              <select
-                className="sheet-input"
-                value={config.sectionHeadingFontWeight}
+        {/* Font section */}
+        <Section title="Fonts">
+          <FontPicker field="sectionHeadingFontFamily" label="Headings" />
+          <FontPicker field="labelFontFamily" label="Labels" />
+          <FontPicker field="textFontFamily" label="Body" />
+          <FontPicker field="helperTextFontFamily" label="Helpers" />
+          <FontImportSection />
+        </Section>
+
+        {/* Heading weight + hide bg */}
+        <Section title="Layout">
+          <label className="customize__field">
+            <span className="customize__label-text">Heading Weight</span>
+            <select
+              className="sheet-input"
+              value={config.sectionHeadingFontWeight}
+              onChange={(e) =>
+                updateConfig((c) => ({
+                  ...c,
+                  sectionHeadingFontWeight: e.target.value,
+                }))
+              }
+            >
+              <option value="400">400</option>
+              <option value="500">500</option>
+              <option value="600">600</option>
+              <option value="700">700</option>
+              <option value="bold">Bold</option>
+            </select>
+          </label>
+          <label className="customize__field">
+            <span className="customize__label-text">Background</span>
+            <label className="checkbox-field">
+              <input
+                type="checkbox"
+                checked={config.hideSectionBackground}
                 onChange={(e) =>
                   updateConfig((c) => ({
                     ...c,
-                    sectionHeadingFontWeight: e.target.value,
+                    hideSectionBackground: e.target.checked,
                   }))
                 }
-              >
-                <option value="400">400</option>
-                <option value="500">500</option>
-                <option value="600">600</option>
-                <option value="700">700</option>
-                <option value="bold">Bold</option>
-              </select>
+              />
+              Hide section backgrounds
             </label>
-            <label className="customize__field">
-              <span className="customize__label-text">Background</span>
-              <label className="checkbox-field">
-                <input
-                  type="checkbox"
-                  checked={config.hideSectionBackground}
-                  onChange={(e) =>
-                    updateConfig((c) => ({
-                      ...c,
-                      hideSectionBackground: e.target.checked,
-                    }))
-                  }
-                />
-                Hide section backgrounds
-              </label>
-            </label>
-          </Section>
+          </label>
+        </Section>
 
-          {/* Background Image */}
-          <BackgroundImageSection />
+        {/* Background Image */}
+        <BackgroundImageSection />
 
-          {/* Custom CSS */}
-          <Section title="Custom CSS (advanced)">
-            <textarea
-              className="sheet-textarea customize__css"
-              value={config.customCss}
-              onChange={(e) =>
-                updateConfig((c) => ({ ...c, customCss: e.target.value }))
-              }
-              placeholder={':root {\n  --accent-violet: #9b7ed6;\n  --accent-blush: #e8a0bf;\n}'}
-              rows={8}
-              spellCheck={false}
-            />
-          </Section>
-        </div>
+        {/* Custom CSS */}
+        <Section title="Custom CSS (advanced)">
+          <textarea
+            className="sheet-textarea customize__css"
+            value={config.customCss}
+            onChange={(e) =>
+              updateConfig((c) => ({ ...c, customCss: e.target.value }))
+            }
+            placeholder={':root {\n  --accent-violet: #9b7ed6;\n  --accent-blush: #e8a0bf;\n}'}
+            rows={8}
+            spellCheck={false}
+          />
+        </Section>
       </div>
     </div>
   )

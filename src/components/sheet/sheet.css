@@ -3033,32 +3033,66 @@
   border-bottom: none;
 }
 
-/* Uses the shared .modal-overlay / .modal-content / .modal-header classes.
- * Only the panel-specific overrides live here. */
+/* ============================================================================
+   Customization Panel (slide-out drawer — right on desktop, bottom on phones)
+   ============================================================================
+   The drawer shares the customize__* field styles below. Unlike the app's
+   modals it is NOT a .modal-overlay: the sheet stays visible and interactive
+   behind it so changes preview live. On wide screens the sheet content shifts
+   left to make room (mirroring CharacterSelector); on phones the drawer rises
+   from the bottom and the sheet shifts up so both stay partially visible. */
 
-.customize-modal {
-  max-width: 860px;
+.customize-drawer {
+  position: fixed;
+  top: 3.75rem;              /* Clear the sticky .app-header (z 3000, ~3.6rem
+                                tall) so the drawer's own header/✕ stays
+                                visible and clickable below the title bar */
+  right: 0;
+  bottom: 0;
+  width: 340px;
+  z-index: 60;                /* Above the char-selector (50), below modals */
+  background: var(--bg-surface);
+  border-left: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  height: 100%;              /* Fill the .modal-content's max-height */
-  max-height: 80vh;          /* Cap so the panel clears the top nav bar */
+  transform: translateX(100%);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: -4px 0 12px rgba(0, 0, 0, 0.25);
+  visibility: hidden;         /* Keep closed drawer out of tab order/atree */
 }
 
-.customize-panel__header {
-  position: sticky;
-  top: 0;
-  z-index: 200;              /* Stay above all scrolling swatches/popovers */
-  background: var(--bg-surface);
+.customize-drawer--open {
+  transform: translateX(0);
+  visibility: visible;
+}
+
+.customize-drawer__header {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1rem 0.75rem;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.customize-drawer__title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  margin: 0;
 }
 
 .customize-panel__body {
   flex: 1;
   min-height: 0;             /* Allow flex shrink below content size */
-  overflow-y: auto;          /* Scroll the body, not the outer .modal-content */
+  overflow-y: auto;          /* Scroll the body, not the drawer shell */
   padding: 1rem 1.1rem;
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
+  scrollbar-width: thin;
 }
 
 /* Presets row */
@@ -4137,6 +4171,15 @@
   pointer-events: none;
 }
 
+/* The customization drawer is not itself a modal, so when a real modal opens
+ * above it (e.g. a confirmation), the drawer recedes with the rest of the
+ * chrome instead of staying sharp behind the overlay. */
+.app:has(.modal-overlay) .customize-drawer {
+  filter: blur(4px);
+  opacity: 0.4;
+  pointer-events: none;
+}
+
 /* When the selector is open on wide screens, shift the page content right to
  * make room so the character list and the sheet stay visible simultaneously.
  * On narrow screens there isn't enough room, so the panel overlays the sheet
@@ -4174,6 +4217,76 @@
 
 .app-header {
   transition: padding-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* When the customization drawer is open on wide screens, shift the page
+ * content left to make room so the sheet and the drawer stay visible
+ * simultaneously — the mirror image of the char-selector shift above.
+ * Background layers and the top bar shift with it (padding-right on the
+ * header since padding-left is already used by the selector shift). */
+@media (min-width: 601px) {
+  .sheet-page--customize-open .sheet-page__content {
+    margin-right: 340px;
+  }
+
+  .sheet-page--customize-open .sheet-page__bg-color,
+  .sheet-page--customize-open .sheet-page__bg-image,
+  .sheet-page--customize-open .sheet-page__bg-overlay {
+    right: 340px;
+  }
+
+  body:has(.sheet-page--customize-open) .app-header {
+    padding-right: calc(1.25rem + 340px);
+  }
+}
+
+.sheet-page .sheet-page__content {
+  transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+    margin-right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sheet-page .sheet-page__bg-color,
+.sheet-page .sheet-page__bg-image,
+.sheet-page .sheet-page__bg-overlay {
+  transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+    right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* On phones the drawer becomes a bottom sheet: it rises from the bottom edge
+ * and takes ~55% of the viewport height. The sheet content is translated up
+ * (visual only, via transform) so the top of the sheet stays visible and
+ * tappable above the drawer — vertical phone displays let both coexist. */
+@media (max-width: 600px) {
+  .customize-drawer {
+    top: auto;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: auto;
+    height: 55vh;
+    border-left: none;
+    border-top: 1px solid var(--border);
+    border-radius: 14px 14px 0 0;
+    transform: translateY(100%);
+    box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.35);
+  }
+
+  .customize-drawer--open {
+    transform: translateY(0);
+  }
+
+  /* Leave room for a grab-handle style header on the bottom sheet. */
+  .customize-drawer__header {
+    padding: 0.65rem 1rem 0.55rem;
+  }
+
+  .sheet-page--customize-open .sheet-page__content {
+    transform: translateY(-38vh);
+  }
+
+  .sheet-page .sheet-page__content {
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
 }
 
 @media (max-width: 600px) {

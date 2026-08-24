@@ -1,6 +1,6 @@
 /**
  * CharacterSheetPage — wraps the CharacterSheet component with a mode toggle
- * (Edit / View), a customize panel trigger, and background image layers.
+ * (Edit / View), a customize drawer trigger, and background image layers.
  *
  * If the character has a background image configured, it is rendered as a
  * fixed full-viewport layer behind the sheet, with optional darken and blur
@@ -9,12 +9,17 @@
  * A CharacterSelector panel slides out from the left, open by default, listing
  * all player characters with portrait + name. When open, the page content
  * shifts right so the sheet stays fully visible.
+ *
+ * The CustomizationPanel drawer slides in from the right (or rises from the
+ * bottom on phones). While open, the sheet content shifts left/up so the
+ * user sees their changes applied live on the sheet itself.
  */
 
 import { useState } from 'react'
 import { useCharacterStore } from '@/store/characterStore'
 import CharacterSheet from '@/components/sheet/CharacterSheet'
 import CharacterSelector from '@/components/sheet/CharacterSelector'
+import CustomizationPanel from '@/components/sheet/CustomizationPanel'
 
 export type SheetMode = 'edit' | 'view'
 
@@ -22,6 +27,7 @@ export default function CharacterSheetPage() {
   const currentCharacter = useCharacterStore((s) => s.currentCharacter)
   const [mode, setMode] = useState<SheetMode>('view')
   const [selectorOpen, setSelectorOpen] = useState(false)
+  const [customizeOpen, setCustomizeOpen] = useState(false)
 
   if (!currentCharacter) return null
 
@@ -33,7 +39,8 @@ export default function CharacterSheetPage() {
       className={
         'sheet-page' +
         (hasBg ? ' sheet-page--has-bg' : '') +
-        (selectorOpen ? ' sheet-page--selector-open' : '')
+        (selectorOpen ? ' sheet-page--selector-open' : '') +
+        (customizeOpen ? ' sheet-page--customize-open' : '')
       }
     >
       {/* Page background color — fixed full-viewport layer. When a background
@@ -70,12 +77,18 @@ export default function CharacterSheetPage() {
         onToggle={() => setSelectorOpen((v) => !v)}
       />
 
+      <CustomizationPanel
+        open={customizeOpen}
+        onClose={() => setCustomizeOpen(false)}
+      />
+
       <div className="sheet-page__content">
         <CharacterSheet
           key={currentCharacter.id}
           character={currentCharacter}
           mode={mode}
           onModeChange={setMode}
+          onCustomizeToggle={() => setCustomizeOpen((v) => !v)}
         />
       </div>
     </div>

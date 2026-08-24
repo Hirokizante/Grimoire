@@ -446,7 +446,7 @@ Schema migrations are handled on read via `normalizeCharacter`, which upgrades o
 
 ### Theming
 
-Every configurable color lives in `SheetColors`. `themeUtils.colorVars()` maps them onto CSS custom properties, which the entire sheet reads from. The `CustomizationPanel` exposes every color as a swatch + hex input, organized into groups (Surfaces, Text, Borders, Accents, Resource Bars, Stat Tokens). Changes apply live via CSS variables and persist per-character.
+Every configurable color lives in `SheetColors`. `themeUtils.colorVars()` maps them onto CSS custom properties, which the entire sheet reads from. The `CustomizationPanel` is a slide-out drawer (right edge on desktop, bottom sheet on phones) that exposes every color as a swatch + hex input, organized into groups (Surfaces, Text, Borders, Accents, Resource Bars, Stat Tokens). The sheet stays visible and interactive while the drawer is open, so changes apply live via CSS variables and persist per-character.
 
 ### Drag and Drop
 
