@@ -1717,7 +1717,11 @@
 .ability-editor__sub-panel-body {
   flex: 1 1 auto;
   overflow-y: auto;
-  overscroll-behavior: contain;
+  /* No overscroll-behavior: contain here — we WANT scroll chaining to the
+     parent (.ability-editor-dialog__body) so the modal scrolls when the
+     cursor is over the sub-panel and the sub-panel body has no overflow
+     (or has reached its scroll boundary). The parent body already has
+     overscroll-behavior: contain to protect the page behind the modal. */
   -webkit-overflow-scrolling: touch;
 }
 
