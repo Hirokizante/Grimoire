@@ -18,6 +18,7 @@ import { useNotification } from '@/context/NotificationContext'
 import { useCharacterStore } from '@/store/characterStore'
 import { SUB_ABILITY_ACCENT_OPTIONS } from '@/lib/themeUtils'
 import type { AbilityBlock, Character } from '@/types'
+import type { RollSource } from '@/types/rollLog'
 import type { SheetMode } from '@/pages/CharacterSheetPage'
 
 export interface SubAbilityBlockProps {
@@ -46,6 +47,20 @@ export default function SubAbilityBlock({
 
   const hasCost = cost.ap != null || cost.end != null || cost.fp != null
   const isView = mode === 'view'
+
+  // Dice rolls from the damage field are "Damage: [name]"; rolls from
+  // description/overcharge/flavor text are generic "Roll: [name]".
+  const subAbilityName = name || 'Untitled Sub-Ability'
+  const damageSource: RollSource = {
+    type: 'ability-damage',
+    abilityName: subAbilityName,
+    abilityId: ability.id,
+  }
+  const rollSource: RollSource = {
+    type: 'ability-roll',
+    abilityName: subAbilityName,
+    abilityId: ability.id,
+  }
 
   // Resolve the character for both dice notation and resource spending.
   const activeCharacter = character ?? storeCharacter
@@ -157,7 +172,7 @@ export default function SubAbilityBlock({
           {damage && (
             <span className="sub-ability-block__damage">
               <span className="sub-ability-block__meta-label">Dmg</span>{' '}
-              <DiceHighlighter text={damage} mode={mode} character={character} />
+              <DiceHighlighter text={damage} mode={mode} character={character} source={damageSource} />
             </span>
           )}
         </div>
@@ -168,6 +183,7 @@ export default function SubAbilityBlock({
           className="sub-ability-block__description"
           mode={mode}
           character={character}
+          source={rollSource}
         >
           {description}
         </MarkdownText>
@@ -180,6 +196,7 @@ export default function SubAbilityBlock({
             className="sub-ability-block__overcharge-body"
             mode={mode}
             character={character}
+            source={rollSource}
           >
             {overcharge}
           </MarkdownText>
@@ -191,6 +208,7 @@ export default function SubAbilityBlock({
           className="sub-ability-block__flavor"
           mode={mode}
           character={character}
+          source={rollSource}
         >
           {flavorText}
         </MarkdownText>

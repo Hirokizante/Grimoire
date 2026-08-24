@@ -24,6 +24,7 @@ import type { Components } from 'react-markdown'
 import StatusHighlighter from '@/components/status/StatusHighlighter'
 import { hasStatusCandidate } from '@/lib/statusReference'
 import type { Character } from '@/types/character'
+import type { RollSource } from '@/types/rollLog'
 import type { SheetMode } from '@/pages/CharacterSheetPage'
 
 export interface MarkdownTextProps {
@@ -41,6 +42,11 @@ export interface MarkdownTextProps {
    * `currentCharacter` when omitted (DiceHighlighter's default).
    */
   character?: Character
+  /**
+   * The roll source to record with dice rolls triggered from this text
+   * (e.g. ability-damage for an ability's description field).
+   */
+  source?: RollSource
 }
 
 /** Cheap pre-check: does this string contain any dice-notation shape at all? */
@@ -58,13 +64,14 @@ function highlightChildren(
   children: ReactNode,
   mode: SheetMode,
   character?: Character,
+  source?: RollSource,
 ): ReactNode {
   if (children == null) return null
 
   if (typeof children === 'string') {
     if (hasDiceCandidate(children) || hasStatusCandidate(children)) {
       return (
-        <StatusHighlighter text={children} mode={mode} character={character} />
+        <StatusHighlighter text={children} mode={mode} character={character} source={source} />
       )
     }
     return children
@@ -72,7 +79,7 @@ function highlightChildren(
 
   if (Array.isArray(children)) {
     return children.map((child, i) => (
-      <Fragment key={i}>{highlightChildren(child, mode, character)}</Fragment>
+      <Fragment key={i}>{highlightChildren(child, mode, character, source)}</Fragment>
     ))
   }
 
@@ -81,7 +88,7 @@ function highlightChildren(
   if (element && element.props && element.props.children != null) {
     return cloneElement(
       element,
-      { children: highlightChildren(element.props.children, mode, character) },
+      { children: highlightChildren(element.props.children, mode, character, source) },
     )
   }
 
@@ -94,7 +101,7 @@ function highlightChildren(
  * preserve the element itself (so block tags keep their block layout) and only
  * replace string children that contain dice notation with clickable buttons.
  */
-function buildDiceComponents(mode: SheetMode, character?: Character): Components {
+function buildDiceComponents(mode: SheetMode, character?: Character, source?: RollSource): Components {
   // Build a renderer that emits the real DOM element for `tag`, forwarding its
   // props (className, etc.) while highlighting any dice-notation text children.
   // `createElement` sidesteps JSX's generic LibraryManagedAttributes narrowing;
@@ -106,7 +113,7 @@ function buildDiceComponents(mode: SheetMode, character?: Character): Components
       return createElement(
         tag,
         rest,
-        highlightChildren(children as ReactNode, mode, character),
+        highlightChildren(children as ReactNode, mode, character, source),
       )
     }
     return DiceText as unknown as (props: never) => ReactNode
@@ -134,6 +141,7 @@ export default function MarkdownText({
   className,
   mode = 'view',
   character,
+  source,
 }: MarkdownTextProps) {
   const classes = ['md', className].filter(Boolean).join(' ')
   const isView = mode === 'view'
@@ -142,7 +150,7 @@ export default function MarkdownText({
   // augment the renderer so text nodes inside block containers become
   // clickable dice buttons.
   const components: Components | undefined = isView
-    ? buildDiceComponents(mode, character)
+    ? buildDiceComponents(mode, character, source)
     : undefined
 
   return (

@@ -14,6 +14,7 @@ import { findDiceNotation } from '@/lib/diceParser'
 import { useDiceRollStore } from '@/store/diceRollStore'
 import { useCharacterStore } from '@/store/characterStore'
 import type { Character } from '@/types/character'
+import type { RollSource } from '@/types/rollLog'
 import type { SheetMode } from '@/pages/CharacterSheetPage'
 
 export interface DiceHighlighterProps {
@@ -30,6 +31,11 @@ export interface DiceHighlighterProps {
    * stored in `currentCharacter`.
    */
   character?: Character
+  /**
+   * The roll source to record with this roll (e.g. ability-damage). When
+   * omitted, the roll defaults to a manual source.
+   */
+  source?: RollSource
 }
 
 export default function DiceHighlighter({
@@ -37,6 +43,7 @@ export default function DiceHighlighter({
   mode = 'view',
   className,
   character: explicitCharacter,
+  source,
 }: DiceHighlighterProps) {
   const roll = useDiceRollStore((s) => s.roll)
   const currentCharacter = useCharacterStore((s) => s.currentCharacter)
@@ -74,7 +81,7 @@ export default function DiceHighlighter({
         className="dice-notation"
         onClick={() => {
           if (character) {
-            roll({ notation: match.match, character })
+            roll({ notation: match.match, character, source })
           }
         }}
         title={isView ? `Roll ${match.match}` : undefined}

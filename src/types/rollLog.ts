@@ -13,6 +13,7 @@ import type { RollResult } from '@/lib/diceRoller'
 /** Where this roll originated. Used to group/filter and show context. */
 export type RollSource =
   | { type: 'ability-damage'; abilityName: string; abilityId?: string }
+  | { type: 'ability-roll'; abilityName: string; abilityId?: string }
   | { type: 'saving-throw'; stat?: string }
   | { type: 'skill-check'; skillName: string }
   | { type: 'attribute-check'; attributeKey: string; attributeName: string }

@@ -22,6 +22,8 @@ export function sourceLabel(
   switch (source.type) {
     case 'ability-damage':
       return `Damage: ${source.abilityName}`
+    case 'ability-roll':
+      return `Roll: ${source.abilityName}`
     case 'skill-check':
       return `${prefix}${source.skillName}`
     case 'attribute-check':

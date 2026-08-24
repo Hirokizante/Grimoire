@@ -19,6 +19,7 @@ import { useStatusStore } from '@/store/statusStore'
 import DiceHighlighter from '@/components/dice/DiceHighlighter'
 import StatusReference from '@/components/status/StatusReference'
 import type { Character } from '@/types/character'
+import type { RollSource } from '@/types/rollLog'
 import type { SheetMode } from '@/pages/CharacterSheetPage'
 
 export interface StatusHighlighterProps {
@@ -28,6 +29,8 @@ export interface StatusHighlighterProps {
   mode?: SheetMode
   /** Explicit character for dice variable substitution. */
   character?: Character
+  /** The roll source to record with dice rolls (e.g. ability-damage). */
+  source?: RollSource
 }
 
 type DiceSegment = {
@@ -50,6 +53,7 @@ export default function StatusHighlighter({
   text,
   mode = 'view',
   character,
+  source,
 }: StatusHighlighterProps) {
   const statuses = useStatusStore((s) => s.statuses)
 
@@ -60,7 +64,7 @@ export default function StatusHighlighter({
 
   // No status references — just delegate to dice highlighting.
   if (statusRefs.length === 0) {
-    return <DiceHighlighter text={text} mode={mode} character={character} />
+    return <DiceHighlighter text={text} mode={mode} character={character} source={source} />
   }
 
   // Collect and merge both annotation kinds, ordered by position. In the
@@ -103,6 +107,7 @@ export default function StatusHighlighter({
           text={seg.match}
           mode={mode}
           character={character}
+          source={source}
         />,
       )
     } else {

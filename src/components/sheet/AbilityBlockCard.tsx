@@ -14,6 +14,7 @@ import DiceHighlighter from '@/components/dice/DiceHighlighter'
 import MarkdownText from '@/components/ui/MarkdownText'
 import SubAbilityBlock from '@/components/sheet/SubAbilityBlock'
 import type { AbilityBlock, Character } from '@/types'
+import type { RollSource } from '@/types/rollLog'
 import type { SheetMode } from '@/pages/CharacterSheetPage'
 
 export interface AbilityBlockCardProps {
@@ -58,6 +59,20 @@ export default function AbilityBlockCard({
 
   const hasCost = cost.ap != null || cost.end != null || cost.fp != null
 
+  // Dice rolls from the damage field are "Damage: [name]"; rolls from
+  // description/overcharge/flavor text are generic "Roll: [name]".
+  const abilityName = name || 'Untitled Ability'
+  const damageSource: RollSource = {
+    type: 'ability-damage',
+    abilityName,
+    abilityId: ability.id,
+  }
+  const rollSource: RollSource = {
+    type: 'ability-roll',
+    abilityName,
+    abilityId: ability.id,
+  }
+
   return (
     <article className={'ability-card' + (isMinor ? ' ability-card--minor' : '')}>
       <header className="ability-card__head">
@@ -97,14 +112,14 @@ export default function AbilityBlockCard({
           {damage && (
             <span className="ability-card__damage">
               <span className="ability-card__meta-label">Dmg</span>{' '}
-              <DiceHighlighter text={damage} mode={mode} character={character} />
+              <DiceHighlighter text={damage} mode={mode} character={character} source={damageSource} />
             </span>
           )}
         </div>
       )}
 
       {description && (
-        <MarkdownText className="ability-card__description" mode={mode} character={character}>
+        <MarkdownText className="ability-card__description" mode={mode} character={character} source={rollSource}>
           {description}
         </MarkdownText>
       )}
@@ -126,7 +141,7 @@ export default function AbilityBlockCard({
       {overcharge && (
         <div className="ability-card__overcharge">
           <span className="ability-card__section-label">Overcharge</span>
-          <MarkdownText className="ability-card__overcharge-body" mode={mode} character={character}>
+          <MarkdownText className="ability-card__overcharge-body" mode={mode} character={character} source={rollSource}>
             {overcharge}
           </MarkdownText>
         </div>
@@ -147,7 +162,7 @@ export default function AbilityBlockCard({
       )}
 
       {flavorText && (
-        <MarkdownText className="ability-card__flavor" mode={mode} character={character}>
+        <MarkdownText className="ability-card__flavor" mode={mode} character={character} source={rollSource}>
           {flavorText}
         </MarkdownText>
       )}
