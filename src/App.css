@@ -32,11 +32,34 @@
  * and dimmed so only the dialog reads as interactive, and pointer-events
  * disabled so nav can't be triggered while a dialog is pending. The bar
  * keeps its z-index: 3000 stacking position — this is purely a state change,
- * not a re-order. */
+ * not a re-order.
+ *
+ * The bar itself must stay free of filter/opacity: opacity made it
+ * translucent (the page behind it showed through — the modal backdrop sits
+ * BELOW the bar and never dims it), and a filter on the sticky element
+ * forced a compositing-layer swap that made the bar briefly paint beneath
+ * the sheet whenever a modal opened. Instead the bar keeps its normal
+ * opaque surface, a ::after scrim matches the modal backdrop's dark tint,
+ * and the 4px blur is applied only to the inner content (title + nav). */
 .app:has(.modal-overlay) .app-header {
-  filter: blur(4px);
-  opacity: 0.4;
   pointer-events: none;
+}
+
+.app:has(.modal-overlay) .app-header::after {
+  content: '';
+  position: absolute;
+  /* Bottom extends -1px past the padding box so the scrim also covers the
+     header's border-bottom (borders sit outside the padding box, which is
+     what an absolutely positioned child with inset: 0 anchors to). */
+  inset: 0 0 -1px 0;
+  /* Same tint as .modal-overlay's backdrop so the bar dims consistently
+     with the rest of the viewport behind the modal. */
+  background: rgba(10, 8, 16, 0.85);
+}
+
+.app:has(.modal-overlay) .app-title,
+.app:has(.modal-overlay) .app-header__nav {
+  filter: blur(4px);
 }
 
 .app-title {

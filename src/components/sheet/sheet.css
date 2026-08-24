@@ -2170,11 +2170,11 @@
      including the strip beneath the sticky title bar — otherwise raw,
      undimmed sheet content shows through above the modal. The flex content
      box, however, starts below the bar (padding-top: 3.75rem, same offset
-     as the customize drawer): while a modal is open the title bar is
-     blurred + dimmed to opacity 0.4, so a tall dialog sliding beneath it
-     would show through as a semi-transparent smear over its header. This
-     way dialogs can never extend under the bar, yet the backdrop still
-     dims + blurs the whole viewport. */
+     as the customize drawer): the bar stays opaque while a modal is open
+     (it gets a matching dark scrim + blurred contents — see App.css), so a
+     tall dialog sliding beneath it would be cut off at the bar's edge.
+     Keeping the content box below the bar means dialogs can never extend
+     under it, yet the backdrop still dims + blurs the whole viewport. */
   padding-top: 3.75rem;
   animation: modal-overlay-fade 0.2s ease;
 }
