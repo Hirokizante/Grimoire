@@ -1,16 +1,26 @@
-import { useCallback, useRef, useState } from 'react'
-import { ArrowDownFromLine, LayoutGrid, List } from 'lucide-react'
+import { useCallback, useMemo, useRef, useState } from 'react'
+import { ArrowDownFromLine, LayoutGrid, List, Plus } from 'lucide-react'
 
 import { useCharacterStore } from '@/store/characterStore'
 import CreateCharacterModal from '@/components/sheet/CreateCharacterModal'
 import ConfirmDeleteModal from '@/components/sheet/ConfirmDeleteModal'
 import UpdateCharacterModal from '@/components/sheet/UpdateCharacterModal'
 import SheetLabelPills from '@/components/sheet/SheetLabelPills'
+import FilterDropdown, { type FilterGroup } from '@/components/ui/FilterDropdown'
+import SortDropdown, { type SortOption } from '@/components/ui/SortDropdown'
 
 import { parseCharacterJSON } from '@/lib/exportImport'
 import type { Character } from '@/types'
 
 type ViewMode = 'grid' | 'list'
+
+type SortKey = 'name' | 'created' | 'modified'
+
+const SORT_OPTIONS: SortOption[] = [
+  { value: 'name', label: 'Name' },
+  { value: 'created', label: 'Date created' },
+  { value: 'modified', label: 'Date modified' },
+]
 
 /** Format an ISO timestamp into a short, human-readable relative-ish label. */
 function formatUpdatedAt(iso: string): string {
@@ -43,6 +53,7 @@ export default function CharacterListPage() {
   )
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [viewMode, setViewMode] = useState<ViewMode>('grid')
+  const [sortKey, setSortKey] = useState<SortKey>('name')
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [characterToDelete, setCharacterToDelete] = useState<Character | null>(null)
   /** Pending import JSON file that has a matching character by name. */
@@ -51,6 +62,10 @@ export default function CharacterListPage() {
     imported: Character
     rawText: string
   } | null>(null)
+  /** Active filter selections: groupId → set of selected values. */
+  const [filterSelection, setFilterSelection] = useState<
+    Record<string, Set<string>>
+  >({ player: new Set(), label: new Set() })
 
   /** Handle file import with conflict detection for existing characters. */
   const handleImport = useCallback(
@@ -85,6 +100,97 @@ export default function CharacterListPage() {
     },
     [characters, importCharacterFile],
   )
+
+  /** Auto-detect all unique player names and labels across all character sheets. */
+  const filterGroups = useMemo<FilterGroup[]>(() => {
+    // Player names — collect unique non-empty values.
+    const playerSet = new Set<string>()
+    for (const c of characters) {
+      if (c.playerName.trim()) playerSet.add(c.playerName.trim())
+    }
+    const playerOptions = Array.from(playerSet)
+      .sort((a, b) => a.localeCompare(b))
+      .map((name) => ({ label: name, value: name }))
+
+    // Labels — collect unique label names across all sheets.
+    const labelMap = new Map<string, string>() // value (lowercased) → display
+    for (const c of characters) {
+      for (const lbl of c.labels) {
+        const name = lbl.name.trim()
+        if (!name) continue
+        const key = name.toLowerCase()
+        if (!labelMap.has(key)) labelMap.set(key, name)
+      }
+    }
+    const labelOptions = Array.from(labelMap.entries())
+      .sort((a, b) => a[1].localeCompare(b[1]))
+      .map(([value, label]) => ({ label, value }))
+
+    return [
+      { id: 'player', title: 'Player', options: playerOptions },
+      { id: 'label', title: 'Labels', options: labelOptions },
+    ]
+  }, [characters])
+
+  /** Apply active filters to the character list. */
+  const filteredCharacters = useMemo(() => {
+    const playerSel = filterSelection.player ?? new Set<string>()
+    const labelSel = filterSelection.label ?? new Set<string>()
+    if (playerSel.size === 0 && labelSel.size === 0) return characters
+    return characters.filter((c) => {
+      // Player: match if the character's player name is selected.
+      if (playerSel.size > 0 && !playerSel.has(c.playerName.trim())) return false
+      // Labels: match if the character has any of the selected label names.
+      if (labelSel.size > 0) {
+        const charLabels = new Set(
+          c.labels.map((l) => l.name.trim().toLowerCase()),
+        )
+        let found = false
+        for (const sel of labelSel) {
+          if (charLabels.has(sel.toLowerCase())) {
+            found = true
+            break
+          }
+        }
+        if (!found) return false
+      }
+      return true
+    })
+  }, [characters, filterSelection])
+
+  /** Toggle a filter option on/off. */
+  function handleFilterToggle(groupId: string, value: string) {
+    setFilterSelection((prev) => {
+      const next = { ...prev }
+      const set = new Set(next[groupId] ?? new Set<string>())
+      if (set.has(value)) set.delete(value)
+      else set.add(value)
+      next[groupId] = set
+      return next
+    })
+  }
+
+  /** Clear all filter selections. */
+  function handleFilterClear() {
+    setFilterSelection({ player: new Set(), label: new Set() })
+  }
+
+  /** Sort the filtered characters by the selected key. */
+  const sortedCharacters = useMemo(() => {
+    const list = [...filteredCharacters]
+    switch (sortKey) {
+      case 'name':
+        list.sort((a, b) => a.name.localeCompare(b.name))
+        break
+      case 'created':
+        list.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+        break
+      case 'modified':
+        list.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+        break
+    }
+    return list
+  }, [filteredCharacters, sortKey])
 
   if (!isLoaded) {
     return (
@@ -144,10 +250,23 @@ export default function CharacterListPage() {
     <div className="page">
       <div className="page-head">
         <span className="page-count">
-          {characters.length} character{characters.length === 1 ? '' : 's'}
+          {sortedCharacters.length} character
+          {sortedCharacters.length === 1 ? '' : 's'}
         </span>
         {isSaving && <span className="muted saving-badge">saving…</span>}
         <div className="page-head__actions">
+          <FilterDropdown
+            groups={filterGroups}
+            selected={filterSelection}
+            onToggle={handleFilterToggle}
+            onClear={handleFilterClear}
+          />
+          <SortDropdown
+            options={SORT_OPTIONS}
+            value={sortKey}
+            onChange={(v) => setSortKey(v as SortKey)}
+            label="Sort characters"
+          />
           <div
             className="mode-toggle mode-toggle--compact"
             role="tablist"
@@ -186,14 +305,15 @@ export default function CharacterListPage() {
             onClick={() => fileInputRef.current?.click()}
           >
             <ArrowDownFromLine size={14} />
-            Import
+            <span className="page-head__btn-label">Import</span>
           </button>
           <button
             className="btn btn--primary page-head__btn"
             type="button"
             onClick={() => setShowCreateModal(true)}
           >
-            + New
+            <Plus size={14} />
+            <span className="page-head__btn-label">New</span>
           </button>
         </div>
       </div>
@@ -208,7 +328,7 @@ export default function CharacterListPage() {
 
       {viewMode === 'grid' ? (
         <ul className="card-grid" role="list">
-          {characters.map((c) => (
+          {sortedCharacters.map((c) => (
             <li key={c.id} className="card">
               <button
                 className="card-main"
@@ -248,7 +368,7 @@ export default function CharacterListPage() {
         </ul>
       ) : (
         <ul className="character-list" role="list">
-          {characters.map((c) => (
+          {sortedCharacters.map((c) => (
             <li key={c.id} className="character-list__item">
               <button
                 className="character-list__main"

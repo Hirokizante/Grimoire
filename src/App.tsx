@@ -33,6 +33,9 @@ function App() {
   const onSheet = currentCharacter !== null
   const onHome = !onSheet && view === 'home'
   const onNpcSheet = onSheet && currentCharacter?.kind === 'npc'
+  /** Gallery list pages (characters / NPCs / statuses) — full width. */
+  const onGallery =
+    !onSheet && (view === 'characters' || view === 'npcs' || view === 'statuses')
 
   return (
     <NotificationProvider>
@@ -42,7 +45,7 @@ function App() {
         <main
           className={
             'app-main' +
-            (onSheet ? '' : ' app-main--narrow') +
+            (!onSheet && !onGallery ? ' app-main--narrow' : '') +
             (onHome ? ' app-main--home' : '')
           }
         >

@@ -3,15 +3,18 @@
  *
  * Shows a scrolling three-column grid of status cards (icon, name, truncated
  * description, and reference tags), a "create new status" button, and sorting
- * by name / date created / date modified / referenced sheets. Clicking a card
- * opens the global StatusModal for details and editing.
+ * by name / date created / date modified. Clicking a card opens the global
+ * StatusModal for details and editing.
  */
 
 import { useMemo, useState } from 'react'
+import { Plus } from 'lucide-react'
 
 import ConfirmModal from '@/components/sheet/ConfirmModal'
 import CreateStatusModal from '@/components/status/CreateStatusModal'
 import StatusIcon from '@/components/status/StatusIcon'
+import FilterDropdown, { type FilterGroup } from '@/components/ui/FilterDropdown'
+import SortDropdown, { type SortOption } from '@/components/ui/SortDropdown'
 import { plainTextFromMarkdown } from '@/lib/markdown'
 import { collectCharacterStatusNames, referencingCharacters } from '@/lib/statusReference'
 import { useCharacterStore } from '@/store/characterStore'
@@ -19,14 +22,13 @@ import { useStatusStore } from '@/store/statusStore'
 import { DEFAULT_STATUS_TAG } from '@/types/status'
 import type { StatusCondition } from '@/types'
 
-type SortKey = 'name' | 'created' | 'modified' | 'referenced'
+type SortKey = 'name' | 'created' | 'modified'
 
-const SORT_LABELS: Record<SortKey, string> = {
-  name: 'Name',
-  created: 'Date created',
-  modified: 'Date modified',
-  referenced: 'Referenced sheets',
-}
+const SORT_OPTIONS: SortOption[] = [
+  { value: 'name', label: 'Name' },
+  { value: 'created', label: 'Date created' },
+  { value: 'modified', label: 'Date modified' },
+]
 
 export default function StatusCompendiumPage() {
   const statuses = useStatusStore((s) => s.statuses)
@@ -41,20 +43,86 @@ export default function StatusCompendiumPage() {
   const [statusToDelete, setStatusToDelete] =
     useState<StatusCondition | null>(null)
 
-  // Precompute per-status reference counts (lowercased name → number of sheets).
-  const referenceCounts = useMemo(() => {
-    const counts = new Map<string, number>()
-    for (const c of characters) {
-      const names = new Set(collectCharacterStatusNames(c))
-      for (const name of names) {
-        counts.set(name, (counts.get(name) ?? 0) + 1)
-      }
-    }
-    return counts
+  /** Active filter selections: groupId → set of selected values. */
+  const [filterSelection, setFilterSelection] = useState<
+    Record<string, Set<string>>
+  >({ type: new Set(), sheet: new Set() })
+
+  /**
+   * Build filter groups:
+   * - "type": Default (built-in) vs Custom
+   * - "sheet": every character sheet name (statuses referenced in that sheet)
+   */
+  const filterGroups = useMemo<FilterGroup[]>(() => {
+    const typeOptions = [
+      { label: 'Default', value: 'default' },
+      { label: 'Custom', value: 'custom' },
+    ]
+    const sheetOptions = characters
+      .map((c) => ({ label: c.name, value: c.id }))
+      .sort((a, b) => a.label.localeCompare(b.label))
+    return [
+      { id: 'type', title: 'Type', options: typeOptions },
+      { id: 'sheet', title: 'Referenced in sheet', options: sheetOptions },
+    ]
   }, [characters])
 
+  /** Map: characterId → set of lowercased status names that character references. */
+  const charStatusMap = useMemo(() => {
+    const map = new Map<string, Set<string>>()
+    for (const c of characters) {
+      map.set(c.id, new Set(collectCharacterStatusNames(c)))
+    }
+    return map
+  }, [characters])
+
+  /** Apply active filters to the status list. */
+  const filteredStatuses = useMemo(() => {
+    const typeSel = filterSelection.type ?? new Set<string>()
+    const sheetSel = filterSelection.sheet ?? new Set<string>()
+    if (typeSel.size === 0 && sheetSel.size === 0) return statuses
+    return statuses.filter((s) => {
+      // Type filter
+      if (typeSel.size > 0) {
+        const isDefault = s.tags.includes(DEFAULT_STATUS_TAG)
+        const matchesDefault = typeSel.has('default') && isDefault
+        const matchesCustom = typeSel.has('custom') && !isDefault
+        if (!matchesDefault && !matchesCustom) return false
+      }
+      // Sheet filter: status must be referenced in at least one selected sheet
+      if (sheetSel.size > 0) {
+        const lowerName = s.name.trim().toLowerCase()
+        let found = false
+        for (const charId of sheetSel) {
+          const names = charStatusMap.get(charId)
+          if (names?.has(lowerName)) {
+            found = true
+            break
+          }
+        }
+        if (!found) return false
+      }
+      return true
+    })
+  }, [statuses, filterSelection, charStatusMap])
+
+  function handleFilterToggle(groupId: string, value: string) {
+    setFilterSelection((prev) => {
+      const next = { ...prev }
+      const set = new Set(next[groupId] ?? new Set<string>())
+      if (set.has(value)) set.delete(value)
+      else set.add(value)
+      next[groupId] = set
+      return next
+    })
+  }
+
+  function handleFilterClear() {
+    setFilterSelection({ type: new Set(), sheet: new Set() })
+  }
+
   const sorted = useMemo(() => {
-    const list = [...statuses]
+    const list = [...filteredStatuses]
     switch (sortKey) {
       case 'name':
         list.sort((a, b) => a.name.localeCompare(b.name))
@@ -65,17 +133,9 @@ export default function StatusCompendiumPage() {
       case 'modified':
         list.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
         break
-      case 'referenced':
-        list.sort((a, b) => {
-          const ra = referenceCounts.get(a.name.trim().toLowerCase()) ?? 0
-          const rb = referenceCounts.get(b.name.trim().toLowerCase()) ?? 0
-          if (ra !== rb) return rb - ra
-          return a.name.localeCompare(b.name)
-        })
-        break
     }
     return list
-  }, [statuses, sortKey, referenceCounts])
+  }, [filteredStatuses, sortKey])
 
   function tagsFor(status: StatusCondition): string[] {
     if (status.tags.includes(DEFAULT_STATUS_TAG)) return [DEFAULT_STATUS_TAG]
@@ -94,32 +154,28 @@ export default function StatusCompendiumPage() {
     <div className="page">
       <div className="page-head">
         <span className="page-count">
-          {statuses.length} status{statuses.length === 1 ? '' : 'es'}
+          {sorted.length} status{sorted.length === 1 ? '' : 'es'}
         </span>
         <div className="page-head__actions">
-          <label className="sort-select">
-            <span className="sort-select__label" aria-hidden>
-              Sort
-            </span>
-            <select
-              className="sort-select__input"
-              value={sortKey}
-              onChange={(e) => setSortKey(e.target.value as SortKey)}
-              aria-label="Sort statuses"
-            >
-              {(Object.keys(SORT_LABELS) as SortKey[]).map((key) => (
-                <option key={key} value={key}>
-                  {SORT_LABELS[key]}
-                </option>
-              ))}
-            </select>
-          </label>
+          <FilterDropdown
+            groups={filterGroups}
+            selected={filterSelection}
+            onToggle={handleFilterToggle}
+            onClear={handleFilterClear}
+          />
+          <SortDropdown
+            options={SORT_OPTIONS}
+            value={sortKey}
+            onChange={(v) => setSortKey(v as SortKey)}
+            label="Sort statuses"
+          />
           <button
             className="btn btn--primary page-head__btn"
             type="button"
             onClick={() => setShowCreate(true)}
           >
-            + New
+            <Plus size={14} />
+            <span className="page-head__btn-label">New</span>
           </button>
         </div>
       </div>
