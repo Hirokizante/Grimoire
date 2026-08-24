@@ -7,6 +7,10 @@
  *   - Export button is present
  *   - No player name field
  *   - Portrait + Name only
+ *
+ * Like the player HeroSection, combat stats and attributes are embedded
+ * inside the hero section — stats as flat stat tokens, attributes as a
+ * horizontal row of D&D 5e-style attribute boxes.
  */
 
 import { useState } from 'react'
@@ -15,6 +19,8 @@ import { ArrowUpFromLine } from 'lucide-react'
 import PortraitUploader from '@/components/sheet/PortraitUploader'
 import SheetLabelPills from '@/components/sheet/SheetLabelPills'
 import EditLabelsModal from '@/components/sheet/EditLabelsModal'
+import NPCStatsSection from '@/components/sheet/npc/NPCStatsSection'
+import AttributesSection from '@/components/sheet/AttributesSection'
 import { useCharacterStore } from '@/store/characterStore'
 import type { Character } from '@/types'
 import type { SheetMode } from '@/pages/CharacterSheetPage'
@@ -122,6 +128,16 @@ export default function NPCHeroSection({
           onClose={() => setShowLabelEditor(false)}
         />
       )}
+
+      <div className="hero-section__stats-col">
+        <NPCStatsSection npc={npc} mode={mode} variant="flat" />
+        <AttributesSection
+          character={npc}
+          attributes={npc.attributes}
+          mode={mode}
+          variant="flat-row"
+        />
+      </div>
     </section>
   )
 }

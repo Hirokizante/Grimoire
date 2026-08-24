@@ -263,12 +263,19 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Stats + Attributes side by side inside the hero */
+/* Stats + Attributes side by side inside the hero (player sheet) */
 .hero-section__stats-row {
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 1rem;
   align-items: start;
+}
+
+/* Stats stacked above attributes inside the hero (NPC sheet) */
+.hero-section__stats-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
 }
 
 /* ---- Hero labels row ------------------------------------------------------ */
@@ -298,6 +305,10 @@
 @media (max-width: 768px) {
   .hero-section__stats-row {
     grid-template-columns: 1fr;
+  }
+
+  .hero-section__stats-col {
+    gap: 0.6rem;
   }
 
   .hero-section__identity {
@@ -399,14 +410,29 @@
   gap: 0.6rem;
 }
 
+/* Row variant for NPC hero section — 5 attribute boxes in a single row */
+.attr-boxes--row {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0.5rem;
+}
+
 @media (max-width: 640px) {
   .attr-boxes--grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .attr-boxes--row {
     grid-template-columns: repeat(3, 1fr);
   }
 }
 
 @media (max-width: 420px) {
   .attr-boxes--grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .attr-boxes--row {
     grid-template-columns: repeat(2, 1fr);
   }
 }
@@ -601,8 +627,24 @@
   grid-template-columns: repeat(2, 1fr);
 }
 
+/* Inside the NPC hero stats column, use 5 columns for 5 stats */
+.hero-section__stats-col .stat-tokens {
+  grid-template-columns: repeat(5, 1fr);
+  margin-bottom: 0;
+}
+
 @media (max-width: 640px) {
   .stat-tokens {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .hero-section__stats-col .stat-tokens {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 420px) {
+  .hero-section__stats-col .stat-tokens {
     grid-template-columns: repeat(2, 1fr);
   }
 }
@@ -661,6 +703,15 @@
   color: var(--text-primary);
 }
 
+.stat-token__input {
+  font-family: var(--sheet-heading-font, inherit);
+  font-weight: 700;
+  font-size: 1.2rem;
+  text-align: center;
+  width: 3.2rem;
+  padding: 0.1rem 0.2rem;
+}
+
 .stat-token__label {
   font-family: var(--sheet-label-font, inherit);
   font-size: 0.72rem;
@@ -688,90 +739,7 @@
   color: var(--text-muted);
 }
 
-/* ---- NPC Stat Cards ------------------------------------------------------- */
-
-.npc-stat-cards {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 0.75rem;
-}
-
-@media (max-width: 640px) {
-  .npc-stat-cards {
-    grid-template-columns: repeat(3, 1fr);
-  }
-}
-
-@media (max-width: 420px) {
-  .npc-stat-cards {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-.npc-stat-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.25rem;
-  padding: 1rem 0.5rem 0.85rem;
-  border-radius: 14px;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-soft);
-  position: relative;
-  overflow: hidden;
-  transition: border-color 0.15s ease, background-color 0.15s ease, transform 0.15s ease;
-}
-
-.npc-stat-card:hover {
-  border-color: var(--npc-stat-color);
-  background: var(--bg-surface-hover);
-}
-
-/* Top accent stripe */
-.npc-stat-card__stripe {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 4px;
-  background: var(--npc-stat-color);
-  opacity: 0.8;
-}
-
-.npc-stat-card__icon {
-  color: var(--npc-stat-color);
-  margin-top: 0.15rem;
-  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--npc-stat-color) 30%, transparent));
-}
-
-.npc-stat-card__value {
-  font-family: var(--sheet-heading-font, inherit);
-  font-weight: 700;
-  font-size: 2.2rem;
-  line-height: 1;
-  color: var(--text-primary);
-  text-align: center;
-  padding: 0.2rem 0;
-}
-
-.npc-stat-card__input {
-  font-family: var(--sheet-heading-font, inherit);
-  font-weight: 700;
-  font-size: 1.6rem;
-  text-align: center;
-  width: 4rem;
-  padding: 0.15rem;
-  margin: 0.2rem 0;
-}
-
-.npc-stat-card__label {
-  font-family: var(--sheet-label-font, inherit);
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-  color: var(--text-muted);
-  text-align: center;
-}
+/* ---- NPC Stat Cards (removed — NPC stats now use stat-token classes) ------- */
 
 .stat-bars {
   display: flex;

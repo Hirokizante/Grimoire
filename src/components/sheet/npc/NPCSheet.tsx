@@ -7,12 +7,10 @@
  * Attributes, Skills, and Ability damage notation.
  *
  * Layout order (top → bottom):
- *   1. Hero Section — portrait, name, Export button
- *   2. Combat Stats — Evasion, Armor, Movement, Save DC, HP (static tokens)
- *   3. Attributes — MAR, POW, AGI, VIT, GRT (clickable to roll)
- *   4. Abilities — AbilityBlockCards (Activate button always hidden)
- *   5. Skills — skill list (clickable to roll)
- *   6. Description — long-form text field
+ *   1. Hero Section — portrait, name, Export button, Combat Stats, Attributes
+ *   2. Abilities — AbilityBlockCards (Activate button always hidden)
+ *   3. Skills — skill list (clickable to roll)
+ *   4. Description — long-form text field
  *
  * The `mode` prop controls editability: "edit" makes fields editable,
  * "view" makes them read-only.
@@ -39,9 +37,7 @@ import type { SheetMode } from '@/pages/CharacterSheetPage'
 import NPCAbilitiesSection from '@/components/sheet/npc/NPCAbilitiesSection'
 import NPCDescriptionSection from '@/components/sheet/npc/NPCDescriptionSection'
 import NPCHeroSection from '@/components/sheet/npc/NPCHeroSection'
-import NPCStatsSection from '@/components/sheet/npc/NPCStatsSection'
 import NPCExportDialog from '@/components/sheet/npc/NPCExportDialog'
-import AttributesSection from '@/components/sheet/AttributesSection'
 import SkillsSection from '@/components/sheet/SkillsSection'
 
 import '@/components/sheet/sheet.css'
@@ -139,15 +135,6 @@ export default function NPCSheet({
         npc={entity}
         mode={mode}
         onExport={() => setShowExport(true)}
-      />
-
-      <NPCStatsSection npc={entity} mode={mode} />
-
-      <AttributesSection
-        character={entity}
-        attributes={entity.attributes}
-        mode={mode}
-        variant="cards"
       />
 
       {isNPC && (
