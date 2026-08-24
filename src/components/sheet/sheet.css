@@ -1608,10 +1608,13 @@
   max-width: 540px;
   /* Column flex: header stays pinned, body scrolls internally. Combined
      with the dvh-based max-height this keeps the dialog fully on-screen
-     even on short mobile viewports (no top/bottom clipping). */
+     even on short mobile viewports (no top/bottom clipping). Matches the
+     .modal-overlay content box (100dvh − 3.75rem padding-top − 1rem bottom
+     padding) so the dialog never slides under the title bar or past the
+     bottom of the overlay. */
   display: flex;
   flex-direction: column;
-  max-height: calc(100dvh - 2rem);
+  max-height: calc(100dvh - 3.75rem - 1rem);
 }
 
 .ability-editor-dialog .modal-header {
@@ -2163,6 +2166,16 @@
   justify-content: center;
   z-index: 2000;
   padding: 1rem;
+  /* The dark + blurred backdrop must cover the FULL viewport (inset: 0),
+     including the strip beneath the sticky title bar — otherwise raw,
+     undimmed sheet content shows through above the modal. The flex content
+     box, however, starts below the bar (padding-top: 3.75rem, same offset
+     as the customize drawer): while a modal is open the title bar is
+     blurred + dimmed to opacity 0.4, so a tall dialog sliding beneath it
+     would show through as a semi-transparent smear over its header. This
+     way dialogs can never extend under the bar, yet the backdrop still
+     dims + blurs the whole viewport. */
+  padding-top: 3.75rem;
   animation: modal-overlay-fade 0.2s ease;
 }
 
@@ -2188,7 +2201,10 @@
   border-radius: 12px;
   max-width: 420px;
   width: 100%;
-  max-height: 90vh;
+  /* Fits inside the .modal-overlay content box (100dvh − 3.75rem padding-top
+     − 1rem bottom padding): a taller cap would overflow the box and clip
+     the dialog's bottom edge. */
+  max-height: calc(100dvh - 3.75rem - 1rem);
   overflow-y: auto;
   animation: modal-content-pop 0.2s ease;
 }
