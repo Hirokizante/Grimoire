@@ -12,7 +12,7 @@
  * slotted section. The parent {@link AbilitiesDndContext} handles the drag.
  */
 
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { LayoutGrid, List } from 'lucide-react'
 import {
   SortableContext,
@@ -27,6 +27,7 @@ import SortableAbilityCard, {
   type AbilitySectionId,
 } from '@/components/sheet/SortableAbilityCard'
 import { useCharacterStore } from '@/store/characterStore'
+import { useSubAbilityEditor } from '@/hooks/useSubAbilityEditor'
 import type { AbilityBlock } from '@/types'
 import type { SheetMode } from '@/pages/CharacterSheetPage'
 
@@ -55,6 +56,17 @@ export default function AbilityPoolSection({
   const [editing, setEditing] = useState<AbilityBlock | null>(null)
   const [showEditor, setShowEditor] = useState(false)
   const [abilityToRemove, setAbilityToRemove] = useState<{ id: string; name: string } | null>(null)
+
+  const handleUpdateParent = useCallback(
+    (parent: AbilityBlock) => {
+      updateAbilityBlock('abilityPool', parent.id, parent)
+    },
+    [updateAbilityBlock],
+  )
+
+  const { subAbilityActions, subAbilityEditorModal } = useSubAbilityEditor({
+    onUpdateParent: handleUpdateParent,
+  })
 
   const { setNodeRef, isOver } = useDroppable({ id: SECTION, data: { section: SECTION } })
 
@@ -180,6 +192,7 @@ export default function AbilityPoolSection({
                 ability={ability}
                 section={SECTION}
                 mode={mode}
+                subAbilityActions={isEdit ? subAbilityActions : undefined}
                 actions={
                   isEdit ? (
                     <>
@@ -221,6 +234,8 @@ export default function AbilityPoolSection({
         onSave={handleSave}
         onClose={handleCancel}
       />
+
+      {subAbilityEditorModal}
 
       {abilityToRemove && (
         <ConfirmModal

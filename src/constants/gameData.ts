@@ -409,6 +409,8 @@ export function createDefaultBasicAttack(): AbilityBlock {
     flavorText: '',
     isMinor: false,
     showActivate: true,
+    subAbilitiesUnderDescription: [],
+    subAbilitiesUnderOvercharge: [],
   }
 }
 
@@ -428,6 +430,8 @@ function createDefaultFatebreaker(): AbilityBlock {
     flavorText: '',
     isMinor: false,
     showActivate: true,
+    subAbilitiesUnderDescription: [],
+    subAbilitiesUnderOvercharge: [],
   }
 }
 

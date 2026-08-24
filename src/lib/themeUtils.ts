@@ -98,5 +98,38 @@ export function colorVars(colors: SheetColors): Record<string, string> {
     '--fp-bar-color': colors.fpBar,
     '--ap-bar-color': colors.apBar,
     '--end-bar-color': colors.endBar,
+    '--color-token-milestone': colors.tokenMilestone,
+    '--color-token-movement': colors.tokenMovement,
+    '--color-token-evasion': colors.tokenEvasion,
+    '--color-token-save-dc': colors.tokenSaveDC,
+    '--color-token-armor': colors.tokenArmor,
+    '--color-token-end-recovery': colors.tokenEndRecovery,
   }
 }
+
+/**
+ * Accent color keys from {@link SheetColors} that can be chosen as a Sub-Ability
+ * color override. Each entry maps a SheetColors key to a CSS variable name and a
+ * human-readable label for the color picker swatches.
+ */
+export const SUB_ABILITY_ACCENT_OPTIONS: {
+  key: string
+  label: string
+  cssVar: string
+}[] = [
+  { key: 'accent', label: 'Accent', cssVar: '--accent-violet' },
+  { key: 'accentSoft', label: 'Accent Soft', cssVar: '--accent-violet-soft' },
+  { key: 'danger', label: 'Danger', cssVar: '--danger' },
+  { key: 'success', label: 'Success', cssVar: '--color-success' },
+  { key: 'minorAbility', label: 'Minor', cssVar: '--color-minor-ability' },
+  { key: 'hpBar', label: 'HP', cssVar: '--hp-bar-color' },
+  { key: 'fpBar', label: 'FP', cssVar: '--fp-bar-color' },
+  { key: 'apBar', label: 'AP', cssVar: '--ap-bar-color' },
+  { key: 'endBar', label: 'END', cssVar: '--end-bar-color' },
+  { key: 'tokenMilestone', label: 'Milestone', cssVar: '--color-token-milestone' },
+  { key: 'tokenMovement', label: 'Movement', cssVar: '--color-token-movement' },
+  { key: 'tokenEvasion', label: 'Evasion', cssVar: '--color-token-evasion' },
+  { key: 'tokenSaveDC', label: 'Save DC', cssVar: '--color-token-save-dc' },
+  { key: 'tokenArmor', label: 'Armor', cssVar: '--color-token-armor' },
+  { key: 'tokenEndRecovery', label: 'END Recovery', cssVar: '--color-token-end-recovery' },
+]

@@ -12,6 +12,7 @@
 
 import DiceHighlighter from '@/components/dice/DiceHighlighter'
 import MarkdownText from '@/components/ui/MarkdownText'
+import SubAbilityBlock from '@/components/sheet/SubAbilityBlock'
 import type { AbilityBlock, Character } from '@/types'
 import type { SheetMode } from '@/pages/CharacterSheetPage'
 
@@ -20,6 +21,13 @@ export interface AbilityBlockCardProps {
   mode?: SheetMode
   /** Optional action buttons rendered inside the card footer (edit-mode only). */
   actions?: React.ReactNode
+  /**
+   * Optional render function for sub-ability action buttons (edit-mode only).
+   * Called once per sub-ability (both under-description and under-overcharge);
+   * receives the sub-ability and its parent ability, returns the React node
+   * for the sub-ability's footer.
+   */
+  subAbilityActions?: (sub: AbilityBlock, parent: AbilityBlock) => React.ReactNode
   /**
    * Explicit character whose stats resolve variables in dice notation (the
    * damage field and any dice embedded in description/overcharge/flavor text).
@@ -34,6 +42,7 @@ export default function AbilityBlockCard({
   ability,
   mode = 'view',
   actions,
+  subAbilityActions,
   character,
 }: AbilityBlockCardProps) {
   const {
@@ -100,12 +109,40 @@ export default function AbilityBlockCard({
         </MarkdownText>
       )}
 
+      {ability.subAbilitiesUnderDescription?.length > 0 && (
+        <div className="ability-card__sub-abilities">
+          {ability.subAbilitiesUnderDescription.map((sub) => (
+            <SubAbilityBlock
+              key={sub.id}
+              ability={sub}
+              mode={mode}
+              character={character}
+              actions={subAbilityActions?.(sub, ability)}
+            />
+          ))}
+        </div>
+      )}
+
       {overcharge && (
         <div className="ability-card__overcharge">
           <span className="ability-card__section-label">Overcharge</span>
           <MarkdownText className="ability-card__overcharge-body" mode={mode} character={character}>
             {overcharge}
           </MarkdownText>
+        </div>
+      )}
+
+      {ability.subAbilitiesUnderOvercharge?.length > 0 && (
+        <div className="ability-card__sub-abilities">
+          {ability.subAbilitiesUnderOvercharge.map((sub) => (
+            <SubAbilityBlock
+              key={sub.id}
+              ability={sub}
+              mode={mode}
+              character={character}
+              actions={subAbilityActions?.(sub, ability)}
+            />
+          ))}
         </div>
       )}
 

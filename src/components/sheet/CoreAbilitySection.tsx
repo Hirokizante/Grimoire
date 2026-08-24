@@ -13,7 +13,7 @@
  * new blank ability.
  */
 
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 
 import AbilityActivation from '@/components/sheet/AbilityActivation'
 import AbilityBlockCard from '@/components/sheet/AbilityBlockCard'
@@ -21,6 +21,7 @@ import AbilityEditorModal from '@/components/sheet/AbilityEditorModal'
 import ConfirmModal from '@/components/sheet/ConfirmModal'
 import MarkdownText from '@/components/ui/MarkdownText'
 import { useCharacterStore } from '@/store/characterStore'
+import { useSubAbilityEditor } from '@/hooks/useSubAbilityEditor'
 import type { AbilityBlock } from '@/types'
 import type { SheetMode } from '@/pages/CharacterSheetPage'
 
@@ -54,6 +55,27 @@ export default function CoreAbilitySection({
     null,
   )
   const [innateToRemove, setInnateToRemove] = useState<{ id: string; name: string } | null>(null)
+
+  const handleUpdateParent = useCallback(
+    (parent: AbilityBlock) => {
+      if (parent.id === basicAttack.id) {
+        updateCoreAbility('basicAttack', parent)
+      } else if (parent.id === fatebreaker.id) {
+        updateCoreAbility('fatebreaker', parent)
+      } else {
+        // It's an innate ability — update it in the array.
+        const updated = innateAbilities.map((a) =>
+          a.id === parent.id ? parent : a,
+        )
+        updateCoreAbility('innateAbilities', updated)
+      }
+    },
+    [basicAttack.id, fatebreaker.id, innateAbilities, updateCoreAbility],
+  )
+
+  const { subAbilityActions, subAbilityEditorModal } = useSubAbilityEditor({
+    onUpdateParent: handleUpdateParent,
+  })
 
   const setInnateDescription = (value: string) =>
     updateCoreAbility('innateDescription', value)
@@ -152,6 +174,7 @@ export default function CoreAbilitySection({
               <AbilityBlockCard
                 ability={ability}
                 mode={mode}
+                subAbilityActions={isEdit ? subAbilityActions : undefined}
                 actions={
                   isEdit ? (
                     <>
@@ -196,6 +219,7 @@ export default function CoreAbilitySection({
             <AbilityBlockCard
               ability={basicAttack}
               mode={mode}
+              subAbilityActions={isEdit ? subAbilityActions : undefined}
               actions={
                 isEdit ? (
                   <button
@@ -218,6 +242,7 @@ export default function CoreAbilitySection({
             <AbilityBlockCard
               ability={fatebreaker}
               mode={mode}
+              subAbilityActions={isEdit ? subAbilityActions : undefined}
               actions={
                 isEdit ? (
                   <button
@@ -242,6 +267,8 @@ export default function CoreAbilitySection({
         onSave={handleSave}
         onClose={handleCancel}
       />
+
+      {subAbilityEditorModal}
 
       {innateToRemove && (
         <ConfirmModal

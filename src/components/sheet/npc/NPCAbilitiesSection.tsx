@@ -17,13 +17,14 @@
  * attributes/skills).
  */
 
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { LayoutGrid, List } from 'lucide-react'
 
 import AbilityBlockCard from '@/components/sheet/AbilityBlockCard'
 import AbilityEditorModal from '@/components/sheet/AbilityEditorModal'
 import ConfirmModal from '@/components/sheet/ConfirmModal'
 import { useCharacterStore } from '@/store/characterStore'
+import { useSubAbilityEditor } from '@/hooks/useSubAbilityEditor'
 import type { AbilityBlock } from '@/types'
 import type { SheetMode } from '@/pages/CharacterSheetPage'
 
@@ -47,6 +48,22 @@ export default function NPCAbilitiesSection({
   const [editing, setEditing] = useState<AbilityBlock | null>(null)
   const [showEditor, setShowEditor] = useState(false)
   const [abilityToRemove, setAbilityToRemove] = useState<{ id: string; name: string } | null>(null)
+
+  const handleUpdateParent = useCallback(
+    (parent: AbilityBlock) => {
+      updateCurrentCharacter((char) => ({
+        ...char,
+        slottedAbilities: char.slottedAbilities.map((a) =>
+          a.id === parent.id ? parent : a,
+        ),
+      }))
+    },
+    [updateCurrentCharacter],
+  )
+
+  const { subAbilityActions, subAbilityEditorModal } = useSubAbilityEditor({
+    onUpdateParent: handleUpdateParent,
+  })
 
   const openNew = () => {
     setEditing(null)
@@ -166,6 +183,7 @@ export default function NPCAbilitiesSection({
               key={ability.id}
               ability={ability}
               mode={mode}
+              subAbilityActions={isEdit ? subAbilityActions : undefined}
               actions={
                 isEdit ? (
                   <>
@@ -198,6 +216,8 @@ export default function NPCAbilitiesSection({
         onClose={handleCancel}
         npcMode
       />
+
+      {subAbilityEditorModal}
 
       {abilityToRemove && (
         <ConfirmModal

@@ -15,7 +15,7 @@
  * pool. The parent {@link AbilitiesDndContext} handles the actual drag logic.
  */
 
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { LayoutGrid, List } from 'lucide-react'
 import {
   SortableContext,
@@ -31,6 +31,7 @@ import SortableAbilityCard, {
   type AbilitySectionId,
 } from '@/components/sheet/SortableAbilityCard'
 import { useCharacterStore } from '@/store/characterStore'
+import { useSubAbilityEditor } from '@/hooks/useSubAbilityEditor'
 import { formatSlots, isOverflowed, slotsUsed } from '@/lib/slotLogic'
 import type { AbilityBlock } from '@/types'
 import type { SheetMode } from '@/pages/CharacterSheetPage'
@@ -63,6 +64,17 @@ export default function SlottedAbilitiesSection({
   const [editing, setEditing] = useState<AbilityBlock | null>(null)
   const [showEditor, setShowEditor] = useState(false)
   const [abilityToRemove, setAbilityToRemove] = useState<{ id: string; name: string } | null>(null)
+
+  const handleUpdateParent = useCallback(
+    (parent: AbilityBlock) => {
+      updateAbilityBlock('slottedAbilities', parent.id, parent)
+    },
+    [updateAbilityBlock],
+  )
+
+  const { subAbilityActions, subAbilityEditorModal } = useSubAbilityEditor({
+    onUpdateParent: handleUpdateParent,
+  })
 
   // Droppable — makes the section a drop target for cross-section drags.
   const { setNodeRef, isOver } = useDroppable({ id: SECTION, data: { section: SECTION } })
@@ -213,6 +225,7 @@ export default function SlottedAbilitiesSection({
                 ability={ability}
                 section={SECTION}
                 mode={mode}
+                subAbilityActions={isEdit ? subAbilityActions : undefined}
                 actions={
                   <>
                     <button
@@ -252,6 +265,8 @@ export default function SlottedAbilitiesSection({
         onSave={handleSave}
         onClose={handleCancel}
       />
+
+      {subAbilityEditorModal}
 
       {abilityToRemove && (
         <ConfirmModal

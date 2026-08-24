@@ -5,8 +5,11 @@
  * workspace for ability creation without the cramped inline panel feel. Overlay
  * clicks and the Esc key both cancel. When there are unsaved changes, a
  * confirmation dialog is shown before discarding.
+ *
+ * When the side-by-side Sub-Ability editor panel is open, the modal expands to
+ * accommodate both panels.
  */
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import AbilityBlockEditor from '@/components/sheet/AbilityBlockEditor'
 import ConfirmModal from '@/components/sheet/ConfirmModal'
@@ -24,6 +27,11 @@ export interface AbilityEditorModalProps {
   onClose: () => void
   /** NPC variant: hide character-only controls in the editor form. */
   npcMode?: boolean
+  /**
+   * When true, the editor is for a Sub-Ability (hides Minor toggle and
+   * "Add Sub-Ability" buttons). Used by the Sub-Ability editor modal.
+   */
+  isSubAbility?: boolean
 }
 
 export default function AbilityEditorModal({
@@ -32,6 +40,7 @@ export default function AbilityEditorModal({
   onSave,
   onClose,
   npcMode = false,
+  isSubAbility = false,
 }: AbilityEditorModalProps) {
   // Stable key so a fresh AbilityBlockEditor mounts on every open (clean state).
   const editorKey = useMemo(
@@ -41,6 +50,13 @@ export default function AbilityEditorModal({
 
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false)
+  const [subPanelOpen, setSubPanelOpen] = useState(false)
+
+  // Reset sub-panel state when the modal closes so reopening doesn't keep
+  // the wide layout from a previous session.
+  useEffect(() => {
+    if (!open) setSubPanelOpen(false)
+  }, [open])
 
   const handleCancel = useCallback(() => {
     if (hasUnsavedChanges) {
@@ -65,6 +81,11 @@ export default function AbilityEditorModal({
     setHasUnsavedChanges(isDirty)
   }, [])
 
+  // Track sub-editor panel state to expand the modal.
+  const handleSubEditorToggle = useCallback((isOpen: boolean) => {
+    setSubPanelOpen(isOpen)
+  }, [])
+
   // If there are unsaved changes, intercept Esc too. Scroll lock, focus trap
   // and focus restore come from useModalDialog.
   const dialogRef = useModalDialog(
@@ -83,7 +104,11 @@ export default function AbilityEditorModal({
   return (
     <div className="modal-overlay" onClick={handleCancel}>
       <div
-        className="modal-content ability-editor-dialog"
+        className={
+          'modal-content ability-editor-dialog' +
+          (subPanelOpen ? ' ability-editor-dialog--wide' : '') +
+          (isSubAbility ? ' ability-editor-dialog--sub' : '')
+        }
         ref={dialogRef}
         tabIndex={-1}
         role="dialog"
@@ -104,6 +129,8 @@ export default function AbilityEditorModal({
             hideTitle
             onDirtyChange={handleDirtyChange}
             npcMode={npcMode}
+            isSubAbility={isSubAbility}
+            onSubEditorToggle={handleSubEditorToggle}
           />
         </div>
       </div>

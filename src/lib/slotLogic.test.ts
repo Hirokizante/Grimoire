@@ -21,6 +21,8 @@ function makeAbility(id: string, isMinor = false): AbilityBlock {
     flavorText: '',
     isMinor,
     showActivate: true,
+    subAbilitiesUnderDescription: [],
+    subAbilitiesUnderOvercharge: [],
   }
 }
 

@@ -61,4 +61,25 @@ export interface AbilityBlock {
    * abilities). Defaults to true; the toggle is in AbilityBlockEditor.
    */
   showActivate: boolean
+  /**
+   * Sub-Abilities nested under the Description field. Bound to their parent
+   * — they always move with it and cannot be independently slotted/unslotted.
+   * Only one layer of nesting is allowed (sub-abilities cannot have their own
+   * sub-abilities). Sub-abilities do not consume Ability Slots and cannot be
+   * Minor. Defaults to an empty array (normalize-on-read back-fills it).
+   */
+  subAbilitiesUnderDescription: AbilityBlock[]
+  /**
+   * Sub-Abilities nested under the Overcharge field. Same rules as
+   * {@link subAbilitiesUnderDescription}. Defaults to an empty array.
+   */
+  subAbilitiesUnderOvercharge: AbilityBlock[]
+  /**
+   * Optional accent color override for Sub-Ability blocks. Stores a
+   * {@link SheetColors} key (e.g. 'accent', 'danger', 'hpBar') whose
+   * corresponding CSS variable tints the block's border and background.
+   * Only meaningful on sub-abilities; ignored on regular ability blocks.
+   * Undefined / empty means "use default styling".
+   */
+  colorOverride?: string
 }

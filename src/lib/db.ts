@@ -114,9 +114,22 @@ export function normalizeCharacter(raw: Character): Character {
     })
   }
 
-  // Ensure every AbilityBlock has `showActivate` (added in this release).
-  // Existing records default to true so every ability keeps its Activate
-  // button until a user explicitly hides it.
+  // Ensure every AbilityBlock has `showActivate` (added in this release)
+  // and the `subAbilitiesUnderDescription` / `subAbilitiesUnderOvercharge`
+  // arrays (added with the Sub-Abilities feature). Existing records default
+  // to true / [] so every ability keeps its Activate button and has empty
+  // sub-ability lists until a user explicitly adds one.
+  const normalizeBlock = (a: AbilityBlock): AbilityBlock => ({
+    ...a,
+    showActivate: a.showActivate ?? true,
+    subAbilitiesUnderDescription: Array.isArray(a.subAbilitiesUnderDescription)
+      ? a.subAbilitiesUnderDescription
+      : [],
+    subAbilitiesUnderOvercharge: Array.isArray(a.subAbilitiesUnderOvercharge)
+      ? a.subAbilitiesUnderOvercharge
+      : [],
+  })
+
   const blockArrays: (keyof Character)[] = [
     'innateAbilities',
     'slottedAbilities',
@@ -126,10 +139,7 @@ export function normalizeCharacter(raw: Character): Character {
     const arr = result[key] as unknown as AbilityBlock[] | undefined
     if (Array.isArray(arr)) {
       ;(result as unknown as Record<string, unknown>)[key] = arr.map(
-        (a) => ({
-          ...a,
-          showActivate: a.showActivate ?? true,
-        }),
+        normalizeBlock,
       )
     }
   }
@@ -171,10 +181,7 @@ export function normalizeCharacter(raw: Character): Character {
           kind: 'ability' as const,
           id: section.id,
           name: section.name,
-          abilities: (section.abilities ?? []).map((a) => ({
-            ...a,
-            showActivate: a.showActivate ?? true,
-          })),
+          abilities: (section.abilities ?? []).map(normalizeBlock),
         }
       }),
     }))
@@ -216,15 +223,12 @@ export function normalizeCharacter(raw: Character): Character {
   }
 
   // Ensure scalar AbilityBlock shapes (basicAttack, fatebreaker) carry
-  // showActivate too.
+  // showActivate and sub-ability arrays too.
   const scalarBlocks: (keyof Character)[] = ['basicAttack', 'fatebreaker']
   for (const key of scalarBlocks) {
     const block = result[key] as unknown as AbilityBlock | undefined
     if (block && typeof block === 'object') {
-      ;(result as unknown as Record<string, unknown>)[key] = {
-        ...block,
-        showActivate: block.showActivate ?? true,
-      }
+      ;(result as unknown as Record<string, unknown>)[key] = normalizeBlock(block)
     }
   }
 

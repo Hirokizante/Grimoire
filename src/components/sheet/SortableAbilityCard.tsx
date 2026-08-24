@@ -27,6 +27,11 @@ export interface SortableAbilityCardProps {
   mode?: SheetMode
   /** Optional action buttons rendered below the card (Edit, Move, Remove). */
   actions?: React.ReactNode
+  /**
+   * Optional render function for sub-ability action buttons (edit-mode only).
+   * Passed through to AbilityBlockCard.
+   */
+  subAbilityActions?: (sub: AbilityBlock, parent: AbilityBlock) => React.ReactNode
 }
 
 export default function SortableAbilityCard({
@@ -34,6 +39,7 @@ export default function SortableAbilityCard({
   section,
   mode = 'view',
   actions,
+  subAbilityActions,
 }: SortableAbilityCardProps) {
   const isEdit = mode === 'edit'
 
@@ -77,7 +83,7 @@ export default function SortableAbilityCard({
         </button>
       )}
 
-      <AbilityBlockCard ability={ability} mode={mode} actions={actions} />
+      <AbilityBlockCard ability={ability} mode={mode} actions={actions} subAbilityActions={subAbilityActions} />
     </div>
   )
 }

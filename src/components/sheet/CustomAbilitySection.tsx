@@ -6,7 +6,7 @@
  * and the ability to add/edit abilities. No slot limit.
  */
 
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { LayoutGrid, List, Pencil, Check, Trash2 } from 'lucide-react'
 
 import { useDroppable } from '@dnd-kit/core'
@@ -21,6 +21,7 @@ import AbilityEditorModal from '@/components/sheet/AbilityEditorModal'
 import ConfirmModal from '@/components/sheet/ConfirmModal'
 import SortableAbilityCard from '@/components/sheet/SortableAbilityCard'
 import { useCharacterStore } from '@/store/characterStore'
+import { useSubAbilityEditor } from '@/hooks/useSubAbilityEditor'
 import type { AbilityBlock, CustomAbilitySection } from '@/types'
 import type { SheetMode } from '@/pages/CharacterSheetPage'
 
@@ -51,6 +52,17 @@ export default function CustomAbilitySection({
 
   const [renaming, setRenaming] = useState(false)
   const [sectionNameDraft, setSectionNameDraft] = useState('')
+
+  const handleUpdateParent = useCallback(
+    (parent: AbilityBlock) => {
+      updateCustomAbility(tabId, section.id, parent.id, parent)
+    },
+    [updateCustomAbility, tabId, section.id],
+  )
+
+  const { subAbilityActions, subAbilityEditorModal } = useSubAbilityEditor({
+    onUpdateParent: handleUpdateParent,
+  })
 
   const startRenameSection = () => {
     setSectionNameDraft(section.name)
@@ -226,6 +238,7 @@ export default function CustomAbilitySection({
                   ability={ability}
                   section={section.id}
                   mode={mode}
+                  subAbilityActions={isEdit ? subAbilityActions : undefined}
                   actions={
                     <>
                       <button
@@ -255,6 +268,8 @@ export default function CustomAbilitySection({
         onSave={handleSave}
         onClose={handleCancel}
       />
+
+      {subAbilityEditorModal}
 
       {showDeleteConfirm && (
         <ConfirmModal
