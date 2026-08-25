@@ -118,6 +118,12 @@ export default function AbilityBlockCard({
         </div>
       )}
 
+      {flavorText && (
+        <MarkdownText className="ability-card__flavor" mode={mode} character={character} source={rollSource}>
+          {flavorText}
+        </MarkdownText>
+      )}
+
       {description && (
         <MarkdownText className="ability-card__description" mode={mode} character={character} source={rollSource}>
           {description}
@@ -159,12 +165,6 @@ export default function AbilityBlockCard({
             />
           ))}
         </div>
-      )}
-
-      {flavorText && (
-        <MarkdownText className="ability-card__flavor" mode={mode} character={character} source={rollSource}>
-          {flavorText}
-        </MarkdownText>
       )}
 
       {actions && <div className="ability-card__actions">{actions}</div>}

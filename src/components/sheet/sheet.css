@@ -1351,14 +1351,12 @@
   margin-bottom: 0;
 }
 
-.ability-card__flavor {
+.ability-card__flavor,
+.sub-ability-block__flavor {
   font-family: var(--sheet-helper-font, inherit);
   font-style: italic;
   font-size: 0.84rem;
-  color: var(--text-muted);
-  margin: 0;
-  padding-left: 0.5rem;
-  border-left: 2px solid var(--accent-violet-soft);
+  color: var(--text-secondary);
 }
 
 /* ---- Core innate narrative ------------------------------------------------ */
@@ -1889,16 +1887,6 @@
 .sub-ability-block__overcharge-body {
   font-size: 0.82rem;
   color: var(--text-secondary);
-}
-
-.sub-ability-block__flavor {
-  font-family: var(--sheet-helper-font, inherit);
-  font-style: italic;
-  font-size: 0.84rem;
-  color: var(--text-muted);
-  margin: 0;
-  padding-left: 0.5rem;
-  border-left: 2px solid var(--accent-violet-soft);
 }
 
 .sub-ability-block__actions {
@@ -3651,7 +3639,9 @@
   margin: 0.2em 0;
 }
 
-.md blockquote {
+.md blockquote,
+.ability-card__flavor,
+.sub-ability-block__flavor {
   margin: 0.6em 0;
   padding: 0.3em 0.8em;
   border-left: 3px solid var(--accent-violet);

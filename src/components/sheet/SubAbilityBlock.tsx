@@ -178,6 +178,17 @@ export default function SubAbilityBlock({
         </div>
       )}
 
+      {flavorText && (
+        <MarkdownText
+          className="sub-ability-block__flavor"
+          mode={mode}
+          character={character}
+          source={rollSource}
+        >
+          {flavorText}
+        </MarkdownText>
+      )}
+
       {description && (
         <MarkdownText
           className="sub-ability-block__description"
@@ -201,17 +212,6 @@ export default function SubAbilityBlock({
             {overcharge}
           </MarkdownText>
         </div>
-      )}
-
-      {flavorText && (
-        <MarkdownText
-          className="sub-ability-block__flavor"
-          mode={mode}
-          character={character}
-          source={rollSource}
-        >
-          {flavorText}
-        </MarkdownText>
       )}
 
       {activateBtn && (

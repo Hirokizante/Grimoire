@@ -392,6 +392,19 @@ export default function AbilityBlockEditor({
           </label>
 
           <label className="ability-editor__field">
+            <span className="ability-editor__label">Flavor Text</span>
+            <input
+              type="text"
+              className="sheet-input"
+              value={draft.flavorText}
+              onChange={(e) =>
+                setDraft({ ...draft, flavorText: e.target.value })
+              }
+              placeholder="Optional in-universe quote…"
+            />
+          </label>
+
+          <label className="ability-editor__field">
             <span className="ability-editor__label">Description</span>
             <textarea
               className="sheet-textarea"
@@ -444,19 +457,6 @@ export default function AbilityBlockEditor({
               </button>
             </>
           )}
-
-          <label className="ability-editor__field">
-            <span className="ability-editor__label">Flavor Text</span>
-            <input
-              type="text"
-              className="sheet-input"
-              value={draft.flavorText}
-              onChange={(e) =>
-                setDraft({ ...draft, flavorText: e.target.value })
-              }
-              placeholder="Optional in-universe quote…"
-            />
-          </label>
 
           {!npcMode && !isSubAbility && (
             <label className="ability-editor__field ability-editor__field--inline">
