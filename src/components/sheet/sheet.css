@@ -4234,9 +4234,17 @@
   }
 
   /* Sacrifice the page gutter on the drawer side: the sheet keeps its
-     width and the drawer-to-sheet gap shrinks to 0.5rem. */
+     width and the drawer-to-sheet gap shrinks to 0.5rem. The transition
+     lives HERE (not on .app-main globally) so it fires only for the drawer
+     state change — a global one would animate the whole wrapper's padding
+     on home→page navigation (React reuses the <main> node; the home page
+     drops .app-main--home's padding: 0 and every element would visibly
+     "shrink"). On close the gutter returns instantly (12px, at the page
+     edge under the sliding drawer) while the sheet's own margin transition
+     keeps the rest in sync. */
   body:has(.sheet-page--selector-open) .app-main {
     padding-left: 0.5rem;
+    transition: padding-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   /* Background layers shift in sync with the content so the composition
@@ -4289,6 +4297,7 @@
   /* Sacrifice the page gutter on the drawer side (see selector above). */
   body:has(.sheet-page--customize-open) .app-main {
     padding-right: 0.5rem;
+    transition: padding-right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .sheet-page--customize-open .sheet-page__bg-color,

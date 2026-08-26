@@ -174,12 +174,13 @@
   max-width: 1100px;
   width: 100%;
   margin: 0 auto;
-  /* Horizontal gutters are sacrificed (→0.5rem) while a sheet drawer is
-     open so the sheet keeps its width — animate in sync with the drawer's
-     slide-in (see sheet.css .sheet-page--selector-open /
-     .sheet-page--customize-open). */
-  transition: padding-left 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-    padding-right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  /* NO transition on padding here — a global padding transition makes the
+     home→page navigation animate: React reuses this <main> node across view
+     switches, so removing .app-main--home (padding: 0) would tween the whole
+     wrapper 0 → 1.25rem and visibly "shrink" every page opened from home.
+     The gutter sacrifice (1.25rem → 0.5rem while a sheet drawer is open)
+     carries its own transition scoped to the drawer states in sheet.css
+     (body:has(.sheet-page--selector-open/customize-open) .app-main). */
 }
 
 .app-main--narrow {
