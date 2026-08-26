@@ -1607,12 +1607,12 @@
   /* Column flex: header stays pinned, body scrolls internally. Combined
      with the dvh-based max-height this keeps the dialog fully on-screen
      even on short mobile viewports (no top/bottom clipping). Matches the
-     .modal-overlay content box (100dvh − 3.75rem padding-top − 1rem bottom
-     padding) so the dialog never slides under the title bar or past the
-     bottom of the overlay. */
+     .modal-overlay content box (100dvh − var(--app-header-h) padding-top −
+     1rem bottom padding) so the dialog never slides under the title bar or
+     past the bottom of the overlay. */
   display: flex;
   flex-direction: column;
-  max-height: calc(100dvh - 3.75rem - 1rem);
+  max-height: calc(100dvh - var(--app-header-h) - 1rem);
 }
 
 .ability-editor-dialog .modal-header {
@@ -2157,13 +2157,14 @@
   /* The dark + blurred backdrop must cover the FULL viewport (inset: 0),
      including the strip beneath the sticky title bar — otherwise raw,
      undimmed sheet content shows through above the modal. The flex content
-     box, however, starts below the bar (padding-top: 3.75rem, same offset
-     as the customize drawer): the bar stays opaque while a modal is open
-     (it gets a matching dark scrim + blurred contents — see App.css), so a
-     tall dialog sliding beneath it would be cut off at the bar's edge.
-     Keeping the content box below the bar means dialogs can never extend
-     under it, yet the backdrop still dims + blurs the whole viewport. */
-  padding-top: 3.75rem;
+     box, however, starts below the bar (padding-top: var(--app-header-h),
+     the same live-measured offset as the customize drawer): the bar stays
+     opaque while a modal is open (it gets a matching dark scrim + blurred
+     contents — see App.css), so a tall dialog sliding beneath it would be
+     cut off at the bar's edge. Keeping the content box below the bar means
+     dialogs can never extend under it, yet the backdrop still dims + blurs
+     the whole viewport. */
+  padding-top: var(--app-header-h);
   animation: modal-overlay-fade 0.2s ease;
 }
 
@@ -2189,10 +2190,10 @@
   border-radius: 12px;
   max-width: 420px;
   width: 100%;
-  /* Fits inside the .modal-overlay content box (100dvh − 3.75rem padding-top
-     − 1rem bottom padding): a taller cap would overflow the box and clip
-     the dialog's bottom edge. */
-  max-height: calc(100dvh - 3.75rem - 1rem);
+  /* Fits inside the .modal-overlay content box (100dvh − var(--app-header-h)
+     padding-top − 1rem bottom padding): a taller cap would overflow the box
+     and clip the dialog's bottom edge. */
+  max-height: calc(100dvh - var(--app-header-h) - 1rem);
   overflow-y: auto;
   /* Shared dialog shell for EVERY modal: no rubber-band/chaining, so a
      dialog can never bounce or chain its scroll into the page behind the
@@ -3058,9 +3059,7 @@
 
 .customize-drawer {
   position: fixed;
-  top: 3.75rem;              /* Clear the sticky .app-header (z 3000, ~3.6rem
-                                tall) so the drawer's own header/✕ stays
-                                visible and clickable below the title bar */
+  top: calc(var(--app-header-h) - 4px);  /* −4px tuck under the opaque bar */
   right: 0;
   bottom: 0;
   width: 340px;
@@ -4051,7 +4050,7 @@
 
 .char-selector {
   position: fixed;
-  top: 0;
+  top: calc(var(--app-header-h) - 4px);  /* −4px tuck under the opaque bar */
   bottom: 0;
   left: 0;
   width: 240px;
@@ -4162,7 +4161,7 @@
   z-index: 51;
   width: 32px;
   height: 56px;
-  border: none;
+  border: 1px solid var(--border);  /* matches the panel's border-right so the tab reads as a distinct tab against the sheet */
   border-radius: 0 10px 10px 0;
   background: var(--bg-surface);
   color: var(--text-secondary);
@@ -4180,6 +4179,10 @@
 
 .char-selector__toggle--open {
   left: 240px;
+  /* The drawer's own border-right continues the vertical line at the seam,
+   * so the tab's left border is dropped — otherwise the two adjacent 1px
+   * lines read as a doubled segment. The outline flows around the tab. */
+  border-left: none;
 }
 
 /* When any modal is open, the selector toggle recedes behind it like every
@@ -4204,22 +4207,43 @@
  * make room so the character list and the sheet stay visible simultaneously.
  * On narrow screens there isn't enough room, so the panel overlays the sheet
  * instead (drawer-on-top) — see the max-width: 600px block below.
+ *
+ * The shift only moves the sheet as far as it MUST: .app-main is centered
+ * with max-width 1100px, so on wide viewports the drawers already clear the
+ * sheet and no shift is needed at all. margin-left uses
+ * clamp(0, 240px − (100dvw − 1100px)/2, 240px) — the free centering slack
+ * absorbs the drawer before the sheet loses any width. At the same time the
+ * page gutter on the drawer side is sacrificed (1.25rem → 0.5rem), so the
+ * gap between drawer and sheet shrinks to a small breathing-room minimum
+ * instead of eating into the sheet's width.
  * The transition is synced with the panel's slide-in (0.3s, same easing). */
 @media (min-width: 601px) {
   .sheet-page--selector-open .sheet-page__content {
-    margin-left: 240px;
+    margin-left: clamp(0px, calc(240px - (100dvw - 1100px) / 2), 240px);
   }
 
-  /* Background layers also shift so they don't bleed under the panel. */
+  /* Sacrifice the page gutter on the drawer side: the sheet keeps its
+     width and the drawer-to-sheet gap shrinks to 0.5rem. */
+  body:has(.sheet-page--selector-open) .app-main {
+    padding-left: 0.5rem;
+  }
+
+  /* Background layers shift in sync with the content so the composition
+     doesn't jump on wide screens (where the content doesn't move). */
   .sheet-page--selector-open .sheet-page__bg-color,
   .sheet-page--selector-open .sheet-page__bg-image,
   .sheet-page--selector-open .sheet-page__bg-overlay {
-    left: 240px;
+    left: clamp(0px, calc(240px - (100dvw - 1100px) / 2), 240px);
   }
 
-  /* Top navigation bar also shifts so nav buttons stay fully visible. */
+  /* Top navigation bar shifts to stay aligned with the sheet column
+     (0.5rem gutter + drawer width, or the centered slack once it exceeds
+     the drawer). */
   body:has(.sheet-page--selector-open) .app-header {
-    padding-left: calc(1.25rem + 240px);
+    padding-left: max(
+      calc(240px + 0.5rem),
+      calc((100dvw - 1100px) / 2 + 0.5rem)
+    );
   }
 }
 
@@ -4236,27 +4260,37 @@
 }
 
 .app-header {
-  transition: padding-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: padding-left 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+    padding-right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* When the customization drawer is open on wide screens, shift the page
  * content left to make room so the sheet and the drawer stay visible
  * simultaneously — the mirror image of the char-selector shift above.
- * Background layers and the top bar shift with it (padding-right on the
- * header since padding-left is already used by the selector shift). */
+ * Same clamp-based slack absorption, same gutter sacrifice (0.5rem), and
+ * background layers + top bar shift with it (padding-right on the header
+ * since padding-left is already used by the selector shift). */
 @media (min-width: 601px) {
   .sheet-page--customize-open .sheet-page__content {
-    margin-right: 340px;
+    margin-right: clamp(0px, calc(340px - (100dvw - 1100px) / 2), 340px);
+  }
+
+  /* Sacrifice the page gutter on the drawer side (see selector above). */
+  body:has(.sheet-page--customize-open) .app-main {
+    padding-right: 0.5rem;
   }
 
   .sheet-page--customize-open .sheet-page__bg-color,
   .sheet-page--customize-open .sheet-page__bg-image,
   .sheet-page--customize-open .sheet-page__bg-overlay {
-    right: 340px;
+    right: clamp(0px, calc(340px - (100dvw - 1100px) / 2), 340px);
   }
 
   body:has(.sheet-page--customize-open) .app-header {
-    padding-right: calc(1.25rem + 340px);
+    padding-right: max(
+      calc(340px + 0.5rem),
+      calc((100dvw - 1100px) / 2 + 0.5rem)
+    );
   }
 }
 

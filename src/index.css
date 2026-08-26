@@ -23,6 +23,13 @@
   --danger: #e57373;
   --danger-hover: #ef8a8a;
 
+  /* Height of the sticky .app-header (TitleBar). Fallback pre-measurement;
+     TitleBar overwrites it with the live measured pixel height via a
+     ResizeObserver, so every fixed panel that docks under the bar
+     (customize drawer, char-selector) sits flush with zero gap and nothing
+     covered. Modals reuse it for their content-box top offset. */
+  --app-header-h: 3.75rem;
+
   color-scheme: dark;
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial,
     sans-serif;

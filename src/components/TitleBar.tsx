@@ -6,6 +6,7 @@
  * character sheet when on the sheet view.
  */
 
+import { useEffect, useRef } from 'react'
 import { Users, Swords, Sparkles, Settings } from 'lucide-react'
 
 import { useCharacterStore } from '@/store/characterStore'
@@ -28,6 +29,37 @@ export default function TitleBar() {
   const closeNPC = useCharacterStore((s) => s.closeNPC)
   const setView = useCharacterStore((s) => s.setView)
   const appTheme = useAppThemeStore((s) => s.theme)
+
+  // Publish the bar's live height as --app-header-h on <html> so fixed
+  // panels that dock beneath it (customize drawer, char-selector, modal
+  // content boxes) sit flush under it with no gap and nothing covered.
+  // The header's height depends on viewport breakpoints and the user's
+  // font stack, so measuring beats any hardcoded rem value. Measured via
+  // getBoundingClientRect() (float — offsetHeight rounds to whole pixels
+  // and leaves a hairline seam at the bar's bottom edge). ResizeObserver +
+  // window resize + font-load re-measures keep the value fresh across
+  // breakpoint changes, resizes, and font swaps.
+  const headerRef = useRef<HTMLElement | null>(null)
+  useEffect(() => {
+    const el = headerRef.current
+    if (!el) return
+    const update = () => {
+      document.documentElement.style.setProperty(
+        '--app-header-h',
+        `${el.getBoundingClientRect().height}px`,
+      )
+    }
+    update()
+    const observer = new ResizeObserver(update)
+    observer.observe(el)
+    window.addEventListener('resize', update)
+    // Re-measure once fonts settle (web-font swaps can change line boxes).
+    document.fonts?.ready.then(update).catch(() => {})
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('resize', update)
+    }
+  }, [])
 
   const onSheet = currentCharacter !== null
   const onNpcSheet = onSheet && currentCharacter?.kind === 'npc'
@@ -74,7 +106,7 @@ export default function TitleBar() {
   }
 
   return (
-    <header className="app-header" style={headerStyle}>
+    <header ref={headerRef} className="app-header" style={headerStyle}>
       <button
         type="button"
         className={
