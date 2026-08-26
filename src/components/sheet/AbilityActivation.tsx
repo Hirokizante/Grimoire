@@ -15,6 +15,11 @@
 import AbilityBlockCard from '@/components/sheet/AbilityBlockCard'
 import { useNotification } from '@/context/NotificationContext'
 import { useCharacterStore } from '@/store/characterStore'
+import {
+  canAffordCustomCosts,
+  insufficientCustomCostParts,
+  resolveCustomAbilityCosts,
+} from '@/lib/abilityCosts'
 import type { AbilityBlock } from '@/types'
 
 export interface AbilityActivationProps {
@@ -26,6 +31,9 @@ export default function AbilityActivation({ ability }: AbilityActivationProps) {
   const spendAP = useCharacterStore((s) => s.spendAP)
   const spendEND = useCharacterStore((s) => s.spendEND)
   const spendFP = useCharacterStore((s) => s.spendFP)
+  const spendCustomResourceBar = useCharacterStore(
+    (s) => s.spendCustomResourceBar,
+  )
   const { notify } = useNotification()
 
   if (!character) return null
@@ -40,15 +48,25 @@ export default function AbilityActivation({ ability }: AbilityActivationProps) {
   const endCost = (ability.cost.end ?? 0) + (ability.cost.end != null ? exhaustionMod : 0)
   const fpCost = ability.cost.fp ?? 0
 
+  // Custom resource costs resolve against this character's own bars.
+  const customCosts = resolveCustomAbilityCosts(
+    ability.cost.custom,
+    character.customResourceBars,
+  )
+
   const canAfford =
     character.currentAP >= apCost &&
     character.currentEND >= endCost &&
-    character.currentFP >= fpCost
+    character.currentFP >= fpCost &&
+    canAffordCustomCosts(customCosts, character.customResourceBars)
 
   const insufficientParts: string[] = []
   if (character.currentAP < apCost) insufficientParts.push(`${apCost - character.currentAP} AP`)
   if (character.currentEND < endCost) insufficientParts.push(`${endCost - character.currentEND} END`)
   if (character.currentFP < fpCost) insufficientParts.push(`${fpCost - character.currentFP} FP`)
+  insufficientParts.push(
+    ...insufficientCustomCostParts(customCosts, character.customResourceBars),
+  )
   const tooltip = insufficientParts.length > 0
     ? `Need ${insufficientParts.join(', ')}`
     : `Activate: ${apCost} AP, ${endCost} END, ${fpCost} FP`
@@ -59,6 +77,9 @@ export default function AbilityActivation({ ability }: AbilityActivationProps) {
     if (apCost > 0) ok = spendAP(apCost) && ok
     if (endCost > 0) ok = spendEND(endCost) && ok
     if (fpCost > 0) ok = spendFP(fpCost) && ok
+    for (const c of customCosts) {
+      ok = spendCustomResourceBar(c.barId, c.amount) && ok
+    }
 
     if (ok) {
       notify(`Activated ${ability.name}`, 'success')

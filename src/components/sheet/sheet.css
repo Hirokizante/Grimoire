@@ -1293,6 +1293,12 @@
   border-color: color-mix(in srgb, var(--accent-violet-soft) 45%, transparent);
 }
 
+/* Custom resource cost badges get their tint inline from the bar's color;
+   this rule only supplies the shared shape so the badge reads like AP/END/FP. */
+.cost-badge--custom {
+  white-space: nowrap;
+}
+
 .ability-card__damage {
   font-size: 0.82rem;
   color: var(--text-primary);
@@ -1759,13 +1765,35 @@
   flex-shrink: 0;
 }
 
-/* "Add Sub-Ability" button — dashed border, matches edit-mode button style. */
+/* "Add Sub-Ability" / "Add Cost" buttons — dashed border, matches edit-mode
+   button style. */
 .ability-editor__add-sub-btn {
   margin-top: 0.25rem;
   border-style: dashed;
   font-size: 0.8rem;
   padding: 0.3rem 0.6rem;
   width: fit-content;
+}
+
+/* Custom resource cost rows (Ability Editor): each field sized identically to
+   an AP/END/FP third, followed by its own ✕ remove control on the same line.
+   Layout is [field, ✕, field, ✕] so every cost removes independently. */
+.ability-editor__cost-row .ability-editor__field {
+  flex: 0 1 calc((100% - 3.6rem) / 3);
+  min-width: 0;
+}
+
+/* .btn--icon inherits .btn's tall padding, which towers over the input;
+   shrink it to the input's own box so it sits centered on that line.
+   justify-content centers the ✕ within the hover highlight (base .btn
+   only sets align-items). */
+.ability-editor__remove-cost-btn {
+  flex-shrink: 0;
+  align-self: flex-end;
+  padding: 0;
+  width: 1.6rem;
+  height: 2rem;
+  justify-content: center;
 }
 
 /* ---- Wide modal for side-by-side editor ----------------------------------- */

@@ -4,6 +4,7 @@
 export type {
   AbilityBlock,
   AbilityCost,
+  ResolvedCustomAbilityCost,
 } from './ability'
 export type {
   AttributeKey,

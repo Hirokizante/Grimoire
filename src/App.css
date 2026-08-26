@@ -1653,6 +1653,117 @@
   }
 }
 
+/* ---- Select Dropdown (in-sheet pickers, e.g. Add Cost) ------------------- */
+/* Mirrors the SortDropdown chrome so it inherits the sheet's custom colors. */
+
+.select-dropdown {
+  position: relative;
+}
+
+.select-dropdown__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.select-dropdown__btn--active {
+  background: var(--bg-surface-hover);
+}
+
+.select-dropdown__panel {
+  position: absolute;
+  top: calc(100% + 0.4rem);
+  left: 0;
+  z-index: 100;
+  min-width: 13rem;
+  max-width: min(20rem, calc(100vw - 2rem));
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+}
+
+.select-dropdown__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.6rem 0.75rem;
+  border-bottom: 1px solid var(--border-soft);
+  flex-shrink: 0;
+}
+
+.select-dropdown__title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.select-dropdown__options {
+  list-style: none;
+  margin: 0;
+  padding: 0.5rem 0;
+  max-height: 14rem;
+  overflow-y: auto;
+  overscroll-behavior: none;
+}
+
+.select-dropdown__option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.45rem 0.9rem;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.1s ease;
+}
+
+.select-dropdown__option:hover {
+  background: var(--bg-surface-hover);
+  color: var(--accent-violet-soft);
+}
+
+.select-dropdown__option-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.select-dropdown__empty {
+  display: block;
+  padding: 0.5rem 0.9rem;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.select-dropdown__footer {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0.5rem 0.75rem;
+  border-top: 1px solid var(--border-soft);
+  flex-shrink: 0;
+}
+
+.select-dropdown__done {
+  font-size: 0.82rem;
+  padding: 0.35rem 0.9rem;
+}
+
+@media (max-width: 400px) {
+  .select-dropdown__panel {
+    left: 0;
+    min-width: min(13rem, calc(100vw - 2rem));
+  }
+}
+
 /* ---- Inline status reference (sheet descriptions) ----------------------- */
 
 .status-ref {

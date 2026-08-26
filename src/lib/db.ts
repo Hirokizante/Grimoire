@@ -10,7 +10,7 @@
  * All functions here are framework-agnostic and safe to call from anywhere.
  */
 
-import type { AbilityBlock, Character, CharacterViewModes, SheetLabel, StatusCondition, VersionSnapshot } from '@/types'
+import type { AbilityBlock, AbilityCost, Character, CharacterViewModes, SheetLabel, StatusCondition, VersionSnapshot } from '@/types'
 import { createDefaultStatuses } from '@/constants/statuses'
 import { generateId } from '@/constants/gameData'
 
@@ -119,16 +119,37 @@ export function normalizeCharacter(raw: Character): Character {
   // arrays (added with the Sub-Abilities feature). Existing records default
   // to true / [] so every ability keeps its Activate button and has empty
   // sub-ability lists until a user explicitly adds one.
-  const normalizeBlock = (a: AbilityBlock): AbilityBlock => ({
-    ...a,
-    showActivate: a.showActivate ?? true,
-    subAbilitiesUnderDescription: Array.isArray(a.subAbilitiesUnderDescription)
-      ? a.subAbilitiesUnderDescription
-      : [],
-    subAbilitiesUnderOvercharge: Array.isArray(a.subAbilitiesUnderOvercharge)
-      ? a.subAbilitiesUnderOvercharge
-      : [],
-  })
+  const normalizeBlock = (a: AbilityBlock): AbilityBlock => {
+    const cost = (a.cost ?? {}) as AbilityCost
+    const rawCustom: unknown =
+      (cost as unknown as Record<string, unknown>).custom
+    // Backfill `cost.custom` (added with the Custom Ability Costs feature):
+    // keep only finite positive number entries so downstream code never sees
+    // garbage from hand-edited exports.
+    let custom: Record<string, number> | undefined
+    if (rawCustom && typeof rawCustom === 'object') {
+      custom = {}
+      for (const [id, amount] of Object.entries(
+        rawCustom as Record<string, unknown>,
+      )) {
+        if (typeof amount === 'number' && Number.isFinite(amount) && amount > 0) {
+          custom[id] = amount
+        }
+      }
+      if (Object.keys(custom).length === 0) custom = undefined
+    }
+    return {
+      ...a,
+      cost: { ...cost, ...(custom ? { custom } : {}) },
+      showActivate: a.showActivate ?? true,
+      subAbilitiesUnderDescription: Array.isArray(a.subAbilitiesUnderDescription)
+        ? a.subAbilitiesUnderDescription
+        : [],
+      subAbilitiesUnderOvercharge: Array.isArray(a.subAbilitiesUnderOvercharge)
+        ? a.subAbilitiesUnderOvercharge
+        : [],
+    }
+  }
 
   const blockArrays: (keyof Character)[] = [
     'innateAbilities',

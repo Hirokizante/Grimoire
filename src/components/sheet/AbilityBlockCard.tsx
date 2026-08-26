@@ -13,6 +13,8 @@
 import DiceHighlighter from '@/components/dice/DiceHighlighter'
 import MarkdownText from '@/components/ui/MarkdownText'
 import SubAbilityBlock from '@/components/sheet/SubAbilityBlock'
+import { useCharacterStore } from '@/store/characterStore'
+import { resolveCustomAbilityCosts } from '@/lib/abilityCosts'
 import type { AbilityBlock, Character } from '@/types'
 import type { RollSource } from '@/types/rollLog'
 import type { SheetMode } from '@/pages/CharacterSheetPage'
@@ -57,7 +59,18 @@ export default function AbilityBlockCard({
     isMinor,
   } = ability
 
-  const hasCost = cost.ap != null || cost.end != null || cost.fp != null
+  // Resolve custom resource costs against the sheet's own bars (the explicit
+  // character prop wins for NPC sheets embedded in a character sheet tab).
+  const storeCharacter = useCharacterStore((s) => s.currentCharacter)
+  const costCharacter = character ?? storeCharacter
+  const customCosts = resolveCustomAbilityCosts(
+    cost.custom,
+    costCharacter?.customResourceBars ?? [],
+  )
+
+  const hasCustomCosts = customCosts.length > 0
+  const hasCost =
+    cost.ap != null || cost.end != null || cost.fp != null || hasCustomCosts
 
   // Dice rolls from the damage field are "Damage: [name]"; rolls from
   // description/overcharge/flavor text are generic "Roll: [name]".
@@ -107,6 +120,19 @@ export default function AbilityBlockCard({
               {cost.fp != null && (
                 <span className="cost-badge cost-badge--fp">{cost.fp} FP</span>
               )}
+              {customCosts.map((c) => (
+                <span
+                  key={c.barId}
+                  className="cost-badge cost-badge--custom"
+                  style={{
+                    background: `color-mix(in srgb, ${c.color} 16%, transparent)`,
+                    color: c.color,
+                    borderColor: `color-mix(in srgb, ${c.color} 40%, transparent)`,
+                  }}
+                >
+                  {c.amount} {c.name}
+                </span>
+              ))}
             </span>
           )}
           {damage && (

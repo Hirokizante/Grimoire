@@ -18,6 +18,30 @@ export interface AbilityCost {
   end?: number
   /** Fate Points spent. */
   fp?: number
+  /**
+   * Custom resource costs, keyed by CustomResourceBar id (e.g.
+   * `{ 'bar-123': 2 }` spends 2 from the bar with id `bar-123`). Entries with
+   * a value of 0 are pruned on save; the field is omitted entirely when empty.
+   * Bar ids are resolved against the character's own customResourceBars at
+   * render/activation time — see lib/abilityCosts.ts.
+   */
+  custom?: Record<string, number>
+}
+
+/**
+ * One resolved custom-resource cost line: the ability's cost paired with the
+ * CustomResourceBar it drains. Produced by {@link resolveCustomAbilityCosts}
+ * (lib/abilityCosts.ts); entries whose bar no longer exists are dropped.
+ */
+export interface ResolvedCustomAbilityCost {
+  /** Id of the target CustomResourceBar. */
+  barId: string
+  /** Display name of the bar. */
+  name: string
+  /** Hex color of the bar's fill (used for the cost badge tint). */
+  color: string
+  /** Amount the ability costs. */
+  amount: number
 }
 
 /**

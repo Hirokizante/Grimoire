@@ -17,6 +17,11 @@ import MarkdownText from '@/components/ui/MarkdownText'
 import { useNotification } from '@/context/NotificationContext'
 import { useCharacterStore } from '@/store/characterStore'
 import { SUB_ABILITY_ACCENT_OPTIONS } from '@/lib/themeUtils'
+import {
+  canAffordCustomCosts,
+  insufficientCustomCostParts,
+  resolveCustomAbilityCosts,
+} from '@/lib/abilityCosts'
 import type { AbilityBlock, Character } from '@/types'
 import type { RollSource } from '@/types/rollLog'
 import type { SheetMode } from '@/pages/CharacterSheetPage'
@@ -40,12 +45,25 @@ export default function SubAbilityBlock({
   const spendAP = useCharacterStore((s) => s.spendAP)
   const spendEND = useCharacterStore((s) => s.spendEND)
   const spendFP = useCharacterStore((s) => s.spendFP)
+  const spendCustomResourceBar = useCharacterStore(
+    (s) => s.spendCustomResourceBar,
+  )
   const { notify } = useNotification()
 
   const { name, traits, cost, damage, description, overcharge, flavorText } =
     ability
 
-  const hasCost = cost.ap != null || cost.end != null || cost.fp != null
+  // Resolve custom resource costs against the sheet's own bars (the explicit
+  // character prop wins for NPC sheets embedded in a character sheet tab).
+  const activeCharacter = character ?? storeCharacter
+  const customCosts = resolveCustomAbilityCosts(
+    cost.custom,
+    activeCharacter?.customResourceBars ?? [],
+  )
+
+  const hasCustomCosts = customCosts.length > 0
+  const hasCost =
+    cost.ap != null || cost.end != null || cost.fp != null || hasCustomCosts
   const isView = mode === 'view'
 
   // Dice rolls from the damage field are "Damage: [name]"; rolls from
@@ -63,7 +81,7 @@ export default function SubAbilityBlock({
   }
 
   // Resolve the character for both dice notation and resource spending.
-  const activeCharacter = character ?? storeCharacter
+  // (activeCharacter is declared above for custom-cost resolution.)
 
   // Resolve colorOverride (a SheetColors key) to a CSS variable name for
   // inline styling of the block's border and background.
@@ -91,10 +109,12 @@ export default function SubAbilityBlock({
       (cost.end ?? 0) + (cost.end != null ? exhaustionMod : 0)
     const fpCost = cost.fp ?? 0
 
+    const customAffordable = canAffordCustomCosts(customCosts, activeCharacter.customResourceBars)
     const canAfford =
       activeCharacter.currentAP >= apCost &&
       activeCharacter.currentEND >= endCost &&
-      activeCharacter.currentFP >= fpCost
+      activeCharacter.currentFP >= fpCost &&
+      customAffordable
 
     const insufficientParts: string[] = []
     if (activeCharacter.currentAP < apCost)
@@ -103,6 +123,9 @@ export default function SubAbilityBlock({
       insufficientParts.push(`${endCost - activeCharacter.currentEND} END`)
     if (activeCharacter.currentFP < fpCost)
       insufficientParts.push(`${fpCost - activeCharacter.currentFP} FP`)
+    insufficientParts.push(
+      ...insufficientCustomCostParts(customCosts, activeCharacter.customResourceBars),
+    )
     const tooltip =
       insufficientParts.length > 0
         ? `Need ${insufficientParts.join(', ')}`
@@ -113,6 +136,9 @@ export default function SubAbilityBlock({
       if (apCost > 0) ok = spendAP(apCost) && ok
       if (endCost > 0) ok = spendEND(endCost) && ok
       if (fpCost > 0) ok = spendFP(fpCost) && ok
+      for (const c of customCosts) {
+        ok = spendCustomResourceBar(c.barId, c.amount) && ok
+      }
       if (ok) {
         notify(`Activated ${name}`, 'success')
       } else {
@@ -167,6 +193,19 @@ export default function SubAbilityBlock({
               {cost.fp != null && (
                 <span className="cost-badge cost-badge--fp">{cost.fp} FP</span>
               )}
+              {customCosts.map((c) => (
+                <span
+                  key={c.barId}
+                  className="cost-badge cost-badge--custom"
+                  style={{
+                    background: `color-mix(in srgb, ${c.color} 16%, transparent)`,
+                    color: c.color,
+                    borderColor: `color-mix(in srgb, ${c.color} 40%, transparent)`,
+                  }}
+                >
+                  {c.amount} {c.name}
+                </span>
+              ))}
             </span>
           )}
           {damage && (

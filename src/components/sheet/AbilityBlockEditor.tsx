@@ -23,11 +23,13 @@
  * so the user can reference the main ability while editing the sub-ability.
  */
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, Fragment } from 'react'
 
+import SelectDropdown from '@/components/ui/SelectDropdown'
 import { generateId } from '@/constants/gameData'
 import { SUB_ABILITY_ACCENT_OPTIONS } from '@/lib/themeUtils'
-import type { AbilityBlock, AbilityCost } from '@/types'
+import { useCharacterStore } from '@/store/characterStore'
+import type { AbilityBlock, AbilityCost, CustomResourceBar } from '@/types'
 
 export interface AbilityBlockEditorProps {
   /** The ability to edit, or null when creating a new one. */
@@ -185,6 +187,8 @@ export default function AbilityBlockEditor({
       draft.cost.ap !== original.cost.ap ||
       draft.cost.end !== original.cost.end ||
       draft.cost.fp !== original.cost.fp ||
+      JSON.stringify(draft.cost.custom ?? {}) !==
+        JSON.stringify(original.cost.custom ?? {}) ||
       draft.subAbilitiesUnderDescription.length !== original.subAbilitiesUnderDescription.length ||
       draft.subAbilitiesUnderOvercharge.length !== original.subAbilitiesUnderOvercharge.length ||
       JSON.stringify(draft.subAbilitiesUnderDescription) !== JSON.stringify(original.subAbilitiesUnderDescription) ||
@@ -194,12 +198,12 @@ export default function AbilityBlockEditor({
   }, [draft, traitsText, ability, onDirtyChange])
 
   // -- cost helpers ----------------------------------------------------------
-  const costNum = (key: keyof AbilityCost): string => {
+  const costNum = (key: 'ap' | 'end' | 'fp'): string => {
     const v = draft.cost[key]
     return v == null ? '' : String(v)
   }
 
-  const setCost = (key: keyof AbilityCost, raw: string) => {
+  const setCost = (key: 'ap' | 'end' | 'fp', raw: string) => {
     const nextCost: AbilityCost = { ...draft.cost }
     if (raw === '') {
       delete nextCost[key]
@@ -210,9 +214,61 @@ export default function AbilityBlockEditor({
     setDraft({ ...draft, cost: nextCost })
   }
 
+  // -- custom resource costs ---------------------------------------------------
+  // The character's own custom resource bars — these are what a cost can
+  // target. NPCs have no resource bars, so the whole feature is hidden there.
+  const characterBars: CustomResourceBar[] = useCharacterStore(
+    (s) => s.currentCharacter?.customResourceBars ?? [],
+  )
+  const customCostEntries: [string, number][] = Object.entries(
+    draft.cost.custom ?? {},
+  )
+
+  /** Add a custom cost row for a bar that doesn't have one yet. */
+  const addCustomCost = (barId: string) => {
+    setDraft({
+      ...draft,
+      cost: { ...draft.cost, custom: { ...(draft.cost.custom ?? {}), [barId]: 1 } },
+    })
+  }
+
+  /** Update one custom cost value; '' clears it back to empty input. */
+  const setCustomCostValue = (barId: string, raw: string) => {
+    const nextCustom = { ...(draft.cost.custom ?? {}) }
+    if (raw === '') {
+      delete nextCustom[barId]
+    } else {
+      const n = Number(raw)
+      if (Number.isFinite(n) && n >= 0) nextCustom[barId] = n
+    }
+    setDraft({ ...draft, cost: { ...draft.cost, custom: nextCustom } })
+  }
+
+  /** Remove a custom cost row entirely. */
+  const removeCustomCost = (barId: string) => {
+    const nextCustom = { ...(draft.cost.custom ?? {}) }
+    delete nextCustom[barId]
+    setDraft({ ...draft, cost: { ...draft.cost, custom: nextCustom } })
+  }
+
   const handleSave = () => {
+    // Drop zero/empty entries so only real costs persist; omit `custom`
+    // entirely when nothing remains (keeps stored shape clean).
+    const cleanedCustom: Record<string, number> = {}
+    for (const [id, amount] of Object.entries(draft.cost.custom ?? {})) {
+      if (typeof amount === 'number' && Number.isFinite(amount) && amount > 0) {
+        cleanedCustom[id] = amount
+      }
+    }
+    const finalCost: AbilityCost = { ...draft.cost }
+    if (Object.keys(cleanedCustom).length > 0) {
+      finalCost.custom = cleanedCustom
+    } else {
+      delete finalCost.custom
+    }
     const final: AbilityBlock = {
       ...draft,
+      cost: finalCost,
       traits: parseTraits(traitsText),
     }
     onSave(final)
@@ -379,6 +435,75 @@ export default function AbilityBlockEditor({
               </>
             )}
           </div>
+
+          {/* Custom resource costs (character sheets only) — up to two per row,
+              each field sized to match the AP/END/FP inputs, with its own ✕. */}
+          {!npcMode && (
+            <>
+              {customCostEntries
+                .reduce<[string, number][][]>((rows, entry) => {
+                  const last = rows[rows.length - 1]
+                  if (last.length < 2) last.push(entry)
+                  else rows.push([entry])
+                  return rows
+                }, [[]])
+                .filter((rowEntries) => rowEntries.length > 0)
+                .map((rowEntries) => (
+                  <div
+                    key={rowEntries[0][0]}
+                    className="ability-editor__row ability-editor__cost-row"
+                  >
+                    {rowEntries.map(([barId, amount]) => {
+                      const bar = characterBars.find((b) => b.id === barId)
+                      return (
+                        <Fragment key={barId}>
+                          <label className="ability-editor__field">
+                            <span className="ability-editor__label">
+                              {bar ? bar.name : 'Unknown Resource'}
+                            </span>
+                            <input
+                              type="number"
+                              className="sheet-input sheet-input--num"
+                              min={0}
+                              value={amount === 0 ? '' : String(amount)}
+                              onChange={(e) =>
+                                setCustomCostValue(barId, e.target.value)
+                              }
+                              placeholder="—"
+                            />
+                          </label>
+                          <button
+                            type="button"
+                            className="btn btn--icon ability-editor__remove-cost-btn"
+                            onClick={() => removeCustomCost(barId)}
+                            aria-label={`Remove ${bar ? bar.name : 'custom'} cost`}
+                            title="Remove this cost"
+                          >
+                            ✕
+                          </button>
+                        </Fragment>
+                      )
+                    })}
+                  </div>
+                ))}
+              {(() => {
+                const available = characterBars.filter(
+                  (b) => !draft.cost.custom || draft.cost.custom[b.id] == null,
+                )
+                if (available.length === 0) return null
+                return (
+                  <SelectDropdown
+                    buttonLabel="+ Add Cost"
+                    title="Add Cost"
+                    ariaLabel="Add custom resource cost"
+                    className="ability-editor__add-sub-btn"
+                    options={available.map((b) => ({ value: b.id, label: b.name }))}
+                    onSelect={addCustomCost}
+                  />
+                )
+              })()}
+            </>
+          )}
 
           <label className="ability-editor__field">
             <span className="ability-editor__label">Damage</span>
