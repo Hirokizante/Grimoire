@@ -111,6 +111,7 @@
      stretching the page and forcing a horizontal document scroll. */
   min-width: 0;
   overflow-x: auto;
+  overscroll-behavior: none;
   scrollbar-width: none;
 }
 
@@ -1369,6 +1370,7 @@
 
 .filter-dropdown__body {
   overflow-y: auto;
+  overscroll-behavior: none;
   padding: 0.5rem 0;
   flex: 1;
 }
@@ -1559,6 +1561,7 @@
   padding: 0.5rem 0;
   flex: 1;
   overflow-y: auto;
+  overscroll-behavior: none;
 }
 
 .sort-dropdown__option {
@@ -1871,6 +1874,7 @@
 .status-icon-picker__panel--pack {
   max-height: 220px;
   overflow-y: auto;
+  overscroll-behavior: none;
 }
 
 .status-icon-picker__pack-grid {

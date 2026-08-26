@@ -408,6 +408,7 @@
 .roll-log-drawer__body {
   flex: 1;
   overflow-y: auto;
+  overscroll-behavior: none;
   padding: 0.5rem;
 }
 

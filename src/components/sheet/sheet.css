@@ -1624,7 +1624,7 @@
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
-  overscroll-behavior: contain;
+  overscroll-behavior: none;
   -webkit-overflow-scrolling: touch;
 }
 
@@ -1718,11 +1718,11 @@
 .ability-editor__sub-panel-body {
   flex: 1 1 auto;
   overflow-y: auto;
-  /* No overscroll-behavior: contain here — we WANT scroll chaining to the
+  /* No overscroll-behavior: none here — we WANT scroll chaining to the
      parent (.ability-editor-dialog__body) so the modal scrolls when the
      cursor is over the sub-panel and the sub-panel body has no overflow
      (or has reached its scroll boundary). The parent body already has
-     overscroll-behavior: contain to protect the page behind the modal. */
+     overscroll-behavior: none to protect the page behind the modal. */
   -webkit-overflow-scrolling: touch;
 }
 
@@ -2194,6 +2194,10 @@
      the dialog's bottom edge. */
   max-height: calc(100dvh - 3.75rem - 1rem);
   overflow-y: auto;
+  /* Shared dialog shell for EVERY modal: no rubber-band/chaining, so a
+     dialog can never bounce or chain its scroll into the page behind the
+     overlay (which would yank the sticky TitleBar). */
+  overscroll-behavior: none;
   animation: modal-content-pop 0.2s ease;
 }
 
@@ -2507,6 +2511,7 @@
   gap: 0.45rem;
   max-height: 40vh;
   overflow-y: auto;
+  overscroll-behavior: none;
 }
 
 .edit-labels-modal__row {
@@ -2681,6 +2686,7 @@
   gap: 0.4rem;
   max-height: 320px;
   overflow-y: auto;
+  overscroll-behavior: none;
   padding: 0.1rem;
 }
 
@@ -3096,6 +3102,7 @@
   flex: 1;
   min-height: 0;             /* Allow flex shrink below content size */
   overflow-y: auto;          /* Scroll the body, not the drawer shell */
+  overscroll-behavior: none; /* No rubber-band in the drawer, either */
   padding: 1rem 1.1rem;
   display: flex;
   flex-direction: column;
@@ -3518,6 +3525,7 @@
   gap: 0.35rem;
   max-height: 280px;
   overflow-y: auto;
+  overscroll-behavior: none;
 }
 
 .version-row {
@@ -3672,6 +3680,7 @@
   background: var(--bg-surface-raised);
   border: 1px solid var(--border-soft);
   overflow-x: auto;
+  overscroll-behavior: none;
 }
 
 .md pre code {
@@ -4026,6 +4035,7 @@
   .tab-bar {
     gap: 1px;
     overflow-x: auto;
+    overscroll-behavior: none;
     flex-wrap: nowrap;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: thin;

@@ -108,6 +108,18 @@
   box-sizing: border-box;
 }
 
+/* Kill the rubber-band / elastic overscroll at the root: the bounce
+   translated the ENTIRE page — sticky TitleBar (z 3000) included — past
+   the viewport edges mid-gesture on macOS/iOS, visually breaking the bar
+   against every overlay layer. Every page shares this document scroller,
+   so one rule covers the whole app; inner scroll containers (modals,
+   drawers, lists) carry their own overscroll-behavior: none in App.css /
+   sheet.css / dice.css. */
+html,
+body {
+  overscroll-behavior: none;
+}
+
 body {
   margin: 0;
   min-height: 100vh;
