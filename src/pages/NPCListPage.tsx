@@ -9,6 +9,11 @@ import { useCallback, useMemo, useRef, useState } from 'react'
 import { ArrowDownFromLine, LayoutGrid, List, Plus } from 'lucide-react'
 
 import { useCharacterStore } from '@/store/characterStore'
+import {
+  useListPrefsStore,
+  type ListPageId,
+  type ListSortKey,
+} from '@/store/listPrefsStore'
 import CreateCharacterModal from '@/components/sheet/CreateCharacterModal'
 import ConfirmDeleteModal from '@/components/sheet/ConfirmDeleteModal'
 import UpdateCharacterModal from '@/components/sheet/UpdateCharacterModal'
@@ -20,8 +25,6 @@ import { parseCharacterJSON } from '@/lib/exportImport'
 import type { Character } from '@/types'
 
 type ViewMode = 'grid' | 'list'
-
-type SortKey = 'name' | 'created' | 'modified'
 
 const SORT_OPTIONS: SortOption[] = [
   { value: 'name', label: 'Name' },
@@ -58,7 +61,13 @@ export default function NPCListPage() {
   )
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [viewMode, setViewMode] = useState<ViewMode>('grid')
-  const [sortKey, setSortKey] = useState<SortKey>('name')
+  /** Sort + filter prefs live in listPrefsStore (persisted to localStorage). */
+  const sortKey = useListPrefsStore((s) => s.npcSortKey)
+  const setSortKey = useListPrefsStore((s) => s.setNpcSortKey)
+  const filterSelection = useListPrefsStore((s) => s.npcFilters)
+  const toggleFilterPref = useListPrefsStore((s) => s.toggleFilter)
+  const clearFilterPrefs = useListPrefsStore((s) => s.clearFilters)
+  const PAGE_ID: ListPageId = 'npcs'
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [npcToDelete, setNpcToDelete] = useState<Character | null>(null)
   /** Pending import JSON file that has a matching NPC by name. */
@@ -121,11 +130,6 @@ export default function NPCListPage() {
     return [{ id: 'label', title: 'Labels', options: labelOptions }]
   }, [npcs])
 
-  /** Active filter selections: groupId → set of selected values. */
-  const [filterSelection, setFilterSelection] = useState<
-    Record<string, Set<string>>
-  >({ label: new Set() })
-
   /** Apply active filters to the NPC list. */
   const filteredNpcs = useMemo(() => {
     const labelSel = filterSelection.label ?? new Set<string>()
@@ -142,18 +146,11 @@ export default function NPCListPage() {
   }, [npcs, filterSelection])
 
   function handleFilterToggle(groupId: string, value: string) {
-    setFilterSelection((prev) => {
-      const next = { ...prev }
-      const set = new Set(next[groupId] ?? new Set<string>())
-      if (set.has(value)) set.delete(value)
-      else set.add(value)
-      next[groupId] = set
-      return next
-    })
+    toggleFilterPref(PAGE_ID, groupId, value)
   }
 
   function handleFilterClear() {
-    setFilterSelection({ label: new Set() })
+    clearFilterPrefs(PAGE_ID)
   }
 
   /** Sort the filtered NPCs by the selected key. */
@@ -244,7 +241,7 @@ export default function NPCListPage() {
           <SortDropdown
             options={SORT_OPTIONS}
             value={sortKey}
-            onChange={(v) => setSortKey(v as SortKey)}
+            onChange={(v) => setSortKey(v as ListSortKey)}
             label="Sort NPCs"
           />
           <div

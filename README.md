@@ -308,6 +308,7 @@ Grimoire/
 │   │   ├── appThemeStore.ts   # Zustand store: app theme (localStorage)
 │   │   ├── characterStore.ts  # Zustand store: characters + live play
 │   │   ├── diceRollStore.ts    # Zustand store: dice roll modal lifecycle
+│   │   ├── listPrefsStore.ts   # Zustand store: list sort/filter prefs (localStorage)
 │   │   ├── rollLogStore.ts     # Zustand store: persistent roll log
 │   │   └── statusStore.ts      # Zustand store: status compendium
 │   ├── types/
@@ -432,6 +433,7 @@ Four Zustand stores manage all application state:
 - **`diceRollStore`** — the dice roll modal lifecycle: parse notation → evaluate with character stats → show result → forward to the roll log.
 - **`rollLogStore`** — persistent roll history across all characters, stored in IndexedDB and filterable by character.
 - **`statusStore`** — the status-condition compendium: CRUD, icon picking, and bundling referenced statuses into character exports. Persisted to IndexedDB.
+- **`listPrefsStore`** — remembered list-page display prefs (sort key + filter selections for the character list, NPC list, and status compendium). Persisted to localStorage so choices survive page switches and reloads.
 
 ### Persistence
 

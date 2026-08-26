@@ -18,11 +18,14 @@ import SortDropdown, { type SortOption } from '@/components/ui/SortDropdown'
 import { plainTextFromMarkdown } from '@/lib/markdown'
 import { collectCharacterStatusNames, referencingCharacters } from '@/lib/statusReference'
 import { useCharacterStore } from '@/store/characterStore'
+import {
+  useListPrefsStore,
+  type ListPageId,
+  type ListSortKey,
+} from '@/store/listPrefsStore'
 import { useStatusStore } from '@/store/statusStore'
 import { DEFAULT_STATUS_TAG } from '@/types/status'
 import type { StatusCondition } from '@/types'
-
-type SortKey = 'name' | 'created' | 'modified'
 
 const SORT_OPTIONS: SortOption[] = [
   { value: 'name', label: 'Name' },
@@ -38,15 +41,16 @@ export default function StatusCompendiumPage() {
   const createStatus = useStatusStore((s) => s.createStatus)
   const characters = useCharacterStore((s) => s.characters)
 
-  const [sortKey, setSortKey] = useState<SortKey>('name')
+  /** Sort + filter prefs live in listPrefsStore (persisted to localStorage). */
+  const sortKey = useListPrefsStore((s) => s.statusSortKey)
+  const setSortKey = useListPrefsStore((s) => s.setStatusSortKey)
+  const filterSelection = useListPrefsStore((s) => s.statusFilters)
+  const toggleFilterPref = useListPrefsStore((s) => s.toggleFilter)
+  const clearFilterPrefs = useListPrefsStore((s) => s.clearFilters)
+  const PAGE_ID: ListPageId = 'statuses'
   const [showCreate, setShowCreate] = useState(false)
   const [statusToDelete, setStatusToDelete] =
     useState<StatusCondition | null>(null)
-
-  /** Active filter selections: groupId → set of selected values. */
-  const [filterSelection, setFilterSelection] = useState<
-    Record<string, Set<string>>
-  >({ type: new Set(), sheet: new Set() })
 
   /**
    * Build filter groups:
@@ -107,18 +111,11 @@ export default function StatusCompendiumPage() {
   }, [statuses, filterSelection, charStatusMap])
 
   function handleFilterToggle(groupId: string, value: string) {
-    setFilterSelection((prev) => {
-      const next = { ...prev }
-      const set = new Set(next[groupId] ?? new Set<string>())
-      if (set.has(value)) set.delete(value)
-      else set.add(value)
-      next[groupId] = set
-      return next
-    })
+    toggleFilterPref(PAGE_ID, groupId, value)
   }
 
   function handleFilterClear() {
-    setFilterSelection({ type: new Set(), sheet: new Set() })
+    clearFilterPrefs(PAGE_ID)
   }
 
   const sorted = useMemo(() => {
@@ -166,7 +163,7 @@ export default function StatusCompendiumPage() {
           <SortDropdown
             options={SORT_OPTIONS}
             value={sortKey}
-            onChange={(v) => setSortKey(v as SortKey)}
+            onChange={(v) => setSortKey(v as ListSortKey)}
             label="Sort statuses"
           />
           <button
