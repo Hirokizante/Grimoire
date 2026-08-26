@@ -831,7 +831,7 @@
   display: none;
 }
 
-/* ---- Custom resource bar (wrapper + delete button) ----------------------- */
+/* ---- Custom resource bar (wrapper + edit button) ----------------------- */
 
 .resource-bar-wrapper {
   display: flex;
@@ -844,7 +844,7 @@
   min-width: 0;
 }
 
-.resource-bar__delete {
+.resource-bar__edit {
   flex: 0 0 auto;
   font-size: 0.75rem;
   padding: 0.2rem 0.35rem;
@@ -853,15 +853,16 @@
   color: var(--text-muted);
 }
 
-.resource-bar__delete:hover {
-  color: var(--danger);
-  background: color-mix(in srgb, var(--danger) 8%, transparent);
-}
-
 /* ---- Custom resource bar modal --------------------------------------------- */
 
 .custom-resource-bar-modal {
   max-width: 420px;
+}
+
+/* Edit mode: pin the Delete button to the left of the footer so Cancel/
+   Save group on the right. */
+.resource-bar-modal__delete {
+  margin-right: auto;
 }
 
 .custom-resource-bar-modal__body {

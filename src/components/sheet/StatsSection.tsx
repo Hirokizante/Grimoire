@@ -24,7 +24,7 @@ import {
   Footprints,
   Target,
   Heart,
-  Trash2,
+  Pencil,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -46,7 +46,7 @@ import {
 } from '@/lib/calculations'
 import { MAX_AP, MAX_END, MAX_MORTAL_WOUNDS } from '@/constants/gameData'
 import { useCharacterStore } from '@/store/characterStore'
-import type { Character } from '@/types'
+import type { Character, CustomResourceBar } from '@/types'
 import type { SheetMode } from '@/pages/CharacterSheetPage'
 
 export interface StatsSectionProps {
@@ -94,6 +94,7 @@ export default function StatsSection({
   const restoreFP = useCharacterStore((s) => s.restoreFP)
   const heal = useCharacterStore((s) => s.heal)
   const addCustomResourceBar = useCharacterStore((s) => s.addCustomResourceBar)
+  const updateCustomResourceBar = useCharacterStore((s) => s.updateCustomResourceBar)
   const removeCustomResourceBar = useCharacterStore((s) => s.removeCustomResourceBar)
   const spendCustomResourceBar = useCharacterStore((s) => s.spendCustomResourceBar)
   const restoreCustomResourceBar = useCharacterStore((s) => s.restoreCustomResourceBar)
@@ -101,6 +102,7 @@ export default function StatsSection({
 
   const [showDamageDialog, setShowDamageDialog] = useState(false)
   const [showAddBar, setShowAddBar] = useState(false)
+  const [barToEdit, setBarToEdit] = useState<CustomResourceBar | null>(null)
   const [barToRemove, setBarToRemove] = useState<{ id: string; name: string } | null>(null)
   const isView = mode === 'view'
   const isEdit = mode === 'edit'
@@ -215,12 +217,12 @@ export default function StatsSection({
             {isEdit && (
               <button
                 type="button"
-                className="btn btn--icon resource-bar__delete"
-                onClick={() => setBarToRemove({ id: bar.id, name: bar.name })}
-                aria-label={`Remove ${bar.name}`}
-                title={`Remove ${bar.name}`}
+                className="btn btn--icon resource-bar__edit"
+                onClick={() => setBarToEdit(bar)}
+                aria-label={`Edit ${bar.name}`}
+                title={`Edit ${bar.name}`}
               >
-                <Trash2 size={14} />
+                <Pencil size={14} />
               </button>
             )}
           </div>
@@ -243,6 +245,20 @@ export default function StatsSection({
         open={showAddBar}
         onSave={addCustomResourceBar}
         onClose={() => setShowAddBar(false)}
+      />
+
+      <CustomResourceBarModal
+        open={barToEdit != null}
+        bar={barToEdit ?? undefined}
+        onSave={(updated) => updateCustomResourceBar(updated.id, () => updated)}
+        onDelete={() => {
+          if (!barToEdit) return
+          // Close the edit modal and fall through to the shared confirm
+          // flow so deletion keeps a single confirmation path.
+          setBarToRemove({ id: barToEdit.id, name: barToEdit.name })
+          setBarToEdit(null)
+        }}
+        onClose={() => setBarToEdit(null)}
       />
 
       {isView && <RecoverAction />}
