@@ -22,6 +22,9 @@
   --accent-violet-soft: #c4b1eb;
   --danger: #e57373;
   --danger-hover: #ef8a8a;
+  /* Mirrors DEFAULT_SHEET_COLORS.success (gameData.ts) so app chrome outside
+     sheets (filter dropdowns, etc.) can use the theme's success color. */
+  --color-success: #a9e6a0;
 
   /* Height of the sticky .app-header (TitleBar). Fallback pre-measurement;
      TitleBar overwrites it with the live measured pixel height via a
@@ -62,6 +65,8 @@
   --accent-violet-soft: #c5b8a0;
   --danger: #d97070;
   --danger-hover: #e08888;
+  /* Mirrors PARCHMENT_SHEET_COLORS.success (gameData.ts) — keep in sync. */
+  --color-success: #a8cfa0;
 
   color-scheme: dark;
 }
@@ -84,6 +89,8 @@
   --accent-violet-soft: #88c0d0;
   --danger: #bf616a;
   --danger-hover: #cf727b;
+  /* Mirrors MIKAMI_SHEET_COLORS.success (gameData.ts) — keep in sync. */
+  --color-success: #a3be8c;
 
   color-scheme: dark;
 }
@@ -107,6 +114,8 @@
   --accent-violet-soft: #f3ecd4;
   --danger: #9e5a5a;
   --danger-hover: #b16b6b;
+  /* Mirrors PITCH_BLACK_SHEET_COLORS.success (gameData.ts) — keep in sync. */
+  --color-success: #eecc6c;
 
   color-scheme: dark;
 }

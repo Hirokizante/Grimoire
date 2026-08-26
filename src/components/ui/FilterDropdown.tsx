@@ -1,14 +1,17 @@
 /**
- * FilterDropdown — a reusable multi-select filter panel for list pages.
+ * FilterDropdown — a reusable tri-state filter panel for list pages.
  *
  * Renders a "Filter" button with a count badge. Clicking opens a dropdown
- * panel containing grouped checkbox lists. Click-outside closes the panel.
- * The parent owns the selected state and filtering logic — this component
- * is purely presentational.
+ * panel containing grouped option lists. Each option cycles through three
+ * states: unchecked → include (✓, success color) → exclude (✕, danger color)
+ * → unchecked. Click-outside closes the panel. The parent owns the selection
+ * state and filtering logic — this component is purely presentational.
  */
 
 import { useEffect, useRef, useState } from 'react'
 import { Check, Filter, X } from 'lucide-react'
+
+import type { FilterMode, PageSelection } from '@/store/listPrefsStore'
 
 export interface FilterOption {
   /** Display label. */
@@ -29,19 +32,19 @@ export interface FilterGroup {
 export interface FilterDropdownProps {
   /** Ordered groups of filter options. */
   groups: FilterGroup[]
-  /** Map of groupId → set of selected option values. */
-  selected: Record<string, Set<string>>
-  /** Toggle a single option on/off. */
+  /** Map of groupId → { value: 'include' | 'exclude' }. Missing = unchecked. */
+  selected: PageSelection
+  /** Cycle one option: unchecked → include → exclude → unchecked. */
   onToggle: (groupId: string, value: string) => void
   /** Clear every selection across all groups. */
   onClear: () => void
 }
 
-/** Count total active filters across all groups. */
-function countSelected(selected: Record<string, Set<string>>): number {
+/** Count total active filters (includes + excludes) across all groups. */
+function countSelected(selected: PageSelection): number {
   let n = 0
   for (const key of Object.keys(selected)) {
-    n += selected[key].size
+    n += Object.keys(selected[key] ?? {}).length
   }
   return n
 }
@@ -123,7 +126,7 @@ export default function FilterDropdown({
             ) : (
               groups.map((group) => {
                 if (group.options.length === 0) return null
-                const groupSelected = selected[group.id] ?? new Set<string>()
+                const groupSelected = selected[group.id] ?? {}
                 return (
                   <div key={group.id} className="filter-dropdown__group">
                     <span className="filter-dropdown__group-title">
@@ -131,18 +134,35 @@ export default function FilterDropdown({
                     </span>
                     <ul className="filter-dropdown__options" role="list">
                       {group.options.map((opt) => {
-                        const isChecked = groupSelected.has(opt.value)
+                        const mode: FilterMode | undefined =
+                          groupSelected[opt.value]
                         return (
                           <li key={opt.value}>
                             <label className="filter-dropdown__option">
                               <input
                                 type="checkbox"
                                 className="filter-dropdown__checkbox"
-                                checked={isChecked}
+                                checked={mode !== undefined}
+                                data-mode={mode ?? 'none'}
                                 onChange={() => onToggle(group.id, opt.value)}
                               />
-                              <span className="filter-dropdown__checkmark">
-                                {isChecked && <Check size={12} strokeWidth={3} />}
+                              <span
+                                className="filter-dropdown__checkmark"
+                                data-mode={mode ?? 'none'}
+                                title={
+                                  mode === undefined
+                                    ? undefined
+                                    : mode === 'include'
+                                      ? 'Including — click again to exclude'
+                                      : 'Excluding — click again to clear'
+                                }
+                              >
+                                {mode === 'include' && (
+                                  <Check size={12} strokeWidth={3} />
+                                )}
+                                {mode === 'exclude' && (
+                                  <X size={12} strokeWidth={3} />
+                                )}
                               </span>
                               <span className="filter-dropdown__option-label">
                                 {opt.label}

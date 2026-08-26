@@ -19,6 +19,7 @@ import { plainTextFromMarkdown } from '@/lib/markdown'
 import { collectCharacterStatusNames, referencingCharacters } from '@/lib/statusReference'
 import { useCharacterStore } from '@/store/characterStore'
 import {
+  matchesFacet,
   useListPrefsStore,
   type ListPageId,
   type ListSortKey,
@@ -82,31 +83,26 @@ export default function StatusCompendiumPage() {
 
   /** Apply active filters to the status list. */
   const filteredStatuses = useMemo(() => {
-    const typeSel = filterSelection.type ?? new Set<string>()
-    const sheetSel = filterSelection.sheet ?? new Set<string>()
-    if (typeSel.size === 0 && sheetSel.size === 0) return statuses
+    const typeSel = filterSelection.type ?? {}
+    const sheetSel = filterSelection.sheet ?? {}
+    if (
+      Object.keys(typeSel).length === 0 &&
+      Object.keys(sheetSel).length === 0
+    ) {
+      return statuses
+    }
     return statuses.filter((s) => {
-      // Type filter
-      if (typeSel.size > 0) {
-        const isDefault = s.tags.includes(DEFAULT_STATUS_TAG)
-        const matchesDefault = typeSel.has('default') && isDefault
-        const matchesCustom = typeSel.has('custom') && !isDefault
-        if (!matchesDefault && !matchesCustom) return false
-      }
-      // Sheet filter: status must be referenced in at least one selected sheet
-      if (sheetSel.size > 0) {
-        const lowerName = s.name.trim().toLowerCase()
-        let found = false
-        for (const charId of sheetSel) {
-          const names = charStatusMap.get(charId)
-          if (names?.has(lowerName)) {
-            found = true
-            break
-          }
-        }
-        if (!found) return false
-      }
-      return true
+      // Type: include = must be that type; exclude = must not be.
+      const isDefault = s.tags.includes(DEFAULT_STATUS_TAG)
+      const typeOk = matchesFacet(typeSel, (value) =>
+        value === 'default' ? isDefault : !isDefault,
+      )
+      if (!typeOk) return false
+      // Sheet: any included sheet must reference it; excluded sheets must not.
+      const lowerName = s.name.trim().toLowerCase()
+      return matchesFacet(sheetSel, (charId) =>
+        Boolean(charStatusMap.get(charId)?.has(lowerName)),
+      )
     })
   }, [statuses, filterSelection, charStatusMap])
 

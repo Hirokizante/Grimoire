@@ -3,6 +3,7 @@ import { ArrowDownFromLine, LayoutGrid, List, Plus } from 'lucide-react'
 
 import { useCharacterStore } from '@/store/characterStore'
 import {
+  matchesFacet,
   useListPrefsStore,
   type ListPageId,
   type ListSortKey,
@@ -138,27 +139,28 @@ export default function CharacterListPage() {
 
   /** Apply active filters to the character list. */
   const filteredCharacters = useMemo(() => {
-    const playerSel = filterSelection.player ?? new Set<string>()
-    const labelSel = filterSelection.label ?? new Set<string>()
-    if (playerSel.size === 0 && labelSel.size === 0) return characters
+    const playerSel = filterSelection.player ?? {}
+    const labelSel = filterSelection.label ?? {}
+    if (
+      Object.keys(playerSel).length === 0 &&
+      Object.keys(labelSel).length === 0
+    ) {
+      return characters
+    }
     return characters.filter((c) => {
-      // Player: match if the character's player name is selected.
-      if (playerSel.size > 0 && !playerSel.has(c.playerName.trim())) return false
-      // Labels: match if the character has any of the selected label names.
-      if (labelSel.size > 0) {
-        const charLabels = new Set(
-          c.labels.map((l) => l.name.trim().toLowerCase()),
-        )
-        let found = false
-        for (const sel of labelSel) {
-          if (charLabels.has(sel.toLowerCase())) {
-            found = true
-            break
-          }
-        }
-        if (!found) return false
-      }
-      return true
+      // Player: include = name must be selected; exclude = must not be.
+      const playerOk = matchesFacet(
+        playerSel,
+        (value) => value === c.playerName.trim(),
+      )
+      if (!playerOk) return false
+      // Labels: any included label must match; every excluded label must not.
+      const charLabels = new Set(
+        c.labels.map((l) => l.name.trim().toLowerCase()),
+      )
+      return matchesFacet(labelSel, (value) =>
+        charLabels.has(value.toLowerCase()),
+      )
     })
   }, [characters, filterSelection])
 

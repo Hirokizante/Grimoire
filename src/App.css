@@ -1451,9 +1451,31 @@
   border-color: var(--accent-violet);
 }
 
-.filter-dropdown__checkbox:checked + .filter-dropdown__checkmark {
-  background: var(--accent-violet);
-  border-color: var(--accent-violet);
+/* Include state — ✓ filled with the app theme's success color. */
+.filter-dropdown__checkbox[data-mode='include'] + .filter-dropdown__checkmark,
+.filter-dropdown__checkbox[data-mode='include']:checked + .filter-dropdown__checkmark {
+  background: var(--color-success, #a9e6a0);
+  border-color: var(--color-success, #a9e6a0);
+}
+
+/* Exclude state — ✕ filled with the app theme's danger color. */
+.filter-dropdown__checkbox[data-mode='exclude'] + .filter-dropdown__checkmark,
+.filter-dropdown__checkbox[data-mode='exclude']:checked + .filter-dropdown__checkmark {
+  background: var(--danger);
+  border-color: var(--danger);
+}
+
+/* Hover tints the active states instead of overriding them with the accent. */
+.filter-dropdown__option:hover
+  .filter-dropdown__checkbox[data-mode='include']
+  + .filter-dropdown__checkmark {
+  border-color: color-mix(in srgb, var(--color-success, #a9e6a0) 70%, white);
+}
+
+.filter-dropdown__option:hover
+  .filter-dropdown__checkbox[data-mode='exclude']
+  + .filter-dropdown__checkmark {
+  border-color: color-mix(in srgb, var(--danger) 70%, white);
 }
 
 .filter-dropdown__checkbox:focus-visible + .filter-dropdown__checkmark {

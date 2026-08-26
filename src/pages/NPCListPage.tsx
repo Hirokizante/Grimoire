@@ -10,6 +10,7 @@ import { ArrowDownFromLine, LayoutGrid, List, Plus } from 'lucide-react'
 
 import { useCharacterStore } from '@/store/characterStore'
 import {
+  matchesFacet,
   useListPrefsStore,
   type ListPageId,
   type ListSortKey,
@@ -132,16 +133,15 @@ export default function NPCListPage() {
 
   /** Apply active filters to the NPC list. */
   const filteredNpcs = useMemo(() => {
-    const labelSel = filterSelection.label ?? new Set<string>()
-    if (labelSel.size === 0) return npcs
+    const labelSel = filterSelection.label ?? {}
+    if (Object.keys(labelSel).length === 0) return npcs
     return npcs.filter((c) => {
       const charLabels = new Set(
         c.labels.map((l) => l.name.trim().toLowerCase()),
       )
-      for (const sel of labelSel) {
-        if (charLabels.has(sel.toLowerCase())) return true
-      }
-      return false
+      return matchesFacet(labelSel, (value) =>
+        charLabels.has(value.toLowerCase()),
+      )
     })
   }, [npcs, filterSelection])
 
