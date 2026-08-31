@@ -104,6 +104,7 @@ export function colorVars(colors: SheetColors): Record<string, string> {
     '--color-token-save-dc': colors.tokenSaveDC,
     '--color-token-armor': colors.tokenArmor,
     '--color-token-end-recovery': colors.tokenEndRecovery,
+    '--color-token-mortal-wounds': colors.tokenMortalWounds,
   }
 }
 
@@ -132,4 +133,5 @@ export const SUB_ABILITY_ACCENT_OPTIONS: {
   { key: 'tokenSaveDC', label: 'Save DC', cssVar: '--color-token-save-dc' },
   { key: 'tokenArmor', label: 'Armor', cssVar: '--color-token-armor' },
   { key: 'tokenEndRecovery', label: 'END Recovery', cssVar: '--color-token-end-recovery' },
+  { key: 'tokenMortalWounds', label: 'Mortal Wounds', cssVar: '--color-token-mortal-wounds' },
 ]

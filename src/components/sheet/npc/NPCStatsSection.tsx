@@ -16,7 +16,7 @@
  *   - "flat": flat block for embedding inside the hero section
  */
 
-import { Wind, Shield, Footprints, Target, Heart } from 'lucide-react'
+import { Wind, Shield, Footprints, Target, Heart, Skull } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 import { useCharacterStore } from '@/store/characterStore'
@@ -58,6 +58,7 @@ export default function NPCStatsSection({
     { label: 'Movement', key: 'movement', icon: Footprints, color: colors.tokenMovement },
     { label: 'Save DC', key: 'saveDC', icon: Target, color: colors.tokenSaveDC },
     { label: 'HP', key: 'hp', icon: Heart, color: colors.hpBar },
+    { label: 'Mortal Wounds', key: 'mortalWounds', icon: Skull, color: colors.tokenMortalWounds },
   ]
 
   const setStat = (key: keyof NPCStats, raw: string) => {
@@ -65,7 +66,7 @@ export default function NPCStatsSection({
     if (!Number.isFinite(n)) return
     update((c) => ({
       ...c,
-      npcStats: { ...(c.npcStats ?? { evasion: 10, armor: 0, movement: 5, saveDC: 10, hp: 20 }), [key]: n },
+      npcStats: { ...(c.npcStats ?? { evasion: 10, armor: 0, movement: 5, saveDC: 10, hp: 20, mortalWounds: 0 }), [key]: n },
     }))
   }
 

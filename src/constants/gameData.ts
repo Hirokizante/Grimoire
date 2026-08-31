@@ -228,6 +228,7 @@ export const DEFAULT_SHEET_COLORS: SheetColors = {
   tokenSaveDC: '#9b7ed6',
   tokenArmor: '#7ba7d6',
   tokenEndRecovery: '#a9e6a0',
+  tokenMortalWounds: '#e57373',
 }
 
 /**
@@ -261,6 +262,7 @@ export const PARCHMENT_SHEET_COLORS: SheetColors = {
   tokenSaveDC: '#b3a48a',
   tokenArmor: '#9aa8bd',
   tokenEndRecovery: '#a8cfa0',
+  tokenMortalWounds: '#d97070',
 }
 
 /**
@@ -294,6 +296,7 @@ export const MIKAMI_SHEET_COLORS: SheetColors = {
   tokenSaveDC: '#b48ead',
   tokenArmor: '#81a1c1',
   tokenEndRecovery: '#d8dee9',
+  tokenMortalWounds: '#bf616a',
 }
 
 /**
@@ -328,6 +331,7 @@ export const PITCH_BLACK_SHEET_COLORS: SheetColors = {
   tokenSaveDC: '#f3ecd4',
   tokenArmor: '#888888',
   tokenEndRecovery: '#c1c1c1',
+  tokenMortalWounds: '#9e5a5a',
 }
 
 /**
@@ -508,6 +512,7 @@ const DEFAULT_NPC_STATS: NPCStats = {
   movement: 5,
   saveDC: 10,
   hp: 20,
+  mortalWounds: 0,
 }
 
 /**

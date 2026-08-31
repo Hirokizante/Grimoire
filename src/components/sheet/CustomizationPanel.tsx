@@ -114,6 +114,7 @@ const COLOR_GROUPS: {
       { key: 'tokenSaveDC', label: 'Save DC' },
       { key: 'tokenArmor', label: 'Armor' },
       { key: 'tokenEndRecovery', label: 'END Recovery' },
+      { key: 'tokenMortalWounds', label: 'Mortal Wounds' },
     ],
   },
 ]
@@ -162,6 +163,7 @@ const PRESETS: PresetTheme[] = [
       tokenSaveDC: '#e8736b',
       tokenArmor: '#d4a854',
       tokenEndRecovery: '#8ce09a',
+      tokenMortalWounds: '#e57373',
     },
   },
   {
@@ -211,6 +213,7 @@ const PRESETS: PresetTheme[] = [
       tokenSaveDC: '#e05a4a',
       tokenArmor: '#c87850',
       tokenEndRecovery: '#a0d878',
+      tokenMortalWounds: '#e05a4a',
     },
   },
   {
@@ -242,6 +245,7 @@ const PRESETS: PresetTheme[] = [
       tokenSaveDC: '#4fb0e8',
       tokenArmor: '#c8a878',
       tokenEndRecovery: '#6dd8a8',
+      tokenMortalWounds: '#e85a5a',
     },
   },
   {
@@ -273,6 +277,7 @@ const PRESETS: PresetTheme[] = [
       tokenSaveDC: '#e57373',
       tokenArmor: '#c8a878',
       tokenEndRecovery: '#9ed88a',
+      tokenMortalWounds: '#e57373',
     },
   },
   {
@@ -304,6 +309,7 @@ const PRESETS: PresetTheme[] = [
       tokenSaveDC: '#ff79c6',
       tokenArmor: '#ffb86c',
       tokenEndRecovery: '#50fa7b',
+      tokenMortalWounds: '#ff5555',
     },
   },
   {
@@ -335,6 +341,7 @@ const PRESETS: PresetTheme[] = [
       tokenSaveDC: '#81a1c1',
       tokenArmor: '#d08770',
       tokenEndRecovery: '#a3be8c',
+      tokenMortalWounds: '#bf616a',
     },
   },
   {
@@ -366,6 +373,7 @@ const PRESETS: PresetTheme[] = [
       tokenSaveDC: '#fb4934',
       tokenArmor: '#83a598',
       tokenEndRecovery: '#b8bb26',
+      tokenMortalWounds: '#fb4934',
     },
   },
   {
@@ -397,6 +405,7 @@ const PRESETS: PresetTheme[] = [
       tokenSaveDC: '#d33682',
       tokenArmor: '#cb4b16',
       tokenEndRecovery: '#859900',
+      tokenMortalWounds: '#dc322f',
     },
   },
   {
@@ -428,6 +437,7 @@ const PRESETS: PresetTheme[] = [
       tokenSaveDC: '#9d7cd8',
       tokenArmor: '#ff9e64',
       tokenEndRecovery: '#73daca',
+      tokenMortalWounds: '#f07178',
     },
   },
   {
@@ -459,6 +469,7 @@ const PRESETS: PresetTheme[] = [
       tokenSaveDC: '#fab387',
       tokenArmor: '#74c7ec',
       tokenEndRecovery: '#a6e3a1',
+      tokenMortalWounds: '#f38ba8',
     },
   },
 ]

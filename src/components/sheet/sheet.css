@@ -614,22 +614,25 @@
 
 /* ---- Combat Stats --------------------------------------------------------- */
 
-/* Stat tokens — stylized cards with icon+value on left, label on right */
+/* Stat tokens — stylized cards with icon+value on left, label on right.
+   Default to a 3×2 grid: 6 stats fit as 3 columns × 2 rows on every
+   variant (player Combat Stats, NPC Combat Stats section, NPC hero
+   flat column) so no token is orphaned on its own row. The hero column
+   explicitly opts into 3-col here to override its former 5-col rule —
+   the extra Mortal Wounds stat (added with the NPC stat) used to
+   leave it dangling on row 2 alone. */
 .stat-tokens {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 0.5rem;
+  gap: 0.45rem;
   margin-bottom: 0.85rem;
 }
 
-/* When in a standalone section (non-flat), use 2 columns */
-.sheet-section--stats .stat-tokens {
-  grid-template-columns: repeat(2, 1fr);
-}
-
-/* Inside the NPC hero stats column, use 5 columns for 5 stats */
+/* Inside the NPC hero stats column, keep the 3-col layout so the 6
+   stats stay balanced (was repeat(5, 1fr) before Mortal Wounds was
+   added — left the new stat alone on a second row). */
 .hero-section__stats-col .stat-tokens {
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   margin-bottom: 0;
 }
 
@@ -652,14 +655,15 @@
 .stat-token {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
-  padding: 0.5rem 0.7rem;
-  border-radius: 10px;
+  gap: 0.5rem;
+  padding: 0.4rem 0.55rem;
+  border-radius: 8px;
   background: var(--bg-surface);
   border: 1px solid var(--border-soft);
   position: relative;
   overflow: hidden;
   transition: border-color 0.15s ease;
+  min-width: 0;
 }
 
 .stat-token::before {
@@ -677,7 +681,7 @@
 .stat-token__left {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.35rem;
   flex: 0 0 auto;
 }
 
@@ -698,7 +702,7 @@
 .stat-token__value {
   font-family: var(--sheet-heading-font, inherit);
   font-weight: 700;
-  font-size: 1.5rem;
+  font-size: 1.2rem;
   line-height: 1;
   color: var(--text-primary);
 }
@@ -706,9 +710,9 @@
 .stat-token__input {
   font-family: var(--sheet-heading-font, inherit);
   font-weight: 700;
-  font-size: 1.2rem;
+  font-size: 1rem;
   text-align: center;
-  width: 3.2rem;
+  width: 2.6rem;
   padding: 0.1rem 0.2rem;
 }
 

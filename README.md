@@ -349,7 +349,7 @@ The central domain object is a **`Character`**, which holds everything about a s
 | `config` | Full aesthetic configuration (colors, fonts, CSS, background image) |
 | `viewModes` | Per-section grid/list preference |
 | `customResourceBars` | User-defined resource pools |
-| `npcStats` | Manually-entered combat stats (NPCs only: evasion, armor, movement, save DC, HP) |
+| `npcStats` | Manually-entered combat stats (NPCs only: evasion, armor, movement, save DC, HP, mortal wounds) |
 | `description` | Long-form NPC description (NPCs only) |
 | `createdAt`, `updatedAt` | Timestamps |
 

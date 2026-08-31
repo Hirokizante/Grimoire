@@ -13,7 +13,7 @@
  */
 
 import { useState } from 'react'
-import { Trash2, Wind, Shield, Footprints, Target, Heart } from 'lucide-react'
+import { Trash2, Wind, Shield, Footprints, Target, Heart, Skull } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 import { useCharacterStore } from '@/store/characterStore'
@@ -47,6 +47,7 @@ const STAT_COLORS = {
   movement: '#e8b04a',
   saveDC: '#9b7ed6',
   hp: '#e85252',
+  mortalWounds: '#e57373',
 } as const
 
 interface StatCardMeta {
@@ -62,6 +63,7 @@ const STATS: StatCardMeta[] = [
   { label: 'Movement', key: 'movement', icon: Footprints, color: STAT_COLORS.movement },
   { label: 'Save DC', key: 'saveDC', icon: Target, color: STAT_COLORS.saveDC },
   { label: 'HP', key: 'hp', icon: Heart, color: STAT_COLORS.hp },
+  { label: 'Mortal Wounds', key: 'mortalWounds', icon: Skull, color: STAT_COLORS.mortalWounds },
 ]
 
 const DEFAULT_NPC_STATS: NPCStats = {
@@ -70,6 +72,7 @@ const DEFAULT_NPC_STATS: NPCStats = {
   movement: 5,
   saveDC: 10,
   hp: 20,
+  mortalWounds: 0,
 }
 
 /**

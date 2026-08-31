@@ -10,7 +10,7 @@
  * All functions here are framework-agnostic and safe to call from anywhere.
  */
 
-import type { AbilityBlock, AbilityCost, Character, CharacterViewModes, SheetLabel, StatusCondition, VersionSnapshot } from '@/types'
+import type { AbilityBlock, AbilityCost, Character, CharacterViewModes, NPCStats, SheetLabel, StatusCondition, VersionSnapshot } from '@/types'
 import { createDefaultStatuses } from '@/constants/statuses'
 import { generateId } from '@/constants/gameData'
 
@@ -266,6 +266,16 @@ export function normalizeCharacter(raw: Character): Character {
       movement: 5,
       saveDC: 10,
       hp: 20,
+      mortalWounds: 0,
+    }
+  }
+
+  // Migration for NPC records predating the mortalWounds stat — backfill
+  // the new field with 0 so existing sheets load cleanly.
+  if (result.kind === 'npc' && result.npcStats) {
+    const ns = result.npcStats as Partial<NPCStats>
+    if (typeof ns.mortalWounds !== 'number') {
+      result.npcStats = { ...ns, mortalWounds: 0 } as NPCStats
     }
   }
 

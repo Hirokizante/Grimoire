@@ -93,6 +93,8 @@ export interface SheetColors {
   tokenArmor: string
   /** END Recovery token accent. */
   tokenEndRecovery: string
+  /** Mortal Wounds token accent. */
+  tokenMortalWounds: string
 }
 
 /**
@@ -324,7 +326,9 @@ export interface SheetLabel {
  *
  * Unlike player characters, NPC stats are not derived from attributes — the
  * user enters them directly. NPCs are static references, so there is no
- * current/max tracking: `hp` is a single maximum value.
+ * current/max tracking: `hp` is a single maximum value. `mortalWounds` is a
+ * plain count (no per-wound identity) and has no 2-wound cap — tougher
+ * opponents can sustain more than the player-character maximum.
  */
 export interface NPCStats {
   /** Evasion — target for attackers to hit. */
@@ -337,6 +341,8 @@ export interface NPCStats {
   saveDC: number
   /** Maximum Hit Points (single value, no current/max tracking). */
   hp: number
+  /** Active Mortal Wounds count — no per-wound identity, no 2-wound cap. */
+  mortalWounds: number
 }
 
 /**
