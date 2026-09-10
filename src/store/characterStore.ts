@@ -16,7 +16,10 @@ import {
   normalizeCharacter,
   putCharacter,
 } from '@/lib/db'
-import { calcHP, calcENDRecovery } from '@/lib/calculations'
+import {
+  effectiveCombatStats,
+  setAbilityModifiersActive as applyAbilityModifiersActive,
+} from '@/lib/abilityModifiers'
 import { rollDie } from '@/lib/dice'
 import {
   bumpSemver,
@@ -174,6 +177,12 @@ export interface CharacterStoreActions {
     field: CoreAbilityField,
     value: string | AbilityBlock | AbilityBlock[] | null,
   ) => void
+  /**
+   * Switch one ability's stat/attribute modifiers on or off, wherever the
+   * ability lives on the sheet (core, slotted, pool, custom tabs, or nested
+   * Sub-Abilities). Independent from activation and costs nothing.
+   */
+  setAbilityModifiersActive: (abilityId: string, active: boolean) => void
   /** Apply damage to the character (handles temp HP, armor, resistance, mortal wound overflow). */
   takeDamage: (amount: number, opts?: {
     /** Whether to apply armor reduction (1d6 per armor point). */
@@ -558,6 +567,18 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
     }))
   },
 
+  setAbilityModifiersActive: (abilityId, active) => {
+    get().updateCurrentCharacter((char) => {
+      const next = applyAbilityModifiersActive(char, abilityId, active)
+      if (next === char || next.kind === 'npc') return next
+      // Switching a Max HP modifier off (or a penalty on) can leave current HP
+      // above the new maximum — clamp so the HP bar never exceeds its cap.
+      // (NPC HP is a static stat, not a tracked pool, so it is left alone.)
+      const maxHP = effectiveCombatStats(next).maxHP
+      return next.currentHP > maxHP ? { ...next, currentHP: maxHP } : next
+    })
+  },
+
   // ---- Live play: damage & healing -------------------------------------------
 
   takeDamage: (amount, opts = {}) => {
@@ -571,8 +592,11 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
     }
 
     const { applyArmor = false, resistant = false, ignoreTempHP = false } = opts
-    const maxHP = calcHP(current.attributes.VIT)
-    const armor = Math.floor(current.attributes.VIT / 2)
+    // Effective stats include any switched-on ability modifiers (e.g. +1 VIT
+    // raises both Max HP and Armor; a flat Armor modifier stacks on top).
+    const stats = effectiveCombatStats(current)
+    const maxHP = stats.maxHP
+    const armor = stats.armor
 
     // Step 1: Armor reduction — 1d6 per armor point.
     let dmg = amount
@@ -656,7 +680,7 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
   heal: (amount) => {
     const current = get().currentCharacter
     if (!current) return
-    const maxHP = calcHP(current.attributes.VIT)
+    const maxHP = effectiveCombatStats(current).maxHP
     // Check for Circulatory Dysfunction (halves healing, rounded down).
     const hasCirculatory = current.mortalWounds.includes('Circulatory Dysfunction')
     const effective = hasCirculatory ? Math.floor(amount / 2) : amount
@@ -764,7 +788,7 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
     if (!current) return
     // Damaged Throat: unable to regain END passively.
     if (current.mortalWounds.includes('Damaged Throat')) return
-    const recovery = calcENDRecovery(current.attributes.GRT)
+    const recovery = effectiveCombatStats(current).endRecovery
     get().updateCurrentCharacter((char) => ({
       ...char,
       currentEND: Math.min(MAX_END, char.currentEND + recovery),
@@ -791,7 +815,7 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
       // 2. Apply END Recovery (unless Damaged Throat prevents it).
       let recovery = 0
       if (!char.mortalWounds.includes('Damaged Throat')) {
-        recovery = calcENDRecovery(char.attributes.GRT)
+        recovery = effectiveCombatStats(char).endRecovery
         newEND = Math.min(MAX_END, newEND + recovery)
       }
       totalGained = apToEND + recovery
@@ -908,7 +932,7 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
 
   fullRestore: () => {
     get().updateCurrentCharacter((char) => {
-      const maxHP = calcHP(char.attributes.VIT)
+      const maxHP = effectiveCombatStats(char).maxHP
       return {
         ...char,
         currentHP: maxHP,
@@ -926,7 +950,7 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
   resetHP: () => {
     get().updateCurrentCharacter((char) => ({
       ...char,
-      currentHP: calcHP(char.attributes.VIT),
+      currentHP: effectiveCombatStats(char).maxHP,
     }))
   },
 

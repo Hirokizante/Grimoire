@@ -99,6 +99,8 @@ export function calcENDRecovery(grt: number): number {
  * @param currentEND - Current Endurance before the turn ends.
  * @param grt - Grit attribute (drives END Recovery).
  * @param maxEND - Maximum Endurance (defaults to 10).
+ * @param endRecovery - Explicit END Recovery value, overriding the one derived
+ *   from `grt`. Used when active Ability modifiers change END Recovery.
  * @returns Actual END regained at end of turn (0 if already at max).
  */
 export function calcEndTurnENDGain(
@@ -106,9 +108,10 @@ export function calcEndTurnENDGain(
   currentEND: number,
   grt: number,
   maxEND: number = 10,
+  endRecovery?: number,
 ): number {
   const apToEND = Math.min(currentAP, maxEND - currentEND)
-  const recovery = calcENDRecovery(grt)
+  const recovery = endRecovery ?? calcENDRecovery(grt)
   const finalEND = Math.min(maxEND, currentEND + apToEND + recovery)
   return finalEND - currentEND
 }

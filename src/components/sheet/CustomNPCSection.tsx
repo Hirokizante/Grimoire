@@ -25,6 +25,13 @@ import AbilityEditorModal from '@/components/sheet/AbilityEditorModal'
 import ConfirmModal from '@/components/sheet/ConfirmModal'
 import MarkdownText from '@/components/ui/MarkdownText'
 import { ATTRIBUTE_LIST, SKILL_LIST } from '@/constants/gameData'
+import {
+  DEFAULT_NPC_STATS,
+  effectiveAttributes,
+  effectiveNPCStats,
+  setAbilityModifiersActive,
+  formatModifierValue,
+} from '@/lib/abilityModifiers'
 import type {
   AbilityBlock,
   AttributeKey,
@@ -65,15 +72,6 @@ const STATS: StatCardMeta[] = [
   { label: 'HP', key: 'hp', icon: Heart, color: STAT_COLORS.hp },
   { label: 'Mortal Wounds', key: 'mortalWounds', icon: Skull, color: STAT_COLORS.mortalWounds },
 ]
-
-const DEFAULT_NPC_STATS: NPCStats = {
-  evasion: 10,
-  armor: 0,
-  movement: 5,
-  saveDC: 10,
-  hp: 20,
-  mortalWounds: 0,
-}
 
 /**
  * Patch the attached NPC record (Character with kind='npc') in the store's
@@ -172,12 +170,23 @@ export default function CustomNPCSection({
 
   const onClickAttr = (key: AttributeKey, name: string) => {
     if (isEdit) return
-    const value = npc.attributes[key]
+    const value = effectiveAttributes(npc)[key]
     roll({
       notation: `d20${value >= 0 ? '+' : ''}${value}`,
       character: npc,
       source: { type: 'attribute-check', attributeKey: key, attributeName: name },
     })
+  }
+
+  /**
+   * Switch an attached NPC ability's modifiers on/off. The ability lives on
+   * the NPC's own record — not on the parent character in `currentCharacter` —
+   * so the update goes through {@link updateAttachedNPC}.
+   */
+  const toggleAbilityModifiers = (abilityId: string, active: boolean) => {
+    updateAttachedNPC(npc.id, (cur) =>
+      setAbilityModifiersActive(cur, abilityId, active),
+    )
   }
 
   const onClickSkill = (skill: SkillName) => {
@@ -238,6 +247,11 @@ export default function CustomNPCSection({
 
   const description = npc.description ?? ''
 
+  // Combat stats / attributes with any switched-on ability modifiers applied.
+  const baseStats: NPCStats = { ...DEFAULT_NPC_STATS, ...(npc.npcStats ?? {}) }
+  const stats = effectiveNPCStats(npc)
+  const effectiveAttrs = effectiveAttributes(npc)
+
   return (
     <section className="sheet-section sheet-section--custom sheet-section--custom-npc">
       <div className="sheet-section__heading-row">
@@ -287,14 +301,20 @@ export default function CustomNPCSection({
             <div className="custom-npc-section__stats">
               {STATS.map((token) => {
                 const Icon = token.icon
-                const value = npc.npcStats?.[token.key] ?? 0
+                const baseValue = baseStats[token.key]
+                const value = isEdit ? baseValue : stats[token.key]
+                const delta = stats[token.key] - baseValue
+                const modified = !isEdit && delta !== 0
                 return (
                   <div
                     key={token.label}
-                    className="custom-npc-stat"
+                    className={
+                      'custom-npc-stat' + (modified ? ' custom-npc-stat--modified' : '')
+                    }
                     style={
                       { '--npc-stat-color': token.color } as React.CSSProperties
                     }
+                    title={modified ? 'Includes active ability modifiers' : undefined}
                   >
                     <span className="custom-npc-stat__stripe" />
                     <div className="custom-npc-stat__left">
@@ -308,7 +328,14 @@ export default function CustomNPCSection({
                           min={0}
                         />
                       ) : (
-                        <span className="custom-npc-stat__value">{value}</span>
+                        <>
+                          <span className="custom-npc-stat__value">{value}</span>
+                          {modified && (
+                            <span className="custom-npc-stat__delta">
+                              {formatModifierValue(delta)}
+                            </span>
+                          )}
+                        </>
                       )}
                     </div>
                     <span className="custom-npc-stat__label">{token.label}</span>
@@ -322,7 +349,10 @@ export default function CustomNPCSection({
               <h5 className="custom-npc-section__block-heading">Attributes</h5>
               <ul className="custom-npc-section__attr-list" role="list">
                 {ATTRIBUTE_LIST.map((attr) => {
-                  const value = npc.attributes[attr.key]
+                  const baseValue = npc.attributes[attr.key]
+                  const value = isEdit ? baseValue : effectiveAttrs[attr.key]
+                  const delta = value - baseValue
+                  const modified = !isEdit && delta !== 0
                   return (
                     <li
                       key={attr.key}
@@ -347,10 +377,22 @@ export default function CustomNPCSection({
                         />
                       ) : (
                         <span
-                          className="custom-npc-section__attr-value"
-                          title={attr.description}
+                          className={
+                            'custom-npc-section__attr-value' +
+                            (modified ? ' attribute-value--modified' : '')
+                          }
+                          title={
+                            modified
+                              ? `${attr.description} — ${baseValue >= 0 ? `+${baseValue}` : baseValue} base, ${delta > 0 ? '+' : '−'}${Math.abs(delta)} from active ability modifiers`
+                              : attr.description
+                          }
                         >
                           {value >= 0 ? `+${value}` : value}
+                          {modified && (
+                            <span className="attribute-value__delta">
+                              {formatModifierValue(delta)}
+                            </span>
+                          )}
                         </span>
                       )}
                     </li>
@@ -389,6 +431,7 @@ export default function CustomNPCSection({
                   ability={ability}
                   mode={mode}
                   character={npc}
+                  onToggleModifiers={toggleAbilityModifiers}
                   actions={
                     isEdit ? (
                       <>

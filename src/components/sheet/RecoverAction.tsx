@@ -11,7 +11,8 @@
  * via the MortalWoundRoller).
  */
 
-import { calcENDRecovery, calcEndTurnENDGain } from '@/lib/calculations'
+import { calcEndTurnENDGain } from '@/lib/calculations'
+import { effectiveCombatStats } from '@/lib/abilityModifiers'
 import { useNotification } from '@/context/NotificationContext'
 import { useCharacterStore } from '@/store/characterStore'
 
@@ -23,9 +24,16 @@ export default function RecoverAction() {
   const currentEND = useCharacterStore((s) => s.currentCharacter?.currentEND ?? 0)
   const { notify } = useNotification()
 
-  const endRecovery = character ? calcENDRecovery(character.attributes.GRT) : 0
+  // END Recovery includes any ability modifiers currently switched on.
+  const endRecovery = character ? effectiveCombatStats(character).endRecovery : 0
   const totalGain = character
-    ? calcEndTurnENDGain(currentAP, currentEND, character.attributes.GRT)
+    ? calcEndTurnENDGain(
+        currentAP,
+        currentEND,
+        character.attributes.GRT,
+        undefined,
+        endRecovery,
+      )
     : endRecovery
 
   const handleRecover = () => {

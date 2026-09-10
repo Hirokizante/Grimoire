@@ -14,6 +14,7 @@
  */
 
 import { ATTRIBUTE_LIST } from '@/constants/gameData'
+import { effectiveAttributes } from '@/lib/abilityModifiers'
 import { useCharacterStore } from '@/store/characterStore'
 import { useDiceRollStore } from '@/store/diceRollStore'
 import type { AttributeKey, Attributes, Character } from '@/types'
@@ -48,6 +49,11 @@ export default function AttributesSection({
   const roll = useDiceRollStore((s) => s.roll)
   const isEdit = mode === 'edit'
 
+  // View mode shows the *effective* value — base Attributes plus any ability
+  // modifiers currently switched on. Edit mode always shows (and edits) the
+  // base value, so nothing is ever silently baked into the stored sheet.
+  const effective = effectiveAttributes(character)
+
   const setAttr = (key: AttributeKey, raw: string) => {
     const n = Number(raw)
     if (!Number.isFinite(n)) return
@@ -59,12 +65,40 @@ export default function AttributesSection({
 
   const onClickAttr = (key: AttributeKey, name: string) => {
     if (isEdit) return
-    const value = attributes[key]
+    const value = effective[key]
     roll({
       notation: `d20${value >= 0 ? '+' : ''}${value}`,
       character,
       source: { type: 'attribute-check', attributeKey: key, attributeName: name },
     })
+  }
+
+  /**
+   * Render one attribute value. In view mode this is the effective value with
+   * a small modifier badge when an active ability changed it.
+   */
+  const renderValue = (key: AttributeKey, className: string, title?: string) => {
+    const base = attributes[key]
+    const value = effective[key]
+    const delta = value - base
+    if (delta === 0) {
+      return (
+        <span className={className} title={title}>
+          {formatAttr(value)}
+        </span>
+      )
+    }
+    return (
+      <span
+        className={className + ' attribute-value--modified'}
+        title={`${title ? `${title} — ` : ''}${formatAttr(base)} base, ${delta > 0 ? '+' : '−'}${Math.abs(delta)} from active ability modifiers`}
+      >
+        {formatAttr(value)}
+        <span className="attribute-value__delta">
+          {delta > 0 ? `+${delta}` : `${delta}`}
+        </span>
+      </span>
+    )
   }
 
   const sectionClass =
@@ -113,9 +147,7 @@ export default function AttributesSection({
                   onChange={(e) => setAttr(attr.key, e.target.value)}
                 />
               ) : (
-                <span className="attr-box__value">
-                  {formatAttr(attributes[attr.key])}
-                </span>
+                renderValue(attr.key, 'attr-box__value')
               )}
               <span className="attr-box__name">{attr.name}</span>
             </li>
@@ -154,12 +186,7 @@ export default function AttributesSection({
                 onChange={(e) => setAttr(attr.key, e.target.value)}
               />
             ) : (
-              <span
-                className="attribute-list__value"
-                title={attr.description}
-              >
-                {formatAttr(attributes[attr.key])}
-              </span>
+              renderValue(attr.key, 'attribute-list__value', attr.description)
             )}
           </li>
         ))}

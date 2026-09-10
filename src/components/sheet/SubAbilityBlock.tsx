@@ -14,6 +14,7 @@
 
 import DiceHighlighter from '@/components/dice/DiceHighlighter'
 import MarkdownText from '@/components/ui/MarkdownText'
+import AbilityModifierToggle from '@/components/sheet/AbilityModifierToggle'
 import { useNotification } from '@/context/NotificationContext'
 import { useCharacterStore } from '@/store/characterStore'
 import { SUB_ABILITY_ACCENT_OPTIONS } from '@/lib/themeUtils'
@@ -33,6 +34,12 @@ export interface SubAbilityBlockProps {
   actions?: React.ReactNode
   /** Character for dice notation variable resolution (same as AbilityBlockCard). */
   character?: Character
+  /**
+   * Persist the stat/attribute modifier switch for an ability that does not
+   * live on the store's current character (attached NPC sections). When
+   * omitted, the switch updates the current character.
+   */
+  onToggleModifiers?: (abilityId: string, active: boolean) => void
 }
 
 export default function SubAbilityBlock({
@@ -40,6 +47,7 @@ export default function SubAbilityBlock({
   mode = 'view',
   actions,
   character,
+  onToggleModifiers,
 }: SubAbilityBlockProps) {
   const storeCharacter = useCharacterStore((s) => s.currentCharacter)
   const spendAP = useCharacterStore((s) => s.spendAP)
@@ -258,6 +266,14 @@ export default function SubAbilityBlock({
           {activateBtn}
         </div>
       )}
+
+      {/* Modifier switch — independent from the Activate button above. */}
+      <AbilityModifierToggle
+        ability={ability}
+        mode={mode}
+        onToggle={onToggleModifiers}
+        className="ability-modifiers--sub"
+      />
 
       {actions && <div className="sub-ability-block__actions">{actions}</div>}
     </article>

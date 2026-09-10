@@ -8,6 +8,7 @@
 
 import { rollDie } from '@/lib/dice'
 import { parseDiceNotation, type ParsedExpression, type ParsedTerm } from '@/lib/diceParser'
+import { effectiveAttributes } from '@/lib/abilityModifiers'
 import type { Character } from '@/types'
 import { SKILL_LIST, ATTRIBUTE_LIST } from '@/constants/gameData'
 
@@ -43,14 +44,16 @@ export function resolveVariable(
   name: string,
   character: Character,
 ): number | null {
-  // Check attributes first (by key or name).
+  // Check attributes first (by key or name). Attributes resolve to their
+  // *effective* value, so a switched-on ability modifier (e.g. +1 MAR) is
+  // included in every roll that references it.
   const attr = ATTRIBUTE_LIST.find(
     (a) =>
       a.key === name.toUpperCase() ||
       a.name.toLowerCase() === name.toLowerCase() ||
       a.abbreviation.toLowerCase() === name.toLowerCase(),
   )
-  if (attr) return character.attributes[attr.key]
+  if (attr) return effectiveAttributes(character)[attr.key]
 
   // Check skills (exact match, case-insensitive).
   const skill = SKILL_LIST.find((s) => s.toLowerCase() === name.toLowerCase())

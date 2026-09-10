@@ -26,10 +26,17 @@
 import { useState, useEffect, useCallback, Fragment } from 'react'
 
 import SelectDropdown from '@/components/ui/SelectDropdown'
+import AbilityModifierFields from '@/components/sheet/AbilityModifierFields'
 import { generateId } from '@/constants/gameData'
+import { normalizeModifiers } from '@/lib/abilityModifiers'
 import { SUB_ABILITY_ACCENT_OPTIONS } from '@/lib/themeUtils'
 import { useCharacterStore } from '@/store/characterStore'
-import type { AbilityBlock, AbilityCost, CustomResourceBar } from '@/types'
+import type {
+  AbilityBlock,
+  AbilityCost,
+  AbilityStatModifier,
+  CustomResourceBar,
+} from '@/types'
 
 export interface AbilityBlockEditorProps {
   /** The ability to edit, or null when creating a new one. */
@@ -184,6 +191,9 @@ export default function AbilityBlockEditor({
       draft.flavorText !== original.flavorText ||
       draft.isMinor !== original.isMinor ||
       draft.showActivate !== original.showActivate ||
+      (draft.modifiersActive === true) !== (original.modifiersActive === true) ||
+      JSON.stringify(normalizeModifiers(draft.modifiers)) !==
+        JSON.stringify(normalizeModifiers(original.modifiers)) ||
       draft.cost.ap !== original.cost.ap ||
       draft.cost.end !== original.cost.end ||
       draft.cost.fp !== original.cost.fp ||
@@ -251,6 +261,19 @@ export default function AbilityBlockEditor({
     setDraft({ ...draft, cost: { ...draft.cost, custom: nextCustom } })
   }
 
+  // -- stat / attribute modifiers ----------------------------------------------
+  /**
+   * Replace the draft's modifier list. Clearing every modifier also drops the
+   * "switched on" flag — an ability with no modifiers has nothing to apply.
+   */
+  const setModifiers = (next: AbilityStatModifier[]) => {
+    setDraft({
+      ...draft,
+      modifiers: next,
+      modifiersActive: next.length > 0 && draft.modifiersActive === true,
+    })
+  }
+
   const handleSave = () => {
     // Drop zero/empty entries so only real costs persist; omit `custom`
     // entirely when nothing remains (keeps stored shape clean).
@@ -270,6 +293,16 @@ export default function AbilityBlockEditor({
       ...draft,
       cost: finalCost,
       traits: parseTraits(traitsText),
+    }
+    // Same treatment for modifiers: prune zero values, and omit both modifier
+    // keys entirely when the ability modifies nothing.
+    const finalModifiers = normalizeModifiers(draft.modifiers)
+    if (finalModifiers.length > 0) {
+      final.modifiers = finalModifiers
+      final.modifiersActive = draft.modifiersActive === true
+    } else {
+      delete final.modifiers
+      delete final.modifiersActive
     }
     onSave(final)
   }
@@ -515,6 +548,14 @@ export default function AbilityBlockEditor({
               placeholder="e.g. 1d6 + MAR"
             />
           </label>
+
+          {/* Stat / attribute modifiers — a switch on the ability card in view
+              mode turns these on and off without spending resources. */}
+          <AbilityModifierFields
+            modifiers={draft.modifiers ?? []}
+            onChange={setModifiers}
+            npcMode={npcMode}
+          />
 
           <label className="ability-editor__field">
             <span className="ability-editor__label">Flavor Text</span>

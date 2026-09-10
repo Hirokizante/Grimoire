@@ -12,6 +12,7 @@
 
 import DiceHighlighter from '@/components/dice/DiceHighlighter'
 import MarkdownText from '@/components/ui/MarkdownText'
+import AbilityModifierToggle from '@/components/sheet/AbilityModifierToggle'
 import SubAbilityBlock from '@/components/sheet/SubAbilityBlock'
 import { useCharacterStore } from '@/store/characterStore'
 import { resolveCustomAbilityCosts } from '@/lib/abilityCosts'
@@ -39,6 +40,12 @@ export interface AbilityBlockCardProps {
    * is the NPC — not the player character stored in `currentCharacter`.
    */
   character?: Character
+  /**
+   * Persist the stat/attribute modifier switch for an ability that does not
+   * live on the store's current character (attached NPC sections). When
+   * omitted, the switch updates the current character.
+   */
+  onToggleModifiers?: (abilityId: string, active: boolean) => void
 }
 
 export default function AbilityBlockCard({
@@ -47,6 +54,7 @@ export default function AbilityBlockCard({
   actions,
   subAbilityActions,
   character,
+  onToggleModifiers,
 }: AbilityBlockCardProps) {
   const {
     name,
@@ -144,6 +152,14 @@ export default function AbilityBlockCard({
         </div>
       )}
 
+      {/* Modifier switch — appears only when the ability declares modifiers.
+          Independent from Activate: switching costs nothing. */}
+      <AbilityModifierToggle
+        ability={ability}
+        mode={mode}
+        onToggle={onToggleModifiers}
+      />
+
       {flavorText && (
         <MarkdownText className="ability-card__flavor" mode={mode} character={character} source={rollSource}>
           {flavorText}
@@ -164,6 +180,7 @@ export default function AbilityBlockCard({
               ability={sub}
               mode={mode}
               character={character}
+              onToggleModifiers={onToggleModifiers}
               actions={subAbilityActions?.(sub, ability)}
             />
           ))}
@@ -187,6 +204,7 @@ export default function AbilityBlockCard({
               ability={sub}
               mode={mode}
               character={character}
+              onToggleModifiers={onToggleModifiers}
               actions={subAbilityActions?.(sub, ability)}
             />
           ))}

@@ -893,3 +893,100 @@ test('setLabels: clearing labels yields an empty list', () => {
   useCharacterStore.getState().setLabels([])
   expect(useCharacterStore.getState().currentCharacter!.labels).toEqual([])
 })
+
+// ---- Ability stat/attribute modifiers ---------------------------------------
+
+/** Slotted ability with the given modifier payload (VIT 2 → maxHP 30). */
+function modifierAbility(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'buff-1',
+    name: 'Battle Focus',
+    traits: [],
+    cost: {},
+    damage: '',
+    description: '',
+    overcharge: '',
+    flavorText: '',
+    isMinor: false,
+    showActivate: true,
+    subAbilitiesUnderDescription: [],
+    subAbilitiesUnderOvercharge: [],
+    modifiers: [{ target: 'maxHP', value: 10 }],
+    ...overrides,
+  }
+}
+
+test('setAbilityModifiersActive: switches a slotted ability on and off', () => {
+  setupChar({ slottedAbilities: [modifierAbility()] as Character['slottedAbilities'] })
+
+  useCharacterStore.getState().setAbilityModifiersActive('buff-1', true)
+  expect(
+    useCharacterStore.getState().currentCharacter!.slottedAbilities[0]
+      .modifiersActive,
+  ).toBe(true)
+
+  useCharacterStore.getState().setAbilityModifiersActive('buff-1', false)
+  expect(
+    useCharacterStore.getState().currentCharacter!.slottedAbilities[0]
+      .modifiersActive,
+  ).toBe(false)
+})
+
+test('setAbilityModifiersActive: unknown ability ids leave the sheet untouched', () => {
+  setupChar({
+    slottedAbilities: [modifierAbility()] as Character['slottedAbilities'],
+  })
+  useCharacterStore.getState().setAbilityModifiersActive('nope', true)
+  expect(
+    useCharacterStore.getState().currentCharacter!.slottedAbilities[0],
+  ).toEqual(modifierAbility())
+})
+
+test('active modifiers raise the effective HP cap used by heal and fullRestore', () => {
+  setupChar({
+    slottedAbilities: [modifierAbility()] as Character['slottedAbilities'],
+    currentHP: 5,
+  })
+
+  // Modifiers are off: healing caps at the base 30 HP.
+  useCharacterStore.getState().heal(100)
+  expect(useCharacterStore.getState().currentCharacter!.currentHP).toBe(30)
+
+  useCharacterStore.getState().setAbilityModifiersActive('buff-1', true)
+  useCharacterStore.getState().heal(100)
+  expect(useCharacterStore.getState().currentCharacter!.currentHP).toBe(40)
+
+  // Switching the modifier off again drops the cap back to the base value.
+  useCharacterStore.getState().setAbilityModifiersActive('buff-1', false)
+  useCharacterStore.getState().resetHP()
+  expect(useCharacterStore.getState().currentCharacter!.currentHP).toBe(30)
+})
+
+test('active END Recovery modifiers feed into endTurn', () => {
+  setupChar({
+    currentEND: 0,
+    currentAP: 0,
+    slottedAbilities: [
+      modifierAbility({ modifiers: [{ target: 'endRecovery', value: 2 }] }),
+    ] as Character['slottedAbilities'],
+  })
+
+  // Base END Recovery with GRT 3 is 1 + floor(3/2) = 2.
+  useCharacterStore.getState().setAbilityModifiersActive('buff-1', true)
+  expect(useCharacterStore.getState().endTurn()).toBe(4)
+  expect(useCharacterStore.getState().currentCharacter!.currentEND).toBe(4)
+})
+
+test('switching off a Max HP modifier clamps current HP to the new maximum', () => {
+  setupChar({
+    slottedAbilities: [modifierAbility()] as Character['slottedAbilities'],
+    currentHP: 5,
+  })
+
+  useCharacterStore.getState().setAbilityModifiersActive('buff-1', true)
+  useCharacterStore.getState().heal(100)
+  expect(useCharacterStore.getState().currentCharacter!.currentHP).toBe(40)
+
+  useCharacterStore.getState().setAbilityModifiersActive('buff-1', false)
+  expect(useCharacterStore.getState().currentCharacter!.currentHP).toBe(30)
+})

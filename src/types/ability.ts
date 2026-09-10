@@ -29,6 +29,42 @@ export interface AbilityCost {
 }
 
 /**
+ * Everything an Ability modifier can target: the five Attributes plus the
+ * derived combat stats shown on the sheet (and, for NPCs, the manually-entered
+ * combat stats — see lib/abilityModifiers.ts for the per-kind availability).
+ *
+ * Attribute targets use the raw {@link AttributeKey} strings so a modifier's
+ * target can be fed straight into an Attributes lookup.
+ */
+export type ModifierTarget =
+  | 'MAR'
+  | 'POW'
+  | 'AGI'
+  | 'VIT'
+  | 'GRT'
+  | 'evasion'
+  | 'armor'
+  | 'movement'
+  | 'saveDC'
+  | 'endRecovery'
+  | 'maxHP'
+
+/**
+ * A single stat/attribute modification granted by an Ability while its
+ * modifier toggle is switched on. Modifiers are signed: a positive `value`
+ * adds to the target, a negative `value` subtracts from it.
+ */
+export interface AbilityStatModifier {
+  /** Which Attribute or combat stat this modifier changes. */
+  target: ModifierTarget
+  /**
+   * Signed amount applied to the target (e.g. `2` = +2 Evasion, `-1` = −1 AGI).
+   * Zero-valued modifiers are pruned on save.
+   */
+  value: number
+}
+
+/**
  * One resolved custom-resource cost line: the ability's cost paired with the
  * CustomResourceBar it drains. Produced by {@link resolveCustomAbilityCosts}
  * (lib/abilityCosts.ts); entries whose bar no longer exists are dropped.
@@ -85,6 +121,21 @@ export interface AbilityBlock {
    * abilities). Defaults to true; the toggle is in AbilityBlockEditor.
    */
   showActivate: boolean
+  /**
+   * Stat/Attribute modifiers this Ability applies while {@link modifiersActive}
+   * is switched on (e.g. `+2 Evasion`, `-1 AGI`). Configured in
+   * AbilityBlockEditor; empty/omitted means the Ability modifies nothing and
+   * renders no toggle on its card. Values are pruned to non-zero entries on
+   * save and validated on read (normalizeCharacter).
+   */
+  modifiers?: AbilityStatModifier[]
+  /**
+   * Whether this Ability's {@link modifiers} are currently applied to the
+   * sheet. Switched from the ability card in view mode — independent of the
+   * Activate button and never costs resources. Defaults to false, and is
+   * meaningless (forced false) when there are no modifiers.
+   */
+  modifiersActive?: boolean
   /**
    * Sub-Abilities nested under the Description field. Bound to their parent
    * — they always move with it and cannot be independently slotted/unslotted.

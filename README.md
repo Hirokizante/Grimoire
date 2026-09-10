@@ -45,6 +45,7 @@ Divergence is a DIY tabletop RPG system — there is no compendium of spells or 
 - **Minor Abilities** — flagged abilities that occupy half a slot instead of a full one.
 - **Ability Block editor** — structured fields for name, traits, cost (AP/END/FP), damage, description, overcharge, and flavor text. Supports Markdown in description and overcharge.
 - **Custom ability costs** — abilities can also spend any custom resource bar: "+ Add Cost" in the Ability Block editor picks a bar, and the cost renders as a color-matched badge next to AP/END/FP and auto-deducts on Activate (sub-abilities included).
+- **Ability stat & attribute modifiers** — an ability can modify the sheet's Attributes (MAR, POW, AGI, VIT, GRT) and combat stats (Evasion, Armor, Movement, Save DC, Max HP, END Recovery). Ticking "Modifies combat stats / attributes" in the Ability Block editor reveals one row per modifier, where you pick the target, choose **+** (add) or **−** (subtract), and enter the amount. Switching the card's modifier toggle on in view mode applies every modifier; switching it off removes them. Every switched-on ability counts, wherever it sits (core, slotted, pool, or a custom tab) — the switch, not the slot, is what applies a modifier. Modifiers are never baked into the stored sheet — attributes, derived stats, dice rolls, and live-play maths all read the *effective* values, and modified values are flagged with a small delta chip. NPC abilities support the same feature (minus END Recovery, which NPCs don't have).
 - **Ability templates** — pre-filled starting points for common ability types (melee, ranged, buff, debuff) that remain fully editable.
 - **Custom tabs & sections** — create up to 6 custom tabs, each with named sections, for organizing homebrew content. When adding a section, choose between an **Ability Block** group, an **NPC Sheet** (a blank, editable NPC bundled directly into the tab), or a **Text** section (a free-form Markdown body for unique mechanics, flavor text, or lore).
 - **NPC sections** — attach a full NPC to a custom tab. NPC sheets show portrait, combat stats, attributes, skills, abilities, and description in a compact inline layout, and are editable in place within the tab; NPC attributes and skills are click-to-roll, matching the main sheet. Attached NPCs are exported and re-imported alongside their parent character, and removing an NPC section only detaches the reference — the NPC record stays in the NPC list.
@@ -62,6 +63,7 @@ Divergence is a DIY tabletop RPG system — there is no compendium of spells or 
 - **Mortal Wound rolling** — D20 roll on the 20-entry Mortal Wounds table when HP reaches 0; up to 2 wounds tracked.
 - **Death Save tracking** — success/failure pips, auto-roll with nat 20/nat 1 doubling, revive at 3 successes or die at 3 failures.
 - **Exhaustion support** — the Exhaustion mortal wound adds +1 to all END costs automatically.
+- **Ability modifier switches** — each ability that declares modifiers (see above) carries an on/off switch on its card. Switching it on instantly applies the ability's stat/attribute changes to the sheet; switching it off removes them. It is independent from the Activate button, costs no resources, and does not require the ability to be activated — so passive stances, forms, and auras work without spending AP.
 
 ### Dice Roller
 - **Inline dice notation** — `d20`, `2d6+4`, `1d6+POW`, `2d6+POW/MAR` are auto-detected in any text field and become clickable in view mode.
@@ -89,7 +91,7 @@ Divergence is a DIY tabletop RPG system — there is no compendium of spells or 
 ### App Settings
 - **App themes** — switch the app's own color scheme (header, list pages, modals, dice UI — everything *around* the sheets) in Settings. Ships with **Midnight** (the default violet-dark palette), **Parchment** (warm charcoal `#262626` with parchment `#c5b8a0` highlights, plus a matching alternate title-bar glyph), **Mikami** (Nord on near-black, from Ghostty), and **Pitch Black** (pure black with cream, gold, and muted teal, from Ghostty). The choice persists in `localStorage` and applies before first paint. Sheet color themes are unaffected — those stay per-character in the Customization panel.
 - **Home page animation** — pick the ambient effect behind the home page title in Settings: **Arcane Glow** (the default drifting light + floating dust particles) or **Terminal Boot** (a startup log that types itself out, as if Grimoire were launched from a shell, then settles to a dim static trace). Animations can also be switched off entirely for a plain, motion-free home page. The choice persists in `localStorage`.
-- **NPC sheets follow the app theme** — standalone NPC sheets (no per-sheet customization) adopt the app's palette, including the page and card backgrounds. NPC sections embedded in a player character sheet never apply colors of their own, so the player sheet's theme takes precedence there.
+- **NPC sheets follow the app theme** — standalone NPC sheets (no per-sheet customization) adopt the app's palette, including the page and card backgrounds. Their Combat Stats tokens use a dedicated per-theme accent set (`NPC_STAT_TOKEN_COLORS` in `themeUtils.ts`) tuned so all six stripes — Evasion, Armor, Movement, Save DC, HP, and Mortal Wounds — stay clearly distinct from each other and from the card behind them in every theme (a unit test enforces the floor). NPC sections embedded in a player character sheet never apply colors of their own, so the player sheet's theme takes precedence there.
 
 ### Import / Export
 - **Export as JSON** — downloads a versioned file (`Character Name v1.2.3.json`).
@@ -228,6 +230,8 @@ Grimoire/
 │   │   │   ├── AbilityBlockEditor.tsx   # Inline ability form
 │   │   │   ├── AbilityEditorModal.tsx   # Full-screen ability editor
 │   │   │   ├── AbilityActivation.tsx    # Activate button + cost deduction
+│   │   │   ├── AbilityModifierFields.tsx # Stat/attribute modifier editor rows
+│   │   │   ├── AbilityModifierToggle.tsx # Card switch + modifier chips
 │   │   │   ├── SortableAbilityCard.tsx  # Draggable ability card
 │   │   │   ├── AbilitiesDndContext.tsx # Drag-and-drop context
 │   │   │   ├── CustomTabContent.tsx     # Custom tab renderer
@@ -287,6 +291,7 @@ Grimoire/
 │   │   └── useImportedFonts.ts     # Google Fonts link injection
 │   ├── lib/
 │   │   ├── calculations.ts  # Pure derived-stat formulas (HP, EVA, etc.)
+│   │   ├── abilityModifiers.ts # Ability stat/attribute modifiers → effective values
 │   │   ├── db.ts            # IndexedDB wrapper (characters, versions, roll logs, statuses)
 │   │   ├── dice.ts          # Single die roll utility
 │   │   ├── diceParser.ts    # Tokenizer + parser for dice notation
@@ -296,7 +301,7 @@ Grimoire/
 │   │   ├── rollSourceUtils.ts # Human-readable roll source labels
 │   │   ├── slotLogic.ts    # Minor/regular slot counting
 │   │   ├── statusReference.ts # [Name] reference parsing + status mapping
-│   │   └── themeUtils.ts   # SheetColors → CSS custom properties
+│   │   └── themeUtils.ts   # SheetColors → CSS custom properties + NPC stat accents
 │   ├── pages/
 │   │   ├── HomePage.tsx          # Landing screen
 │   │   ├── CharacterListPage.tsx # Grid/list of all characters
@@ -364,6 +369,8 @@ The central domain object is a **`Character`**, which holds everything about a s
 | `description`, `overcharge`, `flavorText` | Prose fields (Markdown-supported) |
 | `isMinor` | Half-slot flag |
 | `showActivate` | Whether to show the Activate button in view mode |
+| `modifiers` | Stat/attribute modifiers applied while the card's modifier toggle is on (`[{ target, value }]`; signed — positive adds, negative subtracts) |
+| `modifiersActive` | Whether those modifiers are currently applied to the sheet (view-mode switch; defaults to `false`) |
 
 **CustomSection** is a discriminated union describing one section inside a custom tab:
 
@@ -401,6 +408,8 @@ The following are derived from Attributes and Milestones and are always read-onl
 | Save DC | `10 + Milestone Bonus` |
 | END Recovery | `max(1, 1 + floor(GRT / 2))` |
 
+Ability modifiers layer on top of these formulas without ever changing them: attribute modifiers change the Attributes first (so `+1 VIT` also raises Max HP and Armor), then direct stat modifiers are added to the derived values. Everything that reads an attribute or a combat stat — display, dice rolls, damage/armor resolution, heal caps, END Recovery — uses the *effective* value, and switching the modifier off restores the base instantly.
+
 ### Slot Logic
 
 - A regular Slotted Ability occupies **1 slot**.
@@ -410,7 +419,7 @@ The following are derived from Attributes and Milestones and are always read-onl
 ### View Modes
 
 - **Edit Mode** — all fields editable; live-play trackers hidden.
-- **View Mode** — all fields read-only; live-play interactions enabled (resource bars, dice rolling, ability activation, damage, death saves, mortal wounds).
+- **View Mode** — all fields read-only; live-play interactions enabled (resource bars, dice rolling, ability activation, ability modifier switches, damage, death saves, mortal wounds).
 
 ### Dice Notation
 
@@ -445,7 +454,7 @@ A thin promise wrapper around the native IndexedDB API (`src/lib/db.ts`) manages
 - `roll_logs` — `RollLogEntry` records for the dice roll log, indexed by `characterId`.
 - `statuses` — `StatusCondition` records for the status compendium, seeded with the built-in Divergence conditions on first run.
 
-Schema migrations are handled on read via `normalizeCharacter`, which upgrades older records to the latest shape (e.g. migrating `innateAbility` → `innateAbilities`, adding `showActivate`, ensuring `customTabs` and `customResourceBars` exist, and stamping the `kind` discriminator on legacy custom-tab sections). No bulk migration is needed.
+Schema migrations are handled on read via `normalizeCharacter`, which upgrades older records to the latest shape (e.g. migrating `innateAbility` → `innateAbilities`, adding `showActivate`, ensuring `customTabs` and `customResourceBars` exist, sanitizing ability `modifiers` (unknown targets / non-finite values dropped; the modifier switch is dropped when nothing survives), and stamping the `kind` discriminator on legacy custom-tab sections). No bulk migration is needed.
 
 ### Theming
 

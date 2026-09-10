@@ -16,7 +16,7 @@ import { useState } from 'react'
 import { useModalDialog } from '@/hooks/useModalDialog'
 import { useNotification } from '@/context/NotificationContext'
 import { useCharacterStore, type DamageResult } from '@/store/characterStore'
-import { calcArmor } from '@/lib/calculations'
+import { effectiveCombatStats } from '@/lib/abilityModifiers'
 
 export interface DamageDialogProps {
   onClose: () => void
@@ -35,7 +35,8 @@ export default function DamageDialog({ onClose }: DamageDialogProps) {
 
   const dialogRef = useModalDialog(onClose)
 
-  const armor = character ? calcArmor(character.attributes.VIT) : 0
+  // Armor includes any ability modifiers currently switched on.
+  const armor = character ? effectiveCombatStats(character).armor : 0
 
   const handleApply = () => {
     const n = parseInt(amount, 10)

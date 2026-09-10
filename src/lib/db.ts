@@ -10,9 +10,10 @@
  * All functions here are framework-agnostic and safe to call from anywhere.
  */
 
-import type { AbilityBlock, AbilityCost, Character, CharacterViewModes, NPCStats, SheetLabel, StatusCondition, VersionSnapshot } from '@/types'
+import type { AbilityBlock, AbilityCost, Character, CharacterViewModes, NPCStats, SheetColors, SheetLabel, StatusCondition, VersionSnapshot } from '@/types'
 import { createDefaultStatuses } from '@/constants/statuses'
-import { generateId } from '@/constants/gameData'
+import { DEFAULT_SHEET_COLORS, generateId } from '@/constants/gameData'
+import { normalizeModifiers } from '@/lib/abilityModifiers'
 
 const DB_NAME = 'grimoire'
 const DB_VERSION = 4
@@ -138,7 +139,12 @@ export function normalizeCharacter(raw: Character): Character {
       }
       if (Object.keys(custom).length === 0) custom = undefined
     }
-    return {
+    // Sanitize stat/attribute modifiers (added with the Ability Modifiers
+    // feature): unknown targets and non-finite values are dropped, and the
+    // switch is only kept meaningful when at least one modifier survives.
+    // Both keys are omitted entirely when unused so stored shapes stay lean.
+    const modifiers = normalizeModifiers(a.modifiers)
+    const normalized: AbilityBlock = {
       ...a,
       cost: { ...cost, ...(custom ? { custom } : {}) },
       showActivate: a.showActivate ?? true,
@@ -149,6 +155,14 @@ export function normalizeCharacter(raw: Character): Character {
         ? a.subAbilitiesUnderOvercharge
         : [],
     }
+    if (modifiers.length > 0) {
+      normalized.modifiers = modifiers
+      normalized.modifiersActive = a.modifiersActive === true
+    } else {
+      delete (normalized as unknown as Record<string, unknown>).modifiers
+      delete (normalized as unknown as Record<string, unknown>).modifiersActive
+    }
+    return normalized
   }
 
   const blockArrays: (keyof Character)[] = [
@@ -241,6 +255,21 @@ export function normalizeCharacter(raw: Character): Character {
     )
   ) {
     ;(result.config as unknown as Record<string, unknown>).importedFonts = []
+  }
+
+  // Ensure every SheetColors key exists (migration for records saved before a
+  // palette color was added — most recently tokenMortalWounds, which arrived
+  // with the NPC Mortal Wounds stat). A missing key is not merely a cosmetic
+  // default: it leaves the matching CSS variable unset, so the stat token that
+  // reads it renders with no stripe and no accent, and the Customize drawer's
+  // swatch/hex input gets an undefined value. User-set colors always win over
+  // the defaults merged in here.
+  const storedColors = (
+    result.config as unknown as { colors?: Partial<SheetColors> } | undefined
+  )?.colors
+  result.config = {
+    ...result.config,
+    colors: { ...DEFAULT_SHEET_COLORS, ...(storedColors ?? {}) },
   }
 
   // Ensure scalar AbilityBlock shapes (basicAttack, fatebreaker) carry

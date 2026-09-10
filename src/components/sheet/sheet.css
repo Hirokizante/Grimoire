@@ -734,6 +734,50 @@
   color: var(--accent-violet-soft);
 }
 
+/* Ability-modifier indicators -------------------------------------------------
+   Values shown on the sheet are the *effective* ones (base + switched-on
+   ability modifiers). When a modifier is changing a value, the token gets a
+   highlighted border and a small badge showing the applied delta, so the
+   player can always tell why a number differs from the sheet's base value. */
+.stat-token--modified,
+.custom-npc-stat--modified {
+  border-color: color-mix(in srgb, var(--accent-violet) 45%, transparent);
+}
+
+.stat-token__delta,
+.custom-npc-stat__delta,
+.attribute-value__delta {
+  font-family: var(--sheet-label-font, inherit);
+  font-size: 0.62rem;
+  font-weight: 700;
+  line-height: 1.6;
+  padding: 0 0.3rem;
+  border-radius: 999px;
+  white-space: nowrap;
+  color: var(--accent-violet-soft);
+  background: color-mix(in srgb, var(--accent-violet) 18%, transparent);
+}
+
+.attribute-value--modified {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.25rem;
+}
+
+.attr-box__value.attribute-value--modified {
+  justify-content: center;
+}
+
+.attribute-list__value.attribute-value--modified {
+  justify-content: flex-end;
+}
+
+.custom-npc-section__attr-value.attribute-value--modified {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.25rem;
+}
+
 /* Keep old stat-item classes for mortal wounds label etc. */
 .stat-item__label {
   font-family: var(--sheet-label-font, inherit);
@@ -1799,6 +1843,195 @@
   width: 1.6rem;
   height: 2rem;
   justify-content: center;
+}
+
+/* ---- Ability stat / attribute modifiers ----------------------------------- */
+
+/* Card row: the modifier switch plus one chip per modified value. Rendered
+   only when an ability actually declares modifiers. */
+.ability-modifiers {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.6rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: 8px;
+  border: 1px dashed var(--border-soft);
+  background: color-mix(in srgb, var(--accent-violet) 4%, transparent);
+}
+
+/* Switched on: the modifiers are live on the sheet right now. */
+.ability-modifiers--active {
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--accent-violet) 50%, transparent);
+  background: color-mix(in srgb, var(--accent-violet) 12%, transparent);
+}
+
+.ability-modifiers--sub {
+  margin-top: 0.15rem;
+  padding: 0.3rem 0.45rem;
+}
+
+.ability-modifiers__label {
+  font-family: var(--sheet-label-font, inherit);
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-muted);
+}
+
+/* The switch itself — a frameless control (no border) with a track + thumb. */
+.modifier-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-family: var(--sheet-label-font, inherit);
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  transition: color 0.15s ease;
+}
+
+.modifier-switch:hover {
+  color: var(--text-primary);
+}
+
+.modifier-switch__track {
+  position: relative;
+  flex: 0 0 auto;
+  width: 2.1rem;
+  height: 1.1rem;
+  border-radius: 999px;
+  background: var(--bg-surface-hover);
+  border: 1px solid var(--border);
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.modifier-switch__thumb {
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  width: 0.85rem;
+  height: 0.85rem;
+  border-radius: 50%;
+  background: var(--text-muted);
+  transition: transform 0.15s ease, background-color 0.15s ease;
+}
+
+.modifier-switch[aria-checked='true'] {
+  color: var(--accent-violet-soft);
+}
+
+.modifier-switch[aria-checked='true'] .modifier-switch__track {
+  background: color-mix(in srgb, var(--accent-violet) 45%, transparent);
+  border-color: var(--accent-violet);
+}
+
+.modifier-switch[aria-checked='true'] .modifier-switch__thumb {
+  transform: translateX(1rem);
+  background: var(--bg-base);
+}
+
+.ability-modifiers__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.ability-modifiers__item {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border-soft);
+  background: var(--bg-surface-hover);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.ability-modifiers__item--on {
+  border-color: color-mix(in srgb, var(--accent-violet) 45%, transparent);
+  background: color-mix(in srgb, var(--accent-violet) 16%, transparent);
+  color: var(--accent-violet-soft);
+}
+
+/* Ability editor: one row per modifier — [target ▾] [+|−] [amount] [✕]. */
+.ability-editor__modifiers {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.5rem 0.55rem;
+  border-radius: 8px;
+  border: 1px dashed var(--border-soft);
+  background: color-mix(in srgb, var(--accent-violet) 4%, transparent);
+}
+
+.ability-editor__hint {
+  margin: 0;
+  font-family: var(--sheet-helper-font, inherit);
+  font-size: 0.72rem;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.ability-editor__modifier-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.ability-editor__modifier-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.ability-editor__modifier-target {
+  flex: 1 1 8rem;
+  min-width: 0;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  padding: 0.3rem 0.5rem;
+}
+
+.mode-toggle--sign .mode-toggle__btn {
+  padding: 0.25rem 0.6rem;
+  font-size: 0.95rem;
+  line-height: 1.2;
+}
+
+.ability-editor__modifier-value {
+  flex: 0 0 4.2rem;
+  width: 4.2rem;
+  text-align: center;
+}
+
+/* Keep the ✕ vertically centered on the row (the shared cost-row rule
+   bottom-aligns it, which is right for stacked cost fields but not here). */
+.ability-editor__modifier-row .ability-editor__remove-cost-btn {
+  align-self: center;
+}
+
+/* Phone widths: give the target picker its own line so the +/− control,
+   amount and ✕ stay together on the next one instead of wrapping raggedly. */
+@media (max-width: 480px) {
+  .ability-editor__modifier-target {
+    flex: 1 1 100%;
+  }
 }
 
 /* ---- Wide modal for side-by-side editor ----------------------------------- */

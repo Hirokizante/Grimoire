@@ -11,7 +11,7 @@
 
 import { test, expect } from 'vitest'
 import { normalizeCharacter } from '@/lib/db'
-import { createDefaultCharacter } from '@/constants/gameData'
+import { DEFAULT_SHEET_COLORS, createDefaultCharacter } from '@/constants/gameData'
 import type { Character } from '@/types'
 
 /** Cast an object to Character (bypassing TS for legacy-shape fixtures). */
@@ -289,4 +289,140 @@ test('normalizeCharacter: labels normalization is idempotent', () => {
   })
   const once = normalizeCharacter(base)
   expect(normalizeCharacter(once)).toEqual(once)
+})
+
+// ---- ability stat/attribute modifiers ---------------------------------------
+
+/** A character with one slotted ability carrying the given modifier payload. */
+function withModifierAbility(
+  ability: Record<string, unknown>,
+): Character {
+  const char = createDefaultCharacter()
+  return asCharacter({
+    ...char,
+    slottedAbilities: [
+      {
+        id: 'a1',
+        name: 'Buff',
+        traits: [],
+        cost: {},
+        damage: '',
+        description: '',
+        overcharge: '',
+        flavorText: '',
+        isMinor: false,
+        showActivate: true,
+        subAbilitiesUnderDescription: [],
+        subAbilitiesUnderOvercharge: [],
+        ...ability,
+      },
+    ],
+  })
+}
+
+test('normalizeCharacter: sanitizes ability modifiers and keeps the switch', () => {
+  const char = withModifierAbility({
+    modifiers: [
+      { target: 'evasion', value: 2 },
+      { target: 'not-a-target', value: 3 },
+      { target: 'armor', value: 0 },
+      { target: 'VIT', value: 1 },
+    ],
+    modifiersActive: true,
+  })
+  const out = normalizeCharacter(char)
+  expect(out.slottedAbilities[0].modifiers).toEqual([
+    { target: 'evasion', value: 2 },
+    { target: 'VIT', value: 1 },
+  ])
+  expect(out.slottedAbilities[0].modifiersActive).toBe(true)
+})
+
+test('normalizeCharacter: drops modifier keys entirely when nothing survives', () => {
+  const char = withModifierAbility({
+    modifiers: [{ target: 'bogus', value: 1 }],
+    modifiersActive: true,
+  })
+  const out = normalizeCharacter(char)
+  const ability = out.slottedAbilities[0] as unknown as Record<string, unknown>
+  expect('modifiers' in ability).toBe(false)
+  expect('modifiersActive' in ability).toBe(false)
+})
+
+test('normalizeCharacter: modifier normalization is idempotent', () => {
+  const char = withModifierAbility({
+    modifiers: [{ target: 'saveDC', value: -2 }],
+    modifiersActive: true,
+  })
+  const once = normalizeCharacter(char)
+  expect(normalizeCharacter(once)).toEqual(once)
+})
+
+test('normalizeCharacter: switches in custom-tab abilities are normalized too', () => {
+  const char = createDefaultCharacter()
+  const base = asCharacter({
+    ...char,
+    customTabs: [
+      {
+        id: 'tab-1',
+        name: 'Tab',
+        sections: [
+          {
+            kind: 'ability',
+            id: 'sec-1',
+            name: 'Offense',
+            abilities: [
+              {
+                id: 'a1',
+                name: 'Stance',
+                traits: [],
+                cost: {},
+                damage: '',
+                description: '',
+                overcharge: '',
+                flavorText: '',
+                isMinor: false,
+                showActivate: true,
+                subAbilitiesUnderDescription: [],
+                subAbilitiesUnderOvercharge: [],
+                modifiers: [{ target: 'movement', value: 2 }],
+                modifiersActive: 'yes',
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  })
+  const out = normalizeCharacter(base)
+  const section = out.customTabs[0].sections[0]
+  expect(section.kind).toBe('ability')
+  if (section.kind !== 'ability') return
+  expect(section.abilities[0].modifiers).toEqual([{ target: 'movement', value: 2 }])
+  // Anything other than an explicit `true` reads as switched off.
+  expect(section.abilities[0].modifiersActive).toBe(false)
+})
+
+test('normalizeCharacter: backfills palette colors missing from old records', () => {
+  const char = createDefaultCharacter()
+  // Simulate a record saved before the Mortal Wounds color key existed, with
+  // both a customized color and an untouched one.
+  const colors = { ...char.config.colors } as Record<string, string>
+  delete colors.tokenMortalWounds
+  colors.accent = '#123456'
+  const oldShape = { ...char, config: { ...char.config, colors } }
+
+  const out = normalizeCharacter(asCharacter(oldShape))
+
+  // The missing key is restored from the defaults...
+  expect(out.config.colors.tokenMortalWounds).toBe(
+    DEFAULT_SHEET_COLORS.tokenMortalWounds,
+  )
+  // ...every other key survives, and the user's own colors are never replaced.
+  expect(Object.keys(out.config.colors).sort()).toEqual(
+    Object.keys(DEFAULT_SHEET_COLORS).sort(),
+  )
+  expect(out.config.colors.accent).toBe('#123456')
+  // Idempotent.
+  expect(normalizeCharacter(out).config.colors).toEqual(out.config.colors)
 })

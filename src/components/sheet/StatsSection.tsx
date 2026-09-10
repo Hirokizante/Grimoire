@@ -39,11 +39,11 @@ import {
   calcArmor,
   calcENDRecovery,
   calcEvasion,
-  calcHP,
   calcMilestoneBonus,
   calcMovement,
   calcSaveDC,
 } from '@/lib/calculations'
+import { effectiveCombatStats, formatModifierValue } from '@/lib/abilityModifiers'
 import { MAX_AP, MAX_END, MAX_MORTAL_WOUNDS } from '@/constants/gameData'
 import { useCharacterStore } from '@/store/characterStore'
 import type { Character, CustomResourceBar } from '@/types'
@@ -68,6 +68,11 @@ interface StatToken {
   icon: LucideIcon
   /** Hex color used for stripe + icon. */
   color: string
+  /**
+   * Difference between the displayed value and the unmodified base value.
+   * Non-zero only while ability modifiers are switched on.
+   */
+  delta?: number
 }
 
 export default function StatsSection({
@@ -77,13 +82,15 @@ export default function StatsSection({
 }: StatsSectionProps) {
   const { attributes, milestones } = character
 
-  const maxHP = calcHP(attributes.VIT)
+  // Combat stats with any switched-on ability modifiers already applied.
+  const stats = effectiveCombatStats(character)
+  const maxHP = stats.maxHP
   const milestoneBonus = calcMilestoneBonus(milestones)
-  const evasion = calcEvasion(attributes.AGI)
-  const armor = calcArmor(attributes.VIT)
-  const movement = calcMovement(attributes.AGI)
-  const saveDC = calcSaveDC(milestones)
-  const endRecovery = calcENDRecovery(attributes.GRT)
+  const evasion = stats.evasion
+  const armor = stats.armor
+  const movement = stats.movement
+  const saveDC = stats.saveDC
+  const endRecovery = stats.endRecovery
 
   // Store actions for resource bars
   const spendAP = useCharacterStore((s) => s.spendAP)
@@ -120,13 +127,15 @@ export default function StatsSection({
       : 'sheet-section__heading'
 
   const colors = character.config.colors
+  // `delta` flags tokens whose value is being changed by active ability
+  // modifiers, so the extra badge only appears when something is switched on.
   const statTokens: StatToken[] = [
     { label: 'Milestones', value: milestones, sub: `+${milestoneBonus} bonus`, icon: Star, color: colors.tokenMilestone },
-    { label: 'Evasion', value: evasion, icon: Wind, color: colors.tokenEvasion },
-    { label: 'Armor', value: armor, icon: Shield, color: colors.tokenArmor },
-    { label: 'Movement', value: movement, icon: Footprints, color: colors.tokenMovement },
-    { label: 'Save DC', value: saveDC, icon: Target, color: colors.tokenSaveDC },
-    { label: 'END Recovery', value: endRecovery, icon: Heart, color: colors.tokenEndRecovery },
+    { label: 'Evasion', value: evasion, delta: evasion - calcEvasion(attributes.AGI), icon: Wind, color: colors.tokenEvasion },
+    { label: 'Armor', value: armor, delta: armor - calcArmor(attributes.VIT), icon: Shield, color: colors.tokenArmor },
+    { label: 'Movement', value: movement, delta: movement - calcMovement(attributes.AGI), icon: Footprints, color: colors.tokenMovement },
+    { label: 'Save DC', value: saveDC, delta: saveDC - calcSaveDC(milestones), icon: Target, color: colors.tokenSaveDC },
+    { label: 'END Recovery', value: endRecovery, delta: endRecovery - calcENDRecovery(attributes.GRT), icon: Heart, color: colors.tokenEndRecovery },
   ]
 
   return (
@@ -136,11 +145,22 @@ export default function StatsSection({
       <div className="stat-tokens">
         {statTokens.map((token) => {
           const Icon = token.icon
+          const modified = token.delta != null && token.delta !== 0
           return (
-            <div key={token.label} className="stat-token" style={{ '--token-color': token.color } as React.CSSProperties}>
+            <div
+              key={token.label}
+              className={'stat-token' + (modified ? ' stat-token--modified' : '')}
+              style={{ '--token-color': token.color } as React.CSSProperties}
+              title={modified ? 'Includes active ability modifiers' : undefined}
+            >
               <div className="stat-token__left">
                 <Icon className="stat-token__icon" size={18} strokeWidth={2.2} />
                 <span className="stat-token__value">{token.value}</span>
+                {modified && (
+                  <span className="stat-token__delta">
+                    {formatModifierValue(token.delta as number)}
+                  </span>
+                )}
               </div>
               <div className="stat-token__right">
                 <span className="stat-token__label">{token.label}</span>
