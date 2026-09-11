@@ -48,6 +48,14 @@ export interface AbilityBlockCardProps {
    * omitted, the switch updates the current character.
    */
   onToggleModifiers?: (abilityId: string, active: boolean) => void
+  /**
+   * Persist a manual adjustment of a limited ability's remaining uses for an
+   * ability that does not live on the store's current character (attached NPC
+   * sections). When omitted, the adjustment updates the current character —
+   * but only if the card's character *is* that character, so a read-only card
+   * (a GM panel's entity, a drag overlay) renders no steppers at all.
+   */
+  onSetUses?: (abilityId: string, remaining: number) => void
 }
 
 export default function AbilityBlockCard({
@@ -57,6 +65,7 @@ export default function AbilityBlockCard({
   subAbilityActions,
   character,
   onToggleModifiers,
+  onSetUses,
 }: AbilityBlockCardProps) {
   const {
     name,
@@ -72,6 +81,7 @@ export default function AbilityBlockCard({
   // Resolve custom resource costs against the sheet's own bars (the explicit
   // character prop wins for NPC sheets embedded in a character sheet tab).
   const storeCharacter = useCharacterStore((s) => s.currentCharacter)
+  const storeSetUses = useCharacterStore((s) => s.setAbilityUsesRemaining)
   const costCharacter = character ?? storeCharacter
   const customCosts = resolveCustomAbilityCosts(
     cost.custom,
@@ -86,6 +96,28 @@ export default function AbilityBlockCard({
   // the cost badges (the budget itself is authored in the editor — see
   // AbilityBlockEditor).
   const hasUses = isLimitedAbility(ability)
+
+  /**
+   * Manual use adjustment is for a *live* ability on a sheet the app owns: view
+   * mode (edit mode is for building — the editor, not the card, owns the
+   * maximum), an ability that actually has an Activate button, and an entity we
+   * can write to. An attached-NPC section supplies its own writer; otherwise
+   * the store action only helps when the card's character *is* the store's
+   * current character, so GM-panel entities and drag overlays stay read-only.
+   *
+   * `adjustUses` stays undefined for those read-only cases, which is exactly
+   * what suppresses the steppers (a control that cannot write must not look
+   * clickable).
+   */
+  const canAdjustUses = mode === 'view' && ability.showActivate
+
+  const storeAdjuster =
+    canAdjustUses && storeCharacter && costCharacter?.id === storeCharacter.id
+      ? (abilityId: string, next: number) =>
+          storeSetUses(costCharacter.id, abilityId, next)
+      : undefined
+
+  const adjustUses = canAdjustUses ? (onSetUses ?? storeAdjuster) : undefined
 
   // Dice rolls from the damage field are "Damage: [name]"; rolls from
   // description/overcharge/flavor text are generic "Roll: [name]".
@@ -122,7 +154,16 @@ export default function AbilityBlockCard({
 
       {(hasCost || damage || hasUses) && (
         <div className="ability-card__meta">
-          {hasUses && <AbilityUsesMeter ability={ability} />}
+          {hasUses && (
+            <AbilityUsesMeter
+              ability={ability}
+              onAdjust={
+                adjustUses
+                  ? (next) => adjustUses(ability.id, next)
+                  : undefined
+              }
+            />
+          )}
           {hasCost && (
             <span className="ability-card__costs">
               {cost.ap != null && (
@@ -189,6 +230,7 @@ export default function AbilityBlockCard({
               mode={mode}
               character={character}
               onToggleModifiers={onToggleModifiers}
+              onSetUses={onSetUses}
               actions={subAbilityActions?.(sub, ability)}
             />
           ))}
@@ -213,6 +255,7 @@ export default function AbilityBlockCard({
               mode={mode}
               character={character}
               onToggleModifiers={onToggleModifiers}
+              onSetUses={onSetUses}
               actions={subAbilityActions?.(sub, ability)}
             />
           ))}

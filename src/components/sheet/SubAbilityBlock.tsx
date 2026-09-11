@@ -38,6 +38,14 @@ export interface SubAbilityBlockProps {
    * omitted, the switch updates the current character.
    */
   onToggleModifiers?: (abilityId: string, active: boolean) => void
+  /**
+   * Persist a manual adjustment of a limited Sub-Ability's remaining uses for
+   * an ability that does not live on the store's current character. When
+   * omitted, the adjustment updates the current character — but only if the
+   * block's character *is* that character, so a read-only block renders no
+   * steppers. Same contract as `AbilityBlockCard`'s `onSetUses`.
+   */
+  onSetUses?: (abilityId: string, remaining: number) => void
 }
 
 /**
@@ -73,8 +81,10 @@ export default function SubAbilityBlock({
   actions,
   character,
   onToggleModifiers,
+  onSetUses,
 }: SubAbilityBlockProps) {
   const storeCharacter = useCharacterStore((s) => s.currentCharacter)
+  const storeSetUses = useCharacterStore((s) => s.setAbilityUsesRemaining)
 
   const { name, traits, cost, damage, description, overcharge, flavorText } =
     ability
@@ -92,6 +102,22 @@ export default function SubAbilityBlock({
     cost.ap != null || cost.end != null || cost.fp != null || hasCustomCosts
   const hasUses = isLimitedAbility(ability)
   const isView = mode === 'view'
+
+  /**
+   * A Sub-Ability carries its own Activate button, so it also gets its own
+   * uses stepper. Same writer contract as the parent card: the parent's
+   * handler wins, otherwise the store is used only when this block's character
+   * is the store's current character (a GM panel's entity stays read-only).
+   */
+  const canAdjustUses = isView && ability.showActivate
+
+  const storeAdjuster =
+    canAdjustUses && storeCharacter && activeCharacter?.id === storeCharacter.id
+      ? (abilityId: string, next: number) =>
+          storeSetUses(activeCharacter.id, abilityId, next)
+      : undefined
+
+  const adjustUses = canAdjustUses ? (onSetUses ?? storeAdjuster) : undefined
 
   // Dice rolls from the damage field are "Damage: [name]"; rolls from
   // description/overcharge/flavor text are generic "Roll: [name]".
@@ -158,7 +184,13 @@ export default function SubAbilityBlock({
       {(hasCost || damage || hasUses) && (
         <div className="sub-ability-block__meta">
           {hasUses && (
-            <AbilityUsesMeter ability={ability} className="ability-uses--sub" />
+            <AbilityUsesMeter
+              ability={ability}
+              className="ability-uses--sub"
+              onAdjust={
+                adjustUses ? (next) => adjustUses(ability.id, next) : undefined
+              }
+            />
           )}
           {hasCost && (
             <span className="sub-ability-block__costs">

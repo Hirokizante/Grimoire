@@ -11,10 +11,11 @@
  * dice/status dependencies are the same stubs the other sheet card tests use.
  */
 
-import { act, fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { beforeEach, expect, test, vi } from 'vitest'
 
 import AbilityActivation from '@/components/sheet/AbilityActivation'
+import AbilityBlockCard from '@/components/sheet/AbilityBlockCard'
 import { NotificationProvider } from '@/context/NotificationContext'
 import { createDefaultCharacter } from '@/constants/gameData'
 import { useCharacterStore } from '@/store/characterStore'
@@ -115,10 +116,15 @@ function usesReadout(): HTMLElement {
   return screen.getByRole('img', { name: /uses remaining/i })
 }
 
+/** The meter wrapper around the readout, which carries the state classes. */
+function usesMeter(): HTMLElement {
+  return usesReadout().closest('.ability-uses') as HTMLElement
+}
+
 /** Rendered use tokens (filled first, hollow after). */
 function tokens(): HTMLElement[] {
   return Array.from(
-    usesReadout().querySelectorAll<HTMLElement>('.ability-uses__token'),
+    usesMeter().querySelectorAll<HTMLElement>('.ability-uses__token'),
   )
 }
 
@@ -178,7 +184,7 @@ test('an exhausted ability shows hollow tokens and flags the card', () => {
   renderActivation(setupCharacter({ uses: { max: 3, current: 0, expendOnActivate: true } }).slottedAbilities[0])
 
   expect(usesReadout()).toHaveAccessibleName('0 of 3 uses remaining')
-  expect(usesReadout().classList.contains('ability-uses--depleted')).toBe(true)
+  expect(usesMeter().classList.contains('ability-uses--depleted')).toBe(true)
   expect(tokens().filter((d) => d.classList.contains('ability-uses__token--filled'))).toHaveLength(0)
 })
 
@@ -286,7 +292,158 @@ test('full restore refills a spent limited ability', () => {
   expect(slottedUses(useCharacterStore.getState().currentCharacter)).toBe(3)
 })
 
-// ---- read-only cards -------------------------------------------------------
+// ---- manual steppers -------------------------------------------------------
+
+/** The card's minus stepper (spends a use by hand). */
+function spendStep(): HTMLElement {
+  return screen.getByRole('button', { name: /spend one use of/i })
+}
+
+/** The card's plus stepper (hands a use back). */
+function restoreStep(): HTMLElement {
+  return screen.getByRole('button', { name: /restore one use of/i })
+}
+
+test('the stepper spends a use', () => {
+  const char = setupCharacter()
+  renderActivation(char.slottedAbilities[0])
+
+  fireEvent.click(spendStep())
+
+  expect(slottedUses(useCharacterStore.getState().currentCharacter)).toBe(2)
+})
+
+test('the stepper hands a use back without touching resources', () => {
+  const char = setupCharacter({ uses: { max: 3, current: 1, expendOnActivate: true } })
+  renderActivation(char.slottedAbilities[0])
+
+  fireEvent.click(restoreStep())
+
+  const updated = useCharacterStore.getState().currentCharacter
+  expect(slottedUses(updated)).toBe(2)
+  // A manual adjustment is not an activation: AP is untouched.
+  expect(updated?.currentAP).toBe(3)
+})
+
+test('the sheet re-renders the meter from the adjusted value', () => {
+  const char = setupCharacter()
+  const { rerender } = renderActivation(char.slottedAbilities[0])
+
+  fireEvent.click(spendStep())
+
+  // The sheet page re-renders its sections from the store, which is what the
+  // card reads after a manual adjustment.
+  const updated = useCharacterStore.getState().currentCharacter as Character
+  rerender(
+    <NotificationProvider>
+      <AbilityActivation ability={updated.slottedAbilities[0]} character={updated} />
+    </NotificationProvider>,
+  )
+
+  expect(usesReadout()).toHaveAccessibleName('2 of 3 uses remaining')
+  expect(
+    tokens().filter((d) => d.classList.contains('ability-uses__token--filled')),
+  ).toHaveLength(2)
+})
+
+test('a burst of stepper clicks never escapes the ability’s bounds', () => {
+  // The stepper only *requests* a count; the store clamps every write. Even a
+  // burst of clicks that outruns the re-render can't push the count below 0 or
+  // above the maximum.
+  const char = setupCharacter({ uses: { max: 3, current: 1, expendOnActivate: true } })
+  const first = renderActivation(char.slottedAbilities[0])
+
+  fireEvent.click(spendStep())
+  fireEvent.click(spendStep())
+  fireEvent.click(spendStep())
+  expect(slottedUses(useCharacterStore.getState().currentCharacter)).toBe(0)
+
+  first.unmount()
+  const atZero = useCharacterStore.getState().currentCharacter as Character
+  renderActivation(atZero.slottedAbilities[0])
+  // Every click in the burst reads the same rendered 0, so five of them all ask
+  // for 1 use — the count stays inside [0, max] rather than compounding to 5.
+  for (let i = 0; i < 5; i++) fireEvent.click(restoreStep())
+  expect(slottedUses(useCharacterStore.getState().currentCharacter)).toBe(1)
+})
+
+test('stepping down is disabled once the ability is exhausted', () => {
+  const char = setupCharacter({ uses: { max: 3, current: 0, expendOnActivate: true } })
+  renderActivation(char.slottedAbilities[0])
+
+  expect(spendStep()).toBeDisabled()
+  expect(restoreStep()).toBeEnabled()
+
+  fireEvent.click(spendStep())
+  expect(slottedUses(useCharacterStore.getState().currentCharacter)).toBe(0)
+})
+
+test('stepping up is disabled at the ability’s maximum', () => {
+  const char = setupCharacter()
+  renderActivation(char.slottedAbilities[0])
+
+  expect(restoreStep()).toBeDisabled()
+  expect(spendStep()).toBeEnabled()
+
+  fireEvent.click(restoreStep())
+  expect(slottedUses(useCharacterStore.getState().currentCharacter)).toBe(3)
+})
+
+test('numeric meters get the same steppers', () => {
+  const char = setupCharacter({ uses: { max: 12, current: 4, expendOnActivate: true } })
+  renderActivation(char.slottedAbilities[0])
+
+  expect(tokens()).toHaveLength(0)
+  expect(spendStep()).toBeEnabled()
+
+  fireEvent.click(spendStep())
+  expect(slottedUses(useCharacterStore.getState().currentCharacter)).toBe(3)
+})
+
+test('edit mode renders no steppers', () => {
+  const char = setupCharacter()
+  render(
+    <NotificationProvider>
+      <AbilityBlockCard ability={char.slottedAbilities[0]} mode="edit" />
+    </NotificationProvider>,
+  )
+
+  expect(usesReadout()).toHaveAccessibleName('3 of 3 uses remaining')
+  expect(screen.queryByRole('button', { name: /spend one use of/i })).toBeNull()
+  expect(screen.queryByRole('button', { name: /restore one use of/i })).toBeNull()
+})
+
+test('a limited ability with no Activate button gets no steppers', () => {
+  const char = setupCharacter({ showActivate: false })
+  renderActivation(char.slottedAbilities[0])
+
+  expect(usesReadout()).toHaveAccessibleName('3 of 3 uses remaining')
+  expect(screen.queryByRole('button', { name: 'Activate' })).toBeNull()
+  expect(screen.queryByRole('button', { name: /spend one use of/i })).toBeNull()
+})
+
+test('a sub-ability gets its own steppers', () => {
+  const sub: AbilityBlock = {
+    ...limitedAbility(3, 3),
+    id: 'sub-1',
+    name: 'Sub Step',
+  }
+  const char = setupCharacter({ subAbilitiesUnderDescription: [sub] })
+  render(
+    <NotificationProvider>
+      <AbilityBlockCard ability={char.slottedAbilities[0]} mode="view" />
+    </NotificationProvider>,
+  )
+
+  const subBlock = document.querySelector('.sub-ability-block') as HTMLElement
+  expect(subBlock).not.toBeNull()
+
+  fireEvent.click(within(subBlock).getByRole('button', { name: /spend one use of/i }))
+  const updated = useCharacterStore.getState().currentCharacter as Character
+  expect(
+    abilityUsesRemaining(updated.slottedAbilities[0].subAbilitiesUnderDescription[0]),
+  ).toBe(2)
+})
 
 test('a read-only entity keeps the readout but gets no steppers', () => {
   const char = setupCharacter()
@@ -297,6 +454,32 @@ test('a read-only entity keeps the readout but gets no steppers', () => {
 
   expect(usesReadout()).toHaveAccessibleName('3 of 3 uses remaining')
   expect(screen.queryByRole('button', { name: /spend one use of/i })).toBeNull()
+})
+
+test('a supplied writer handles an ability that is not on the current character', () => {
+  const onSetUses = vi.fn()
+  // 2 of 3: both steppers are live, so each direction is observable.
+  const ability = limitedAbility(2, 3)
+
+  render(
+    <NotificationProvider>
+      <AbilityBlockCard
+        ability={ability}
+        mode="view"
+        character={{ ...createDefaultCharacter(), id: 'attached-npc' }}
+        onSetUses={onSetUses}
+      />
+    </NotificationProvider>,
+  )
+
+  // The meter reports the count it believes it is moving to, and the parent
+  // owns the write (and any clamping) — each step is measured from the rendered
+  // value, which the parent's next render replaces.
+  fireEvent.click(spendStep())
+  expect(onSetUses).toHaveBeenLastCalledWith(ability.id, 1)
+
+  fireEvent.click(restoreStep())
+  expect(onSetUses).toHaveBeenLastCalledWith(ability.id, 3)
 })
 
 test('an unlimited ability gets no steppers even in view mode', () => {

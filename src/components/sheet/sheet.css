@@ -1352,7 +1352,13 @@
    The remaining-uses readout sits first in the card's meta row: a small label
    plus either one circle per use (5 or fewer) or a plain "current / max" number.
    Filled circles are uses still available; hollow ones are spent. The accent
-   comes from the sheet palette, so the meter follows every theme. */
+   comes from the sheet palette, so the meter follows every theme.
+
+   In view mode on a writable sheet the readout is flanked by two compact
+   stepper buttons (− / +) that spend or hand back a use by hand. They live
+   INSIDE the meter so the control sits with the count it changes, and they fit
+   on the meta row without adding a line: the whole stepper is ~1.6rem tall
+   against the 1.5rem tokens. */
 
 .ability-uses {
   display: inline-flex;
@@ -1368,6 +1374,13 @@
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--text-muted);
+}
+
+/* Label + count: the unit the two stepper buttons act on. */
+.ability-uses__value {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
 }
 
 .ability-uses__tokens {
@@ -1399,6 +1412,45 @@
 .ability-uses__count-sep {
   margin: 0 1px;
   opacity: 0.6;
+}
+
+/* Stepper buttons. `.btn--icon` supplies the frameless ghost treatment; this
+   only compacts the box (`.btn`'s 0.55rem/1rem padding is text-button sized)
+   and centres the glyph, since a padding-free flex row otherwise hugs its left
+   edge. Sized off the text scale so it keeps up with browser zoom. */
+.ability-uses__step.btn {
+  width: 1.15rem;
+  height: 1.15rem;
+  padding: 0;
+  border-radius: 50%;
+  justify-content: center;
+  flex: 0 0 auto;
+  background: color-mix(in srgb, var(--accent-violet) 14%, transparent);
+}
+
+.ability-uses__step.btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent-violet) 30%, transparent);
+  color: var(--text-primary);
+}
+
+.ability-uses__step.btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+/* Touch input has no hover to aim with, so give the tiny stepper a 1.75rem hit
+   area. The pseudo-element only extends the pointer target — it is absolutely
+   positioned, so it adds no box, no layout height, and no card overflow. */
+@media (hover: none) {
+  .ability-uses__step.btn {
+    position: relative;
+  }
+
+  .ability-uses__step.btn::before {
+    content: '';
+    position: absolute;
+    inset: -0.3rem;
+  }
 }
 
 /* Exhausted: every use is spent, so the whole readout reads as a warning. */
@@ -2426,12 +2478,24 @@
   z-index: 100;
 }
 
+/* Exhausted: the stepper that is still usable (restore) reads as the way out. */
+.ability-uses--depleted .ability-uses__step.btn {
+  background: color-mix(in srgb, var(--danger) 16%, transparent);
+  color: var(--danger);
+}
+
 /* Drag overlay — follows the cursor */
 .sortable-ability--overlay {
   opacity: 0.9;
   cursor: grabbing;
   transform: rotate(1deg);
   box-shadow: 0 8px 28px color-mix(in srgb, var(--bg-base) 50%, transparent);
+}
+
+/* The overlay is a picture, not a control surface: its cards are live copies,
+   so their uses steppers would otherwise take clicks mid-drag. */
+.sortable-ability--overlay .ability-uses__step {
+  pointer-events: none;
 }
 
 /* Card wrapping: when there's a drag handle, the card's top border is removed
