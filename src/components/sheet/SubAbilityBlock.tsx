@@ -17,7 +17,11 @@ import MarkdownText from '@/components/ui/MarkdownText'
 import AbilityModifierToggle from '@/components/sheet/AbilityModifierToggle'
 import AbilityUsesMeter from '@/components/sheet/AbilityUsesMeter'
 import { useCharacterStore } from '@/store/characterStore'
-import { useAbilityActivation } from '@/hooks/useAbilityActivation'
+import {
+  useAbilityActivation,
+  type AbilityActivationOverride,
+  type AbilityActivationOverrideResolver,
+} from '@/hooks/useAbilityActivation'
 import { SUB_ABILITY_ACCENT_OPTIONS } from '@/lib/themeUtils'
 import { resolveCustomAbilityCosts } from '@/lib/abilityCosts'
 import { isLimitedAbility } from '@/lib/abilityUses'
@@ -46,6 +50,13 @@ export interface SubAbilityBlockProps {
    * steppers. Same contract as `AbilityBlockCard`'s `onSetUses`.
    */
   onSetUses?: (abilityId: string, remaining: number) => void
+  /**
+   * Per-ability activation override (GM Screen NPC instances): its presence
+   * gives the sub-ability an Activate button even when `showActivate` is off,
+   * redirects the costs to the panel's own AP, and adds the Recharge badge.
+   * Same contract as {@link AbilityActivation}'s prop of the same name.
+   */
+  activateOverride?: AbilityActivationOverrideResolver
 }
 
 /**
@@ -57,11 +68,13 @@ export interface SubAbilityBlockProps {
 function SubAbilityActivateButton({
   ability,
   character,
+  override,
 }: {
   ability: AbilityBlock
   character: Character
+  override: AbilityActivationOverride | null
 }) {
-  const plan = useAbilityActivation(ability, character)
+  const plan = useAbilityActivation(ability, character, override?.options)
   return (
     <button
       type="button"
@@ -82,6 +95,7 @@ export default function SubAbilityBlock({
   character,
   onToggleModifiers,
   onSetUses,
+  activateOverride,
 }: SubAbilityBlockProps) {
   const storeCharacter = useCharacterStore((s) => s.currentCharacter)
   const storeSetUses = useCharacterStore((s) => s.setAbilityUsesRemaining)
@@ -152,13 +166,21 @@ export default function SubAbilityBlock({
   // -- Activate logic (view mode only) ----------------------------------------
   // Cost deduction, the Exhaustion penalty, and limited-use spending all live
   // in useAbilityActivation so a Sub-Ability behaves exactly like a regular
-  // ability card.
-  const canShowActivate = isView && ability.showActivate && activeCharacter != null
+  // ability card. A GM NPC panel supplies a resolver, and then the resolver is
+  // the last word: it returns an override only for the sub-abilities that
+  // should activate (anything with a cost), so the `showActivate` flag — which
+  // the NPC editor does not offer — cannot re-enable one the panel skipped.
+  const override = activateOverride?.(ability) ?? null
+  const canShowActivate =
+    isView &&
+    activeCharacter != null &&
+    (activateOverride ? override != null : ability.showActivate)
   const activateCharacter = canShowActivate ? activeCharacter : null
   const activateBtn: React.ReactNode = activateCharacter ? (
     <SubAbilityActivateButton
       ability={ability}
       character={activateCharacter}
+      override={override}
     />
   ) : null
 
@@ -175,7 +197,7 @@ export default function SubAbilityBlock({
         <ul className="sub-ability-block__traits" role="list">
           {traits.map((trait, i) => (
             <li key={i} className="sub-ability-block__trait">
-              {trait}
+              {override?.renderTrait?.(trait) ?? trait}
             </li>
           ))}
         </ul>

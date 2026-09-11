@@ -4,6 +4,72 @@ All notable changes to Grimoire are documented here. This project is in alpha:
 storage format may change between pre-1.0 releases, so export (or back up) your
 characters regularly.
 
+## Unreleased
+
+### GM Screen — NPC turns: Action Points & Recharge
+
+- **NPC instances now take turns.** Every spawned instance is initialised with
+  **3 AP**, shown in the panel through the same meter player sheets use
+  (segmented bar, `−`/`+` steppers, app-theme AP color). Three spawned Bandits
+  each spend their own AP — the base record never changes, and the standalone
+  NPC sheet still tracks nothing.
+- **Every NPC ability with a cost gets a working Activate button** in a panel,
+  through the same plan, cost deduction, and toasts the player sheets use
+  (`useAbilityActivation` with the panel's own resource adapter — one
+  implementation, not two). The ability's *Show Activate* flag does not gate it:
+  NPC abilities are authored in a mode that never offers the flag, and the
+  panel's rule is "a cost means a button". Cost-free abilities stay static
+  reference cards, except a cost-free ability carrying **Recharge**, which still
+  activates because the cooldown is the thing being tracked.
+- **Recharge (X) is implemented for NPC abilities.** Using one marks it **on
+  cooldown** and disables its button ("On cooldown — Recharge X"). The trait
+  chip under the ability name is the live read-out — it carries `⧗ Recharge X`
+  in place of the authored `Recharge (X)` text and switches to `⧗ On cooldown —
+  Recharge X` with a tinted chip, so the state never appears twice; a collapsed
+  panel shows a `2 on cooldown` count beside the AP meter.
+- **Start new turn** appears as a button the moment an instance's AP hits **0**
+  (and is always available in the ⋯ panel menu). It refills AP to 3 and rolls
+  one **Recharge Die (1d6)**: every cooling ability whose Recharge value is at
+  or below the roll comes back, everything above stays cooling. The roll is
+  announced in a toast and written to the roll log as a `1d6` entry tagged
+  `Recharge Die: <instance>`.
+- **One reusable trait parser.** `lib/abilityTraits.ts` turns any
+  `Name` / `Name (Value)` tag — "Recharge (4)", "Multi-Hit(2)", "Status
+  (Quick)" — into a structured trait (name, text, numeric value), matched
+  case-insensitively by registry key or display name, so future traits
+  (Cooldown, Reliable, …) add a registry entry and a rules module instead of a
+  new regex. Recharge's rules live in `lib/abilityRecharge.ts`; cooldowns store
+  bare ability ids and resolve against the base's traits at roll time, so
+  editing or deleting an ability can never leave a stale cooldown behind.
+- **Unchanged on purpose:** NPC sheets outside the GM Screen remain static
+  references — no Activate buttons anywhere (sub-abilities included), no AP
+  meter, no cooldown badges. Limited-use budgets also stay read-only in panels,
+  since they live on the shared base record.
+- **Player panels got the same AP meter.** AP used to exist on a player panel
+  only inside the sheet body, which is collapsed by default — the resource a
+  player spends on every activation was invisible at a glance. Every panel now
+  renders the same `PanelApBar` under its HP bar (label row, segmented meter,
+  `[−]`/`[+]` steppers), and at **0 AP** a player panel offers **Start new turn**,
+  which runs the character sheet's own **End Turn** (unspent AP → END, then END
+  Recovery, AP refilled) and reports the gain. The AP stat token was dropped
+  from the player panel's token strip so the number is never printed twice, and
+  the sheet body's AP bar is suppressed for the same reason. The remaining
+  tokens all lead with an icon now — END takes the sheet's END Recovery heart,
+  FP a spark — since AP and END share a hue in the default theme.
+- **An out-of-AP panel dims.** When the entity in a panel reaches 0 AP its
+  chrome recedes — header, HP bar, tokens, expanded sheet body — so a glance
+  down the screen shows who has already acted. The AP block is exempt (it holds
+  the manual `+` stepper and Start new turn), the dim is `opacity` only so every
+  control stays interactive, and it clears the moment AP comes back.
+- **One bar vocabulary for panel chrome.** The HP block is now one shared
+  component (`PanelHpBar`) used by player *and* NPC panels, and both it and the
+  AP meter are a label row plus a `[−] track [+]` row whose steppers are the same
+  `PanelStepper` control: identical lucide glyphs, identical boxes, dead-centre
+  icons (the old typed "−"/"+" sat high in its box), and the row's action button
+  (Damage…, Start new turn) pinned at the end. Steppers disable only when their
+  action is a no-op — and a disabled stepper keeps its box so the row never
+  looks like it is missing a control.
+
 ## v0.8.0-alpha — 2026-09-11
 
 The GM Screen release. Eight commits since `v0.7.0-alpha`.

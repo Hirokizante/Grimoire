@@ -32,6 +32,8 @@ export function sourceLabel(
       return `Attack${source.abilityName ? ` (${source.abilityName})` : ''}`
     case 'saving-throw':
       return `Save${source.stat ? ` (${source.stat})` : ''}`
+    case 'recharge':
+      return source.npcName ? `Recharge Die: ${source.npcName}` : 'Recharge Die'
     case 'manual':
       return source.note || 'Manual roll'
   }

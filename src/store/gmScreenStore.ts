@@ -19,9 +19,10 @@ import {
   getAllScreens,
   putScreen,
 } from '@/lib/db'
-import { generateId } from '@/constants/gameData'
+import { MAX_AP, generateId } from '@/constants/gameData'
 import { MAX_PANEL_STATUS_STACKS } from '@/constants/statusDurations'
 import { rollDie } from '@/lib/dice'
+import { resolveRecharge, rollRechargeDie, type RechargeOutcome } from '@/lib/abilityRecharge'
 import { useCharacterStore } from '@/store/characterStore'
 import type { DamageResult } from '@/store/characterStore'
 import type { Character, GMScreen, NpcInstanceState, PanelStatusDuration, ScreenPanel, ScreenPanelDensity } from '@/types'
@@ -226,6 +227,37 @@ export interface GMScreenActions {
   setInstanceTempHP: (screenId: string, panelId: string, amount: number) => void
   /** Nudge an instance's HP by ±amount, clamped to [0, base max]. */
   adjustInstanceHP: (screenId: string, panelId: string, delta: number) => void
+  /**
+   * Spend AP from an NPC instance's own turn budget. Returns false when the
+   * instance cannot afford it (the caller decides what to tell the GM).
+   */
+  spendInstanceAP: (screenId: string, panelId: string, amount: number) => boolean
+  /** Give an NPC instance AP back, clamped to `MAX_AP`. */
+  restoreInstanceAP: (screenId: string, panelId: string, amount: number) => void
+  /**
+   * Mark one of the base record's abilities as on Recharge cooldown for this
+   * instance. No-op when it is already cooling, so a double click cannot
+   * reorder the list or schedule a redundant save.
+   */
+  markAbilityCooldown: (
+    screenId: string,
+    panelId: string,
+    abilityId: string,
+  ) => void
+  /**
+   * Start an NPC instance's next turn: refill its Action Points and roll the
+   * Recharge Die once, bringing every cooling ability whose Recharge value is
+   * at or below the roll back online (and dropping ids that no longer resolve
+   * to a Recharge ability on the base).
+   *
+   * Returns the roll + what it changed so the caller can surface it (the store
+   * deliberately knows nothing about notifications or the roll log), or null
+   * when the panel is gone.
+   */
+  startInstanceTurn: (
+    screenId: string,
+    panelId: string,
+  ) => RechargeOutcome | null
   /**
    * Quick-create helper for the NPC picker: create a base NPC record (without
    * navigating) and immediately spawn an instance of it on this screen.
@@ -452,6 +484,8 @@ export const useGMScreenStore = create<GMScreenStore>()((set, get) => {
           currentHP: baseMaxHP(base ?? null),
           tempHP: 0,
           condition: 'active',
+          currentAP: MAX_AP,
+          cooldowns: [],
         },
       }
       commit({ ...screen, panels: [...screen.panels, panel] })
@@ -471,12 +505,15 @@ export const useGMScreenStore = create<GMScreenStore>()((set, get) => {
         id,
         label: base ? autoInstanceLabel(screen, base) : panel.label,
         // A duplicate is a FRESH instance at full HP — never a HP copy, and no
-        // inherited statuses either: the GM applied those to the original.
+        // inherited statuses either: the GM applied those to the original. Its
+        // turn is fresh too: full AP and nothing on cooldown.
         statuses: [],
         state: {
           currentHP: baseMaxHP(base ?? null),
           tempHP: 0,
           condition: 'active',
+          currentAP: MAX_AP,
+          cooldowns: [],
         },
       }
       withPanels(screenId, (panels) => [...panels, copy])
@@ -629,6 +666,7 @@ export const useGMScreenStore = create<GMScreenStore>()((set, get) => {
       if (downedNow) newHP = 0
 
       get().updateInstanceState(screenId, panelId, (state) => ({
+        ...state,
         currentHP: newHP,
         tempHP: newTempHP,
         condition:
@@ -690,6 +728,62 @@ export const useGMScreenStore = create<GMScreenStore>()((set, get) => {
         currentHP: Math.min(maxHP, state.currentHP + delta),
         condition: state.condition === 'downed' ? 'active' : state.condition,
       }))
+    },
+
+    // ---- Live play: NPC Action Points & Recharge -------------------------------
+
+    spendInstanceAP: (screenId, panelId, amount) => {
+      const found = findInstance(screenId, panelId)
+      if (!found || amount <= 0) return false
+      if (found.panel.state.currentAP < amount) return false
+      get().updateInstanceState(screenId, panelId, (state) => ({
+        ...state,
+        currentAP: Math.max(0, state.currentAP - amount),
+      }))
+      return true
+    },
+
+    restoreInstanceAP: (screenId, panelId, amount) => {
+      const found = findInstance(screenId, panelId)
+      if (!found || amount <= 0) return
+      if (found.panel.state.currentAP >= MAX_AP) return
+      get().updateInstanceState(screenId, panelId, (state) => ({
+        ...state,
+        currentAP: Math.min(MAX_AP, state.currentAP + amount),
+      }))
+    },
+
+    markAbilityCooldown: (screenId, panelId, abilityId) => {
+      const found = findInstance(screenId, panelId)
+      if (!found || !abilityId) return
+      if (found.panel.state.cooldowns.includes(abilityId)) return
+      get().updateInstanceState(screenId, panelId, (state) => ({
+        ...state,
+        cooldowns: [...state.cooldowns, abilityId],
+      }))
+    },
+
+    startInstanceTurn: (screenId, panelId) => {
+      const found = findInstance(screenId, panelId)
+      if (!found) return null
+      const base = useCharacterStore
+        .getState()
+        .characters.find((c) => c.id === found.panel.baseNpcId)
+      // One roll decides everything: the die is rolled here (not by the caller)
+      // so the number the GM is told, the number in the roll log, and the set
+      // of abilities that come back can never disagree.
+      const roll = rollRechargeDie()
+      const outcome: RechargeOutcome = base
+        ? resolveRecharge(base, found.panel.state.cooldowns, roll)
+        : // The base record is gone (the panel renders MissingPanel, so this is
+          // unreachable from the UI) — nothing can be resolved against it.
+          { roll, recharged: [], stillCooling: [] }
+      get().updateInstanceState(screenId, panelId, (state) => ({
+        ...state,
+        currentAP: MAX_AP,
+        cooldowns: outcome.stillCooling.map((entry) => entry.id),
+      }))
+      return outcome
     },
 
     createNpcBaseAndInstance: async (screenId, name) => {

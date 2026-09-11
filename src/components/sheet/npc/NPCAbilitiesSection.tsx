@@ -5,8 +5,12 @@
  *   - No slot tracking (NPCs have no slot limit)
  *   - No drag-and-drop reordering (static reference, not encounter management)
  *   - No "Move to Pool" button
- *   - The Activate button on AbilityBlockCards is ALWAYS disabled/hidden —
- *     NPCs are static references, not active participants in turn-based combat
+ *   - On the NPC **sheet pages** the Activate button is never rendered — NPC
+ *     sheets are static references, not active participants in turn-based
+ *     combat. The GM Screen passes an `activation` resolver instead, and only
+ *     the abilities that resolver returns an override for (any ability with a
+ *     cost, plus anything on Recharge cooldown) get a working Activate button
+ *     backed by the panel's own AP. See hooks/useNpcInstanceActivation.
  *
  * In edit mode, an "Add Ability" button opens the AbilityEditorModal, and
  * each card gains Edit and Remove buttons.
@@ -20,11 +24,13 @@
 import { useState, useCallback } from 'react'
 import { LayoutGrid, List } from 'lucide-react'
 
+import AbilityActivation from '@/components/sheet/AbilityActivation'
 import AbilityBlockCard from '@/components/sheet/AbilityBlockCard'
 import AbilityEditorModal from '@/components/sheet/AbilityEditorModal'
 import ConfirmModal from '@/components/sheet/ConfirmModal'
 import { useCharacterStore } from '@/store/characterStore'
 import { useSubAbilityEditor } from '@/hooks/useSubAbilityEditor'
+import type { AbilityActivationOverrideResolver } from '@/hooks/useAbilityActivation'
 import type { AbilityBlock } from '@/types'
 import type { Character } from '@/types'
 import type { SheetMode } from '@/pages/CharacterSheetPage'
@@ -46,7 +52,25 @@ export interface NPCAbilitiesSectionProps {
   mode?: SheetMode
   viewMode?: 'grid' | 'list'
   onViewModeChange?: (mode: 'grid' | 'list') => void
+  /**
+   * GM Screen live-play resolver. When supplied (view mode only), every ability
+   * it returns an override for renders through {@link AbilityActivation} — a
+   * real Activate button spending the **panel instance's** AP, gated on its
+   * Recharge cooldowns. Omitted on the NPC sheet pages, where abilities stay
+   * static reference cards.
+   */
+  activation?: AbilityActivationOverrideResolver
 }
+
+/**
+ * The sheet pages' resolver: an NPC sheet is a **static reference**, so nothing
+ * on it activates — not even a sub-ability whose own `showActivate` flag is on.
+ * Passing a resolver that always says "no" (rather than passing none) is what
+ * makes that explicit: a resolver is the last word on activation, so no card
+ * below can fall back to the flag and grow a button that would spend the *base*
+ * record's AP.
+ */
+const NO_ACTIVATION: AbilityActivationOverrideResolver = () => null
 
 export default function NPCAbilitiesSection({
   abilities,
@@ -55,9 +79,13 @@ export default function NPCAbilitiesSection({
   mode = 'view',
   viewMode = 'grid',
   onViewModeChange,
+  activation,
 }: NPCAbilitiesSectionProps) {
   const isEdit = mode === 'edit'
   const isListView = viewMode === 'list'
+  // A resolver is always supplied — the GM panel's, or the "nothing activates"
+  // one for the sheet pages (see NO_ACTIVATION).
+  const activateOverride = activation ?? NO_ACTIVATION
   const updateCharacter = useCharacterStore((s) => s.updateCharacter)
   const storeOwnerId = useCharacterStore((s) => s.currentCharacter?.id)
   const targetId = ownerId ?? storeOwnerId ?? ''
@@ -202,35 +230,53 @@ export default function NPCAbilitiesSection({
               : 'ability-grid ability-grid--cards'
           }
         >
-          {abilities.map((ability) => (
-            <AbilityBlockCard
-              key={ability.id}
-              ability={ability}
-              character={owner}
-              mode={mode}
-              subAbilityActions={isEdit ? subAbilityActions : undefined}
-              actions={
-                isEdit ? (
-                  <>
-                    <button
-                      type="button"
-                      className="btn btn--ghost ability-card__action-btn"
-                      onClick={() => openEdit(ability)}
-                    >
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn--ghost ability-card__action-btn ability-card__action-btn--danger"
-                      onClick={() => handleRemoveRequest(ability.id)}
-                    >
-                      Remove
-                    </button>
-                  </>
-                ) : undefined
-              }
-            />
-          ))}
+          {abilities.map((ability) => {
+            // A GM panel resolves an override per ability: one with a cost (or
+            // on Recharge cooldown) activates, the rest stay reference cards.
+            const override = isEdit ? null : activateOverride(ability)
+            if (override) {
+              return (
+                <AbilityActivation
+                  key={ability.id}
+                  ability={ability}
+                  character={owner}
+                  activateOverride={activateOverride}
+                />
+              )
+            }
+            return (
+              <AbilityBlockCard
+                key={ability.id}
+                ability={ability}
+                character={owner}
+                mode={mode}
+                subAbilityActions={isEdit ? subAbilityActions : undefined}
+                // The parent is not activatable here, but its sub-abilities may
+                // be — the resolver travels with the card either way.
+                activateOverride={activateOverride}
+                actions={
+                  isEdit ? (
+                    <>
+                      <button
+                        type="button"
+                        className="btn btn--ghost ability-card__action-btn"
+                        onClick={() => openEdit(ability)}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn--ghost ability-card__action-btn ability-card__action-btn--danger"
+                        onClick={() => handleRemoveRequest(ability.id)}
+                      >
+                        Remove
+                      </button>
+                    </>
+                  ) : undefined
+                }
+              />
+            )
+          })}
         </div>
       )}
 

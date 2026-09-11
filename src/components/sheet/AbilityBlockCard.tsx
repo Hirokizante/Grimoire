@@ -18,6 +18,7 @@ import SubAbilityBlock from '@/components/sheet/SubAbilityBlock'
 import { useCharacterStore } from '@/store/characterStore'
 import { resolveCustomAbilityCosts } from '@/lib/abilityCosts'
 import { isLimitedAbility } from '@/lib/abilityUses'
+import type { AbilityActivationOverrideResolver } from '@/hooks/useAbilityActivation'
 import type { AbilityBlock, Character } from '@/types'
 import type { RollSource } from '@/types/rollLog'
 import type { SheetMode } from '@/pages/CharacterSheetPage'
@@ -56,6 +57,14 @@ export interface AbilityBlockCardProps {
    * (a GM panel's entity, a drag overlay) renders no steppers at all.
    */
   onSetUses?: (abilityId: string, remaining: number) => void
+  /**
+   * Per-ability activation override, threaded to this card's **sub-abilities**
+   * (a card never activates itself — that is {@link AbilityActivation}'s job).
+   * GM Screen NPC panels pass the instance's resolver so a Recharge
+   * sub-ability gets the same Activate button and cooldown tracking as a
+   * top-level one; omitted everywhere else.
+   */
+  activateOverride?: AbilityActivationOverrideResolver
 }
 
 export default function AbilityBlockCard({
@@ -66,6 +75,7 @@ export default function AbilityBlockCard({
   character,
   onToggleModifiers,
   onSetUses,
+  activateOverride,
 }: AbilityBlockCardProps) {
   const {
     name,
@@ -122,6 +132,15 @@ export default function AbilityBlockCard({
 
   const adjustUses = onSetUses ?? storeAdjuster
 
+  /**
+   * The resolved activation override for THIS ability (the GM panel's live-play
+   * state). Resolved here as well as in the activation wrapper because the
+   * override can also *replace a trait chip*: an ability whose Recharge trait is
+   * being tracked shows the live cooldown badge in the trait's own slot instead
+   * of a second copy of the same information below the card.
+   */
+  const activationOverride = activateOverride?.(ability) ?? null
+
   // Dice rolls from the damage field are "Damage: [name]"; rolls from
   // description/overcharge/flavor text are generic "Roll: [name]".
   const abilityName = name || 'Untitled Ability'
@@ -148,7 +167,7 @@ export default function AbilityBlockCard({
           <ul className="ability-card__traits" role="list">
             {traits.map((trait, i) => (
               <li key={i} className="ability-card__trait">
-                {trait}
+                {activationOverride?.renderTrait?.(trait) ?? trait}
               </li>
             ))}
           </ul>
@@ -234,6 +253,7 @@ export default function AbilityBlockCard({
               character={character}
               onToggleModifiers={onToggleModifiers}
               onSetUses={onSetUses}
+              activateOverride={activateOverride}
               actions={subAbilityActions?.(sub, ability)}
             />
           ))}
@@ -259,6 +279,7 @@ export default function AbilityBlockCard({
               character={character}
               onToggleModifiers={onToggleModifiers}
               onSetUses={onSetUses}
+              activateOverride={activateOverride}
               actions={subAbilityActions?.(sub, ability)}
             />
           ))}

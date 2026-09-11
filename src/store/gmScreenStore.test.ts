@@ -97,6 +97,8 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers()
+  // The Recharge Die tests pin Math.random; never leak that into the next test.
+  vi.restoreAllMocks()
 })
 
 // ---- Screen CRUD ----------------------------------------------------------
@@ -463,6 +465,204 @@ test('adjustInstanceHP: +1 clamps at max, −1 routes through temp HP', async ()
   expect(after.kind === 'npc-instance' && after.state.tempHP).toBe(1)
   expect(after.kind === 'npc-instance' && after.state.currentHP).toBe(20)
 })
+
+// ---- Instance AP & Recharge (live play) ------------------------------------
+
+/** A base NPC whose slotted abilities carry the given traits. */
+function npcWithAbilities(
+  abilities: { id: string; name: string; traits: string[] }[],
+): Character {
+  return makeNpc({
+    id: 'n1',
+    slottedAbilities: abilities.map((a) => ({
+      id: a.id,
+      name: a.name,
+      traits: a.traits,
+      cost: { ap: 1 },
+      damage: '',
+      description: '',
+      overcharge: '',
+      flavorText: '',
+      isMinor: false,
+      showActivate: true,
+      subAbilitiesUnderDescription: [],
+      subAbilitiesUnderOvercharge: [],
+    })),
+  })
+}
+
+/** Force the next Recharge Die to land on `value` (1–6). */
+function mockRechargeRoll(value: number) {
+  vi.spyOn(Math, 'random').mockReturnValue((value - 0.5) / 6)
+}
+
+/** The live state of the panel at `index`. */
+function instanceState(index = 0) {
+  const panel = useGMScreenStore.getState().screens[0].panels[index]
+  if (panel.kind !== 'npc-instance') throw new Error('expected an npc-instance panel')
+  return panel.state
+}
+
+test('addNpcInstancePanel: spawns with a full turn (3 AP, nothing cooling)', async () => {
+  const screen = await useGMScreenStore.getState().createScreen('S')
+  seedCharacters(makeNpc({ id: 'n1' }))
+  useGMScreenStore.getState().addNpcInstancePanel(screen.id, 'n1')
+
+  expect(instanceState()).toMatchObject({ currentAP: 3, cooldowns: [] })
+})
+
+test('duplicatePanel: a fresh instance gets its own full turn', async () => {
+  const screen = await useGMScreenStore.getState().createScreen('S')
+  seedCharacters(makeNpc({ id: 'n1' }))
+  const firstId = useGMScreenStore.getState().addNpcInstancePanel(screen.id, 'n1')
+  useGMScreenStore.getState().spendInstanceAP(screen.id, firstId, 2)
+  useGMScreenStore.getState().markAbilityCooldown(screen.id, firstId, 'a1')
+
+  useGMScreenStore.getState().duplicatePanel(screen.id, firstId)
+
+  expect(instanceState(0)).toMatchObject({ currentAP: 1, cooldowns: ['a1'] })
+  expect(instanceState(1)).toMatchObject({ currentAP: 3, cooldowns: [] })
+})
+
+test('instances of the same base keep independent AP', async () => {
+  const screen = await useGMScreenStore.getState().createScreen('S')
+  seedCharacters(makeNpc({ id: 'n1' }))
+  const firstId = useGMScreenStore.getState().addNpcInstancePanel(screen.id, 'n1')
+  useGMScreenStore.getState().addNpcInstancePanel(screen.id, 'n1')
+
+  useGMScreenStore.getState().spendInstanceAP(screen.id, firstId, 1)
+
+  expect(instanceState(0).currentAP).toBe(2)
+  expect(instanceState(1).currentAP).toBe(3)
+})
+
+test('spendInstanceAP: deducts, and refuses when the instance cannot afford it', async () => {
+  const screen = await useGMScreenStore.getState().createScreen('S')
+  seedCharacters(makeNpc({ id: 'n1' }))
+  const panelId = useGMScreenStore.getState().addNpcInstancePanel(screen.id, 'n1')
+
+  expect(useGMScreenStore.getState().spendInstanceAP(screen.id, panelId, 1)).toBe(true)
+  expect(useGMScreenStore.getState().spendInstanceAP(screen.id, panelId, 2)).toBe(true)
+  expect(instanceState().currentAP).toBe(0)
+  // Nothing left: the third point must not push AP negative.
+  expect(useGMScreenStore.getState().spendInstanceAP(screen.id, panelId, 1)).toBe(false)
+  expect(instanceState().currentAP).toBe(0)
+  // Unknown panels are refused rather than throwing.
+  expect(useGMScreenStore.getState().spendInstanceAP(screen.id, 'nope', 1)).toBe(false)
+})
+
+test('restoreInstanceAP: caps at the 3 AP turn budget', async () => {
+  const screen = await useGMScreenStore.getState().createScreen('S')
+  seedCharacters(makeNpc({ id: 'n1' }))
+  const panelId = useGMScreenStore.getState().addNpcInstancePanel(screen.id, 'n1')
+
+  useGMScreenStore.getState().spendInstanceAP(screen.id, panelId, 2)
+  useGMScreenStore.getState().restoreInstanceAP(screen.id, panelId, 1)
+  expect(instanceState().currentAP).toBe(2)
+  useGMScreenStore.getState().restoreInstanceAP(screen.id, panelId, 5)
+  expect(instanceState().currentAP).toBe(3)
+})
+
+test('markAbilityCooldown: tracks an ability once, per instance', async () => {
+  const screen = await useGMScreenStore.getState().createScreen('S')
+  seedCharacters(makeNpc({ id: 'n1' }))
+  const firstId = useGMScreenStore.getState().addNpcInstancePanel(screen.id, 'n1')
+  useGMScreenStore.getState().addNpcInstancePanel(screen.id, 'n1')
+
+  const store = useGMScreenStore.getState()
+  store.markAbilityCooldown(screen.id, firstId, 'a1')
+  store.markAbilityCooldown(screen.id, firstId, 'a2')
+  // Re-marking an ability already cooling must not duplicate it.
+  store.markAbilityCooldown(screen.id, firstId, 'a1')
+
+  expect(instanceState(0).cooldowns).toEqual(['a1', 'a2'])
+  expect(instanceState(1).cooldowns).toEqual([])
+})
+
+test('startInstanceTurn: refills AP and recharges everything at or below the roll', async () => {
+  const screen = await useGMScreenStore.getState().createScreen('S')
+  seedCharacters(
+    npcWithAbilities([
+      { id: 'a1', name: 'Fire Breath', traits: ['Recharge (5)'] },
+      { id: 'a2', name: 'Bite', traits: ['Recharge (3)'] },
+    ]),
+  )
+  const panelId = useGMScreenStore.getState().addNpcInstancePanel(screen.id, 'n1')
+  const store = useGMScreenStore.getState()
+  store.spendInstanceAP(screen.id, panelId, 3)
+  store.markAbilityCooldown(screen.id, panelId, 'a1')
+  store.markAbilityCooldown(screen.id, panelId, 'a2')
+
+  mockRechargeRoll(5)
+  const outcome = useGMScreenStore.getState().startInstanceTurn(screen.id, panelId)
+
+  expect(outcome?.roll).toBe(5)
+  expect(outcome?.recharged.map((r) => r.name)).toEqual(['Fire Breath', 'Bite'])
+  expect(outcome?.stillCooling).toEqual([])
+  expect(instanceState()).toMatchObject({ currentAP: 3, cooldowns: [] })
+})
+
+test('startInstanceTurn: keeps abilities that rolled short cooling', async () => {
+  const screen = await useGMScreenStore.getState().createScreen('S')
+  seedCharacters(
+    npcWithAbilities([
+      { id: 'a1', name: 'Fire Breath', traits: ['Recharge (5)'] },
+      { id: 'a2', name: 'Bite', traits: ['Recharge (2)'] },
+    ]),
+  )
+  const panelId = useGMScreenStore.getState().addNpcInstancePanel(screen.id, 'n1')
+  const store = useGMScreenStore.getState()
+  store.markAbilityCooldown(screen.id, panelId, 'a1')
+  store.markAbilityCooldown(screen.id, panelId, 'a2')
+
+  mockRechargeRoll(2)
+  const outcome = useGMScreenStore.getState().startInstanceTurn(screen.id, panelId)
+
+  expect(outcome?.roll).toBe(2)
+  expect(outcome?.recharged.map((r) => r.name)).toEqual(['Bite'])
+  expect(outcome?.stillCooling.map((r) => r.name)).toEqual(['Fire Breath'])
+  expect(instanceState().cooldowns).toEqual(['a1'])
+})
+
+test('startInstanceTurn: drops ids that no longer resolve to a Recharge ability', async () => {
+  const screen = await useGMScreenStore.getState().createScreen('S')
+  seedCharacters(
+    npcWithAbilities([{ id: 'a1', name: 'Slash', traits: ['Action'] }]),
+  )
+  const panelId = useGMScreenStore.getState().addNpcInstancePanel(screen.id, 'n1')
+  const store = useGMScreenStore.getState()
+  store.markAbilityCooldown(screen.id, panelId, 'a1') // trait-less: stale
+  store.markAbilityCooldown(screen.id, panelId, 'deleted')
+
+  mockRechargeRoll(1)
+  const outcome = useGMScreenStore.getState().startInstanceTurn(screen.id, panelId)
+
+  // Nothing is reported as recharged; the stale ids are simply gone.
+  expect(outcome?.recharged).toEqual([])
+  expect(outcome?.stillCooling).toEqual([])
+  expect(instanceState().cooldowns).toEqual([])
+})
+
+test('startInstanceTurn: an unknown panel returns null and changes nothing', async () => {
+  const screen = await useGMScreenStore.getState().createScreen('S')
+  expect(useGMScreenStore.getState().startInstanceTurn(screen.id, 'nope')).toBeNull()
+})
+
+test('startInstanceTurn: resolving a deleted base record is safe', async () => {
+  const screen = await useGMScreenStore.getState().createScreen('S')
+  seedCharacters(makeNpc({ id: 'n1' }))
+  const panelId = useGMScreenStore.getState().addNpcInstancePanel(screen.id, 'n1')
+  useGMScreenStore.getState().spendInstanceAP(screen.id, panelId, 2)
+  // The GM deleted the base NPC while the panel stayed on the screen.
+  seedCharacters()
+
+  mockRechargeRoll(4)
+  const outcome = useGMScreenStore.getState().startInstanceTurn(screen.id, panelId)
+
+  expect(outcome).toMatchObject({ roll: 4, recharged: [], stillCooling: [] })
+  expect(instanceState().currentAP).toBe(3)
+})
+
 
 // ---- Panel ordering & density ---------------------------------------------
 

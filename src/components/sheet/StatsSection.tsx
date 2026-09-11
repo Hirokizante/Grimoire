@@ -64,6 +64,12 @@ export interface StatsSectionProps {
    * showing both was redundant and pushed the rest of the sheet down.
    */
   hideHP?: boolean
+  /**
+   * Hide the Action Points bar. Used by GM Screen character panels, which show
+   * AP in the panel chrome directly under the HP bar (see PanelApBar) — the
+   * body must not print a second copy of the same number.
+   */
+  hideAP?: boolean
 }
 
 /** Metadata for each derived stat token: icon, label, accent class. */
@@ -86,6 +92,7 @@ export default function StatsSection({
   mode = 'view',
   variant = 'section',
   hideHP = false,
+  hideAP = false,
 }: StatsSectionProps) {
   const { attributes, milestones } = character
 
@@ -216,15 +223,17 @@ export default function StatsSection({
           onSpend={() => spendFP(character.id, 1)}
           onRestore={() => restoreFP(character.id, 1)}
         />
-        <ResourceBar
-          label="Action Points"
-          value={character.currentAP}
-          max={MAX_AP}
-          color="var(--ap-bar-color)"
-          interactive={isView}
-          onSpend={() => spendAP(character.id, 1)}
-          onRestore={() => restoreAP(character.id, 1)}
-        />
+        {!hideAP && (
+          <ResourceBar
+            label="Action Points"
+            value={character.currentAP}
+            max={MAX_AP}
+            color="var(--ap-bar-color)"
+            interactive={isView}
+            onSpend={() => spendAP(character.id, 1)}
+            onRestore={() => restoreAP(character.id, 1)}
+          />
+        )}
         <ResourceBar
           label="Endurance"
           value={character.currentEND}

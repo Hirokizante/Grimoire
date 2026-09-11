@@ -95,6 +95,56 @@ async function addStatus(
   await page.getByRole('button', { name: 'Done' }).click()
 }
 
+/**
+ * Record an element's height every animation frame for `ms`, resolving with the
+ * samples. Started BEFORE the click that triggers the animation, because a
+ * collapsing panel unmounts its body (recorded as -1) before the run ends.
+ *
+ * A single sample after the click is not enough to prove an animation is
+ * running: right after the click the body is still at its start height whether
+ * or not a transition exists, which is how a `transition` shorthand that
+ * replaced the grid-row transition slipped through and snapped the panel open
+ * and shut.
+ */
+function recordHeights(page: Page, selector: string, maxMs = 1200) {
+  return page.evaluate(
+    ([sel, cap]) =>
+      new Promise<number[]>((resolve) => {
+        const samples: number[] = []
+        const started = performance.now()
+        let moved = false
+        const tick = () => {
+          const el = document.querySelector(sel)
+          const height = el ? +el.getBoundingClientRect().height.toFixed(1) : -1
+          if (samples.length > 0 && height !== samples[samples.length - 1]) {
+            moved = true
+          }
+          samples.push(height)
+          // Stop as soon as the run has moved and then held still for a few
+          // frames — the animation is ~190ms, so this ends right after it
+          // settles instead of burning the whole cap, and it starts sampling
+          // before the click however long Playwright's actionability checks
+          // take to fire it.
+          const tail = samples.slice(-5)
+          const settled =
+            moved && tail.length === 5 && tail.every((h) => h === tail[0])
+          if (!settled && performance.now() - started < cap) {
+            requestAnimationFrame(tick)
+          } else {
+            resolve(samples)
+          }
+        }
+        tick()
+      }),
+    [selector, maxMs] as const,
+  )
+}
+
+/** Distinct heights a run passed through on its way between two sizes. */
+function intermediateHeights(samples: number[], low: number, high: number) {
+  return [...new Set(samples.filter((h) => h > low && h < high))]
+}
+
 /** Measured geometry of a panel's tracked-status strip. */
 function stripMetrics(panel: Locator) {
   return panel.evaluate((el) => {
@@ -317,31 +367,32 @@ test.describe('GM Screen', () => {
 
     // ---- Expanding a panel animates rather than snapping -----------------
     // The body unmounts when collapsed, so the container transitions
-    // `grid-template-rows: 0fr -> 1fr`; sample it mid-flight to prove the
-    // height is genuinely interpolating.
+    // `grid-template-rows: 0fr -> 1fr`. Record every frame across the whole
+    // animation and require the height to pass through real intermediate sizes
+    // in BOTH directions — a snap has no frames in between.
     const npcPanel = page.locator('.gm-panel--npc').first()
+    const expandSelector = '.gm-panel--npc .gm-panel__expand'
+    const opening = recordHeights(page, expandSelector)
     await npcPanel.getByRole('button', { name: /Expand/ }).click()
-    const duringExpand = await npcPanel.evaluate((panel) => {
-      const el = panel.querySelector('.gm-panel__expand') as HTMLElement | null
-      return el ? el.getBoundingClientRect().height : -1
-    })
-    // Let it settle, then confirm the collapsed body is cleaned up.
+    const openingHeights = await opening
     await expect
-      .poll(async () =>
-        npcPanel.evaluate((panel) => {
-          const el = panel.querySelector('.gm-panel__expand') as HTMLElement | null
-          return el ? +el.getBoundingClientRect().height.toFixed(0) : -1
-        }),
-      )
-      .toBeGreaterThan(100)
+      .poll(async () => page.locator(expandSelector).count())
+      .toBe(1)
     const settled = await npcPanel.evaluate((panel) => {
       const el = panel.querySelector('.gm-panel__expand') as HTMLElement
       return +el.getBoundingClientRect().height.toFixed(0)
     })
-    // Mid-flight height is strictly between collapsed (0) and settled.
-    expect(duringExpand).toBeLessThan(settled)
+    expect(settled).toBeGreaterThan(100)
+    // Opening climbs through at least a handful of distinct in-between heights.
+    expect(intermediateHeights(openingHeights, 0, settled).length).toBeGreaterThan(2)
 
+    // Closing animates too (this is the direction that regressed): the height
+    // eases back down before the body is unmounted.
+    const closing = recordHeights(page, expandSelector)
     await npcPanel.getByRole('button', { name: /Collapse/ }).click()
+    const closingHeights = await closing
+    expect(intermediateHeights(closingHeights, 0, settled).length).toBeGreaterThan(2)
+    // …and the body really is gone once it has finished.
     await expect
       .poll(async () => page.locator('.gm-panel__expand').count())
       .toBe(0)
@@ -405,7 +456,7 @@ test.describe('GM Screen', () => {
     const siblingHP = await page
       .locator('.gm-panel--npc')
       .nth(1)
-      .locator('.gm-hp__value')
+      .locator('.gm-hp .gm-bar__value')
       .innerText()
     const siblingHPNumber = siblingHP.split('/')[0].trim()
 
@@ -489,7 +540,7 @@ test.describe('GM Screen', () => {
     const panel = page.locator('.gm-panel--character')
     await expect(panel).toHaveCount(1)
     // The default character is at full HP on the panel.
-    await expect(panel.locator('.gm-hp__value')).toContainText('/')
+    await expect(panel.locator('.gm-hp .gm-bar__value')).toContainText('/')
 
     // Damage 6 from the GM screen…
     await panel.getByRole('button', { name: 'Damage…' }).click()
@@ -498,7 +549,37 @@ test.describe('GM Screen', () => {
     await page.getByRole('button', { name: 'Apply Damage' }).click()
     await page.getByRole('button', { name: '✕' }).click()
 
-    const panelHP = await panel.locator('.gm-hp__value').innerText()
+    const panelHP = await panel.locator('.gm-hp .gm-bar__value').innerText()
+
+    // The panel carries the character's own AP directly under the HP bar, the
+    // same meter an NPC instance panel shows…
+    const panelAP = panel.locator('.gm-ap .gm-bar__value')
+    const hpBlock = panel.locator('.gm-hp')
+    await expect(panelAP).toContainText('3')
+    for (let i = 0; i < 3; i += 1) {
+      await panel.getByRole('button', { name: 'Spend Action Points' }).click()
+    }
+    await expect(panelAP).toContainText('0')
+
+    // Out of AP the panel dims — but stays fully interactive, and its AP block
+    // does not dim: that is where both ways back live.
+    await expect(panel).toHaveClass(/gm-panel--no-ap/)
+    await expect(hpBlock).toHaveCSS('opacity', '0.55')
+    await expect(panel.locator('.gm-ap')).toHaveCSS('opacity', '1')
+    await expect(panel.getByRole('button', { name: 'Start new turn' })).toBeEnabled()
+    await expect(panel.getByRole('button', { name: /Deal 1 damage/ })).toBeEnabled()
+
+    // Handing AP back by hand restores the panel…
+    await panel.getByRole('button', { name: 'Restore Action Points' }).click()
+    await expect(hpBlock).toHaveCSS('opacity', '1')
+    await panel.getByRole('button', { name: 'Spend Action Points' }).click()
+    await expect(hpBlock).toHaveCSS('opacity', '0.55')
+
+    // …and so does the turn button, which is the sheet's End Turn: AP is
+    // refilled on the same record the player owns.
+    await panel.getByRole('button', { name: 'Start new turn' }).click()
+    await expect(panelAP).toContainText('3')
+    await expect(hpBlock).toHaveCSS('opacity', '1')
 
     // …then open the player's own sheet: identical state, same record.
     await panel.getByRole('button', { name: /Open .* sheet/ }).click()
@@ -511,6 +592,13 @@ test.describe('GM Screen', () => {
     await expect(
       page.getByRole('button', { name: new RegExp(`^HP ${currentHP} / `) }),
     ).toBeVisible()
+    // The AP the panel refilled is the AP the sheet shows.
+    await expect(
+      page
+        .locator('.resource-bar')
+        .filter({ hasText: 'Action Points' })
+        .locator('.resource-bar__value'),
+    ).toContainText('3')
   })
 
   test('deleting a referenced NPC leaves a removable placeholder panel', async ({
@@ -588,7 +676,7 @@ test.describe('GM Screen', () => {
     // The pill sits on the HP row, vertically in line with the HP number —
     // "inline with the HP number", not on a row of its own.
     const inline = await npcPanel.evaluate((el) => {
-      const value = el.querySelector('.gm-hp__value')!.getBoundingClientRect()
+      const value = el.querySelector('.gm-hp .gm-bar__value')!.getBoundingClientRect()
       const pill = el.querySelector('.gm-status-pill')!.getBoundingClientRect()
       return {
         sameRow: pill.top < value.bottom && pill.bottom > value.top,
@@ -791,6 +879,106 @@ test.describe('GM Screen', () => {
     await expect(
       dialog.getByText('Stunned', { exact: true }),
     ).toBeVisible()
+  })
+
+  test('an NPC panel runs its own turn: AP, Recharge cooldown, and the Recharge Die', async ({
+    page,
+  }) => {
+    // A deterministic Recharge Die: ids come from crypto.randomUUID(), so
+    // pinning Math.random fixes the d6 (always 6) without touching anything
+    // else. A d6 of 6 recharges every ability in this test.
+    await page.addInitScript(() => {
+      Math.random = () => 0.9
+    })
+
+    await gotoHome(page)
+    await createNpc(page, 'Bandit')
+
+    // ---- Author a Recharge ability on the base through the real editor ----
+    await page.locator('.card-main').filter({ hasText: 'Bandit' }).first().click()
+    await page
+      .locator('.mode-toggle--floating')
+      .getByRole('tab', { name: 'Edit' })
+      .click()
+    await page.getByRole('button', { name: '+ Add Ability' }).click()
+    const editor = page.getByRole('dialog', { name: 'New Ability' })
+    await editor.getByLabel('Name').fill('Fire Breath')
+    await editor
+      .getByLabel('Traits (comma-separated)')
+      .fill('Action, Recharge (5)')
+    await editor.getByLabel('AP Cost').fill('2')
+    await editor.getByRole('button', { name: 'Save', exact: true }).click()
+    await expect(page.getByText('Fire Breath')).toBeVisible()
+
+    // ---- The standalone NPC sheet stays a static reference ---------------
+    await page
+      .locator('.mode-toggle--floating')
+      .getByRole('tab', { name: 'View' })
+      .click()
+    await expect(page.getByRole('button', { name: 'Activate' })).toHaveCount(0)
+    await expect(page.locator('.gm-recharge')).toHaveCount(0)
+    await expect(page.locator('.gm-ap')).toHaveCount(0)
+    // Let the sheet's debounced autosave land before leaving the page.
+    await page.waitForTimeout(700)
+
+    // ---- Spawn an instance of it on a screen ------------------------------
+    await gotoGmScreen(page)
+    await page.getByRole('button', { name: 'New Screen' }).first().click()
+    await page.getByRole('button', { name: 'Create' }).click()
+    await page.getByRole('button', { name: 'Add NPC' }).first().click()
+    await page
+      .locator('.gm-picker__list .gm-picker__item')
+      .filter({ hasText: 'Bandit' })
+      .click()
+    await page.getByRole('button', { name: 'Done' }).click()
+
+    const panel = page.locator('.gm-panel--npc')
+    // Spawned mid-turn-ready: a full 3 AP, on the same meter player sheets use.
+    const apMeter = panel.locator('.gm-ap .gm-bar__value')
+    await expect(apMeter).toContainText('3')
+    await panel.getByRole('button', { name: /Expand/ }).click()
+
+    // ---- Activating spends the instance's AP and starts the cooldown ------
+    // The badge lives in the ability's own trait chip (it replaces the authored
+    // "Recharge (5)" text), not in a separate block under the card.
+    const badge = panel.locator('.ability-card__trait .gm-recharge')
+    await expect(badge).toHaveText('Recharge 5')
+    await panel.getByRole('button', { name: 'Activate' }).click()
+    await expect(apMeter).toContainText('1')
+    await expect(badge).toHaveText('On cooldown — Recharge 5')
+    await expect(panel.getByRole('button', { name: 'Activate' })).toBeDisabled()
+    // The collapsed-panel count rides with the AP meter.
+    await expect(panel.locator('.gm-ap__cooling')).toHaveText('1 on cooldown')
+
+    // ---- At 0 AP the panel offers the turn button -------------------------
+    await panel.getByRole('button', { name: 'Spend Action Points' }).click()
+    await expect(apMeter).toContainText('0')
+    // An NPC panel takes the same out-of-AP dim, AP block exempt.
+    await expect(panel.locator('.gm-hp')).toHaveCSS('opacity', '0.55')
+    await expect(panel.locator('.gm-ap')).toHaveCSS('opacity', '1')
+    const turn = panel.getByRole('button', { name: 'Start new turn' })
+    await expect(turn).toBeVisible()
+    await turn.click()
+    await expect(panel.locator('.gm-hp')).toHaveCSS('opacity', '1')
+
+    // AP is back, the die roll brought the ability off cooldown, and the roll
+    // was announced.
+    await expect(apMeter).toContainText('3')
+    await expect(badge).toHaveText('Recharge 5')
+    await expect(panel.locator('.gm-ap__cooling')).toHaveCount(0)
+    await expect(
+      page.getByText("Bandit's turn — Recharge Die: 6 · recharged: Fire Breath"),
+    ).toBeVisible()
+
+    // ---- …and stored in the roll log --------------------------------------
+    await page.locator('.roll-log-tab').click()
+    const entry = page.locator('.roll-log-item').first()
+    await expect(entry.locator('.roll-log-item__notation')).toHaveText('1d6')
+    await expect(entry.locator('.roll-log-item__src')).toHaveText(
+      'Recharge Die: Bandit',
+    )
+    await expect(entry.locator('.roll-log-item__character')).toHaveText('Bandit')
+    await expect(entry.locator('.roll-log-item__total')).toHaveText('6')
   })
 
   test('a phone-width layout keeps panels on one column without overflow', async ({

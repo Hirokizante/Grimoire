@@ -22,14 +22,17 @@
  */
 
 import { useState } from 'react'
-import { HeartPulse, Pencil, Shield, Swords, Wind } from 'lucide-react'
+import { Heart, Pencil, Shield, Sparkles, Swords, Wind } from 'lucide-react'
 
 import DamageDialog from '@/components/sheet/DamageDialog'
 import PanelHeader, { type PanelMenuItem } from '@/components/gmscreen/PanelHeader'
+import PanelApBar from '@/components/gmscreen/PanelApBar'
 import PanelExpand from '@/components/gmscreen/PanelExpand'
+import PanelHpBar from '@/components/gmscreen/PanelHpBar'
 import PanelSheet from '@/components/gmscreen/PanelSheet'
 import PanelStatuses from '@/components/gmscreen/PanelStatuses'
 import { useCharacterStore } from '@/store/characterStore'
+import { useNotification } from '@/context/NotificationContext'
 import { useGMScreenStore } from '@/store/gmScreenStore'
 import { effectiveCombatStats } from '@/lib/abilityModifiers'
 import { appThemeColorVars, colorVars } from '@/lib/themeUtils'
@@ -54,7 +57,14 @@ export default function CharacterPanel({
   const setPanelDensity = useGMScreenStore((s) => s.setPanelDensity)
   const heal = useCharacterStore((s) => s.heal)
   const takeDamage = useCharacterStore((s) => s.takeDamage)
+  const spendAP = useCharacterStore((s) => s.spendAP)
+  const restoreAP = useCharacterStore((s) => s.restoreAP)
+  // Ending a turn is the same store action the sheet's own End Turn button
+  // runs: unspent AP converts to END 1:1, then END Recovery is applied and AP
+  // is refilled — one implementation, two surfaces.
+  const endTurn = useCharacterStore((s) => s.endTurn)
   const appTheme = useAppThemeStore((s) => s.theme)
+  const { notify } = useNotification()
   const [showDamage, setShowDamage] = useState(false)
 
   // Panel-chrome colors — the app theme's palette, deliberately NOT the
@@ -64,16 +74,40 @@ export default function CharacterPanel({
   const stats = effectiveCombatStats(character)
   const maxHP = stats.maxHP
   const hp = Math.max(0, character.currentHP)
+  const ap = character.currentAP
+  // Out of AP = out of actions for this turn: the panel dims (except its AP
+  // block, which holds the `+` stepper and the turn button). See gmscreen.css.
+  const spent = ap <= 0
+
+  const startTurn = () => {
+    const gained = endTurn(character.id)
+    notify(
+      gained > 0
+        ? `${character.name}'s turn — AP restored · +${gained} END`
+        : `${character.name}'s turn — AP replenished`,
+      gained > 0 ? 'success' : 'info',
+    )
+  }
 
   const menuItems: PanelMenuItem[] = [
     { label: 'Open sheet', onSelect: onOpenSheet },
+    // The turn button appears by itself once AP runs out; the menu entry keeps
+    // an early turn possible without spending down first (same pairing as an
+    // NPC instance panel).
+    { label: 'Start new turn', onSelect: startTurn },
     { label: 'Remove panel', onSelect: onRemove, danger: true },
   ]
 
   const expanded = panel.density === 'expanded'
 
   return (
-    <section className={'gm-panel gm-panel--character' + (expanded ? ' gm-panel--expanded' : '')}>
+    <section
+      className={
+        'gm-panel gm-panel--character' +
+        (expanded ? ' gm-panel--expanded' : '') +
+        (spent ? ' gm-panel--no-ap' : '')
+      }
+    >
       <PanelHeader
         portrait={character.portrait}
         name={character.name}
@@ -88,66 +122,39 @@ export default function CharacterPanel({
         }
       />
 
-      <div className="gm-hp">
-        <div className="gm-hp__row">
-          <HeartPulse size={14} className="gm-hp__icon" aria-hidden="true" />
-          <span className="gm-hp__label">HP</span>
-          <span className="gm-hp__value">
-            {hp}
-            <span className="gm-hp__max">/{maxHP}</span>
-          </span>
-          {character.tempHP > 0 && (
-            <span className="gm-hp__temp" title="Temporary HP (absorbed first)">
-              +{character.tempHP}
-            </span>
-          )}
-          {/* Statuses the GM is tracking: inline with the HP number, on one
-            * scrollable line so they can never make the panel taller. */}
+      <PanelHpBar
+        name={character.name}
+        hp={hp}
+        maxHP={maxHP}
+        tempHP={character.tempHP}
+        onDamage={() => takeDamage(character.id, 1)}
+        onHeal={() => heal(character.id, 1)}
+        onOpenDamageDialog={() => setShowDamage(true)}
+        statuses={
           <PanelStatuses
             screenId={screenId}
             panel={panel}
             entityName={character.name}
           />
-        </div>
-        <div
-          className="gm-hp__track"
-          role="img"
-          aria-label={`${hp} of ${maxHP} hit points`}
-        >
-          <div
-            className="gm-hp__fill"
-            style={{ width: `${maxHP > 0 ? Math.min(100, (hp / maxHP) * 100) : 0}%` }}
-          />
-        </div>
-        <div className="gm-hp__controls">
-          <button
-            type="button"
-            className="btn btn--icon gm-hp__step"
-            onClick={() => takeDamage(character.id, 1)}
-            aria-label={`Deal 1 damage to ${character.name}`}
-            title="−1 HP"
-          >
-            −
-          </button>
-          <button
-            type="button"
-            className="btn btn--icon gm-hp__step"
-            onClick={() => heal(character.id, 1)}
-            aria-label={`Heal ${character.name} 1 HP`}
-            title="+1 HP"
-          >
-            +
-          </button>
-          <button
-            type="button"
-            className="btn btn--ghost gm-hp__damage"
-            onClick={() => setShowDamage(true)}
-          >
-            Damage…
-          </button>
-        </div>
-      </div>
+        }
+      />
 
+      {/* The character's own turn budget, in the panel chrome and directly
+        * under the HP bar — matching an NPC instance panel exactly. The sheet
+        * body's copy is suppressed (see PanelSheet's `hideAP`) so AP is never
+        * printed twice in one panel; the store action is the character's real
+        * AP, shared with the player's own sheet. */}
+      <PanelApBar
+        ap={ap}
+        onSpend={() => spendAP(character.id, 1)}
+        onRestore={() => restoreAP(character.id, 1)}
+        onStartTurn={startTurn}
+        startTurnTitle="End turn: unspent AP becomes END, then END Recovery refills AP"
+      />
+
+      {/* No AP token: the meter above carries it now, exactly as on an NPC
+        * panel (which has no AP token either). END and FP have no chrome bar,
+        * so their tokens stay the at-a-glance read-out. */}
       <div className="gm-tokens">
         <span className="gm-token" style={{ '--token-color': tokenColors['--color-token-evasion'] } as React.CSSProperties}>
           <Wind size={13} /> <span className="gm-token__label">Eva</span>
@@ -157,16 +164,17 @@ export default function CharacterPanel({
           <Shield size={13} /> <span className="gm-token__label">Arm</span>
           <span className="gm-token__value">{stats.armor}</span>
         </span>
-        <span className="gm-token" style={{ '--token-color': tokenColors['--ap-bar-color'] } as React.CSSProperties}>
-          <span className="gm-token__label">AP</span>
-          <span className="gm-token__value">{character.currentAP}</span>
-        </span>
+        {/* Every token leads with an icon, END and FP included: their pools are
+          * both violet in most themes (and AP's is the same hue), so the glyph
+          * is what tells them apart at a glance. Heart is the icon the sheet
+          * already uses for END (its END Recovery stat token); Sparkles marks
+          * Fate. */}
         <span className="gm-token" style={{ '--token-color': tokenColors['--end-bar-color'] } as React.CSSProperties}>
-          <span className="gm-token__label">END</span>
+          <Heart size={13} /> <span className="gm-token__label">END</span>
           <span className="gm-token__value">{character.currentEND}</span>
         </span>
         <span className="gm-token" style={{ '--token-color': tokenColors['--fp-bar-color'] } as React.CSSProperties}>
-          <span className="gm-token__label">FP</span>
+          <Sparkles size={13} /> <span className="gm-token__label">FP</span>
           <span className="gm-token__value">{character.currentFP}</span>
         </span>
         <button
@@ -200,7 +208,7 @@ export default function CharacterPanel({
             ...colorVars(character.config.colors),
           } as React.CSSProperties}
         >
-          <PanelSheet entity={character} mode="view" />
+          <PanelSheet entity={character} mode="view" hideAP />
         </div>
       </PanelExpand>
 

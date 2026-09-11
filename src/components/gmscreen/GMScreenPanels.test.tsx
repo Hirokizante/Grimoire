@@ -8,7 +8,7 @@
  */
 
 import { test, expect, beforeEach, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { act, render, screen, fireEvent } from '@testing-library/react'
 
 import DamageDialog from '@/components/sheet/DamageDialog'
 import CharacterPanel from '@/components/gmscreen/CharacterPanel'
@@ -16,10 +16,11 @@ import NpcInstancePanel from '@/components/gmscreen/NpcInstancePanel'
 import { NotificationProvider } from '@/context/NotificationContext'
 import { useCharacterStore } from '@/store/characterStore'
 import { useGMScreenStore } from '@/store/gmScreenStore'
-import { createDefaultNPC, createDefaultCharacter, DEFAULT_SHEET_COLORS } from '@/constants/gameData'
+import { useRollLogStore } from '@/store/rollLogStore'
+import { createDefaultNPC, createDefaultCharacter, DEFAULT_SHEET_COLORS, MAX_AP } from '@/constants/gameData'
 import { appThemeSheetColors } from '@/lib/themeUtils'
 import { useAppThemeStore } from '@/store/appThemeStore'
-import type { Character } from '@/types'
+import type { AbilityBlock, Character } from '@/types'
 
 const { dbMap } = vi.hoisted(() => ({ dbMap: new Map<string, unknown>() }))
 
@@ -86,6 +87,8 @@ function seedScreenFor(base: Character, state?: Partial<{ currentHP: number; tem
               currentHP: state?.currentHP ?? 20,
               tempHP: state?.tempHP ?? 0,
               condition: 'active',
+              currentAP: MAX_AP,
+              cooldowns: [],
             },
           },
         ],
@@ -250,11 +253,14 @@ test('NpcInstancePanel: compact shows the HP value, max, and base tokens', () =>
 })
 
 test('NpcInstancePanel: HP steppers target this instance', () => {
-  renderPanel('compact')
+  // The subscribed harness, so the panel re-renders after each write — the
+  // steppers disable at their own end of the pool (full HP has nothing to heal).
+  renderNpcPanel(makeBase(), 'compact')
 
   fireEvent.click(screen.getByRole('button', { name: 'Deal 1 damage to Bandit' }))
   expect(panelState().currentHP).toBe(19)
 
+  expect(screen.getByRole('button', { name: 'Heal Bandit 1 HP' })).toBeEnabled()
   fireEvent.click(screen.getByRole('button', { name: 'Heal Bandit 1 HP' }))
   expect(panelState().currentHP).toBe(20)
 })
@@ -404,16 +410,22 @@ test('CharacterPanel: stat tokens use the app theme, never the sheet palette', (
   const defaultTheme = appThemeSheetColors('midnight')
   expect(tokenColor(container, 'Eva')).toBe(theme.tokenEvasion)
   expect(tokenColor(container, 'Arm')).toBe(theme.tokenArmor)
-  expect(tokenColor(container, 'AP')).toBe(theme.apBar)
   expect(tokenColor(container, 'END')).toBe(theme.endBar)
   expect(tokenColor(container, 'FP')).toBe(theme.fpBar)
+  // AP has no token at all any more: the meter under the HP bar carries it
+  // (and colors its own accent from the same app theme).
+  expect(
+    Array.from(container.querySelectorAll('.gm-token__label')).map(
+      (l) => l.textContent,
+    ),
+  ).not.toContain('AP')
   // The app theme really is a different palette from the sheet's defaults, so
   // the assertions above are meaningful rather than coincidental.
   expect(theme.tokenEvasion).not.toBe(defaultTheme.tokenEvasion)
-  expect(theme.apBar).not.toBe(defaultTheme.apBar)
+  expect(theme.endBar).not.toBe(defaultTheme.endBar)
 
   // And none of the sheet's custom colors leaked through.
-  const rendered = ['Eva', 'Arm', 'AP', 'END', 'FP'].map((l) => tokenColor(container, l))
+  const rendered = ['Eva', 'Arm', 'END', 'FP'].map((l) => tokenColor(container, l))
   for (const garish of ['#ff00ff', '#00ff00', '#ff0000', '#0000ff', '#ffff00']) {
     expect(rendered).not.toContain(garish)
   }
@@ -544,7 +556,13 @@ function expandedHeadings(kind: 'character' | 'npc') {
                 label: 'Bandit',
                 density: 'expanded',
                 statuses: [],
-                state: { currentHP: 20, tempHP: 0, condition: 'active' },
+                state: {
+                  currentHP: 20,
+                  tempHP: 0,
+                  condition: 'active',
+                  currentAP: MAX_AP,
+                  cooldowns: [],
+                },
               },
         ],
         createdAt: '2026-01-01T00:00:00.000Z',
@@ -630,15 +648,17 @@ test('expanded player panel shows Slotted Abilities but never the Ability Pool',
 })
 
 
-test('expanded player panel hides the HP bar the panel header already shows', () => {
+test('expanded player panel hides the bars its own chrome already shows', () => {
   const { container } = expandedHeadings('character')
   const labels = Array.from(container.querySelectorAll('.resource-bar__label')).map(
     (l) => l.textContent?.trim(),
   )
+  // HP and AP both live in the panel chrome, directly above the sheet body
+  // (`.gm-hp` / `.gm-ap`), so the body must not print a second copy of either.
   expect(labels).not.toContain('HP')
+  expect(labels).not.toContain('Action Points')
   // The rest of the live-play resources are still there.
   expect(labels).toContain('Fate Points')
-  expect(labels).toContain('Action Points')
   expect(labels).toContain('Endurance')
 })
 
@@ -661,4 +681,638 @@ test('expanded panel attributes keep the shorthand and their full names in the D
       expect(box.querySelector('.attr-box__name')).not.toBeNull()
     }
   }
+})
+
+// ---- NPC live play: Action Points & Recharge --------------------------------
+
+/** A slotted ability for an NPC base, with sensible defaults per test. */
+function makeAbility(
+  overrides: Partial<AbilityBlock> & { id: string; name: string },
+): AbilityBlock {
+  return {
+    traits: [],
+    cost: { ap: 1 },
+    damage: '',
+    description: '',
+    overcharge: '',
+    flavorText: '',
+    isMinor: false,
+    showActivate: true,
+    subAbilitiesUnderDescription: [],
+    subAbilitiesUnderOvercharge: [],
+    ...overrides,
+  }
+}
+
+/** A base NPC carrying the given slotted abilities. */
+function makeBaseWith(abilities: AbilityBlock[], overrides: Partial<Character> = {}) {
+  // The base keeps its OWN live-play AP at 3 so a test can prove the panel
+  // never spends it: the instance owns its turn, the base stays a template.
+  return makeBase({ slottedAbilities: abilities, currentAP: 3, ...overrides })
+}
+
+/**
+ * Render the seeded panel the way GMScreenPage does — subscribed to the screen,
+ * so a store write re-renders it with the fresh panel object.
+ */
+function NpcPanelHarness({ base }: { base: Character }) {
+  const panel = useGMScreenStore((s) =>
+    s.screens.find((screen) => screen.id === SCREEN_ID)?.panels[0],
+  )
+  if (!panel || panel.kind !== 'npc-instance') return null
+  return (
+    <NpcInstancePanel
+      panel={panel}
+      base={base}
+      screenId={SCREEN_ID}
+      subtitle={null}
+      onOpenBase={() => {}}
+      onRemove={() => {}}
+    />
+  )
+}
+
+/** Seed one panel over `base` and render it (expanded unless told otherwise). */
+function renderNpcPanel(base: Character, density: 'compact' | 'expanded' = 'expanded') {
+  seedScreenFor(base)
+  useGMScreenStore.getState().setPanelDensity(SCREEN_ID, PANEL_ID, density)
+  return render(
+    <NotificationProvider>
+      <NpcPanelHarness base={base} />
+    </NotificationProvider>,
+  )
+}
+
+/** The single Activate button on screen (there is one per activatable ability). */
+function activateButtons(): HTMLElement[] {
+  return screen.queryAllByRole('button', { name: 'Activate' })
+}
+
+/** Force the next Recharge Die to land on `value` (1–6). */
+function mockRechargeRoll(value: number) {
+  vi.spyOn(Math, 'random').mockReturnValue((value - 0.5) / 6)
+}
+
+beforeEach(() => {
+  // The recharge turn logs its roll; start every test from an empty log.
+  useRollLogStore.setState({ entries: [], isLoaded: true })
+})
+
+/**
+ * A player character with a known END pool, so an end-of-turn gain is visible.
+ */
+function makePlayer(overrides: Partial<Character> = {}) {
+  return {
+    ...createDefaultCharacter(),
+    id: 'pc-1',
+    name: 'Vex',
+    currentAP: 3,
+    currentEND: 4,
+    attributes: { MAR: 0, POW: 0, AGI: 0, VIT: 0, GRT: 0 },
+    ...overrides,
+  }
+}
+
+/**
+ * Subscribe to BOTH stores like GMScreenPage does — the panel from the screen,
+ * the entity from the character list — so a live-play write re-renders with the
+ * fresh character (a character panel's HP/AP live on the sheet record, not on
+ * the panel).
+ */
+function PlayerPanelHarness({ characterId }: { characterId: string }) {
+  const panel = useGMScreenStore((s) =>
+    s.screens.find((screen) => screen.id === SCREEN_ID)?.panels[0],
+  )
+  const character = useCharacterStore((s) =>
+    s.characters.find((c) => c.id === characterId),
+  )
+  if (!panel || panel.kind !== 'character' || !character) return null
+  return (
+    <CharacterPanel
+      panel={panel}
+      character={character}
+      screenId={SCREEN_ID}
+      onOpenSheet={() => {}}
+      onRemove={() => {}}
+    />
+  )
+}
+
+/** Seed one character panel over `character` and render it. */
+function renderPlayerPanel(
+  character: Character,
+  density: 'compact' | 'expanded' = 'compact',
+) {
+  useCharacterStore.setState({ characters: [character], currentCharacter: null })
+  useGMScreenStore.setState({
+    screens: [
+      {
+        id: SCREEN_ID,
+        name: 'Session 4',
+        panels: [
+          {
+            kind: 'character',
+            id: PANEL_ID,
+            characterId: character.id,
+            density,
+            statuses: [],
+          },
+        ],
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      },
+    ],
+    currentScreenId: SCREEN_ID,
+    isLoaded: true,
+    isSaving: false,
+    loadError: null,
+  })
+  return render(
+    <NotificationProvider>
+      <PlayerPanelHarness characterId={character.id} />
+    </NotificationProvider>,
+  )
+}
+
+/** The character as the store currently holds it. */
+function storedPlayer(id: string) {
+  const character = useCharacterStore.getState().characters.find((c) => c.id === id)
+  if (!character) throw new Error('expected the character to still exist')
+  return character
+}
+
+test('every stat token on both panel kinds leads with an icon', () => {
+  /** The token strip as `{ label, hasIcon }` entries (the pencil is not a token). */
+  const tokens = (container: HTMLElement) =>
+    Array.from(container.querySelectorAll('.gm-token'))
+      .map((token) => ({
+        label: token.querySelector('.gm-token__label')?.textContent ?? null,
+        icon: token.querySelector('svg') != null,
+      }))
+      .filter((token) => token.label != null)
+
+  const player = renderPlayerPanel(makePlayer())
+  // END and FP are the pools with no chrome bar, and both share AP's violet in
+  // most themes — their icons are what tell them apart.
+  expect(tokens(player.container)).toEqual([
+    { label: 'Eva', icon: true },
+    { label: 'Arm', icon: true },
+    { label: 'END', icon: true },
+    { label: 'FP', icon: true },
+  ])
+  player.unmount()
+
+  const npc = renderNpcPanel(makeBase(), 'compact')
+  expect(tokens(npc.container)).toEqual([
+    { label: 'Eva', icon: true },
+    { label: 'Arm', icon: true },
+    { label: 'Move', icon: true },
+    { label: 'DC', icon: true },
+  ])
+})
+
+test('a panel with no AP left dims, keeping its AP block (and the way back) bright', () => {
+  const pc = makePlayer()
+  const player = renderPlayerPanel(pc)
+  const panelEl = () => player.container.querySelector('.gm-panel')
+
+  // A full turn: nothing is dimmed.
+  expect(panelEl()).not.toHaveClass('gm-panel--no-ap')
+
+  // Spent: the panel takes the dim class, and the AP block that holds the `+`
+  // stepper and the turn button is NOT one of the regions it dims.
+  act(() => {
+    useCharacterStore.getState().spendAP(pc.id, 3)
+  })
+  expect(panelEl()).toHaveClass('gm-panel--no-ap')
+  expect(panelEl()!.querySelector('.gm-panel--no-ap .gm-ap')).not.toBeNull()
+  expect(panelEl()!.querySelectorAll('.gm-panel--no-ap .gm-hp')).toHaveLength(1)
+  expect(player.container.querySelector('.gm-panel--no-ap .gm-tokens')).not.toBeNull()
+  // Still interactive — dimming is a coat of paint, never `pointer-events`.
+  expect(screen.getByRole('button', { name: 'Start new turn' })).toBeEnabled()
+  expect(screen.getByRole('button', { name: 'Deal 1 damage to Vex' })).toBeEnabled()
+
+  // Handing AP back by hand clears the whole state.
+  act(() => {
+    useCharacterStore.getState().restoreAP(pc.id, 1)
+  })
+  expect(panelEl()).not.toHaveClass('gm-panel--no-ap')
+  player.unmount()
+
+  // Same rule on an NPC instance panel.
+  const npc = renderNpcPanel(makeBase(), 'compact')
+  const npcPanel = () => npc.container.querySelector('.gm-panel')
+  expect(npcPanel()).not.toHaveClass('gm-panel--no-ap')
+  act(() => {
+    useGMScreenStore.getState().spendInstanceAP(SCREEN_ID, PANEL_ID, 3)
+  })
+  expect(npcPanel()).toHaveClass('gm-panel--no-ap')
+  expect(screen.getByRole('button', { name: 'Start new turn' })).toBeEnabled()
+})
+
+test('player panel: the AP meter sits under the HP bar, matching an NPC panel', () => {
+  const pc = makePlayer()
+  const { container } = renderPlayerPanel(pc)
+
+  const hp = container.querySelector('.gm-hp')
+  const ap = container.querySelector('.gm-ap')
+  expect(hp).not.toBeNull()
+  expect(ap).not.toBeNull()
+  // Directly below the HP bar, in the panel chrome (not inside the sheet body,
+  // which is collapsed by default and would hide it).
+  expect(hp!.compareDocumentPosition(ap!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  expect(container.querySelector('.gm-panel__sheet .gm-ap')).toBeNull()
+
+  expect(ap!.querySelector('.gm-bar__label')?.textContent).toBe('Action Points')
+  expect(ap!.querySelector('.gm-bar__value')?.textContent).toContain('3')
+
+  // Same `[−] track [+]` row and the same stepper control as an NPC panel.
+  const controls = Array.from(ap!.querySelector('.gm-bar__controls')!.children)
+  expect(controls[0]).toHaveClass('gm-step')
+  expect(controls[1]).toHaveClass('gm-ap__track')
+  expect(controls[2]).toHaveClass('gm-step')
+  // No Recharge cooldown pill: players do not track Recharge.
+  expect(ap!.querySelector('.gm-ap__cooling')).toBeNull()
+
+  fireEvent.click(screen.getByRole('button', { name: 'Spend Action Points' }))
+  expect(storedPlayer(pc.id).currentAP).toBe(2)
+  fireEvent.click(screen.getByRole('button', { name: 'Restore Action Points' }))
+  expect(storedPlayer(pc.id).currentAP).toBe(3)
+})
+
+test('player panel: at 0 AP the turn button runs the sheet’s End Turn', () => {
+  const pc = makePlayer()
+  renderPlayerPanel(pc)
+
+  expect(screen.queryByRole('button', { name: 'Start new turn' })).toBeNull()
+
+  fireEvent.click(screen.getByRole('button', { name: 'Spend Action Points' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Spend Action Points' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Spend Action Points' }))
+  expect(storedPlayer(pc.id).currentAP).toBe(0)
+
+  const turn = screen.getByRole('button', { name: 'Start new turn' })
+  fireEvent.click(turn)
+
+  // Identical to the sheet's End Turn: AP refilled, END Recovery applied
+  // (GRT 0 → 1 END), and the GM told about it.
+  expect(storedPlayer(pc.id).currentAP).toBe(3)
+  expect(storedPlayer(pc.id).currentEND).toBe(5)
+  expect(
+    screen.getByText("Vex's turn — AP restored · +1 END"),
+  ).toBeInTheDocument()
+})
+
+test('player panel: the menu can end the turn early, like an NPC panel', () => {
+  const pc = makePlayer({ currentAP: 2, currentEND: 9 })
+  renderPlayerPanel(pc)
+
+  fireEvent.click(screen.getByRole('button', { name: 'Vex options' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Start new turn' }))
+
+  // Unspent AP converts to END 1:1 (9 + 2), plus 1 END Recovery, capped at 10.
+  expect(storedPlayer(pc.id).currentAP).toBe(3)
+  expect(storedPlayer(pc.id).currentEND).toBe(10)
+})
+
+test('NPC panel: each instance carries a 3 AP turn meter with steppers', () => {
+  const base = makeBase({ currentAP: 3 })
+  const { container } = renderNpcPanel(base, 'compact')
+
+  const meter = container.querySelector('.gm-ap')
+  expect(meter?.querySelector('.gm-bar__label')?.textContent).toBe(
+    'Action Points',
+  )
+  expect(meter?.querySelector('.gm-bar__value')?.textContent).toContain('3')
+
+  fireEvent.click(screen.getByRole('button', { name: 'Spend Action Points' }))
+  expect(panelState().currentAP).toBe(2)
+  fireEvent.click(screen.getByRole('button', { name: 'Restore Action Points' }))
+  expect(panelState().currentAP).toBe(3)
+
+  // The base record's own AP is a different thing entirely and never moves.
+  expect(base.currentAP).toBe(3)
+})
+
+test('NPC panel: the HP and AP bars are the same bar, steppers and all', () => {
+  const base = makeBase()
+  const { container } = renderNpcPanel(base, 'compact')
+
+  /** The bar's `[−][track][+]` triple, in DOM order. */
+  const controlsOf = (selector: string) => {
+    const block = container.querySelector(selector)
+    expect(block, selector).not.toBeNull()
+    const children = Array.from(
+      block!.querySelector('.gm-bar__controls')!.children,
+    )
+    return {
+      spend: children[0] as HTMLElement,
+      track: children[1] as HTMLElement,
+      restore: children[2] as HTMLElement,
+    }
+  }
+  const hp = controlsOf('.gm-hp')
+  const ap = controlsOf('.gm-ap')
+
+  for (const [kind, bar] of Object.entries({ hp, ap })) {
+    // − left of the track, + right of it — the same order on both bars.
+    expect(bar.spend.tagName, kind).toBe('BUTTON')
+    expect(bar.track.className, kind).toMatch(/_+track/)
+    expect(bar.restore.tagName, kind).toBe('BUTTON')
+    expect(bar.spend.className).toContain('gm-step')
+    expect(bar.restore.className).toContain('gm-step')
+    // Vector glyphs, never typed "+"/"−": a text glyph's ink sits wherever the
+    // font puts it and was visibly off-centre in the old AP steppers.
+    expect(bar.spend.querySelector('svg'), `${kind} spend`).not.toBeNull()
+    expect(bar.restore.querySelector('svg'), `${kind} restore`).not.toBeNull()
+  }
+
+  // Identical icons on both bars: same component, same glyph.
+  const glyph = (el: HTMLElement) => el.querySelector('svg')!.outerHTML
+  expect(glyph(ap.spend)).toBe(glyph(hp.spend))
+  expect(glyph(ap.restore)).toBe(glyph(hp.restore))
+
+  // Every stepper disables at its own end of its pool, on both bars: HP is
+  // full (nothing to heal), AP is full (nothing to restore).
+  expect(hp.spend).toBeEnabled()
+  expect(hp.restore).toBeDisabled()
+  expect(ap.spend).toBeEnabled()
+  expect(ap.restore).toBeDisabled()
+
+  act(() => {
+    useGMScreenStore.getState().spendInstanceAP(SCREEN_ID, PANEL_ID, 3)
+    useGMScreenStore.getState().adjustInstanceHP(SCREEN_ID, PANEL_ID, -20)
+  })
+  expect(ap.spend).toBeDisabled()
+  expect(ap.restore).toBeEnabled()
+  expect(hp.spend).toBeDisabled()
+  expect(hp.restore).toBeEnabled()
+})
+
+test('NPC panel: every ability with a cost gets a working Activate button', () => {
+  const base = makeBaseWith([
+    makeAbility({ id: 'a1', name: 'Cleave', cost: { ap: 2 } }),
+    makeAbility({ id: 'a2', name: 'Shrug Off', cost: {} }),
+  ])
+  renderNpcPanel(base)
+
+  // Only the costed ability is activatable; the free one stays a reference card.
+  expect(activateButtons()).toHaveLength(1)
+
+  fireEvent.click(activateButtons()[0])
+  // AP comes off the INSTANCE (2 of its 3), never off the base record.
+  expect(panelState().currentAP).toBe(1)
+  expect(base.currentAP).toBe(3)
+  expect(screen.getByText(/Activated Cleave/)).toBeInTheDocument()
+})
+
+test('NPC panel: the Activate button is automatic — showActivate does not gate it', () => {
+  const base = makeBaseWith([
+    makeAbility({ id: 'a1', name: 'Cleave', cost: { ap: 1 }, showActivate: false }),
+  ])
+  renderNpcPanel(base)
+
+  // The flag is not even offered in the NPC editor, and a GM panel activates
+  // every ability that costs something.
+  expect(activateButtons()).toHaveLength(1)
+  fireEvent.click(activateButtons()[0])
+  expect(panelState().currentAP).toBe(2)
+})
+
+test('NPC panel: a cost-free Recharge ability still activates (it can cool down)', () => {
+  const base = makeBaseWith([
+    makeAbility({ id: 'a1', name: 'Howl', cost: {}, traits: ['Recharge (3)'] }),
+  ])
+  renderNpcPanel(base)
+
+  expect(activateButtons()).toHaveLength(1)
+  fireEvent.click(activateButtons()[0])
+  // Nothing to spend, but the cooldown is the point.
+  expect(panelState().currentAP).toBe(3)
+  expect(panelState().cooldowns).toEqual(['a1'])
+  expect(screen.getByText('On cooldown — Recharge 3')).toBeInTheDocument()
+})
+
+test('NPC panel: the collapsed panel shows how many abilities are cooling', () => {
+  const base = makeBaseWith([
+    makeAbility({ id: 'a1', name: 'Fire Breath', traits: ['Recharge (5)'] }),
+    makeAbility({ id: 'a2', name: 'Bite', traits: ['Recharge (2)'] }),
+  ])
+  renderNpcPanel(base, 'compact')
+  expect(screen.queryByText(/on cooldown/)).toBeNull()
+
+  act(() => {
+    const store = useGMScreenStore.getState()
+    store.markAbilityCooldown(SCREEN_ID, PANEL_ID, 'a1')
+    store.markAbilityCooldown(SCREEN_ID, PANEL_ID, 'a2')
+  })
+
+  expect(screen.getByText('2 on cooldown')).toBeInTheDocument()
+})
+
+test('NPC panel: the Recharge badge replaces the trait chip instead of duplicating it', () => {
+  const base = makeBaseWith([
+    makeAbility({
+      id: 'a1',
+      name: 'High-Impact Rounds',
+      traits: ['Action', 'Range (12)', 'Recharge (4)'],
+    }),
+  ])
+  const { container } = renderNpcPanel(base)
+
+  // The authored chip is replaced in place: its slot now carries the live
+  // badge, under the ability name, with no second "Recharge 4" anywhere.
+  const chips = Array.from(
+    container.querySelectorAll('.ability-card__trait'),
+  ).map((chip) => chip.textContent)
+  expect(chips).toEqual(['Action', 'Range (12)', 'Recharge 4'])
+  expect(
+    container.querySelectorAll('.ability-card__head .gm-recharge'),
+  ).toHaveLength(1)
+  expect(screen.getAllByText('Recharge 4')).toHaveLength(1)
+  // …and nothing sits between the card and its Activate button.
+  expect(container.querySelector('.ability-activation > .gm-recharge')).toBeNull()
+
+  // Cooling state reads through the same chip, which also carries the state
+  // class the stylesheet tints.
+  fireEvent.click(activateButtons()[0])
+  const cooling = container.querySelector('.ability-card__trait .gm-recharge')
+  expect(cooling).toHaveClass('gm-recharge--cooling')
+  expect(cooling?.textContent).toBe('On cooldown — Recharge 4')
+})
+
+test('NPC panel: a Recharge sub-ability badges its own trait chip', () => {
+  const base = makeBaseWith([
+    makeAbility({
+      id: 'a1',
+      name: 'Storm Call',
+      cost: {},
+      subAbilitiesUnderDescription: [
+        makeAbility({
+          id: 'sub',
+          name: 'Lightning Lash',
+          cost: { ap: 1 },
+          traits: ['Recharge (2)'],
+        }),
+      ],
+    }),
+  ])
+  const { container } = renderNpcPanel(base)
+
+  const chip = container.querySelector('.sub-ability-block__trait')
+  expect(chip?.textContent).toBe('Recharge 2')
+  expect(chip?.querySelector('.gm-recharge')).not.toBeNull()
+})
+
+test('NPC panel: a limited ability is refused once its uses run out', () => {
+  const base = makeBaseWith([
+    makeAbility({
+      id: 'a1',
+      name: 'Cleave',
+      cost: { ap: 1 },
+      uses: { max: 1, current: 0, expendOnActivate: true },
+    }),
+  ])
+  renderNpcPanel(base)
+
+  const button = activateButtons()[0]
+  expect(button).toBeDisabled()
+  expect(button).toHaveAttribute('title', expect.stringContaining('No uses'))
+  expect(panelState().currentAP).toBe(3)
+})
+
+test('NPC panel: a Recharge ability cools down when used and is disabled', () => {
+  const base = makeBaseWith([
+    makeAbility({ id: 'a1', name: 'Fire Breath', traits: ['Action', 'Recharge (5)'] }),
+  ])
+  renderNpcPanel(base)
+
+  // Idle: the badge warns that using it starts a cooldown.
+  expect(screen.getByText('Recharge 5')).toBeInTheDocument()
+
+  fireEvent.click(activateButtons()[0])
+
+  expect(panelState().cooldowns).toEqual(['a1'])
+  expect(screen.getByText('On cooldown — Recharge 5')).toBeInTheDocument()
+  expect(activateButtons()[0]).toBeDisabled()
+  expect(screen.getByText(/Activated Fire Breath.*on cooldown/)).toBeInTheDocument()
+})
+
+test('NPC panel: an ability without the trait never goes on cooldown', () => {
+  const base = makeBaseWith([makeAbility({ id: 'a1', name: 'Cleave' })])
+  renderNpcPanel(base)
+
+  fireEvent.click(activateButtons()[0])
+
+  expect(panelState().cooldowns).toEqual([])
+  expect(document.querySelector('.gm-recharge')).toBeNull()
+})
+
+test('NPC panel: sub-abilities with a cost activate too', () => {
+  const base = makeBaseWith([
+    makeAbility({
+      id: 'a1',
+      name: 'Storm Call',
+      cost: {},
+      subAbilitiesUnderDescription: [
+        makeAbility({ id: 'sub', name: 'Lightning Lash', cost: { ap: 1 } }),
+      ],
+    }),
+  ])
+  renderNpcPanel(base)
+
+  // The parent has no cost (no button); its sub-ability does.
+  expect(activateButtons()).toHaveLength(1)
+  fireEvent.click(activateButtons()[0])
+  expect(panelState().currentAP).toBe(2)
+  expect(screen.getByText(/Activated Lightning Lash/)).toBeInTheDocument()
+})
+
+test('NPC panel: the turn button appears only once AP reaches 0', () => {
+  const base = makeBase()
+  renderNpcPanel(base, 'compact')
+
+  expect(screen.queryByRole('button', { name: /Start new turn/ })).toBeNull()
+
+  act(() => {
+    useGMScreenStore.getState().spendInstanceAP(SCREEN_ID, PANEL_ID, 3)
+  })
+  expect(screen.getByRole('button', { name: /Start new turn/ })).toBeInTheDocument()
+})
+
+test('NPC panel: starting a new turn refills AP, rolls the Recharge Die, notifies and logs', () => {
+  const base = makeBaseWith([
+    makeAbility({ id: 'a1', name: 'Fire Breath', traits: ['Recharge (5)'] }),
+    makeAbility({ id: 'a2', name: 'Bite', traits: ['Recharge (2)'] }),
+  ])
+  renderNpcPanel(base, 'compact')
+
+  // Both used, and the turn's AP spent: the NPC's turn is over.
+  act(() => {
+    const store = useGMScreenStore.getState()
+    store.spendInstanceAP(SCREEN_ID, PANEL_ID, 3)
+    store.markAbilityCooldown(SCREEN_ID, PANEL_ID, 'a1')
+    store.markAbilityCooldown(SCREEN_ID, PANEL_ID, 'a2')
+  })
+
+  mockRechargeRoll(5)
+  fireEvent.click(screen.getByRole('button', { name: /Start new turn/ }))
+
+  // AP is back to a full turn, and only the abilities the roll covered returned.
+  expect(panelState().currentAP).toBe(3)
+  expect(panelState().cooldowns).toEqual([])
+  expect(
+    screen.getByText("Bandit's turn — Recharge Die: 5 · recharged: Fire Breath, Bite"),
+  ).toBeInTheDocument()
+
+  // The roll is in the persistent log, tagged with the instance and its turn.
+  const entries = useRollLogStore.getState().entries
+  expect(entries).toHaveLength(1)
+  expect(entries[0]).toMatchObject({
+    notation: '1d6',
+    characterId: base.id,
+    characterName: 'Bandit',
+    source: {
+      type: 'recharge',
+      npcName: 'Bandit',
+      recharged: ['Fire Breath', 'Bite'],
+    },
+  })
+  expect(entries[0].result.total).toBe(5)
+})
+
+test('NPC panel: a low Recharge Die leaves high-value abilities cooling', () => {
+  const base = makeBaseWith([
+    makeAbility({ id: 'a1', name: 'Fire Breath', traits: ['Recharge (5)'] }),
+    makeAbility({ id: 'a2', name: 'Bite', traits: ['Recharge (2)'] }),
+  ])
+  renderNpcPanel(base, 'compact')
+  act(() => {
+    const store = useGMScreenStore.getState()
+    store.spendInstanceAP(SCREEN_ID, PANEL_ID, 3)
+    store.markAbilityCooldown(SCREEN_ID, PANEL_ID, 'a1')
+    store.markAbilityCooldown(SCREEN_ID, PANEL_ID, 'a2')
+  })
+
+  mockRechargeRoll(2)
+  fireEvent.click(screen.getByRole('button', { name: /Start new turn/ }))
+
+  expect(panelState().cooldowns).toEqual(['a1'])
+  expect(
+    screen.getByText("Bandit's turn — Recharge Die: 2 · recharged: Bite"),
+  ).toBeInTheDocument()
+})
+
+test('NPC panel: the panel menu can start a turn early', () => {
+  const base = makeBase()
+  renderNpcPanel(base, 'compact')
+  act(() => {
+    useGMScreenStore.getState().spendInstanceAP(SCREEN_ID, PANEL_ID, 2)
+  })
+
+  fireEvent.click(screen.getByRole('button', { name: /Bandit options/ }))
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Start new turn' }))
+
+  expect(panelState().currentAP).toBe(3)
+  expect(useRollLogStore.getState().entries).toHaveLength(1)
 })

@@ -19,6 +19,13 @@
  *
  * NPCs have no death saves, so `downed` is set automatically when damage drives
  * `currentHP` to 0; `dead` is a GM-set flag applied from the panel menu.
+ *
+ * The instance also owns its **live play** resources: Action Points (3 per
+ * turn, exactly like a player's sheet) and the Recharge cooldowns of its
+ * abilities. Both live here rather than on the base record because they are
+ * per-instance: three spawned Bandits each spend their own AP, and nothing a GM
+ * does at the table may leak into the standalone NPC sheet, which stays a static
+ * reference.
  */
 export interface NpcInstanceState {
   /** Current HP. Spawned at the base's `npcStats.hp`. */
@@ -30,6 +37,20 @@ export interface NpcInstanceState {
    * currentHP to 0 (NPCs have no death saves). `dead` is a GM-set flag.
    */
   condition: 'active' | 'downed' | 'dead'
+  /**
+   * Action Points left this turn. Spawned at `MAX_AP` (3) and reset to it by
+   * "Start new turn"; activating an ability through the panel spends it.
+   */
+  currentAP: number
+  /**
+   * Ids of the base record's abilities currently on **Recharge** cooldown, in
+   * the order they were used. Read against the base's traits at roll time (see
+   * lib/abilityRecharge.ts): the start of the instance's next turn rolls one
+   * Recharge Die and clears every id whose value is ≤ the roll, so a stored id
+   * whose ability was deleted or lost its trait is dropped rather than kept
+   * cooling forever.
+   */
+  cooldowns: string[]
 }
 
 /** How much detail a panel renders: a glance-height card, or the full sheet. */

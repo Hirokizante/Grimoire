@@ -18,6 +18,19 @@ export type RollSource =
   | { type: 'skill-check'; skillName: string }
   | { type: 'attribute-check'; attributeKey: string; attributeName: string }
   | { type: 'attack'; abilityName?: string }
+  | {
+      /**
+       * The Recharge Die rolled at the start of an NPC instance's turn on the
+       * GM Screen. The roll's own value is the entry's `result.total`; the
+       * names here are what it brought off cooldown, so the log keeps the
+       * rules context of the roll.
+       */
+      type: 'recharge'
+      /** Instance label the turn belonged to (e.g. "Bandit 2"). */
+      npcName: string
+      /** Names of the abilities this roll recharged (empty when none). */
+      recharged: string[]
+    }
   | { type: 'manual'; note?: string }
 
 /**

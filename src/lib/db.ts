@@ -13,7 +13,7 @@
 import type { AbilityBlock, AbilityCost, Character, CharacterViewModes, GMScreen, NPCStats, NpcInstanceState, PanelStatus, ScreenPanel, SheetColors, SheetLabel, StatusCondition, VersionSnapshot } from '@/types'
 import { createDefaultStatuses } from '@/constants/statuses'
 import { MAX_PANEL_STATUS_STACKS, isPanelStatusDuration } from '@/constants/statusDurations'
-import { DEFAULT_SHEET_COLORS, generateId } from '@/constants/gameData'
+import { DEFAULT_SHEET_COLORS, MAX_AP, generateId } from '@/constants/gameData'
 import { normalizeModifiers } from '@/lib/abilityModifiers'
 import { normalizeAbilityUses } from '@/lib/abilityUses'
 
@@ -875,6 +875,23 @@ export function normalizeScreen(raw: GMScreen): GMScreen {
         rawState.condition === 'downed' || rawState.condition === 'dead'
           ? rawState.condition
           : 'active'
+      // Live-play fields added with NPC AP + Recharge tracking. Screens written
+      // before they existed simply have no `currentAP`/`cooldowns`, which
+      // backfills to a full turn with nothing cooling.
+      const currentAP =
+        typeof rawState.currentAP === 'number' && Number.isFinite(rawState.currentAP)
+          ? Math.min(MAX_AP, Math.max(0, Math.round(rawState.currentAP)))
+          : MAX_AP
+      const cooldowns = Array.isArray(rawState.cooldowns)
+        ? [
+            ...new Set(
+              rawState.cooldowns.filter(
+                (abilityId): abilityId is string =>
+                  typeof abilityId === 'string' && abilityId !== '',
+              ),
+            ),
+          ]
+        : []
       panels.push({
         kind: 'npc-instance',
         id,
@@ -882,7 +899,13 @@ export function normalizeScreen(raw: GMScreen): GMScreen {
         label: typeof p.label === 'string' ? p.label : '',
         density,
         statuses,
-        state: { currentHP: Math.max(0, currentHP), tempHP, condition },
+        state: {
+          currentHP: Math.max(0, currentHP),
+          tempHP,
+          condition,
+          currentAP,
+          cooldowns,
+        },
       })
       continue
     }

@@ -238,6 +238,40 @@
   padding-bottom: 1rem;
 }
 
+/* Out of Action Points: the entity has no actions left this turn, so its
+   content recedes — header, HP bar, tokens and the expanded sheet body. Purely
+   a dim: opacity, never `filter` or `pointer-events`, so every control in the
+   panel keeps working (the GM can still damage, heal, add a status, activate
+   nothing — and, crucially, hand AP back with the AP row's `+`).
+
+   The AP block itself is deliberately NOT dimmed. It is where both ways out of
+   this state live (the manual `+` stepper and the Start new turn button), and
+   its "0/3" is the explanation for why everything else went quiet. The
+   transition lives on the base rules so the panel also animates back to full
+   strength the moment AP returns.
+
+   `.gm-panel__expand` is deliberately NOT in the transition list below. It
+   already declares its own `transition` (grid-template-rows + opacity, see the
+   PanelExpand section at the end of this file), and the `transition` shorthand
+   here would REPLACE that list rather than add to it — which is exactly how the
+   panel expand/collapse animation got flattened into a snap. It needs nothing
+   added anyway: fading its body is already part of its own transition, and the
+   rule below only moves the opacity it animates to. */
+.gm-panel .gm-panel__header,
+.gm-panel .gm-hp,
+.gm-panel .gm-tokens,
+.gm-panel .gm-panel__rename {
+  transition: opacity 0.2s ease;
+}
+
+.gm-panel--no-ap .gm-panel__header,
+.gm-panel--no-ap .gm-hp,
+.gm-panel--no-ap .gm-tokens,
+.gm-panel--no-ap .gm-panel__rename,
+.gm-panel--no-ap .gm-panel__expand {
+  opacity: 0.55;
+}
+
 .gm-panel--downed {
   border-color: color-mix(in srgb, var(--danger) 45%, var(--border));
 }
@@ -436,21 +470,38 @@
   font-style: italic;
 }
 
-/* ---- HP bar -------------------------------------------------------------- */
+/* ---- Resource bars (HP + NPC Action Points) ------------------------------ */
 
-.gm-hp {
+/* Every live-play bar in a panel is the same three parts: a label row, a
+   `[−][track][+]` control row, and the square steppers. HP and an NPC
+   instance's AP share these classes so the two can never drift apart again:
+   the HP steppers used to be text glyphs on a second row under the bar while
+   the AP meter used the sheet's `.resource-bar__btn` beside it, which read as
+   two different controls stacked on one card. */
+
+.gm-hp,
+.gm-ap {
   display: flex;
   flex-direction: column;
   gap: 0.3rem;
 }
 
-.gm-hp__row {
+.gm-hp__row,
+.gm-ap__row {
   display: flex;
-  /* Never wraps: the status strip scrolls instead (see `.gm-statuses`). */
-  flex-wrap: nowrap;
   align-items: center;
   gap: 0.35rem;
   font-size: 0.8rem;
+}
+
+/* The status strip scrolls instead of wrapping, so the HP row never wraps. */
+.gm-hp__row {
+  flex-wrap: nowrap;
+}
+
+/* The AP row has no such strip and may wrap its cooldown pill on a phone. */
+.gm-ap__row {
+  flex-wrap: wrap;
 }
 
 .gm-hp__icon {
@@ -458,25 +509,43 @@
   flex: 0 0 auto;
 }
 
-.gm-hp__label {
+/* The AP accent is set inline from the panel's `themeVars` (like the stat
+   tokens' `--token-color`): the app themes only publish `--hp-bar-color` as a
+   global chrome variable, so the CSS var would otherwise always fall back. */
+.gm-ap__icon {
+  flex: 0 0 auto;
+}
+
+.gm-bar__label {
   color: var(--text-secondary);
   letter-spacing: 0.05em;
   font-size: 0.72rem;
   text-transform: uppercase;
 }
 
-.gm-hp__value {
-  /* The HP number is the panel's anchor: shrink the status strip, never this. */
+/* The bar's number is the panel's anchor: shrink anything else, never this. */
+.gm-bar__value {
   flex: 0 0 auto;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
   font-weight: 600;
 }
 
-.gm-hp__max {
+.gm-bar__max {
   color: var(--text-muted);
   font-weight: 400;
   font-size: 0.78rem;
+}
+
+/* `−` [track] `+` [row action] — the steppers sit in line with the bar they
+   change, on both bars, and the action button (Damage… / Start new turn) keeps
+   its right edge. Wraps rather than squeezing the track to nothing on a phone,
+   which drops the action button onto its own line still pinned right. */
+.gm-bar__controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem;
 }
 
 .gm-hp__temp {
@@ -489,6 +558,8 @@
 }
 
 .gm-hp__track {
+  flex: 1 1 6rem;
+  min-width: 0;
   height: 8px;
   border-radius: 999px;
   background: var(--bg-surface-raised);
@@ -504,33 +575,139 @@
   transition: width 0.2s ease;
 }
 
-.gm-hp__controls {
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
+/* The AP track is the sheet's own `SegmentedBar` (three discrete AP), so only
+   its sizing is panel business: same 8px height as the HP track, and the
+   component's own label/value head is suppressed because the row above
+   carries them. */
+.gm-ap__track {
+  flex: 1 1 6rem;
+  min-width: 0;
 }
 
-/* The global button reset zeroes padding, and a bare text glyph in a fixed box
-   sits high/left depending on the font. Flex centring handles that — but
-   `line-height: 1` must NOT be set here: it clips the glyph's em box to the
-   font size, which for "+"/U+2212 sits above the box centre in most UI fonts
-   and leaves the symbol visibly high. */
-.gm-hp__step {
+.gm-ap__track .seg-bar__head {
+  display: none;
+}
+
+.gm-ap__track .seg-bar__track,
+.gm-ap__track .seg-bar__track--empty {
+  height: 8px;
+}
+
+/* The −/+ stepper itself: one square, one vector glyph, dead centre. A vector
+   icon cannot sit high the way a typed "+"/"−" does, and `line-height` is left
+   alone so nothing clips the glyph's box. */
+.gm-panel .gm-step {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex: 0 0 auto;
   width: 1.75rem;
   height: 1.75rem;
   padding: 0;
-  font-size: 1rem;
   background: var(--bg-surface-raised);
   color: var(--text-primary);
+}
+
+.gm-panel .gm-step svg {
+  display: block;
+}
+
+.gm-panel .gm-step:hover:not(:disabled) {
+  background: var(--bg-surface-hover);
+}
+
+/* Disabled keeps its BOX and only quiets its glyph: fading the whole button
+   (the sheet's `.resource-bar__btn` does) erased the square entirely at 0 AP,
+   so the row looked like it was missing a control instead of showing an
+   unavailable one. */
+.gm-panel .gm-step:disabled {
+  background: color-mix(in srgb, var(--bg-surface-raised) 55%, transparent);
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+
+.gm-panel .gm-step:disabled svg {
+  opacity: 0.55;
 }
 
 .gm-hp__damage {
   margin-left: auto;
   padding: 0.3rem 0.6rem;
   font-size: 0.78rem;
+}
+
+/* ---- Action Points (NPC instances) --------------------------------------- */
+
+/* The turn button exists only while AP is 0: an NPC still holding Action Points
+   has not finished its turn. It is the one control that rolls the Recharge Die,
+   so it is a filled (not ghost) button. */
+.gm-ap__turn {
+  margin-left: auto;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.6rem;
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+/* The collapsed panel's cooldown count, in the AP label row. */
+.gm-ap__cooling {
+  --recharge-tone: var(--accent-blush);
+  margin-left: auto;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--recharge-tone) 45%, transparent);
+  background: color-mix(in srgb, var(--recharge-tone) 14%, transparent);
+  color: var(--text-primary);
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.gm-ap__cooling svg {
+  flex: 0 0 auto;
+  color: var(--recharge-tone);
+}
+
+/* ---- Recharge badge (NPC abilities) -------------------------------------- */
+
+/* The live state of an ability's Recharge trait: it replaces the trait chip's
+   authored text rather than being printed a second time below the card, so it
+   is only the chip's *content* — the chip itself (`.ability-card__trait` /
+   `.sub-ability-block__trait`, styled in sheet.css) still supplies the pill.
+   Idle it reads like any other trait ("Recharge 4") with an hourglass marking
+   it as tracked; while cooling it says so and tints its own chip. */
+.gm-recharge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+}
+
+.gm-recharge svg {
+  flex: 0 0 auto;
+}
+
+.gm-recharge--cooling {
+  color: var(--accent-blush);
+  font-weight: 600;
+}
+
+/* Tint the chip while its ability is unavailable. `:has()` deliberately keeps
+   the state on the chip (the thing with the pill styling) without the card
+   having to know what a Recharge badge is; scoped to panel sheets because the
+   badge only ever exists inside a GM panel's ability list. */
+.gm-panel__sheet .ability-card__trait:has(.gm-recharge--cooling),
+.gm-panel__sheet .sub-ability-block__trait:has(.gm-recharge--cooling) {
+  background: color-mix(in srgb, var(--accent-blush) 18%, transparent);
+  border-color: color-mix(in srgb, var(--accent-blush) 45%, transparent);
+  color: var(--text-primary);
 }
 
 /* ---- Tracked statuses (GM Screen only) ----------------------------------- */
@@ -744,7 +921,11 @@ button.gm-status-pill__main:hover {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .gm-panel__expand {
+  .gm-panel__expand,
+  .gm-panel .gm-panel__header,
+  .gm-panel .gm-hp,
+  .gm-panel .gm-tokens,
+  .gm-panel .gm-panel__rename {
     transition: none;
   }
 }

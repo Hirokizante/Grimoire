@@ -3,28 +3,37 @@
  *
  * The instance is a **delta, not a clone**: stats, abilities, portrait, and
  * description all come from the base record at render time, and only live
- * state (HP, temp HP, condition) plus the display label belong to the panel.
- * Spawning "Bandit" three times therefore gives three independent HP pools
+ * state (HP, temp HP, condition, **Action Points, Recharge cooldowns**) plus
+ * the display label belong to the panel. Spawning "Bandit" three times
+ * therefore gives three independent HP pools *and* three independent turns
  * over one shared statblock, and editing the base updates every instance.
  *
  * - **Compact** (default): portrait, instance label (+ base name when it
  *   differs), HP bar with −/+/damage affordances, temp HP, the GM's tracked
- *   status pills inline with the HP number, key tokens from the base, and a
- *   condition badge. Downed/dead instances dim and strike through the label.
- * - **Expanded**: the full `NPCSheet` for the base record, with the instance
- *   HP bar kept above it. Edits inside the panel edit the **base**, which is
- *   shared by every instance — the intended semantic, flagged by an inline
- *   hint.
+ *   status pills inline with the HP number, the instance's **Action Point
+ *   meter** (3 per turn, the same meter player sheets use), key tokens from the
+ *   base, and a condition badge. Downed/dead instances dim and strike through
+ *   the label.
+ * - **Expanded**: the shared condensed `PanelSheet` for the base record, with
+ *   the instance HP bar and AP meter kept above it. Its abilities are live:
+ *   every ability with a cost activates against the instance's AP, Recharge
+ *   abilities go on cooldown when used, and "Start new turn" (offered once AP
+ *   hits 0) refills AP and rolls the Recharge Die. Edits inside the panel edit
+ *   the **base**, which is shared by every instance — the intended semantic,
+ *   flagged by an inline hint.
  */
 
 import { useState } from 'react'
-import { HeartPulse, Shield, Skull, Swords, Target, Wind } from 'lucide-react'
+import { Hourglass, Pencil, Shield, Skull, Swords, Target, Wind } from 'lucide-react'
 
 import DamageDialog from '@/components/sheet/DamageDialog'
+import PanelApBar from '@/components/gmscreen/PanelApBar'
 import PanelExpand from '@/components/gmscreen/PanelExpand'
+import PanelHpBar from '@/components/gmscreen/PanelHpBar'
 import PanelSheet from '@/components/gmscreen/PanelSheet'
 import PanelHeader, { type PanelMenuItem } from '@/components/gmscreen/PanelHeader'
 import PanelStatuses from '@/components/gmscreen/PanelStatuses'
+import { useNpcInstanceActivation } from '@/hooks/useNpcInstanceActivation'
 import { useGMScreenStore } from '@/store/gmScreenStore'
 import { appThemeColorVars } from '@/lib/themeUtils'
 import { useAppThemeStore } from '@/store/appThemeStore'
@@ -60,10 +69,20 @@ export default function NpcInstancePanel({
   const renameInstance = useGMScreenStore((s) => s.renameInstance)
   const setInstanceCondition = useGMScreenStore((s) => s.setInstanceCondition)
   const adjustInstanceHP = useGMScreenStore((s) => s.adjustInstanceHP)
+  const spendInstanceAP = useGMScreenStore((s) => s.spendInstanceAP)
+  const restoreInstanceAP = useGMScreenStore((s) => s.restoreInstanceAP)
   const appTheme = useAppThemeStore((s) => s.theme)
   // Panel-chrome colors — the app theme's palette, matching CharacterPanel and
   // deliberately independent of any sheet's customization.
   const themeVars = appThemeColorVars(appTheme)
+
+  // Live-play wiring for this instance: its own AP, its own Recharge
+  // cooldowns, its own turn. Everything the base record owns stays untouched.
+  const { activation, startTurn, hasCooldowns } = useNpcInstanceActivation(
+    screenId,
+    panel,
+    base,
+  )
 
   const [showDamage, setShowDamage] = useState(false)
   const [renaming, setRenaming] = useState(false)
@@ -74,13 +93,20 @@ export default function NpcInstancePanel({
   const movement = base.npcStats?.movement ?? 0
   const saveDC = base.npcStats?.saveDC ?? 0
   const hp = Math.max(0, panel.state.currentHP)
+  const ap = panel.state.currentAP
   const { condition } = panel.state
   const impaired = condition !== 'active'
+  // Out of AP = out of actions for this turn: the panel dims (except its AP
+  // block, which holds the `+` stepper and the turn button). See gmscreen.css.
+  const spent = ap <= 0
 
   const menuItems: PanelMenuItem[] = [
     { label: 'Rename instance…', onSelect: () => setRenaming(true) },
     { label: 'Duplicate instance', onSelect: () => duplicatePanel(screenId, panel.id) },
     { label: 'Open base sheet', onSelect: onOpenBase },
+    // The turn button appears by itself once AP runs out; the menu entry keeps
+    // an early turn (or a GM hand-wave) possible without spending down first.
+    { label: 'Start new turn', onSelect: startTurn },
     ...(condition === 'dead'
       ? [{ label: 'Mark alive', onSelect: () => setInstanceCondition(screenId, panel.id, 'active') }]
       : [{ label: 'Mark dead', onSelect: () => setInstanceCondition(screenId, panel.id, 'dead') }]),
@@ -97,7 +123,8 @@ export default function NpcInstancePanel({
       className={
         'gm-panel gm-panel--npc' +
         (expanded ? ' gm-panel--expanded' : '') +
-        (impaired ? ` gm-panel--${condition}` : '')
+        (impaired ? ` gm-panel--${condition}` : '') +
+        (spent ? ' gm-panel--no-ap' : '')
       }
     >
       <PanelHeader
@@ -138,65 +165,44 @@ export default function NpcInstancePanel({
         </form>
       )}
 
-      <div className="gm-hp">
-        <div className="gm-hp__row">
-          <HeartPulse size={14} className="gm-hp__icon" aria-hidden="true" />
-          <span className="gm-hp__label">HP</span>
-          <span className="gm-hp__value">
-            {hp}
-            <span className="gm-hp__max">/{maxHP}</span>
-          </span>
-          {panel.state.tempHP > 0 && (
-            <span className="gm-hp__temp" title="Temporary HP (absorbed first)">
-              +{panel.state.tempHP}
-            </span>
-          )}
-          {/* Statuses the GM is tracking: inline with the HP number, on one
-            * scrollable line so they can never make the panel taller. */}
+      <PanelHpBar
+        name={panel.label || base.name}
+        hp={hp}
+        maxHP={maxHP}
+        tempHP={panel.state.tempHP}
+        onDamage={() => adjustInstanceHP(screenId, panel.id, -1)}
+        onHeal={() => adjustInstanceHP(screenId, panel.id, 1)}
+        onOpenDamageDialog={() => setShowDamage(true)}
+        statuses={
           <PanelStatuses
             screenId={screenId}
             panel={panel}
             entityName={panel.label || base.name}
           />
-        </div>
-        <div
-          className="gm-hp__track"
-          role="img"
-          aria-label={`${hp} of ${maxHP} hit points`}
-        >
-          <div
-            className="gm-hp__fill"
-            style={{ width: `${maxHP > 0 ? Math.min(100, (hp / maxHP) * 100) : 0}%` }}
-          />
-        </div>
-        <div className="gm-hp__controls">
-          <button
-            type="button"
-            className="btn btn--icon gm-hp__step"
-            onClick={() => adjustInstanceHP(screenId, panel.id, -1)}
-            aria-label={`Deal 1 damage to ${panel.label}`}
-            title="−1 HP"
-          >
-            −
-          </button>
-          <button
-            type="button"
-            className="btn btn--icon gm-hp__step"
-            onClick={() => adjustInstanceHP(screenId, panel.id, 1)}
-            aria-label={`Heal ${panel.label} 1 HP`}
-            title="+1 HP"
-          >
-            +
-          </button>
-          <button
-            type="button"
-            className="btn btn--ghost gm-hp__damage"
-            onClick={() => setShowDamage(true)}
-          >
-            Damage…
-          </button>
-        </div>
-      </div>
+        }
+      />
+
+      <PanelApBar
+        ap={ap}
+        onSpend={() => spendInstanceAP(screenId, panel.id, 1)}
+        onRestore={() => restoreInstanceAP(screenId, panel.id, 1)}
+        onStartTurn={startTurn}
+        startTurnTitle="Refill Action Points and roll the Recharge Die"
+        status={
+          // A collapsed panel shows no ability cards, so the cooldown count
+          // rides in the label row: the GM can see an NPC is still waiting on a
+          // Recharge Die without expanding it.
+          hasCooldowns ? (
+            <span
+              className="gm-ap__cooling"
+              title="Abilities on Recharge cooldown, waiting for the next turn's Recharge Die"
+            >
+              <Hourglass size={12} aria-hidden="true" />
+              {panel.state.cooldowns.length} on cooldown
+            </span>
+          ) : undefined
+        }
+      />
 
       <div className="gm-tokens">
         <span className="gm-token" style={{ '--token-color': themeVars['--color-token-evasion'] } as React.CSSProperties}>
@@ -215,17 +221,30 @@ export default function NpcInstancePanel({
           <Target size={13} /> <span className="gm-token__label">DC</span>
           <span className="gm-token__value">{saveDC}</span>
         </span>
+        {/* Parity with a player panel, whose token row ends in the pencil that
+          * opens the full sheet. An instance opens its BASE sheet — the record
+          * every instance of it shares — so the tooltip says so. */}
+        <button
+          type="button"
+          className="btn btn--icon gm-token gm-token--edit"
+          onClick={onOpenBase}
+          aria-label={`Open ${panel.label || base.name}'s base sheet`}
+          title="Open base sheet"
+        >
+          <Pencil size={13} />
+        </button>
       </div>
 
       {/* Same condensed body as an expanded player panel (see PanelSheet) —
         * an NPC panel used to render the entire NPCSheet, which was far too
-        * tall to read alongside other panels. */}
+        * tall to read alongside other panels. `npcActivation` is what makes
+        * the abilities live here without touching the base record's sheet. */}
       <PanelExpand open={expanded}>
         <div
           className="character-sheet character-sheet--view gm-panel__sheet"
           style={themeVars as React.CSSProperties}
         >
-          <PanelSheet entity={base} mode="view" />
+          <PanelSheet entity={base} mode="view" npcActivation={activation} />
         </div>
       </PanelExpand>
 

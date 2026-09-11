@@ -11,7 +11,7 @@
 
 import { test, expect } from 'vitest'
 import { normalizeCharacter, normalizeScreen } from '@/lib/db'
-import { DEFAULT_SHEET_COLORS, createDefaultCharacter } from '@/constants/gameData'
+import { DEFAULT_SHEET_COLORS, MAX_AP, createDefaultCharacter } from '@/constants/gameData'
 import type { Character, GMScreen, ScreenPanel } from '@/types'
 
 /** Cast an object to Character (bypassing TS for legacy-shape fixtures). */
@@ -453,7 +453,13 @@ test('normalizeScreen: a well-formed screen is unchanged and idempotent', () => 
         label: 'Bandit',
         density: 'expanded',
         statuses: [],
-        state: { currentHP: 12, tempHP: 3, condition: 'active' },
+        state: {
+          currentHP: 12,
+          tempHP: 3,
+          condition: 'active',
+          currentAP: 2,
+          cooldowns: ['a1'],
+        },
       },
     ],
     createdAt: '2026-01-01T00:00:00.000Z',
@@ -509,7 +515,14 @@ test('normalizeScreen: backfills complete instance state', () => {
     }),
   )
   const panel = out.panels[0] as Extract<ScreenPanel, { kind: 'npc-instance' }>
-  expect(panel.state).toEqual({ currentHP: 0, tempHP: 0, condition: 'active' })
+  expect(panel.state).toEqual({
+    currentHP: 0,
+    tempHP: 0,
+    condition: 'active',
+    // Live-play fields backfill to a full, fresh turn.
+    currentAP: MAX_AP,
+    cooldowns: [],
+  })
   expect(panel.label).toBe('')
 })
 
@@ -531,7 +544,46 @@ test('normalizeScreen: keeps a valid instance state and clamps negatives', () =>
   )
   const panel = out.panels[0] as Extract<ScreenPanel, { kind: 'npc-instance' }>
   expect(panel.label).toBe('Bandit 2')
-  expect(panel.state).toEqual({ currentHP: 0, tempHP: 0, condition: 'downed' })
+  expect(panel.state).toEqual({
+    currentHP: 0,
+    tempHP: 0,
+    condition: 'downed',
+    currentAP: MAX_AP,
+    cooldowns: [],
+  })
+})
+
+test('normalizeScreen: repairs the instance turn state (AP + cooldowns)', () => {
+  const out = normalizeScreen(
+    asScreen({
+      id: 's1',
+      name: 'Spawns',
+      panels: [
+        {
+          kind: 'npc-instance',
+          id: 'p1',
+          baseNpcId: 'n1',
+          state: { currentHP: 5, currentAP: 99, cooldowns: ['a1'] },
+        },
+        {
+          kind: 'npc-instance',
+          id: 'p2',
+          baseNpcId: 'n1',
+          state: { currentHP: 5, currentAP: -3, cooldowns: ['a1', 'a1', '', 7, 'a2'] },
+        },
+      ],
+    }),
+  )
+  const [first, second] = out.panels as Extract<
+    ScreenPanel,
+    { kind: 'npc-instance' }
+  >[]
+  // AP is a whole number inside the turn budget.
+  expect(first.state.currentAP).toBe(MAX_AP)
+  expect(second.state.currentAP).toBe(0)
+  // Cooldown ids are strings, de-duplicated, and blanks dropped — the list is
+  // written straight from ability ids, so anything else is corrupt data.
+  expect(second.state.cooldowns).toEqual(['a1', 'a2'])
 })
 
 test('normalizeScreen: drops panels that reference nothing', () => {

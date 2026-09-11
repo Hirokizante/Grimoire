@@ -21,7 +21,7 @@ import CharacterPanel from '@/components/gmscreen/CharacterPanel'
 import NpcInstancePanel from '@/components/gmscreen/NpcInstancePanel'
 import StatusModal from '@/components/status/StatusModal'
 import { NotificationProvider } from '@/context/NotificationContext'
-import { createDefaultCharacter, createDefaultNPC } from '@/constants/gameData'
+import { createDefaultCharacter, createDefaultNPC, MAX_AP } from '@/constants/gameData'
 import { useCharacterStore } from '@/store/characterStore'
 import { useGMScreenStore } from '@/store/gmScreenStore'
 import { useStatusStore } from '@/store/statusStore'
@@ -121,7 +121,13 @@ function seed(kind: 'character' | 'npc') {
                 label: 'Bandit',
                 density: 'compact',
                 statuses: [],
-                state: { currentHP: 20, tempHP: 0, condition: 'active' },
+                state: {
+                  currentHP: 20,
+                  tempHP: 0,
+                  condition: 'active',
+                  currentAP: MAX_AP,
+                  cooldowns: [],
+                },
               },
         ],
         createdAt: '2026-01-01T00:00:00.000Z',

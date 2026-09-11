@@ -32,6 +32,7 @@ import StatsSection from '@/components/sheet/StatsSection'
 import NPCAbilitiesSection from '@/components/sheet/npc/NPCAbilitiesSection'
 import NPCStatsSection from '@/components/sheet/npc/NPCStatsSection'
 import { effectiveAttributes } from '@/lib/abilityModifiers'
+import type { AbilityActivationOverrideResolver } from '@/hooks/useAbilityActivation'
 import type { Character } from '@/types'
 import type { SheetMode } from '@/pages/CharacterSheetPage'
 
@@ -40,9 +41,26 @@ export interface PanelSheetProps {
   entity: Character
   /** GM panels are live-play surfaces, so this is view mode in practice. */
   mode?: SheetMode
+  /**
+   * NPC-instance live-play resolver: the panel's own AP, Recharge cooldowns,
+   * and cooldown badges (see hooks/useNpcInstanceActivation). Only NPC panels
+   * pass it — a player panel spends the character's real sheet instead.
+   */
+  npcActivation?: AbilityActivationOverrideResolver
+  /**
+   * Suppress the sheet body's own Action Points bar. A player panel shows AP in
+   * its chrome, directly under the HP bar, so the body must not print a second
+   * copy of the same number (see PanelApBar).
+   */
+  hideAP?: boolean
 }
 
-export default function PanelSheet({ entity, mode = 'view' }: PanelSheetProps) {
+export default function PanelSheet({
+  entity,
+  mode = 'view',
+  npcActivation,
+  hideAP = false,
+}: PanelSheetProps) {
   const isNpc = entity.kind === 'npc'
 
   return (
@@ -51,7 +69,13 @@ export default function PanelSheet({ entity, mode = 'view' }: PanelSheetProps) {
       {isNpc ? (
         <NPCStatsSection npc={entity} mode={mode} variant="flat" />
       ) : (
-        <StatsSection character={entity} mode={mode} variant="flat" hideHP />
+        <StatsSection
+          character={entity}
+          mode={mode}
+          variant="flat"
+          hideHP
+          hideAP={hideAP}
+        />
       )}
 
       {/* 2. Attributes — a horizontal row, mirroring the hero section. */}
@@ -87,6 +111,7 @@ export default function PanelSheet({ entity, mode = 'view' }: PanelSheetProps) {
           owner={entity}
           mode={mode}
           viewMode="list"
+          activation={npcActivation}
         />
       ) : (
         <SlottedAbilitiesSection

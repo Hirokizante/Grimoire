@@ -12,9 +12,26 @@
  */
 
 import type {
+  AbilityCost,
   CustomResourceBar,
   ResolvedCustomAbilityCost,
 } from '@/types'
+
+/**
+ * Whether an ability declares **any** cost at all (AP, END, FP, or a positive
+ * custom amount). This is the cheap "does activating this spend something?"
+ * question the GM Screen asks before giving an ability an Activate button; it
+ * deliberately does not resolve custom bar ids, so an ability whose bar no
+ * longer exists still counts as costing something (see
+ * {@link resolveCustomAbilityCosts} for the render-time resolution).
+ */
+export function hasAbilityCost(cost: AbilityCost | undefined): boolean {
+  if (!cost) return false
+  if (cost.ap != null || cost.end != null || cost.fp != null) return true
+  return Object.values(cost.custom ?? {}).some(
+    (amount) => typeof amount === 'number' && Number.isFinite(amount) && amount > 0,
+  )
+}
 
 /**
  * Resolve an AbilityCost's `custom` map against the character's resource

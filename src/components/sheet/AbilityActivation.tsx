@@ -14,11 +14,21 @@
  * disabled and shows a tooltip explaining why.
  *
  * Exhaustion mortal wound: all END costs are 1 more than usual.
+ *
+ * The GM Screen's NPC instances are not store characters: they pass an
+ * {@link AbilityActivationOverrideResolver}, which redirects the costs to the
+ * panel's own Action Points, gates the button on the instance's Recharge
+ * cooldowns, and renders the cooldown badge. Everything else — the plan, the
+ * deduction, the toast — is the same code path the player sheets use.
  */
 
 import AbilityBlockCard from '@/components/sheet/AbilityBlockCard'
 import { useCharacterStore } from '@/store/characterStore'
-import { useAbilityActivation } from '@/hooks/useAbilityActivation'
+import {
+  useAbilityActivation,
+  type AbilityActivationOverride,
+  type AbilityActivationOverrideResolver,
+} from '@/hooks/useAbilityActivation'
 import type { AbilityBlock, Character } from '@/types'
 
 export interface AbilityActivationProps {
@@ -29,6 +39,14 @@ export interface AbilityActivationProps {
    * sheet page); GM-screen panels pass their own entity.
    */
   character?: Character
+  /**
+   * Per-ability override for entities the character store does not own (GM
+   * Screen NPC instances). It is also what gives an ability an Activate button
+   * while its own `showActivate` flag is off: a GM panel activates every
+   * ability that has a cost, and the flag is not even offered in the NPC
+   * editor. Omitted everywhere else, where `showActivate` keeps deciding.
+   */
+  activateOverride?: AbilityActivationOverrideResolver
 }
 
 /**
@@ -39,15 +57,24 @@ export interface AbilityActivationProps {
 function ActivatableCard({
   ability,
   character,
+  override,
+  activateOverride,
 }: {
   ability: AbilityBlock
   character: Character
+  override: AbilityActivationOverride | null
+  activateOverride?: AbilityActivationOverrideResolver
 }) {
-  const plan = useAbilityActivation(ability, character)
+  const plan = useAbilityActivation(ability, character, override?.options)
 
   return (
     <div className="ability-activation">
-      <AbilityBlockCard ability={ability} mode="view" character={character} />
+      <AbilityBlockCard
+        ability={ability}
+        mode="view"
+        character={character}
+        activateOverride={activateOverride}
+      />
       <div className="ability-activation__footer">
         <button
           type="button"
@@ -66,16 +93,43 @@ function ActivatableCard({
 export default function AbilityActivation({
   ability,
   character: explicitCharacter,
+  activateOverride,
 }: AbilityActivationProps) {
   const storeCharacter = useCharacterStore((s) => s.currentCharacter)
   const character = explicitCharacter ?? storeCharacter
 
   if (!character) return null
 
-  // Nothing to activate: render the plain card (no button, no plan needed).
-  if (!ability.showActivate) {
-    return <AbilityBlockCard ability={ability} mode="view" character={character} />
+  const override = activateOverride?.(ability) ?? null
+
+  // A resolver, when present, is the last word on what activates here: it
+  // returns an override for every ability that should have a button (a GM panel
+  // activates anything with a cost) and null for the rest, so the per-ability
+  // `showActivate` flag — which the NPC editor does not even offer — cannot
+  // re-enable a button the panel decided against. Without a resolver the flag
+  // keeps deciding, exactly as it always has on the sheets.
+  const activatable = activateOverride ? override != null : ability.showActivate
+
+  if (!activatable) {
+    // Nothing to activate: render the plain card (no button, no plan needed).
+    // The resolver still travels with it — a parent may be a plain card while
+    // its sub-abilities activate.
+    return (
+      <AbilityBlockCard
+        ability={ability}
+        mode="view"
+        character={character}
+        activateOverride={activateOverride}
+      />
+    )
   }
 
-  return <ActivatableCard ability={ability} character={character} />
+  return (
+    <ActivatableCard
+      ability={ability}
+      character={character}
+      override={override}
+      activateOverride={activateOverride}
+    />
+  )
 }
