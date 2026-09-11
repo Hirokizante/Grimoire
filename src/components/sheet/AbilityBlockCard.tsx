@@ -62,7 +62,11 @@ export interface AbilityBlockCardProps {
    * (a card never activates itself — that is {@link AbilityActivation}'s job).
    * GM Screen NPC panels pass the instance's resolver so a Recharge
    * sub-ability gets the same Activate button and cooldown tracking as a
-   * top-level one; omitted everywhere else.
+   * top-level one. A surface where *nothing* activates passes
+   * {@link NO_ACTIVATION} instead — the Ability Pool (its abilities are not
+   * slotted) and attached/standalone NPC sheets (static references). Because a
+   * resolver is the last word, that is what stops a sub-ability from falling
+   * back to its own `showActivate` flag and growing a button there.
    */
   activateOverride?: AbilityActivationOverrideResolver
 }

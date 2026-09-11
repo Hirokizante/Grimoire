@@ -30,7 +30,10 @@ import AbilityEditorModal from '@/components/sheet/AbilityEditorModal'
 import ConfirmModal from '@/components/sheet/ConfirmModal'
 import { useCharacterStore } from '@/store/characterStore'
 import { useSubAbilityEditor } from '@/hooks/useSubAbilityEditor'
-import type { AbilityActivationOverrideResolver } from '@/hooks/useAbilityActivation'
+import {
+  NO_ACTIVATION,
+  type AbilityActivationOverrideResolver,
+} from '@/hooks/useAbilityActivation'
 import type { AbilityBlock } from '@/types'
 import type { Character } from '@/types'
 import type { SheetMode } from '@/pages/CharacterSheetPage'
@@ -62,16 +65,6 @@ export interface NPCAbilitiesSectionProps {
   activation?: AbilityActivationOverrideResolver
 }
 
-/**
- * The sheet pages' resolver: an NPC sheet is a **static reference**, so nothing
- * on it activates — not even a sub-ability whose own `showActivate` flag is on.
- * Passing a resolver that always says "no" (rather than passing none) is what
- * makes that explicit: a resolver is the last word on activation, so no card
- * below can fall back to the flag and grow a button that would spend the *base*
- * record's AP.
- */
-const NO_ACTIVATION: AbilityActivationOverrideResolver = () => null
-
 export default function NPCAbilitiesSection({
   abilities,
   ownerId,
@@ -84,7 +77,11 @@ export default function NPCAbilitiesSection({
   const isEdit = mode === 'edit'
   const isListView = viewMode === 'list'
   // A resolver is always supplied — the GM panel's, or the "nothing activates"
-  // one for the sheet pages (see NO_ACTIVATION).
+  // one for the sheet pages. An NPC sheet is a **static reference**, so a sheet
+  // page must pass NO_ACTIVATION rather than nothing at all: a resolver is the
+  // last word on activation, so no card below it can fall back to its own
+  // `showActivate` flag and grow a button that would spend the *base* record's
+  // AP — sub-abilities included.
   const activateOverride = activation ?? NO_ACTIVATION
   const updateCharacter = useCharacterStore((s) => s.updateCharacter)
   const storeOwnerId = useCharacterStore((s) => s.currentCharacter?.id)
@@ -115,6 +112,10 @@ export default function NPCAbilitiesSection({
 
   const { subAbilityActions, subAbilityEditorModal } = useSubAbilityEditor({
     onUpdateParent: handleUpdateParent,
+    // The sub-ability editor matches this section's own ability editor: an NPC
+    // outside a GM Screen never renders an Activate button, so it offers no
+    // "Show Activate button" toggle (nor the character-only END/FP costs).
+    npcMode: true,
   })
 
   const openNew = () => {

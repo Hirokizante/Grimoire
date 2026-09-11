@@ -29,6 +29,11 @@ async function gotoGmScreen(page: Page) {
   ).toBeVisible()
 }
 
+/** The milestone badge in a player panel's header. */
+function characterPanelBadge(page: Page) {
+  return page.locator('.gm-panel--character .gm-panel__badge').first()
+}
+
 /** Navigate to the character list through the title bar. */
 async function gotoCharacters(page: Page) {
   await page.getByRole('button', { name: 'Characters' }).first().click()
@@ -51,6 +56,27 @@ async function createPlayerCharacter(page: Page, name: string) {
   // Creating a character navigates to its sheet — go back to the list. The
   // title bar's Characters button closes the open sheet.
   await gotoCharacters(page)
+}
+
+/**
+ * Give a character milestones through the sheet's own Level Up flow, skipping
+ * the wizard's choices each time, and come back to the GM Screen. Two
+ * milestones grant a +1 Milestone Bonus, so 4 gives the "+2" the Milestones
+ * token prints beside its label.
+ */
+async function addMilestones(page: Page, name: string, count: number) {
+  await gotoGmScreen(page)
+  const panel = page.locator('.gm-panel--character').filter({ hasText: name })
+  await panel.getByRole('button', { name: new RegExp(`${name} options`) }).click()
+  await page.getByRole('menuitem', { name: 'Open sheet' }).click()
+  for (let i = 0; i < count; i += 1) {
+    await page.getByRole('button', { name: 'Level Up' }).click()
+    await page.getByRole('button', { name: 'Skip', exact: true }).click()
+    // The wizard closes on Skip; wait for it to be gone before the next round.
+    await expect(page.getByRole('button', { name: 'Skip', exact: true })).toHaveCount(0)
+  }
+  await gotoGmScreen(page)
+  await expect(panel).toBeVisible()
 }
 
 /** Create a fresh NPC via the NPC list page's real create flow. */
@@ -231,6 +257,12 @@ test.describe('GM Screen', () => {
     expect(hpFill.bg).not.toBe('rgba(0, 0, 0, 0)')
     expect(hpFill.bg).not.toBe('transparent')
 
+    // Milestones 1-4 first: the 4th grants a +2 Milestone Bonus, so the row
+    // below is measured WITH the inline bonus on one of its tokens rather than
+    // on a fresh character that has none to show.
+    await addMilestones(page, 'Vex', 4)
+    await expect(characterPanelBadge(page)).toHaveText(/4/)
+
     // Expanded panels: every attribute box is exactly the same width (the
     // sheet's `repeat(5, 1fr)` is `minmax(auto, 1fr)`, whose content floor made
     // MAR's column wider than VIT's), the full attribute names are hidden so
@@ -282,7 +314,157 @@ test.describe('GM Screen', () => {
     expect(expanded.skillWidths.length).toBeGreaterThanOrEqual(1)
     expect(expanded.skillWidths.length).toBeLessThanOrEqual(2)
 
+    // ---- Panel stat tokens: shorthand labels, one line, one height --------
+    // Two things were wrong with the expanded panel's Combat Stats row. (1)
+    // Token columns are ~7.5rem wide, so the full stat names ellipsised
+    // ("MILEST…", "END RE…") — a GM mid-turn cannot read those. Panels print
+    // shorthand now, and the full name rides in the `title`. (2) The Milestones
+    // token's "+N bonus" line was a second in-flow line, so that token — and
+    // therefore its whole grid row — stood taller than the row below it. The
+    // bonus is now inline with the label ("Miles +2"), so a token is one line.
+    const statTokens = await characterPanel.evaluate((panel) => {
+      const sheet = panel.querySelector('.gm-panel__sheet')!
+      return Array.from(sheet.querySelectorAll<HTMLElement>('.stat-token')).map(
+        (el) => {
+          const label = el.querySelector<HTMLElement>('.stat-token__label')!
+          const box = el.getBoundingClientRect()
+          const bonus = el.querySelector<HTMLElement>('.stat-token__bonus')
+          const bonusBox = bonus?.getBoundingClientRect()
+          const labelBox = label.getBoundingClientRect()
+          return {
+            label: label.textContent ?? '',
+            title: el.getAttribute('title'),
+            height: +box.height.toFixed(1),
+            // Where the value's line and the label sit INSIDE the token, so the
+            // row's shared reading line can be compared across tokens (absolute
+            // page y would just compare row 1 against row 2).
+            valueOffset: +(
+              el.querySelector<HTMLElement>('.stat-token__value')!
+                .getBoundingClientRect().top - box.top
+            ).toFixed(2),
+            labelOffset: +(labelBox.top - box.top).toFixed(2),
+            // `overflow: hidden` makes the label's scrollWidth the text's real
+            // width, so this is exactly "is any of this name cut off?".
+            labelClipped: label.scrollWidth > label.clientWidth + 1,
+            // The milestone bonus, inline with the label: same line (their
+            // vertical centres agree) and to its right.
+            bonus: bonus?.textContent ?? null,
+            bonusOnLabelLine: bonusBox
+              ? Math.abs(
+                  bonusBox.top +
+                    bonusBox.height / 2 -
+                    (labelBox.top + labelBox.height / 2),
+                ) < 3 && bonusBox.left > labelBox.left
+              : null,
+          }
+        },
+      )
+    })
+
+    expect(statTokens.map((t) => t.label)).toEqual([
+      'Miles',
+      'Eva',
+      'Arm',
+      'Move',
+      'Save',
+      'END Rec',
+    ])
+    // One height for the whole row — the milestone bonus included.
+    expect(new Set(statTokens.map((t) => t.height)).size).toBe(1)
+    // …and one line: the value and the label sit at the same offset inside every
+    // token, so the bonus line cannot push its own token's value off the line
+    // the rest of the row is read along.
+    const spread = (values: number[]) =>
+      Math.max(...values) - Math.min(...values)
+    expect(spread(statTokens.map((t) => t.valueOffset))).toBeLessThan(1)
+    expect(spread(statTokens.map((t) => t.labelOffset))).toBeLessThan(1)
+    expect(statTokens.every((t) => !t.labelClipped)).toBe(true)
+    // Short names are shorthand, never a loss: the full name stays reachable
+    // and the milestone bonus stays printed.
+    expect(statTokens.map((t) => t.title)).toEqual([
+      'Milestones',
+      'Evasion',
+      'Armor',
+      'Movement',
+      'Save DC',
+      'END Recovery',
+    ])
+    // The milestone bonus: bare ("+2", not "+2 bonus"), inline with the label,
+    // and the ONLY token that carries one.
+    const milestone = statTokens[0]
+    expect(milestone.bonus).toBe('+2')
+    expect(milestone.bonusOnLabelLine).toBe(true)
+    expect(statTokens.slice(1).map((t) => t.bonus)).toEqual([
+      null,
+      null,
+      null,
+      null,
+      null,
+    ])
+    // One line, so the token is the height of a value line and its padding —
+    // not the two-line block the reserved bonus line used to force.
+    expect(statTokens[0].height).toBeLessThan(40)
+
+    // The NPC panel's row is the same six-token grid and must read the same
+    // way — its stats are the ones a GM cross-references against the player's.
+    const npcBodyPanel = page.locator('.gm-panel--npc').first()
+    await npcBodyPanel.getByRole('button', { name: /Expand/ }).click()
+    await expect(npcBodyPanel.locator('.gm-panel__sheet')).toBeVisible()
+
+    const npcStatTokens = await npcBodyPanel.evaluate((panel) => {
+      const sheet = panel.querySelector('.gm-panel__sheet')!
+      return Array.from(sheet.querySelectorAll<HTMLElement>('.stat-token')).map(
+        (el) => {
+          const box = el.getBoundingClientRect()
+          return {
+            label:
+              el.querySelector<HTMLElement>('.stat-token__label')!.textContent ?? '',
+            title: el.getAttribute('title'),
+            height: +box.height.toFixed(1),
+            valueOffset: +(
+              el.querySelector<HTMLElement>('.stat-token__value')!
+                .getBoundingClientRect().top - box.top
+            ).toFixed(2),
+          }
+        },
+      )
+    })
+
+    expect(npcStatTokens.map((t) => t.label)).toEqual([
+      'Eva',
+      'Arm',
+      'Move',
+      'Save',
+      'HP',
+      'Wounds',
+    ])
+    expect(new Set(npcStatTokens.map((t) => t.height)).size).toBe(1)
+    // One size for both panel kinds: a token is one line of stat everywhere, so
+    // a player panel and an NPC panel side by side are the same grid.
+    expect(npcStatTokens[0].height).toBe(statTokens[0].height)
+    // …and the value sits at the same offset inside it, so the two panel kinds
+    // also read along one line.
+    expect(
+      new Set([
+        ...statTokens.map((t) => t.valueOffset),
+        ...npcStatTokens.map((t) => t.valueOffset),
+      ]).size,
+    ).toBe(1)
+    expect(npcStatTokens.map((t) => t.title)).toEqual([
+      'Evasion',
+      'Armor',
+      'Movement',
+      'Save DC',
+      null, // "HP" is already the shorthand — nothing to expand.
+      'Mortal Wounds',
+    ])
+
+    // Both panels go back to collapsed, which is where the rest of the run
+    // (and the expand-animation checks below) expect to find them — the latter
+    // measures the panel bodies by frame, so it must start from no body at all.
     await characterPanel.getByRole('button', { name: /Collapse/ }).click()
+    await npcBodyPanel.getByRole('button', { name: /Collapse/ }).click()
+    await expect.poll(async () => page.locator('.gm-panel__expand').count()).toBe(0)
 
     // ---- Panel stat tokens are framed like the sheet's cost badges --------
     // A single thick left stripe was replaced by a hairline border on every
@@ -392,9 +574,11 @@ test.describe('GM Screen', () => {
     await npcPanel.getByRole('button', { name: /Collapse/ }).click()
     const closingHeights = await closing
     expect(intermediateHeights(closingHeights, 0, settled).length).toBeGreaterThan(2)
-    // …and the body really is gone once it has finished.
+    // …and the body really is gone once it has finished. (Scoped to the NPC
+    // panel kind: a character panel body stays mounted too once its own
+    // animation has run, so an unscoped count would see that one.)
     await expect
-      .poll(async () => page.locator('.gm-panel__expand').count())
+      .poll(async () => page.locator('.gm-panel--npc .gm-panel__expand').count())
       .toBe(0)
 
     // ---- Damage the first instance to 0 HP -------------------------------

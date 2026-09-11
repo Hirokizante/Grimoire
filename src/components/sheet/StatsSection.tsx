@@ -13,7 +13,9 @@
  *
  * The six derived stats (Milestones, Evasion, Armor, Movement, Save DC, END
  * Recovery) are displayed as stylized "stat tokens" with icons and accent
- * colors for visual flair.
+ * colors for visual flair. The accents are the character's own sheet colors by
+ * default; a GM panel overrides them with the app theme's shared stat palette
+ * (see the `tokenColors` prop) so a player panel reads exactly like an NPC one.
  */
 
 import { useState } from 'react'
@@ -46,6 +48,11 @@ import {
 import { effectiveCombatStats, formatModifierValue } from '@/lib/abilityModifiers'
 import { MAX_AP, MAX_END, MAX_MORTAL_WOUNDS } from '@/constants/gameData'
 import { useCharacterStore } from '@/store/characterStore'
+import {
+  statTokenLabel,
+  type StatTokenLabelMode,
+} from '@/components/sheet/statTokenLabels'
+import type { StatColorKey } from '@/lib/themeUtils'
 import type { Character, CustomResourceBar } from '@/types'
 import type { SheetMode } from '@/pages/CharacterSheetPage'
 
@@ -70,13 +77,47 @@ export interface StatsSectionProps {
    * body must not print a second copy of the same number.
    */
   hideAP?: boolean
+  /**
+   * Override the Combat Stats token accents, per {@link StatColorKey}.
+   *
+   * GM panels pass the active app theme's shared stat palette
+   * (`appThemeStatColors`) so a player panel's row colors Evasion, Armor,
+   * Movement and Save DC exactly like an NPC panel standing next to it — the
+   * panel is app chrome, and two panels disagreeing about what "Evasion" looks
+   * like defeats the at-a-glance reading the screen exists for.
+   *
+   * The sheet page passes nothing and keeps the character's own token colors
+   * from the Customization panel.
+   */
+  tokenColors?: Partial<Record<StatColorKey, string>>
+  /**
+   * How much of each stat name the token prints.
+   *
+   * "full" (default) is the sheet page: it has the width for "END Recovery".
+   * "short" is the GM Screen's expanded panel, whose ~7.5rem token columns cut
+   * every long name down to "MILEST…", "SAVE …", "END RE…" — an ellipsis that
+   * tells a GM nothing mid-turn. Short mode prints the {@link SHORT_STAT_LABELS}
+   * shorthand instead, and every token carries its full name as a tooltip.
+   */
+  tokenLabels?: StatTokenLabelMode
 }
 
 /** Metadata for each derived stat token: icon, label, accent class. */
 interface StatToken {
   label: string
   value: number | string
-  sub?: string
+  /**
+   * A second number that belongs to this stat, printed beside its label as
+   * `+N` on the same line. Omitted when there is nothing to show (a zero
+   * bonus), so an unmodified stat prints no badge at all.
+   *
+   * Only Milestones has one (the bonus it grants), and it used to be a second
+   * line — "+2 bonus" under the label. That line was what made this token
+   * taller than the five beside it, and reserving its height on every token to
+   * keep the row uniform cost the row ~13px of slack. Inlined, the row is one
+   * line of stat and needs no reservation at all.
+   */
+  bonus?: number
   icon: LucideIcon
   /** Hex color used for stripe + icon. */
   color: string
@@ -93,6 +134,8 @@ export default function StatsSection({
   variant = 'section',
   hideHP = false,
   hideAP = false,
+  tokenColors,
+  tokenLabels = 'full',
 }: StatsSectionProps) {
   const { attributes, milestones } = character
 
@@ -144,15 +187,17 @@ export default function StatsSection({
       : 'sheet-section__heading'
 
   const colors = character.config.colors
+  // Each accent is the caller's override when it supplies one (GM panels pass
+  // the app theme's shared stat palette), otherwise the character's own color.
   // `delta` flags tokens whose value is being changed by active ability
   // modifiers, so the extra badge only appears when something is switched on.
   const statTokens: StatToken[] = [
-    { label: 'Milestones', value: milestones, sub: `+${milestoneBonus} bonus`, icon: Star, color: colors.tokenMilestone },
-    { label: 'Evasion', value: evasion, delta: evasion - calcEvasion(attributes.AGI), icon: Wind, color: colors.tokenEvasion },
-    { label: 'Armor', value: armor, delta: armor - calcArmor(attributes.VIT), icon: Shield, color: colors.tokenArmor },
-    { label: 'Movement', value: movement, delta: movement - calcMovement(attributes.AGI), icon: Footprints, color: colors.tokenMovement },
-    { label: 'Save DC', value: saveDC, delta: saveDC - calcSaveDC(milestones), icon: Target, color: colors.tokenSaveDC },
-    { label: 'END Recovery', value: endRecovery, delta: endRecovery - calcENDRecovery(attributes.GRT), icon: Heart, color: colors.tokenEndRecovery },
+    { label: 'Milestones', value: milestones, bonus: milestoneBonus || undefined, icon: Star, color: tokenColors?.milestone ?? colors.tokenMilestone },
+    { label: 'Evasion', value: evasion, delta: evasion - calcEvasion(attributes.AGI), icon: Wind, color: tokenColors?.evasion ?? colors.tokenEvasion },
+    { label: 'Armor', value: armor, delta: armor - calcArmor(attributes.VIT), icon: Shield, color: tokenColors?.armor ?? colors.tokenArmor },
+    { label: 'Movement', value: movement, delta: movement - calcMovement(attributes.AGI), icon: Footprints, color: tokenColors?.movement ?? colors.tokenMovement },
+    { label: 'Save DC', value: saveDC, delta: saveDC - calcSaveDC(milestones), icon: Target, color: tokenColors?.saveDC ?? colors.tokenSaveDC },
+    { label: 'END Recovery', value: endRecovery, delta: endRecovery - calcENDRecovery(attributes.GRT), icon: Heart, color: tokenColors?.endRecovery ?? colors.tokenEndRecovery },
   ]
 
   return (
@@ -163,12 +208,17 @@ export default function StatsSection({
         {statTokens.map((token) => {
           const Icon = token.icon
           const modified = token.delta != null && token.delta !== 0
+          const { text: label, title } = statTokenLabel(
+            token.label,
+            tokenLabels,
+            modified,
+          )
           return (
             <div
               key={token.label}
               className={'stat-token' + (modified ? ' stat-token--modified' : '')}
               style={{ '--token-color': token.color } as React.CSSProperties}
-              title={modified ? 'Includes active ability modifiers' : undefined}
+              title={title}
             >
               <div className="stat-token__left">
                 <Icon className="stat-token__icon" size={18} strokeWidth={2.2} />
@@ -180,8 +230,17 @@ export default function StatsSection({
                 )}
               </div>
               <div className="stat-token__right">
-                <span className="stat-token__label">{token.label}</span>
-                {token.sub && <span className="stat-token__sub">{token.sub}</span>}
+                <span className="stat-token__line">
+                  <span className="stat-token__label">{label}</span>
+                  {/* The milestone bonus, inline with the label: "+2" beside
+                   *  "Miles", read as one phrase. Kept out of the ellipsised
+                   *  label so a narrow token can never truncate the number. */}
+                  {token.bonus != null && (
+                    <span className="stat-token__bonus">
+                      {formatModifierValue(token.bonus)}
+                    </span>
+                  )}
+                </span>
               </div>
             </div>
           )

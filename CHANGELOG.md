@@ -70,6 +70,94 @@ characters regularly.
   action is a no-op — and a disabled stepper keeps its box so the row never
   looks like it is missing a control.
 
+### GM Screen — optional app-theme panel sheets
+
+- **New setting: Settings → GM Screen → *Match app theme*.** With it on, a
+  player panel's expanded sheet body drops its custom colors, card background,
+  and fonts, and renders in the active app theme — the same body an NPC panel
+  has always shown. Reading several sheets at a glance is the whole point of
+  the screen, and a row of wildly different palettes defeats it; the panel
+  *chrome* has followed the app theme from the start, and this extends the same
+  voice to the sheet content. **Off by default**, so nothing changes unless the
+  GM asks for it.
+- **It is display only.** The switch is read while rendering and never written
+  to the character: the character's own sheet page, its Customization panel,
+  its exports, and its version history keep every custom color. A test renders
+  the full sheet page with the setting on and asserts its palette is untouched.
+- **Both panel kinds now build their body from one helper**
+  (`gmPanelSheetPresentation` in `themeUtils.ts`), so "player panel with the
+  setting on" and "NPC panel" cannot drift apart — a test compares the two
+  bodies class-for-class and variable-for-variable under every app theme.
+
+### Combat Stats — one color per stat, on every panel
+
+- **A player panel and an NPC panel now color their Combat Stats tokens the
+  same.** The two rows drew from different sources — an NPC's from the app
+  theme's tuned stat palette, a player's from the character's own sheet colors —
+  so Evasion could be blush on one panel and cyan on the next, Movement green on
+  one and gold on the other. `NPC_STAT_TOKEN_COLORS` is now
+  **`STAT_TOKEN_COLORS`**, covering both rows (Milestones and END Recovery
+  joined the six), and the four stats the rows share — **Evasion, Armor,
+  Movement, Save DC** — are read from the same entry by both panels.
+- **The row is app chrome, like everything else in a panel.** A panel colors its
+  Combat Stats from that shared palette whether or not *Match app theme* is on,
+  and the panel chrome's own Eva/Arm/Move/DC tokens read the same entries, so a
+  stat is one color everywhere on a panel. (END/FP keep the resource-bar colors:
+  those are pools, not combat stats.) **Per-sheet customization is intact** — a
+  character's own sheet page still paints its Combat Stats with the colors from
+  their Customization panel, and nothing is written to the record.
+- **Milestones and END Recovery got tuned accents per theme:** the sheet's own
+  gold for Milestones, and a calm, restorative tone for END Recovery — mint in
+  Midnight, warm sand in Parchment, Nord snow in Mikami, taupe in Pitch Black.
+  The palette test now checks distinctness **per row** (ΔE(CIE76) ≥ 16 between
+  every pair of stripes a GM reads side by side) plus ≥ 3.5:1 contrast against
+  the card surface for all eight accents.
+
+### Combat Stats — shorthand labels and one token height in expanded panels
+
+- **An expanded panel's stat tokens print shorthand, not an ellipsis.** A
+  panel's token column is ~7.5rem wide, so the full names were being cut to
+  "MILEST…", "SAVE …" and "END RE…" — unreadable at a glance, which is the one
+  thing the row exists for. Panels now read `Miles / Eva / Arm / Move / Save /
+  END Rec` (and `Wounds` for an NPC's Mortal Wounds) from one shared vocabulary,
+  `SHORT_STAT_LABELS` in `StatsSection.tsx`, chosen so the row agrees with the
+  panel chrome's own **Eva/Arm/Move/DC** tokens — a stat can no longer be called
+  one thing above the body and another inside it. Every token carries its full
+  name as a **tooltip**, so the shorthand is never a loss of information, and a
+  sheet page — which has the width — keeps the full names (`tokenLabels` defaults
+  to `full`; only `PanelSheet` asks for `short`). A measured e2e check fails if
+  any panel label is clipped again.
+- **Every stat token is one line, one height, on every sheet — and the
+  Milestones bonus rides in that line.** The bonus used to be its own line under
+  the label ("+2 bonus"), which made the Milestones token ~48px against its
+  row-mates' ~34px; and because grid cells stretch, its whole row stood taller
+  than the row beneath it. Reserving that second line on every token made the
+  rows agree but cost ~13px of slack per token. It is now printed inline —
+  **`Miles +2`** (shorthand on a panel), **`Milestones +2`** on a sheet page —
+  so a token is a single line of stat, every token in the app is the same
+  ~34px, a player panel's row matches an NPC panel's beside it exactly, and the
+  content stays centred. The number is its own element, so the label's ellipsis
+  can never truncate it, and nothing is printed at all when the bonus is 0.
+
+### Fixes
+
+- **A pooled ability's sub-abilities no longer offer Activate.** The Ability
+  Pool holds *inactive* abilities, so its cards have never carried an Activate
+  button — but the sub-abilities nested under a pooled ability fell back to
+  their own *Show Activate* flag and grew one anyway, spending the character's
+  real AP from a card that is not in play. The pool now passes the same
+  "nothing here activates" resolver the standalone NPC sheet uses; a resolver is
+  the last word on activation, so it reaches the nested cards too. Slotted, core
+  and custom-tab sub-abilities are untouched, as are the use steppers everywhere
+  (a counter is not an activation), and an attached NPC section — a static
+  reference like the NPC sheet — gets the same treatment.
+- **The NPC sub-ability editor no longer offers *Show Activate*.** An NPC sheet
+  outside the GM Screen never renders an Activate button (NPCs activate only
+  through a GM Screen panel's own "a cost means a button" rule), so the
+  sheet-level sub-ability editor now hides the toggle — along with the END/FP
+  cost inputs and custom resource costs — exactly as the main NPC ability editor
+  already did. Player sheets keep all of them.
+
 ## v0.8.0-alpha — 2026-09-11
 
 The GM Screen release. Eight commits since `v0.7.0-alpha`.

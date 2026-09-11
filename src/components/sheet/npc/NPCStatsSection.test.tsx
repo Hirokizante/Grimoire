@@ -5,6 +5,9 @@
  * token with no stripe and no icon color), and the accents must come from the
  * app theme's NPC palette rather than the record's own stored sheet colors
  * (which predate the Mortal Wounds color key and duplicate each other).
+ *
+ * The third is the label: full stat names on the sheet page, shorthand on a GM
+ * Screen panel (see StatsSection's `tokenLabels`).
  */
 
 import { render } from '@testing-library/react'
@@ -12,7 +15,7 @@ import { beforeEach, expect, test, vi } from 'vitest'
 
 import NPCStatsSection from '@/components/sheet/npc/NPCStatsSection'
 import { createDefaultNPC } from '@/constants/gameData'
-import { NPC_STAT_TOKEN_COLORS } from '@/lib/themeUtils'
+import { STAT_TOKEN_COLORS } from '@/lib/themeUtils'
 import { APP_THEMES } from '@/store/appThemeStore'
 import type { AppTheme } from '@/store/appThemeStore'
 import type { Character, SheetColors } from '@/types'
@@ -98,13 +101,31 @@ test('token accents follow the app theme, not the stored record palette', () => 
     themeRef.current = theme
     const { unmount } = render(<NPCStatsSection npc={npc} />)
     expect(tokenAccents()).toEqual({
-      Evasion: NPC_STAT_TOKEN_COLORS[theme].evasion,
-      Armor: NPC_STAT_TOKEN_COLORS[theme].armor,
-      Movement: NPC_STAT_TOKEN_COLORS[theme].movement,
-      'Save DC': NPC_STAT_TOKEN_COLORS[theme].saveDC,
-      HP: NPC_STAT_TOKEN_COLORS[theme].hp,
-      'Mortal Wounds': NPC_STAT_TOKEN_COLORS[theme].mortalWounds,
+      Evasion: STAT_TOKEN_COLORS[theme].evasion,
+      Armor: STAT_TOKEN_COLORS[theme].armor,
+      Movement: STAT_TOKEN_COLORS[theme].movement,
+      'Save DC': STAT_TOKEN_COLORS[theme].saveDC,
+      HP: STAT_TOKEN_COLORS[theme].hp,
+      'Mortal Wounds': STAT_TOKEN_COLORS[theme].mortalWounds,
     })
     unmount()
   }
+})
+
+test('tokenLabels="short" prints the shorthand and keeps the accents', () => {
+  // An NPC's "Mortal Wounds" is the longest stat name in the app — on a GM
+  // Screen panel it used to render as "MORTAL…". The shorthand must carry the
+  // same accents the full row does; only the printed name changes.
+  const theme = 'midnight'
+  themeRef.current = theme
+  render(<NPCStatsSection npc={legacyNPC()} variant="flat" tokenLabels="short" />)
+
+  expect(tokenAccents()).toEqual({
+    Eva: STAT_TOKEN_COLORS[theme].evasion,
+    Arm: STAT_TOKEN_COLORS[theme].armor,
+    Move: STAT_TOKEN_COLORS[theme].movement,
+    Save: STAT_TOKEN_COLORS[theme].saveDC,
+    HP: STAT_TOKEN_COLORS[theme].hp,
+    Wounds: STAT_TOKEN_COLORS[theme].mortalWounds,
+  })
 })

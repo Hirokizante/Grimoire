@@ -2,10 +2,12 @@
  * SettingsPage — app-level preferences.
  *
  * Hosts the app color theme picker (themes the app chrome around the sheets —
- * header, list pages, modals, dice UI), the home page animation picker
- * (on/off + which ambient effect plays behind the title), and the full-app
- * Backup & Restore section. Per-sheet color themes live in each sheet's
- * Customization panel and are stored on the character.
+ * header, list pages, modals, dice UI), the GM Screen display options (whether
+ * a player panel's expanded sheet body keeps its own customization or follows
+ * the app theme like an NPC panel), the home page animation picker (on/off +
+ * which ambient effect plays behind the title), and the full-app Backup &
+ * Restore section. Per-sheet color themes live in each sheet's Customization
+ * panel and are stored on the character.
  *
  * Backup & Restore: downloads EVERYTHING (characters, NPCs, statuses, version
  * history, roll log) as a single JSON file; restoring replaces all current
@@ -31,6 +33,7 @@ import { useAppThemeStore } from '@/store/appThemeStore'
 import type { AppTheme } from '@/store/appThemeStore'
 import { useCharacterStore } from '@/store/characterStore'
 import { useGMScreenStore } from '@/store/gmScreenStore'
+import { useGmPanelThemeStore } from '@/store/gmPanelThemeStore'
 import { useHomeAnimationStore } from '@/store/homeAnimationStore'
 import type { HomeAnimation } from '@/store/homeAnimationStore'
 import { useRollLogStore } from '@/store/rollLogStore'
@@ -125,6 +128,8 @@ function backupSheetSummary(counts: FullBackup['counts']): string {
 export default function SettingsPage() {
   const theme = useAppThemeStore((s) => s.theme)
   const setTheme = useAppThemeStore((s) => s.setTheme)
+  const gmPanelMatchAppTheme = useGmPanelThemeStore((s) => s.matchAppTheme)
+  const setGmPanelMatchAppTheme = useGmPanelThemeStore((s) => s.setMatchAppTheme)
   const homeAnimation = useHomeAnimationStore((s) => s.animation)
   const setHomeAnimation = useHomeAnimationStore((s) => s.setAnimation)
   const homeAnimationEnabled = useHomeAnimationStore((s) => s.enabled)
@@ -265,6 +270,50 @@ export default function SettingsPage() {
             )
           })}
         </div>
+      </section>
+
+      <section
+        className="settings-section"
+        aria-labelledby="settings-gm-screen-heading"
+      >
+        <h2 className="settings-section__title" id="settings-gm-screen-heading">
+          GM Screen
+        </h2>
+        <p className="muted settings-section__hint">
+          How sheets look inside the GM Screen's expanded panels. The panel
+          chrome — header, HP/AP bars, stat tokens, status pills — always
+          follows the app theme.
+        </p>
+
+        <div className="settings-toggle-row">
+          <span
+            className="settings-toggle-row__label"
+            id="gm-panel-match-theme-label"
+          >
+            Match app theme
+          </span>
+          <label className="settings-toggle">
+            <input
+              type="checkbox"
+              checked={gmPanelMatchAppTheme}
+              onChange={(e) => setGmPanelMatchAppTheme(e.target.checked)}
+              aria-labelledby="gm-panel-match-theme-label"
+              aria-describedby="gm-panel-match-theme-hint"
+            />
+            <span className="settings-toggle__track" aria-hidden="true" />
+          </label>
+        </div>
+
+        <p
+          className="muted settings-section__hint"
+          id="gm-panel-match-theme-hint"
+        >
+          On, a player's sheet panel drops its custom colors, background, and
+          fonts and uses the app theme instead — exactly like an NPC panel, so
+          a screen full of sheets reads with one voice. Off, each panel keeps
+          the character's own customization. This is display only: the
+          character sheet itself, and everything you export, is never changed.
+        </p>
       </section>
 
       <section

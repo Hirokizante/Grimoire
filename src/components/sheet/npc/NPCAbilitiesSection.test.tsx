@@ -8,7 +8,7 @@
  * covered in components/gmscreen/GMScreenPanels.test.tsx.
  */
 
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { beforeEach, expect, test, vi } from 'vitest'
 
 import NPCAbilitiesSection from '@/components/sheet/npc/NPCAbilitiesSection'
@@ -115,4 +115,31 @@ test('standalone NPC abilities never render an Activate button', () => {
   expect(document.querySelector('.gm-ap')).toBeNull()
   // The card itself still renders (static reference).
   expect(screen.getByText('Fire Breath')).toBeInTheDocument()
+})
+
+test('the sub-ability editor hides the Show Activate toggle on an NPC sheet', () => {
+  const npc = seedNpc()
+  render(
+    <NPCAbilitiesSection
+      abilities={npc.slottedAbilities}
+      ownerId={npc.id}
+      owner={npc}
+      mode="edit"
+    />,
+  )
+
+  // Edit the nested sub-ability straight from the card…
+  const sub = document.querySelector('.sub-ability-block') as HTMLElement
+  fireEvent.click(within(sub).getByRole('button', { name: 'Edit' }))
+
+  // …and the editor offers exactly what the main NPC ability editor offers:
+  // AP cost, and none of the character-only controls. An NPC outside a GM
+  // panel never renders an Activate button, so a flag for one is noise.
+  expect(
+    screen.getByRole('dialog', { name: 'Edit Sub-Ability' }),
+  ).toBeInTheDocument()
+  expect(screen.getByLabelText('AP Cost')).toBeInTheDocument()
+  expect(screen.queryByLabelText('Show Activate button')).toBeNull()
+  expect(screen.queryByLabelText('END Cost')).toBeNull()
+  expect(screen.queryByLabelText('FP Cost')).toBeNull()
 })

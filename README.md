@@ -42,7 +42,7 @@ Divergence is a DIY tabletop RPG system — there is no compendium of spells or 
 - **Fifteen Skills** with selectable proficiencies and click-to-roll support.
 - **Core Ability** — Innate narrative, Innate Abilities, Basic Attack, and Fatebreaker ultimate.
 - **Slotted Abilities** — equip abilities for an encounter; drag-and-drop to reorder or move to/from the pool.
-- **Ability Pool** — unlimited inactive abilities available to swap in before an encounter.
+- **Ability Pool** — unlimited inactive abilities available to swap in before an encounter. Nothing in the pool activates: pooled cards carry no Activate button, and neither do the sub-abilities nested under them (a sub-ability is bound to its parent and cannot be slotted on its own). Only the use steppers stay — a counter is not an activation.
 - **Minor Abilities** — flagged abilities that occupy half a slot instead of a full one.
 - **Ability Block editor** — structured fields for name, traits, cost (AP/END/FP), damage, description, overcharge, and flavor text. Supports Markdown in description and overcharge.
 - **Custom ability costs** — abilities can also spend any custom resource bar: "+ Add Cost" in the Ability Block editor picks a bar, and the cost renders as a color-matched badge next to AP/END/FP and auto-deducts on Activate (sub-abilities included).
@@ -96,7 +96,8 @@ Divergence is a DIY tabletop RPG system — there is no compendium of spells or 
 ### App Settings
 - **App themes** — switch the app's own color scheme (header, list pages, modals, dice UI — everything *around* the sheets) in Settings. Ships with **Midnight** (the default violet-dark palette), **Parchment** (warm charcoal `#262626` with parchment `#c5b8a0` highlights, plus a matching alternate title-bar glyph), **Mikami** (Nord on near-black, from Ghostty), and **Pitch Black** (pure black with cream, gold, and muted teal, from Ghostty). The choice persists in `localStorage` and applies before first paint. Sheet color themes are unaffected — those stay per-character in the Customization panel.
 - **Home page animation** — pick the ambient effect behind the home page title in Settings: **Arcane Glow** (the default — a volumetric shaft of light falling through a dark room, air haze where it lands, and a slow field of out-of-focus dust motes at three depths, the ones caught in the beam glowing warm) or **Terminal Boot** (a startup log that types itself out, as if Grimoire were launched from a shell, then settles to a dim static trace). Animations can also be switched off entirely for a plain, motion-free home page. The choice persists in `localStorage`.
-- **NPC sheets follow the app theme** — standalone NPC sheets (no per-sheet customization) adopt the app's palette, including the page and card backgrounds. Their Combat Stats tokens use a dedicated per-theme accent set (`NPC_STAT_TOKEN_COLORS` in `themeUtils.ts`) tuned so all six stripes — Evasion, Armor, Movement, Save DC, HP, and Mortal Wounds — stay clearly distinct from each other and from the card behind them in every theme (a unit test enforces the floor). NPC sections embedded in a player character sheet never apply colors of their own, so the player sheet's theme takes precedence there.
+- **GM panel sheets can match the app theme** — Settings → GM Screen → **Match app theme** makes a player panel's expanded sheet body drop its custom colors, card background, and fonts and use the app theme instead, exactly as an NPC panel always renders. Off by default, so each panel keeps the character's own customization unless the GM asks otherwise. Display only: the character's own sheet page, its Customization panel, and its exports are never changed.
+- **One Combat Stats palette for every sheet** — `STAT_TOKEN_COLORS` in `themeUtils.ts` gives each app theme a tuned accent per stat, covering both rows a sheet can show: a player's (Milestones, Evasion, Armor, Movement, Save DC, END Recovery) and an NPC's (Evasion, Armor, Movement, Save DC, HP, Mortal Wounds). The four stats the two rows share hold the **same** hue in both, so a stat is never two colors. Every stripe stays clearly distinct from its row-mates and from the card behind it in every theme (a unit test enforces a floor of ΔE(CIE76) ≥ 16 within a row and ≥ 3.5:1 contrast; the shipped palettes sit at ≥ 18 and ≥ 3.7:1). A standalone NPC sheet reads this palette because it has no customization of its own; a player's own sheet page uses the character's per-sheet token colors from the Customization panel, while a **GM panel's Combat Stats row — either kind — always reads this palette** (see [GM Screen](#gm-screen)). NPC sections embedded in a player character sheet never apply colors of their own, so the player sheet's theme takes precedence there.
 
 ### Import / Export
 - **Export as JSON** — downloads a versioned file (`Character Name v1.2.3.json`).
@@ -113,9 +114,15 @@ Divergence is a DIY tabletop RPG system — there is no compendium of spells or 
 
 ## GM Screen
 
-The GM Screen is a saved, named surface that holds **panels** — one per sheet you want to run. It lives behind the **GM Screen** entry in the title bar (and on the home page) and is deliberately app chrome: it uses the active app theme, while each panel's sheet content keeps its own customization.
+The GM Screen is a saved, named surface that holds **panels** — one per sheet you want to run. It lives behind the **GM Screen** entry in the title bar (and on the home page) and is deliberately app chrome: it uses the active app theme, while each panel's sheet content keeps its own customization (optionally switched off — see below).
 
 That split is deliberate and precise. The **panel chrome** — header, name, HP bar, the tracked status pills, the AP/END/FP and Evasion/Armor stat tokens, HP steppers — always follows the **app theme**, never the sheet's palette. A screen shows several sheets side by side, so per-sheet token colors would make every panel read differently and destroy the at-a-glance consistency that is the whole point of the GM Screen; a player panel and an NPC panel therefore color their shared stats identically. The sheet's own palette is injected only inside the **expanded panel's sheet content**, where a player's customization belongs.
+
+**Settings → GM Screen → *Match app theme*** turns even that off. With it on, a player panel's body is rendered through the same helper an NPC panel uses (`gmPanelSheetPresentation` in `themeUtils.ts`), so it carries the app theme's palette and no per-sheet background, fonts, or flat-section override — every panel on the screen, player or NPC, reads in one voice. It is off by default, and it is **purely cosmetic**: the panel reads the character's config and never writes it, so the character's own sheet page, its Customization panel, its exported theme, and its version history are unaffected.
+
+The **Combat Stats row** is app chrome in its own right, whichever way that switch is set: both panel kinds color it from the app theme's shared stat palette (`STAT_TOKEN_COLORS`), so Evasion is one color on a player panel, on an NPC panel beside it, and in the chrome above them. A character's per-sheet token colors apply to their own sheet page, not to a panel — that is what stops two panels from disagreeing about what a stat looks like.
+
+An expanded panel also **prints those stats in shorthand** — `Miles / Eva / Arm / Move / Save / END Rec`, and `Wounds` on an NPC — because a panel's token column is ~7.5rem wide and the full names ellipsised there ("MILEST…", "SAVE …", "END RE…"), which tells a GM nothing mid-turn. The shorthand is one shared vocabulary (`SHORT_STAT_LABELS` in `statTokenLabels.ts`) that the panel chrome's own Eva/Arm/Move/DC tokens use too, and every token keeps its full stat name as a tooltip. A sheet page has the width, so it keeps the full names. Every stat token is **one line and one height**, on every sheet: the icon and value on the left, the label (plus a stat's own bonus number, if it has one) on the right. The Milestones bonus is printed inline — `Miles +2`, `Milestones +2` on a sheet page — rather than as a second line under the label, which is what keeps a token to a single line and its grid row free of reserved slack: nothing has to be paid for up front, so a player panel's tokens are exactly the size of an NPC panel's beside it, and the content is centred in the token. The bonus is its own element, so the label's ellipsis can never eat the number, and it is omitted entirely when a character's bonus is 0.
 
 ### Two kinds of panel
 
@@ -423,11 +430,12 @@ Grimoire/
 │   │   ├── NPCSheetPage.tsx      # NPC sheet wrapper with mode toggle
 │   │   ├── GMScreenPage.tsx      # Multi-sheet GM view (panels, pickers, reorder)
 │   │   ├── StatusCompendiumPage.tsx # Status compendium browser
-│   │   └── SettingsPage.tsx         # App preferences (theme picker)
+│   │   └── SettingsPage.tsx         # App preferences (theme, GM panels, animation, backup)
 │   ├── store/
 │   │   ├── appThemeStore.ts   # Zustand store: app theme (localStorage)
 │   │   ├── characterStore.ts  # Zustand store: characters + live play (id-targeted)
 │   │   ├── gmScreenStore.ts   # Zustand store: saved GM screens + panels
+│   │   ├── gmPanelThemeStore.ts # Zustand store: GM panel sheet theming (localStorage)
 │   │   ├── diceRollStore.ts    # Zustand store: dice roll modal lifecycle
 │   │   ├── listPrefsStore.ts   # Zustand store: list sort/filter prefs (localStorage)
 │   │   ├── rollLogStore.ts     # Zustand store: persistent roll log
@@ -487,7 +495,7 @@ The central domain object is a **`Character`**, which holds everything about a s
 | `damage` | Dice notation string (e.g. `2d6+POW`) |
 | `description`, `overcharge`, `flavorText` | Prose fields (Markdown-supported) |
 | `isMinor` | Half-slot flag |
-| `showActivate` | Whether to show the Activate button in view mode |
+| `showActivate` | Whether to show the Activate button in view mode. Offered in the player ability editors only — an NPC's ability editor (and every sub-ability editor on an NPC sheet) hides it, because an NPC outside a GM Screen never activates |
 | `modifiers` | Stat/attribute modifiers applied while the card's modifier toggle is on (`[{ target, value }]`; signed — positive adds, negative subtracts) |
 | `modifiersActive` | Whether those modifiers are currently applied to the sheet (view-mode switch; defaults to `false`) |
 | `uses` | Limited-use budget, present only on abilities flagged as limited: `{ max, current, expendOnActivate }`. `current` moves when the ability is activated and is refilled to `max` on a full restore; omitted entirely for unlimited abilities |
@@ -567,7 +575,7 @@ The dice parser supports:
 
 ### State Management
 
-Six Zustand stores manage all application state:
+Zustand stores manage all application state:
 
 - **`characterStore`** — the character list, the currently-selected sheet, live-play mutations (damage, healing, resource spending, milestone application), and version history. Every live-play action is **id-targeted** (`takeDamage(id, …)`, `spendAP(id, …)`, …) so several sheets can be driven at once; `updateCurrentCharacter` is a thin wrapper over `updateCharacter(id, …)`. Mutations are debounce-autosaved (500ms, per-character timers) to IndexedDB.
 - **`gmScreenStore`** — saved GM screens and their panels: screen CRUD, panel add/remove/reorder, NPC instancing (spawn, duplicate, auto-labelling), instance live state (damage/heal/condition), and reference lookups for placeholders and delete warnings. Autosaved per screen with the same 500ms debounce.
@@ -575,6 +583,7 @@ Six Zustand stores manage all application state:
 - **`rollLogStore`** — persistent roll history across all characters, stored in IndexedDB and filterable by character.
 - **`statusStore`** — the status-condition compendium: CRUD, icon picking, and bundling referenced statuses into character exports. Persisted to IndexedDB.
 - **`listPrefsStore`** — remembered list-page display prefs (sort key + filter selections for the character list, NPC list, and status compendium). Persisted to localStorage so choices survive page switches and reloads.
+- **`appThemeStore` / `homeAnimationStore` / `gmPanelThemeStore`** — app-level UI preferences persisted to localStorage (synchronously available before first paint): the app chrome theme, the home page ambient animation, and whether a GM panel's expanded sheet body follows the app theme instead of the character's own palette. Preferences only — no sheet data is stored here.
 
 ### Persistence
 

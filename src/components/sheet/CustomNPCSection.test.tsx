@@ -2,8 +2,13 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, expect, test, vi } from 'vitest'
 
 import CustomNPCSection from '@/components/sheet/CustomNPCSection'
+import { NotificationProvider } from '@/context/NotificationContext'
 import { createDefaultNPC } from '@/constants/gameData'
-import type { Character, CustomNPCSection as CustomNPCSectionType } from '@/types'
+import type {
+  AbilityBlock,
+  Character,
+  CustomNPCSection as CustomNPCSectionType,
+} from '@/types'
 
 // Shared mock state recreated per test so the NPC lookups are easy to control.
 // `charactersRef` must live in vi.hoisted so the hoisted vi.mock factory can
@@ -110,4 +115,57 @@ test('attributes and skills are not clickable in edit mode', () => {
   fireEvent.click(screen.getByText('Sneak'))
 
   expect(roll).not.toHaveBeenCalled()
+})
+
+/** An NPC ability, costed and activatable, carrying one costed sub-ability. */
+function npcAbility(): AbilityBlock {
+  return {
+    id: 'npc-ability-1',
+    name: 'Fire Breath',
+    traits: [],
+    cost: { ap: 2 },
+    damage: '',
+    description: '',
+    overcharge: '',
+    flavorText: '',
+    isMinor: false,
+    showActivate: true,
+    subAbilitiesUnderDescription: [
+      {
+        id: 'npc-sub-1',
+        name: 'Cinder',
+        traits: [],
+        cost: { ap: 1 },
+        damage: '',
+        description: '',
+        overcharge: '',
+        flavorText: '',
+        isMinor: false,
+        showActivate: true,
+        subAbilitiesUnderDescription: [],
+        subAbilitiesUnderOvercharge: [],
+      },
+    ],
+    subAbilitiesUnderOvercharge: [],
+  }
+}
+
+test('an attached NPC never renders an Activate button — sub-abilities included', () => {
+  // An attached NPC is a static reference like the standalone NPC sheet: the
+  // parent card has no button, and a nested sub-ability must not fall back to
+  // its own `showActivate` flag to grow one.
+  const npc = makeNPC()
+  npc.slottedAbilities = [npcAbility()]
+  charactersRef.current = [npc]
+
+  // Wrapped in the provider the Activate button's plan would need, so this
+  // test fails on the button itself rather than on a missing context.
+  render(
+    <NotificationProvider>
+      <CustomNPCSection tabId="tab-1" section={section} mode="view" />
+    </NotificationProvider>,
+  )
+
+  expect(document.querySelector('.sub-ability-block')).not.toBeNull()
+  expect(screen.queryByRole('button', { name: 'Activate' })).toBeNull()
 })

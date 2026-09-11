@@ -12,6 +12,9 @@
  *     `subAbilityActions` prop (Edit + Remove buttons per sub-ability).
  *   - `subAbilityEditorModal`: the React element to render at the bottom of
  *     the section (the SubAbilityEditorModal). Render it once per section.
+ *
+ * The NPC section passes `npcMode` so the modal matches the NPC's own ability
+ * editor (see {@link UseSubAbilityEditorOptions.npcMode}).
  */
 
 import { useState, useCallback, useMemo } from 'react'
@@ -26,10 +29,19 @@ export interface UseSubAbilityEditorOptions {
    * arrays) is passed back so the section can persist it to the store.
    */
   onUpdateParent: (parent: AbilityBlock) => void
+  /**
+   * NPC context: the sub-ability editor drops the character-only controls the
+   * NPC's own ability editor already drops (the "Show Activate button" toggle,
+   * END/FP costs, custom resource costs). An NPC outside the GM Screen never
+   * renders an Activate button, so a flag for one would be a control that
+   * cannot do anything.
+   */
+  npcMode?: boolean
 }
 
 export function useSubAbilityEditor({
   onUpdateParent,
+  npcMode = false,
 }: UseSubAbilityEditorOptions) {
   const [editingSub, setEditingSub] = useState<AbilityBlock | null>(null)
   const [editingParent, setEditingParent] = useState<AbilityBlock | null>(null)
@@ -132,6 +144,7 @@ export function useSubAbilityEditor({
       open={showEditor}
       onSave={handleSave}
       onClose={handleClose}
+      npcMode={npcMode}
     />
   )
 

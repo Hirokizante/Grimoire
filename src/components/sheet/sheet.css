@@ -653,9 +653,22 @@
 }
 
 .stat-token {
+  /* One height for every stat token in the app, on every kind of sheet: the
+     value line plus the padding around it. Nothing else has to be reserved,
+     because a token's content is one line — the icon and value on the left, the
+     label (and a stat's own bonus number, e.g. Milestones' "+2") on the right.
+     A taller second line inside the token is what used to make one token — and
+     with it its whole grid row — taller than the rest, and reserving that line
+     on every token to compensate is what made the row ~13px of slack tall.
+     Keeping the content to one line removes the problem instead of paying for
+     it, and `align-items: center` centres what is left. */
+  --stat-token-line-h: 1.2rem; /* one line: the .stat-token__value line box */
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  /* Tight on purpose: a panel's token column fits the icon, the number and a
+     label carrying a bonus ("MILES +2") with a few px to spare, so the gaps are
+     what buys that fit. */
+  gap: 0.4rem;
   padding: 0.4rem 0.55rem;
   border-radius: 8px;
   background: var(--bg-surface);
@@ -664,6 +677,7 @@
   overflow: hidden;
   transition: border-color 0.15s ease;
   min-width: 0;
+  min-height: calc(var(--stat-token-line-h) + 0.8rem + 2px);
 }
 
 .stat-token::before {
@@ -685,11 +699,16 @@
   flex: 0 0 auto;
 }
 
+/* The label and the stat's bonus number, side by side on the token's one line. */
 .stat-token__right {
-  display: flex;
-  flex-direction: column;
-  gap: 0.05rem;
   flex: 1 1 auto;
+  min-width: 0;
+}
+
+.stat-token__line {
+  display: flex;
+  align-items: baseline;
+  gap: 0.3rem;
   min-width: 0;
 }
 
@@ -719,6 +738,7 @@
 .stat-token__label {
   font-family: var(--sheet-label-font, inherit);
   font-size: 0.72rem;
+  line-height: 1.2;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--text-muted);
@@ -727,10 +747,18 @@
   text-overflow: ellipsis;
 }
 
-.stat-token__sub {
+/* The Milestones token's bonus, inline with its label: "+2" beside "Miles",
+   an accent-tinted number that reads as part of the stat. Kept OUT of
+   `.stat-token__label` so the label's ellipsis (which exists for the full names
+   on a sheet page) can never eat the number — the shorthand plus the number is
+   what has to fit in a panel's token, and it does. */
+.stat-token__bonus {
   font-family: var(--sheet-helper-font, inherit);
   font-size: 0.65rem;
-  font-weight: 400;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+  flex: 0 0 auto;
   color: var(--accent-violet-soft);
 }
 

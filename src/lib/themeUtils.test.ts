@@ -3,17 +3,20 @@ import {
   appThemeSheetCardBackground,
   appThemeSheetColors,
   appThemeColorVars,
-  appThemeNpcStatColors,
+  appThemeStatColors,
   appThemeSheetPageBackground,
   appThemeStatusDurationColors,
   colorVars,
-  NPC_STAT_TOKEN_COLORS,
+  gmPanelSheetPresentation,
+  STAT_TOKEN_COLORS,
   STATUS_DURATION_COLORS,
   statusDurationColor,
 } from '@/lib/themeUtils'
-import type { NPCStatColorKey } from '@/lib/themeUtils'
+import type { StatColorKey } from '@/lib/themeUtils'
 import { APP_THEMES } from '@/store/appThemeStore'
 import {
+  createDefaultCharacter,
+  createDefaultNPC,
   DEFAULT_SHEET_COLORS,
   MIKAMI_SHEET_COLORS,
   PARCHMENT_SHEET_COLORS,
@@ -21,14 +24,32 @@ import {
 } from '@/constants/gameData'
 import type { PanelStatusDuration, SheetConfig } from '@/types'
 
-/** The six NPC Combat Stats tokens, in sheet order. */
-const NPC_STAT_KEYS: NPCStatColorKey[] = [
+/** The six tokens a player sheet's Combat Stats row shows, in reading order. */
+const PLAYER_STAT_KEYS: StatColorKey[] = [
+  'milestone',
+  'evasion',
+  'armor',
+  'movement',
+  'saveDC',
+  'endRecovery',
+]
+
+/** The six an NPC's Combat Stats row shows, in reading order. */
+const NPC_STAT_KEYS: StatColorKey[] = [
   'evasion',
   'armor',
   'movement',
   'saveDC',
   'hp',
   'mortalWounds',
+]
+
+/** The four stats BOTH rows show — the ones that have to match across panels. */
+const SHARED_STAT_KEYS: StatColorKey[] = [
+  'evasion',
+  'armor',
+  'movement',
+  'saveDC',
 ]
 
 test('appThemeSheetColors: midnight returns the built-in default palette', () => {
@@ -96,6 +117,84 @@ test('sheet card/page backgrounds follow the theme except in midnight', () => {
   }
 })
 
+// ---- GM panel sheet bodies --------------------------------------------------
+
+/** A player config whose every customization is impossible to miss. */
+function customizedSheetConfig(): SheetConfig {
+  const { config } = createDefaultCharacter()
+  return {
+    ...config,
+    backgroundColor: '#123123',
+    sectionHeadingFontFamily: 'Playfair Display',
+    sectionHeadingFontWeight: '800',
+    labelFontFamily: 'Cinzel',
+    textFontFamily: 'Georgia',
+    helperTextFontFamily: 'monospace',
+    hideSectionBackground: true,
+    colors: {
+      ...DEFAULT_SHEET_COLORS,
+      bgBase: '#010203',
+      accent: '#ff00ff',
+      hpBar: '#00ff00',
+    },
+  }
+}
+
+test('gmPanelSheetPresentation: matching the app theme drops every per-sheet value', () => {
+  const { className, style: rawStyle } = gmPanelSheetPresentation(
+    customizedSheetConfig(),
+    'parchment',
+    true,
+  )
+  const style = rawStyle as Record<string, string>
+
+  // Exactly the app theme's palette, variable for variable.
+  expect(style).toEqual(appThemeColorVars('parchment'))
+  // Nothing per-sheet survives: no custom card background, no custom fonts,
+  // and no flat-section layout override.
+  expect(style['--sheet-bg']).toBeUndefined()
+  expect(style['--sheet-heading-font']).toBeUndefined()
+  expect(style['--sheet-text-font']).toBeUndefined()
+  expect(className).toBe('character-sheet character-sheet--view gm-panel__sheet')
+  expect(className).not.toContain('character-sheet--flat')
+  for (const garish of ['#123123', '#010203', '#ff00ff', '#00ff00']) {
+    expect(Object.values(style)).not.toContain(garish)
+  }
+})
+
+test('gmPanelSheetPresentation: without the setting the sheet keeps its customization', () => {
+  const { className, style: rawStyle } = gmPanelSheetPresentation(
+    customizedSheetConfig(),
+    'parchment',
+    false,
+  )
+  const style = rawStyle as Record<string, string>
+
+  expect(style['--sheet-bg']).toBe('#123123')
+  expect(style['--sheet-heading-font']).toBe('Playfair Display')
+  expect(style['--sheet-heading-weight']).toBe('800')
+  expect(style['--sheet-label-font']).toBe('Cinzel')
+  expect(style['--sheet-text-font']).toBe('Georgia')
+  expect(style['--sheet-helper-font']).toBe('monospace')
+  expect(style['--bg-base']).toBe('#010203')
+  expect(style['--accent-violet']).toBe('#ff00ff')
+  expect(style['--hp-bar-color']).toBe('#00ff00')
+  expect(className).toContain('character-sheet--flat')
+})
+
+test('gmPanelSheetPresentation: matching the app theme is identical to an NPC panel', () => {
+  // An NPC panel always matches the app theme, so its body is the reference a
+  // player panel has to hit with the setting on — under every app theme.
+  const player = customizedSheetConfig()
+  const npc = createDefaultNPC().config
+
+  for (const theme of APP_THEMES) {
+    expect(gmPanelSheetPresentation(player, theme, true)).toEqual(
+      gmPanelSheetPresentation(npc, theme, true),
+    )
+  }
+})
+
 // ---- NPC Combat Stats accents ----------------------------------------------
 
 /** Parse a `#rrggbb` color into its sRGB channels. */
@@ -141,29 +240,49 @@ function deltaE76(a: string, b: string): number {
   return Math.hypot(l1 - l2, a1 - a2, b1 - b2)
 }
 
-test('every app theme has a full NPC stat palette', () => {
+test('every app theme has a full stat palette covering both rows', () => {
   for (const theme of APP_THEMES) {
-    const palette = appThemeNpcStatColors(theme)
-    expect(palette).toBe(NPC_STAT_TOKEN_COLORS[theme])
-    for (const key of NPC_STAT_KEYS) {
+    const palette = appThemeStatColors(theme)
+    expect(palette).toBe(STAT_TOKEN_COLORS[theme])
+    for (const key of new Set([...PLAYER_STAT_KEYS, ...NPC_STAT_KEYS])) {
       expect(palette[key], `${theme}.${key}`).toMatch(/^#[0-9a-f]{6}$/i)
     }
   }
 })
 
-test('NPC stat accents are all different within a theme', () => {
+test('the stats both rows share are palette keys, not per-row colors', () => {
+  // The whole point of one palette: Evasion/Armor/Movement/Save DC are read
+  // from the same entry by a player row and an NPC row, so two panels can never
+  // disagree about what a stat looks like.
   for (const theme of APP_THEMES) {
-    const palette = appThemeNpcStatColors(theme)
-    const values = NPC_STAT_KEYS.map((key) => palette[key].toLowerCase())
-    expect(new Set(values).size, `${theme} has duplicate accents`).toBe(
-      NPC_STAT_KEYS.length,
-    )
+    const palette = appThemeStatColors(theme)
+    for (const key of SHARED_STAT_KEYS) {
+      expect(PLAYER_STAT_KEYS).toContain(key)
+      expect(NPC_STAT_KEYS).toContain(key)
+      expect(palette[key], `${theme}.${key}`).toMatch(/^#[0-9a-f]{6}$/i)
+    }
+  }
+})
+
+test('the accents within one Combat Stats row are all different', () => {
+  for (const theme of APP_THEMES) {
+    const palette = appThemeStatColors(theme)
+    for (const [rowName, row] of [
+      ['player', PLAYER_STAT_KEYS],
+      ['npc', NPC_STAT_KEYS],
+    ] as const) {
+      const values = row.map((key) => palette[key].toLowerCase())
+      expect(
+        new Set(values).size,
+        `${theme} ${rowName} row has duplicate accents`,
+      ).toBe(row.length)
+    }
   }
 })
 
 test('NPC HP token keeps the theme HP bar color, wounds never match it', () => {
   for (const theme of APP_THEMES) {
-    const palette = appThemeNpcStatColors(theme)
+    const palette = appThemeStatColors(theme)
     expect(palette.hp, `${theme} HP`).toBe(appThemeSheetColors(theme).hpBar)
     // The regression this palette exists for: a wound accent that reads as the
     // HP token (they were the same color in Mikami).
@@ -171,25 +290,33 @@ test('NPC HP token keeps the theme HP bar color, wounds never match it', () => {
   }
 })
 
-test('NPC stat accents stay distinct and visible on every theme card', () => {
+test('stat accents stay distinct within a row and visible on every theme card', () => {
   for (const theme of APP_THEMES) {
-    const palette = appThemeNpcStatColors(theme)
+    const palette = appThemeStatColors(theme)
     const surface = appThemeSheetColors(theme).bgSurface
 
-    for (let i = 0; i < NPC_STAT_KEYS.length; i++) {
-      const key = NPC_STAT_KEYS[i]
-      // Each 3px stripe has to read against the token it sits on.
+    // Every accent has to read against the token it sits on.
+    for (const key of Object.keys(palette) as StatColorKey[]) {
       expect(
         contrastRatio(palette[key], surface),
         `${theme}.${key} vs card surface`,
       ).toBeGreaterThanOrEqual(3.5)
+    }
 
-      for (let j = i + 1; j < NPC_STAT_KEYS.length; j++) {
-        const other = NPC_STAT_KEYS[j]
-        expect(
-          deltaE76(palette[key], palette[other]),
-          `${theme}: ${key} vs ${other}`,
-        ).toBeGreaterThanOrEqual(16)
+    // Distinctness is per ROW: the six stripes a GM reads side by side are the
+    // ones inside one row. (Milestones and HP may share a hue — Pitch Black's
+    // gold is both — because those two never appear together.)
+    for (const [rowName, row] of [
+      ['player', PLAYER_STAT_KEYS],
+      ['npc', NPC_STAT_KEYS],
+    ] as const) {
+      for (let i = 0; i < row.length; i++) {
+        for (let j = i + 1; j < row.length; j++) {
+          expect(
+            deltaE76(palette[row[i]], palette[row[j]]),
+            `${theme} ${rowName}: ${row[i]} vs ${row[j]}`,
+          ).toBeGreaterThanOrEqual(16)
+        }
       }
     }
   }

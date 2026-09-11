@@ -8,18 +8,21 @@
  */
 
 import { test, expect, beforeEach, vi } from 'vitest'
-import { act, render, screen, fireEvent } from '@testing-library/react'
+import { act, cleanup, render, screen, fireEvent } from '@testing-library/react'
 
 import DamageDialog from '@/components/sheet/DamageDialog'
 import CharacterPanel from '@/components/gmscreen/CharacterPanel'
 import NpcInstancePanel from '@/components/gmscreen/NpcInstancePanel'
+import CharacterSheet from '@/components/sheet/CharacterSheet'
 import { NotificationProvider } from '@/context/NotificationContext'
 import { useCharacterStore } from '@/store/characterStore'
 import { useGMScreenStore } from '@/store/gmScreenStore'
 import { useRollLogStore } from '@/store/rollLogStore'
 import { createDefaultNPC, createDefaultCharacter, DEFAULT_SHEET_COLORS, MAX_AP } from '@/constants/gameData'
-import { appThemeSheetColors } from '@/lib/themeUtils'
+import { appThemeSheetColors, appThemeStatColors } from '@/lib/themeUtils'
+import { SHORT_STAT_LABELS } from '@/components/sheet/statTokenLabels'
 import { useAppThemeStore } from '@/store/appThemeStore'
+import { useGmPanelThemeStore } from '@/store/gmPanelThemeStore'
 import type { AbilityBlock, Character } from '@/types'
 
 const { dbMap } = vi.hoisted(() => ({ dbMap: new Map<string, unknown>() }))
@@ -112,6 +115,9 @@ function panelState() {
 beforeEach(() => {
   dbMap.clear()
   localStorage.clear()
+  // `localStorage.clear()` does not reset already-hydrated store state, so the
+  // panel-theme switch is reset explicitly (it is off by default).
+  useGmPanelThemeStore.setState({ matchAppTheme: false })
   useCharacterStore.setState({ characters: [], currentCharacter: null })
   useGMScreenStore.setState({
     screens: [],
@@ -408,8 +414,12 @@ test('CharacterPanel: stat tokens use the app theme, never the sheet palette', (
 
   const theme = appThemeSheetColors('parchment')
   const defaultTheme = appThemeSheetColors('midnight')
-  expect(tokenColor(container, 'Eva')).toBe(theme.tokenEvasion)
-  expect(tokenColor(container, 'Arm')).toBe(theme.tokenArmor)
+  const stats = appThemeStatColors('parchment')
+  // Eva/Arm are combat stats: they take the theme's shared stat palette, the
+  // same one the body's Combat Stats row and an NPC panel use. END/FP are pools
+  // and keep the resource-bar colors.
+  expect(tokenColor(container, 'Eva')).toBe(stats.evasion)
+  expect(tokenColor(container, 'Arm')).toBe(stats.armor)
   expect(tokenColor(container, 'END')).toBe(theme.endBar)
   expect(tokenColor(container, 'FP')).toBe(theme.fpBar)
   // AP has no token at all any more: the meter under the HP bar carries it
@@ -421,8 +431,9 @@ test('CharacterPanel: stat tokens use the app theme, never the sheet palette', (
   ).not.toContain('AP')
   // The app theme really is a different palette from the sheet's defaults, so
   // the assertions above are meaningful rather than coincidental.
-  expect(theme.tokenEvasion).not.toBe(defaultTheme.tokenEvasion)
+  expect(stats.evasion).not.toBe(defaultTheme.tokenEvasion)
   expect(theme.endBar).not.toBe(defaultTheme.endBar)
+  expect(theme.tokenEvasion).not.toBe(defaultTheme.tokenEvasion)
 
   // And none of the sheet's custom colors leaked through.
   const rendered = ['Eva', 'Arm', 'END', 'FP'].map((l) => tokenColor(container, l))
@@ -451,11 +462,11 @@ test('NpcInstancePanel: stat tokens use the same app-theme source', () => {
     </NotificationProvider>,
   )
 
-  const theme = appThemeSheetColors('parchment')
-  expect(tokenColor(container, 'Eva')).toBe(theme.tokenEvasion)
-  expect(tokenColor(container, 'Arm')).toBe(theme.tokenArmor)
-  expect(tokenColor(container, 'Move')).toBe(theme.tokenMovement)
-  expect(tokenColor(container, 'DC')).toBe(theme.tokenSaveDC)
+  const stats = appThemeStatColors('parchment')
+  expect(tokenColor(container, 'Eva')).toBe(stats.evasion)
+  expect(tokenColor(container, 'Arm')).toBe(stats.armor)
+  expect(tokenColor(container, 'Move')).toBe(stats.movement)
+  expect(tokenColor(container, 'DC')).toBe(stats.saveDC)
 })
 
 test('shared stats read the same color on both panel types', () => {
@@ -523,6 +534,340 @@ test('shared stats read the same color on both panel types', () => {
 
   expect(tokenColor(pcRender.container, 'Eva')).toBe(npcEva)
   expect(tokenColor(pcRender.container, 'Arm')).toBe(npcArm)
+})
+
+// ---- The expanded body: the sheet's palette vs the app theme ---------------
+
+/** A player character whose sheet customization is impossible to miss. */
+function makeCustomizedPc(): Character {
+  const base = createDefaultCharacter()
+  return {
+    ...base,
+    id: 'pc-1',
+    name: 'Vex',
+    // 5 milestones = a +2 bonus, so the row carries the inline bonus badge the
+    // milestone test below asserts on.
+    milestones: 5,
+    config: {
+      ...base.config,
+      backgroundColor: '#123123',
+      sectionHeadingFontFamily: 'Playfair Display',
+      labelFontFamily: 'Cinzel',
+      textFontFamily: 'Georgia',
+      helperTextFontFamily: 'monospace',
+      hideSectionBackground: true,
+      colors: {
+        ...DEFAULT_SHEET_COLORS,
+        bgBase: '#010203',
+        accent: '#ff00ff',
+        hpBar: '#00ff00',
+        // Garish Combat Stats accents too: a panel must never paint its row
+        // with these (see the row tests below).
+        tokenMilestone: '#ff00ff',
+        tokenEvasion: '#ff00ff',
+        tokenArmor: '#00ff00',
+        tokenMovement: '#ff0000',
+        tokenSaveDC: '#0000ff',
+        tokenEndRecovery: '#ffff00',
+      },
+    },
+  }
+}
+
+/** Read the Combat Stats accents an expanded panel body rendered. */
+function bodyTokenColors(panel: HTMLElement): Record<string, string> {
+  const tokens = panel.querySelectorAll<HTMLElement>(
+    '.gm-panel__sheet .stat-token',
+  )
+  return Object.fromEntries(
+    [...tokens].map((el) => [
+      el.querySelector('.stat-token__label')?.textContent ?? '',
+      el.style.getPropertyValue('--token-color'),
+    ]),
+  )
+}
+
+/** Seed one EXPANDED player panel over `pc`, render it, return the body div. */
+function renderExpandedPlayerPanel(pc: Character): HTMLElement {
+  useCharacterStore.setState({ characters: [pc], currentCharacter: null })
+  useGMScreenStore.setState({
+    screens: [
+      {
+        id: SCREEN_ID,
+        name: 'Session 4',
+        panels: [
+          {
+            kind: 'character',
+            id: PANEL_ID,
+            characterId: pc.id,
+            density: 'expanded',
+            statuses: [],
+          },
+        ],
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      },
+    ],
+    currentScreenId: SCREEN_ID,
+    isLoaded: true,
+    isSaving: false,
+    loadError: null,
+  })
+  const panel = useGMScreenStore.getState().screens[0].panels[0]
+  if (panel.kind !== 'character') throw new Error('expected a character panel')
+
+  const { container } = render(
+    <NotificationProvider>
+      <CharacterPanel
+        panel={panel}
+        character={pc}
+        screenId={SCREEN_ID}
+        onOpenSheet={() => {}}
+        onRemove={() => {}}
+      />
+    </NotificationProvider>,
+  )
+
+  const body = container.querySelector('.gm-panel__sheet')
+  if (!body) throw new Error('expanded panel body not rendered')
+  return body as HTMLElement
+}
+
+test('CharacterPanel: the expanded body keeps the sheet palette by default', () => {
+  useAppThemeStore.setState({ theme: 'parchment' })
+  const body = renderExpandedPlayerPanel(makeCustomizedPc())
+
+  // Per-sheet customization on a panel is the historical behaviour and the
+  // default: the switch is opt-in.
+  expect(body.style.getPropertyValue('--accent-violet')).toBe('#ff00ff')
+  expect(body.style.getPropertyValue('--bg-base')).toBe('#010203')
+  expect(body.style.getPropertyValue('--sheet-bg')).toBe('#123123')
+  expect(body.style.getPropertyValue('--sheet-heading-font')).toBe(
+    'Playfair Display',
+  )
+  expect(body.className).toContain('character-sheet--flat')
+})
+
+test('CharacterPanel: Match app theme strips the sheet palette from the body', () => {
+  // Parchment app theme against the character's own (garish) palette, so the
+  // two genuinely differ and the assertions cannot pass by coincidence.
+  useAppThemeStore.setState({ theme: 'parchment' })
+  useGmPanelThemeStore.setState({ matchAppTheme: true })
+  const body = renderExpandedPlayerPanel(makeCustomizedPc())
+
+  const theme = appThemeSheetColors('parchment')
+  expect(theme.accent).not.toBe('#ff00ff')
+  expect(body.style.getPropertyValue('--accent-violet')).toBe(theme.accent)
+  expect(body.style.getPropertyValue('--bg-base')).toBe(theme.bgBase)
+  expect(body.style.getPropertyValue('--hp-bar-color')).toBe(theme.hpBar)
+
+  // Nothing per-sheet survives: no custom card background, no custom fonts,
+  // no flat-section layout override.
+  expect(body.style.getPropertyValue('--sheet-bg')).toBe('')
+  expect(body.style.getPropertyValue('--sheet-heading-font')).toBe('')
+  expect(body.style.getPropertyValue('--sheet-text-font')).toBe('')
+  expect(body.className).not.toContain('character-sheet--flat')
+  for (const garish of ['#ff00ff', '#00ff00', '#010203', '#123123']) {
+    expect(body.getAttribute('style')).not.toContain(garish)
+  }
+})
+
+test('CharacterPanel: Match app theme renders the body exactly like an NPC panel', () => {
+  useAppThemeStore.setState({ theme: 'parchment' })
+  useGmPanelThemeStore.setState({ matchAppTheme: true })
+  const playerBody = renderExpandedPlayerPanel(makeCustomizedPc())
+
+  // NPC panels match the app theme unconditionally, so theirs is the reference.
+  // Seeded inside `act` because the player panel above is still mounted and
+  // re-renders off the same stores.
+  let npc: ReturnType<typeof expandedHeadings>
+  act(() => {
+    npc = expandedHeadings('npc')
+  })
+  const npcBody = npc!.container.querySelector('.gm-panel__sheet')
+  if (!npcBody) throw new Error('expanded NPC panel body not rendered')
+
+  expect(playerBody.className).toBe(npcBody.className)
+  expect(playerBody.getAttribute('style')).toBe(npcBody.getAttribute('style'))
+})
+
+test('Match app theme is cosmetic: the character sheet page keeps its palette', () => {
+  // The switch must never reach the sheet the player actually owns — it is a
+  // display option for GM panels only.
+  useAppThemeStore.setState({ theme: 'parchment' })
+  useGmPanelThemeStore.setState({ matchAppTheme: true })
+  const pc = makeCustomizedPc()
+  useCharacterStore.setState({ characters: [pc], currentCharacter: pc })
+
+  const { container } = render(
+    <NotificationProvider>
+      <CharacterSheet character={pc} />
+    </NotificationProvider>,
+  )
+  const sheet = container.querySelector('.character-sheet')
+  if (!sheet) throw new Error('character sheet not rendered')
+
+  expect((sheet as HTMLElement).style.getPropertyValue('--accent-violet')).toBe(
+    '#ff00ff',
+  )
+  expect((sheet as HTMLElement).style.getPropertyValue('--sheet-bg')).toBe(
+    '#123123',
+  )
+  expect(sheet.className).toContain('character-sheet--flat')
+  // And the record itself was only read, never written.
+  expect(pc.config.colors.accent).toBe('#ff00ff')
+  expect(pc.config.backgroundColor).toBe('#123123')
+})
+
+// ---- Combat Stats: one set of accents for both panel kinds -----------------
+
+test('expanded panels color every shared Combat Stats token identically', () => {
+  // Parchment, so the app theme's stat palette genuinely differs from the
+  // character's own token colors.
+  useAppThemeStore.setState({ theme: 'parchment' })
+  const playerBody = renderExpandedPlayerPanel(makeCustomizedPc())
+
+  // Seeded inside `act` because the player panel above is still mounted.
+  let npc: ReturnType<typeof expandedHeadings>
+  act(() => {
+    npc = expandedHeadings('npc')
+  })
+  const npcBody = npc!.container.querySelector('.gm-panel__sheet')
+  if (!npcBody) throw new Error('expanded NPC panel body not rendered')
+
+  const player = bodyTokenColors(playerBody.closest('.gm-panel') as HTMLElement)
+  const npcRow = bodyTokenColors(
+    (npcBody as HTMLElement).closest('.gm-panel') as HTMLElement,
+  )
+  const stats = appThemeStatColors('parchment')
+
+  // A panel's tokens read in shorthand (see SHORT_STAT_LABELS) — the row is
+  // only ~7.5rem wide per token, so the full names ellipsised there.
+  const short = SHORT_STAT_LABELS
+
+  // The four stats both rows show: same color, whichever kind of panel.
+  for (const [label, key] of [
+    [short.Evasion, 'evasion'],
+    [short.Armor, 'armor'],
+    [short.Movement, 'movement'],
+    [short['Save DC'], 'saveDC'],
+  ] as const) {
+    expect(player[label], `player ${label}`).toBe(stats[key])
+    expect(npcRow[label], `npc ${label}`).toBe(stats[key])
+    expect(player[label], `${label} across panels`).toBe(npcRow[label])
+  }
+
+  // The row-specific stats still get their own tuned accents.
+  expect(player[short.Milestones]).toBe(stats.milestone)
+  expect(player[short['END Recovery']]).toBe(stats.endRecovery)
+  expect(npcRow.HP).toBe(stats.hp)
+  expect(npcRow[short['Mortal Wounds']]).toBe(stats.mortalWounds)
+})
+
+test('an expanded panel prints shorthand labels, never a truncated one', () => {
+  // The bug this pins: at panel width every long stat name was ELLIPSISED
+  // ("MILEST…", "SAVE …", "END RE…"), which tells a GM nothing mid-turn. A
+  // shorthand that fits is the fix — so no panel token may be cut off, and the
+  // full stat name has to remain reachable (the tooltip).
+  useAppThemeStore.setState({ theme: 'midnight' })
+  const playerBody = renderExpandedPlayerPanel(makeCustomizedPc())
+
+  let npc: ReturnType<typeof expandedHeadings>
+  act(() => {
+    npc = expandedHeadings('npc')
+  })
+  const npcBody = npc!.container.querySelector('.gm-panel__sheet')
+  if (!npcBody) throw new Error('expanded NPC panel body not rendered')
+
+  const names: Record<string, string> = {
+    [SHORT_STAT_LABELS.Milestones]: 'Milestones',
+    [SHORT_STAT_LABELS.Evasion]: 'Evasion',
+    [SHORT_STAT_LABELS.Armor]: 'Armor',
+    [SHORT_STAT_LABELS.Movement]: 'Movement',
+    [SHORT_STAT_LABELS['Save DC']]: 'Save DC',
+    [SHORT_STAT_LABELS['END Recovery']]: 'END Recovery',
+    [SHORT_STAT_LABELS['Mortal Wounds']]: 'Mortal Wounds',
+    // Already short enough to print as-is: no shorthand, no tooltip needed.
+    HP: 'HP',
+  }
+
+  for (const body of [playerBody, npcBody as HTMLElement]) {
+    const tokens = [...body.querySelectorAll<HTMLElement>('.stat-token')]
+    expect(tokens).toHaveLength(6)
+    for (const token of tokens) {
+      const label = token.querySelector('.stat-token__label')?.textContent ?? ''
+      expect(label.length, `${label} is shorthand`).toBeLessThanOrEqual(8)
+      // The panel chrome labels the same stats Eva/Arm/Move/DC, so the row
+      // below it has to agree; anything else is drift between the two.
+      expect(Object.keys(names), `${label} is a known shorthand`).toContain(label)
+      // "HP" is the only label with nothing to expand.
+      expect(token.getAttribute('title')).toBe(
+        label === 'HP' ? null : names[label],
+      )
+    }
+  }
+})
+
+test('a panel keeps the milestone bonus, inline in its label line', () => {
+  // The bonus is not a hover-only detail: it is printed, beside the label
+  // ("Miles +2"), so the token stays one line and the row needs no reserved
+  // second line. The rendered geometry is asserted in e2e/gm-screen.spec.ts.
+  useAppThemeStore.setState({ theme: 'midnight' })
+  const body = renderExpandedPlayerPanel(makeCustomizedPc())
+
+  const milestone = [...body.querySelectorAll<HTMLElement>('.stat-token')].find(
+    (el) =>
+      el.querySelector('.stat-token__label')?.textContent ===
+      SHORT_STAT_LABELS.Milestones,
+  )
+  if (!milestone) throw new Error('no Milestones token rendered')
+
+  const line = milestone.querySelector('.stat-token__line')
+  expect(line?.querySelector('.stat-token__bonus')?.textContent).toMatch(
+    /^\+\d+$/,
+  )
+  // One height, and it is the single-line one: no second line is reserved.
+  expect(getComputedStyle(milestone).minHeight).toContain('--stat-token-line-h')
+})
+
+test('a panel paints its Combat Stats row with the app theme, not the sheet', () => {
+  useAppThemeStore.setState({ theme: 'parchment' })
+  const stats = appThemeStatColors('parchment')
+  const garish = [
+    '#ff00ff', '#00ff00', '#ff0000', '#0000ff', '#ffff00',
+  ]
+
+  // The row is app chrome, so it looks the same whether or not the body around
+  // it is matching the app theme.
+  for (const matchAppTheme of [false, true]) {
+    useGmPanelThemeStore.setState({ matchAppTheme })
+    const body = renderExpandedPlayerPanel(makeCustomizedPc())
+    const row = bodyTokenColors(body.closest('.gm-panel') as HTMLElement)
+
+    expect(row[SHORT_STAT_LABELS.Milestones]).toBe(stats.milestone)
+    expect(row[SHORT_STAT_LABELS.Evasion]).toBe(stats.evasion)
+    expect(row[SHORT_STAT_LABELS.Armor]).toBe(stats.armor)
+    expect(row[SHORT_STAT_LABELS.Movement]).toBe(stats.movement)
+    expect(row[SHORT_STAT_LABELS['Save DC']]).toBe(stats.saveDC)
+    expect(row[SHORT_STAT_LABELS['END Recovery']]).toBe(stats.endRecovery)
+    for (const color of garish) {
+      expect(Object.values(row)).not.toContain(color)
+    }
+    // Unmount before the next pass re-seeds the stores the panel reads.
+    cleanup()
+  }
+})
+
+test('a panel chrome token and its body token are the same color', () => {
+  // The chrome and the expanded row call the same stat by the same name — that
+  // is why the shorthand vocabulary is shared (SHORT_STAT_LABELS).
+  useAppThemeStore.setState({ theme: 'parchment' })
+  const body = renderExpandedPlayerPanel(makeCustomizedPc())
+  const panel = body.closest('.gm-panel') as HTMLElement
+  const row = bodyTokenColors(panel)
+
+  expect(tokenColor(panel, 'Eva')).toBe(row[SHORT_STAT_LABELS.Evasion])
+  expect(tokenColor(panel, 'Arm')).toBe(row[SHORT_STAT_LABELS.Armor])
 })
 
 

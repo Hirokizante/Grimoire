@@ -24,6 +24,7 @@ import AbilityBlockCard from '@/components/sheet/AbilityBlockCard'
 import AbilityEditorModal from '@/components/sheet/AbilityEditorModal'
 import ConfirmModal from '@/components/sheet/ConfirmModal'
 import MarkdownText from '@/components/ui/MarkdownText'
+import { NO_ACTIVATION } from '@/hooks/useAbilityActivation'
 import { ATTRIBUTE_LIST, SKILL_LIST } from '@/constants/gameData'
 import {
   DEFAULT_NPC_STATS,
@@ -415,7 +416,11 @@ export default function CustomNPCSection({
           </div>
         </div>
 
-        {/* Abilities — compact cards, no Activate button, edit-mode Edit/Remove */}
+        {/* Abilities — compact cards, no Activate button, edit-mode Edit/Remove.
+            An attached NPC is a static reference like the standalone NPC sheet,
+            so the "nothing activates" resolver travels with the card: without
+            it a sub-ability would fall back to its own `showActivate` flag and
+            grow a button that spends resources from a card that never plays. */}
         <div className="custom-npc-section__block">
           <div className="custom-npc-section__block-heading custom-npc-section__block-heading--row">
             <h5 className="custom-npc-section__block-heading">Abilities</h5>
@@ -445,6 +450,7 @@ export default function CustomNPCSection({
                   character={npc}
                   onToggleModifiers={toggleAbilityModifiers}
                   onSetUses={setAbilityUses}
+                  activateOverride={NO_ACTIVATION}
                   actions={
                     isEdit ? (
                       <>

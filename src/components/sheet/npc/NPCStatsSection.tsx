@@ -7,10 +7,11 @@
  * stat here — a static reference value, not the player sheet's wound track.
  *
  * Uses the same `stat-token` card style as the player sheet's StatsSection
- * for visual consistency. Each stat gets its own accent color from the
- * active app theme's NPC stat palette (see NPC_STAT_TOKEN_COLORS) — NPC
- * sheets have no per-sheet customization, so they follow the app theme
- * everywhere else too (page/card backgrounds, palette), and the record's own
+ * for visual consistency, and the same accent palette (STAT_TOKEN_COLORS): the
+ * four stats the two rows share — Evasion, Armor, Movement, Save DC — are the
+ * same color on an NPC sheet, a player sheet page, and a GM panel of either
+ * kind. NPC sheets have no per-sheet customization, so they follow the app
+ * theme everywhere (page/card backgrounds, palette), and the record's own
  * stored colors are deliberately ignored: a record saved before a color key
  * existed would otherwise render that token with no stripe at all.
  *
@@ -26,7 +27,11 @@ import type { LucideIcon } from 'lucide-react'
 
 import { useCharacterStore } from '@/store/characterStore'
 import { useAppThemeStore } from '@/store/appThemeStore'
-import { appThemeNpcStatColors } from '@/lib/themeUtils'
+import { appThemeStatColors } from '@/lib/themeUtils'
+import {
+  statTokenLabel,
+  type StatTokenLabelMode,
+} from '@/components/sheet/statTokenLabels'
 import {
   DEFAULT_NPC_STATS,
   effectiveNPCStats,
@@ -44,6 +49,14 @@ export interface NPCStatsSectionProps {
    * embedded inside the hero section.
    */
   variant?: 'section' | 'flat'
+  /**
+   * How much of each stat name the token prints — see
+   * {@link StatsSectionProps.tokenLabels}. "full" (default) is the sheet page;
+   * an NPC's "Mortal Wounds" is the longest stat name in the app and a GM
+   * Screen panel's token column is far too narrow for it, so panels ask for
+   * "short" ("Wounds") and carry the full name as a tooltip.
+   */
+  tokenLabels?: StatTokenLabelMode
 }
 
 /** Metadata for each NPC stat token: icon, label, key in NPCStats, color. */
@@ -59,12 +72,15 @@ export default function NPCStatsSection({
   npc,
   mode = 'view',
   variant = 'section',
+  tokenLabels = 'full',
 }: NPCStatsSectionProps) {
   const updateCharacter = useCharacterStore((s) => s.updateCharacter)
   const update = (updater: (c: Character) => Character) =>
     updateCharacter(npc.id, updater)
   // Standalone NPC sheets follow the app theme (see NPCSheet) — including the
-  // Combat Stats accents, which come from the theme's NPC stat palette.
+  // Combat Stats accents, which come from the theme's shared stat palette (the
+  // one a player panel's row uses too, so both panels agree on every shared
+  // stat).
   const appTheme = useAppThemeStore((s) => s.theme)
   const isEdit = mode === 'edit'
 
@@ -73,7 +89,7 @@ export default function NPCStatsSection({
   const baseStats: NPCStats = { ...DEFAULT_NPC_STATS, ...(npc.npcStats ?? {}) }
   const stats = effectiveNPCStats(npc)
 
-  const colors = appThemeNpcStatColors(appTheme)
+  const colors = appThemeStatColors(appTheme)
   const statTokens: StatTokenMeta[] = [
     { label: 'Evasion', key: 'evasion', icon: Wind, color: colors.evasion },
     { label: 'Armor', key: 'armor', icon: Shield, color: colors.armor },
@@ -111,12 +127,19 @@ export default function NPCStatsSection({
           const value = isEdit ? baseStats[token.key] : stats[token.key]
           const delta = stats[token.key] - baseStats[token.key]
           const modified = !isEdit && delta !== 0
+          // Short mode prints the shorthand; the full name rides along as the
+          // tooltip so "Wounds" is never a guess (see statTokenLabel).
+          const { text: label, title } = statTokenLabel(
+            token.label,
+            tokenLabels,
+            modified,
+          )
           return (
             <div
               key={token.label}
               className={'stat-token' + (modified ? ' stat-token--modified' : '')}
               style={{ '--token-color': token.color } as React.CSSProperties}
-              title={modified ? 'Includes active ability modifiers' : undefined}
+              title={title}
             >
               <div className="stat-token__left">
                 <Icon className="stat-token__icon" size={18} strokeWidth={2.2} />
@@ -140,7 +163,9 @@ export default function NPCStatsSection({
                 )}
               </div>
               <div className="stat-token__right">
-                <span className="stat-token__label">{token.label}</span>
+                <span className="stat-token__line">
+                  <span className="stat-token__label">{label}</span>
+                </span>
               </div>
             </div>
           )

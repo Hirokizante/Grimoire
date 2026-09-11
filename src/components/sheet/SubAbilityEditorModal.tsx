@@ -30,6 +30,14 @@ export interface SubAbilityEditorModalProps {
   onSave: (ability: AbilityBlock) => void
   /** Called when the user closes (Esc, overlay, cancel, or close button). */
   onClose: () => void
+  /**
+   * NPC context: hide the character-only controls in the editor — most
+   * visibly the "Show Activate button" toggle, which an NPC sheet never
+   * offers (NPCs only activate through a GM Screen panel's own rule). The
+   * sub-ability editor must match the main ability editor, which hides the
+   * same controls under `npcMode`.
+   */
+  npcMode?: boolean
 }
 
 export default function SubAbilityEditorModal({
@@ -39,6 +47,7 @@ export default function SubAbilityEditorModal({
   open,
   onSave,
   onClose,
+  npcMode = false,
 }: SubAbilityEditorModalProps) {
   const editorKey = useMemo(
     () => (ability ? `sub-edit-${ability.id}` : 'new-sub-ability'),
@@ -116,6 +125,7 @@ export default function SubAbilityEditorModal({
             hideTitle
             onDirtyChange={handleDirtyChange}
             isSubAbility
+            npcMode={npcMode}
           />
         </div>
       </div>

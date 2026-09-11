@@ -10,6 +10,11 @@
  * The section is wrapped in a dnd-kit `SortableContext` (vertical) and
  * `useDroppable` so it acts as a drop target for abilities dragged from the
  * slotted section. The parent {@link AbilitiesDndContext} handles the drag.
+ *
+ * **Nothing in the pool activates.** These abilities are not slotted, so their
+ * cards carry no Activate button — and because a sub-ability is bound to its
+ * parent (it cannot be slotted on its own), the nested cards do not either; see
+ * the `activateOverride` passed below.
  */
 
 import { useState, useCallback } from 'react'
@@ -28,6 +33,7 @@ import SortableAbilityCard, {
 } from '@/components/sheet/SortableAbilityCard'
 import { useCharacterStore } from '@/store/characterStore'
 import { useSubAbilityEditor } from '@/hooks/useSubAbilityEditor'
+import { NO_ACTIVATION } from '@/hooks/useAbilityActivation'
 import type { AbilityBlock } from '@/types'
 import type { SheetMode } from '@/pages/CharacterSheetPage'
 
@@ -193,6 +199,11 @@ export default function AbilityPoolSection({
                 section={SECTION}
                 mode={mode}
                 subAbilityActions={isEdit ? subAbilityActions : undefined}
+                // The pool is inactive by definition: nothing here activates.
+                // The resolver is the last word, which is what stops a nested
+                // sub-ability from falling back to its own `showActivate` flag
+                // and growing a button that spends the character's real AP.
+                activateOverride={NO_ACTIVATION}
                 actions={
                   isEdit ? (
                     <>

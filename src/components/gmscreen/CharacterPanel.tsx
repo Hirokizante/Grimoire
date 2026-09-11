@@ -9,16 +9,20 @@
  *   the GM's tracked status pills inline with the HP number, and the key stat
  *   tokens — one glance-height card.
  * - **Expanded**: the live-play sheet sections rendered inline inside a
- *   `colorVars()` container so the character's own customization still applies.
- *   Expanded panels are deliberately read-only live-play views; full editing
- *   happens on the sheet page ("Open sheet" in the panel menu).
+ *   `colorVars()` container, so by default the character's own customization
+ *   applies. Expanded panels are deliberately read-only live-play views; full
+ *   editing happens on the sheet page ("Open sheet" in the panel menu).
  *
  * The panel's own chrome — including its stat tokens — follows the **app
  * theme**, never the sheet's palette. The GM Screen shows several sheets side
  * by side, so per-sheet token colors would make every panel read differently
  * and destroy the at-a-glance consistency that is the point of the screen. The
  * sheet's palette is injected only inside the expanded sheet content, where
- * the player's customization belongs.
+ * the player's customization belongs — and even there the GM can turn it off:
+ * Settings → GM Screen → "Match app theme" makes the expanded body render
+ * exactly like an NPC panel (app theme palette, no per-sheet background or
+ * fonts). That switch is cosmetic and panel-scoped; it reads the config and
+ * never writes it, so the character's own sheet keeps every custom color.
  */
 
 import { useState } from 'react'
@@ -35,8 +39,9 @@ import { useCharacterStore } from '@/store/characterStore'
 import { useNotification } from '@/context/NotificationContext'
 import { useGMScreenStore } from '@/store/gmScreenStore'
 import { effectiveCombatStats } from '@/lib/abilityModifiers'
-import { appThemeColorVars, colorVars } from '@/lib/themeUtils'
+import { appThemeColorVars, appThemeStatColors, gmPanelSheetPresentation } from '@/lib/themeUtils'
 import { useAppThemeStore } from '@/store/appThemeStore'
+import { useGmPanelThemeStore } from '@/store/gmPanelThemeStore'
 import type { Character, ScreenPanel } from '@/types'
 
 export interface CharacterPanelProps {
@@ -64,12 +69,25 @@ export default function CharacterPanel({
   // is refilled — one implementation, two surfaces.
   const endTurn = useCharacterStore((s) => s.endTurn)
   const appTheme = useAppThemeStore((s) => s.theme)
+  // Settings → GM Screen: when on, the expanded body follows the app theme
+  // exactly like an NPC panel instead of the character's own customization.
+  // The setting is read from localStorage-backed store state, never written
+  // back to the character — this panel is the only thing it changes.
+  const matchAppTheme = useGmPanelThemeStore((s) => s.matchAppTheme)
   const { notify } = useNotification()
   const [showDamage, setShowDamage] = useState(false)
 
   // Panel-chrome colors — the app theme's palette, deliberately NOT the
-  // character's own `config.colors` (see the component doc).
+  // character's own `config.colors` (see the component doc). Only the resource
+  // tokens use this: Eva/Arm are combat stats and take `statColors` instead, so
+  // the chrome and the body's Combat Stats row agree.
   const tokenColors = appThemeColorVars(appTheme)
+  const statColors = appThemeStatColors(appTheme)
+  const sheetPresentation = gmPanelSheetPresentation(
+    character.config,
+    appTheme,
+    matchAppTheme,
+  )
 
   const stats = effectiveCombatStats(character)
   const maxHP = stats.maxHP
@@ -154,13 +172,18 @@ export default function CharacterPanel({
 
       {/* No AP token: the meter above carries it now, exactly as on an NPC
         * panel (which has no AP token either). END and FP have no chrome bar,
-        * so their tokens stay the at-a-glance read-out. */}
+        * so their tokens stay the at-a-glance read-out.
+        *
+        * Eva and Arm take the app theme's SHARED stat palette — the same source
+        * the expanded body's Combat Stats row uses, and the same colors an NPC
+        * panel puts on the same two stats. END/FP keep the resource-bar colors
+        * (they are pools, not combat stats, and sit beside their own bars). */}
       <div className="gm-tokens">
-        <span className="gm-token" style={{ '--token-color': tokenColors['--color-token-evasion'] } as React.CSSProperties}>
+        <span className="gm-token" style={{ '--token-color': statColors.evasion } as React.CSSProperties}>
           <Wind size={13} /> <span className="gm-token__label">Eva</span>
           <span className="gm-token__value">{stats.evasion}</span>
         </span>
-        <span className="gm-token" style={{ '--token-color': tokenColors['--color-token-armor'] } as React.CSSProperties}>
+        <span className="gm-token" style={{ '--token-color': statColors.armor } as React.CSSProperties}>
           <Shield size={13} /> <span className="gm-token__label">Arm</span>
           <span className="gm-token__value">{stats.armor}</span>
         </span>
@@ -191,22 +214,14 @@ export default function CharacterPanel({
       {/* The panel content brings the character's OWN customization, exactly
         * as CharacterSheet does — the GM Screen chrome itself stays on the app
         * theme. The body is the shared PanelSheet so player and NPC panels
-        * read identically. */}
+        * read identically, and `gmPanelSheetPresentation` is the single place
+        * that decides which palette the body gets: the sheet's own, or (with
+        * the "Match app theme" setting on) the app theme's, which is the very
+        * same rendering an NPC panel uses. */}
       <PanelExpand open={expanded}>
         <div
-          className={
-            'character-sheet character-sheet--view gm-panel__sheet' +
-            (character.config.hideSectionBackground ? ' character-sheet--flat' : '')
-          }
-          style={{
-            '--sheet-bg': character.config.backgroundColor,
-            '--sheet-heading-font': character.config.sectionHeadingFontFamily,
-            '--sheet-heading-weight': character.config.sectionHeadingFontWeight,
-            '--sheet-label-font': character.config.labelFontFamily,
-            '--sheet-text-font': character.config.textFontFamily,
-            '--sheet-helper-font': character.config.helperTextFontFamily,
-            ...colorVars(character.config.colors),
-          } as React.CSSProperties}
+          className={sheetPresentation.className}
+          style={sheetPresentation.style}
         >
           <PanelSheet entity={character} mode="view" hideAP />
         </div>

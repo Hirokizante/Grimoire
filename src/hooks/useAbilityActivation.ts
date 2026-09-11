@@ -108,6 +108,19 @@ export type AbilityActivationOverrideResolver = (
   ability: AbilityBlock,
 ) => AbilityActivationOverride | null
 
+/**
+ * A resolver for surfaces where **nothing activates**: an ability parked in the
+ * Ability Pool (inactive by definition) and a standalone NPC sheet (a static
+ * reference outside the GM Screen). It answers "no" for every ability.
+ *
+ * Passing this is deliberately *not* the same as passing no resolver at all. A
+ * resolver is the last word on activation, so no card below it can fall back to
+ * its own `showActivate` flag and grow a button — which is how a sub-ability
+ * used to offer an Activate that spent the character's AP from a parent that
+ * was not slotted, or from an NPC sheet that never activates at all.
+ */
+export const NO_ACTIVATION: AbilityActivationOverrideResolver = () => null
+
 export interface AbilityActivationPlan {
   /** Every cost the activation deducts, already exhaustion-adjusted. */
   apCost: number

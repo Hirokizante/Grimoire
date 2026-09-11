@@ -54,7 +54,11 @@ export interface SubAbilityBlockProps {
    * Per-ability activation override (GM Screen NPC instances): its presence
    * gives the sub-ability an Activate button even when `showActivate` is off,
    * redirects the costs to the panel's own AP, and adds the Recharge badge.
-   * Same contract as {@link AbilityActivation}'s prop of the same name.
+   * A resolver that answers "no" for everything means the opposite — no button
+   * at all, whatever this sub-ability's own flag says — which is how surfaces
+   * that activate nothing (the Ability Pool, an NPC sheet outside the GM
+   * Screen) keep their nested cards quiet. Same contract as
+   * {@link AbilityActivation}'s prop of the same name.
    */
   activateOverride?: AbilityActivationOverrideResolver
 }
@@ -170,6 +174,10 @@ export default function SubAbilityBlock({
   // the last word: it returns an override only for the sub-abilities that
   // should activate (anything with a cost), so the `showActivate` flag — which
   // the NPC editor does not offer — cannot re-enable one the panel skipped.
+  // The same contract silences a Sub-Ability whose parent is *not* in play: a
+  // pooled ability and an NPC sheet outside the GM Screen both pass a resolver
+  // that answers "no", so the parent's slot state — not this block's own flag —
+  // decides whether an Activate button appears.
   const override = activateOverride?.(ability) ?? null
   const canShowActivate =
     isView &&

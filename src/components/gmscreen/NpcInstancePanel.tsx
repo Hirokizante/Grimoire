@@ -35,7 +35,7 @@ import PanelHeader, { type PanelMenuItem } from '@/components/gmscreen/PanelHead
 import PanelStatuses from '@/components/gmscreen/PanelStatuses'
 import { useNpcInstanceActivation } from '@/hooks/useNpcInstanceActivation'
 import { useGMScreenStore } from '@/store/gmScreenStore'
-import { appThemeColorVars } from '@/lib/themeUtils'
+import { appThemeStatColors, gmPanelSheetPresentation } from '@/lib/themeUtils'
 import { useAppThemeStore } from '@/store/appThemeStore'
 import type { Character, NpcInstanceState, ScreenPanel } from '@/types'
 
@@ -73,8 +73,16 @@ export default function NpcInstancePanel({
   const restoreInstanceAP = useGMScreenStore((s) => s.restoreInstanceAP)
   const appTheme = useAppThemeStore((s) => s.theme)
   // Panel-chrome colors — the app theme's palette, matching CharacterPanel and
-  // deliberately independent of any sheet's customization.
-  const themeVars = appThemeColorVars(appTheme)
+  // deliberately independent of any sheet's customization. Its four stat
+  // tokens come from the theme's SHARED stat palette (`statColors`), the same
+  // one the expanded body's Combat Stats row and a player panel's chrome use,
+  // so "Eva" is one color everywhere on the screen.
+  const statColors = appThemeStatColors(appTheme)
+  // The expanded body follows the app theme unconditionally: NPCs have no
+  // per-sheet customization. It goes through the same helper a player panel
+  // uses, so a player panel with the "Match app theme" setting on renders its
+  // body through exactly this path — the two can never drift apart.
+  const sheetPresentation = gmPanelSheetPresentation(base.config, appTheme, true)
 
   // Live-play wiring for this instance: its own AP, its own Recharge
   // cooldowns, its own turn. Everything the base record owns stays untouched.
@@ -205,19 +213,19 @@ export default function NpcInstancePanel({
       />
 
       <div className="gm-tokens">
-        <span className="gm-token" style={{ '--token-color': themeVars['--color-token-evasion'] } as React.CSSProperties}>
+        <span className="gm-token" style={{ '--token-color': statColors.evasion } as React.CSSProperties}>
           <Wind size={13} /> <span className="gm-token__label">Eva</span>
           <span className="gm-token__value">{evasion}</span>
         </span>
-        <span className="gm-token" style={{ '--token-color': themeVars['--color-token-armor'] } as React.CSSProperties}>
+        <span className="gm-token" style={{ '--token-color': statColors.armor } as React.CSSProperties}>
           <Shield size={13} /> <span className="gm-token__label">Arm</span>
           <span className="gm-token__value">{armor}</span>
         </span>
-        <span className="gm-token" style={{ '--token-color': themeVars['--color-token-movement'] } as React.CSSProperties}>
+        <span className="gm-token" style={{ '--token-color': statColors.movement } as React.CSSProperties}>
           <Swords size={13} /> <span className="gm-token__label">Move</span>
           <span className="gm-token__value">{movement}</span>
         </span>
-        <span className="gm-token" style={{ '--token-color': themeVars['--color-token-save-dc'] } as React.CSSProperties}>
+        <span className="gm-token" style={{ '--token-color': statColors.saveDC } as React.CSSProperties}>
           <Target size={13} /> <span className="gm-token__label">DC</span>
           <span className="gm-token__value">{saveDC}</span>
         </span>
@@ -241,8 +249,8 @@ export default function NpcInstancePanel({
         * the abilities live here without touching the base record's sheet. */}
       <PanelExpand open={expanded}>
         <div
-          className="character-sheet character-sheet--view gm-panel__sheet"
-          style={themeVars as React.CSSProperties}
+          className={sheetPresentation.className}
+          style={sheetPresentation.style}
         >
           <PanelSheet entity={base} mode="view" npcActivation={activation} />
         </div>

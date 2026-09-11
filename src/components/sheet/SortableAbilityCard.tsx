@@ -15,6 +15,7 @@ import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 
 import AbilityBlockCard from '@/components/sheet/AbilityBlockCard'
+import type { AbilityActivationOverrideResolver } from '@/hooks/useAbilityActivation'
 import type { AbilityBlock } from '@/types'
 import type { SheetMode } from '@/pages/CharacterSheetPage'
 
@@ -32,6 +33,13 @@ export interface SortableAbilityCardProps {
    * Passed through to AbilityBlockCard.
    */
   subAbilityActions?: (sub: AbilityBlock, parent: AbilityBlock) => React.ReactNode
+  /**
+   * Per-ability activation override, passed through to AbilityBlockCard (and so
+   * to the sub-abilities nested in the card). A section that activates nothing
+   * — the Ability Pool — passes a resolver that always says "no", so no card
+   * below can fall back to its own `showActivate` flag.
+   */
+  activateOverride?: AbilityActivationOverrideResolver
 }
 
 export default function SortableAbilityCard({
@@ -40,6 +48,7 @@ export default function SortableAbilityCard({
   mode = 'view',
   actions,
   subAbilityActions,
+  activateOverride,
 }: SortableAbilityCardProps) {
   const isEdit = mode === 'edit'
 
@@ -83,7 +92,13 @@ export default function SortableAbilityCard({
         </button>
       )}
 
-      <AbilityBlockCard ability={ability} mode={mode} actions={actions} subAbilityActions={subAbilityActions} />
+      <AbilityBlockCard
+        ability={ability}
+        mode={mode}
+        actions={actions}
+        subAbilityActions={subAbilityActions}
+        activateOverride={activateOverride}
+      />
     </div>
   )
 }
