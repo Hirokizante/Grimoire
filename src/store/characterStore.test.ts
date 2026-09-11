@@ -1180,3 +1180,134 @@ test('loadCharacters: a successful load clears a previous error', async () => {
   await useCharacterStore.getState().loadCharacters()
   expect(useCharacterStore.getState().loadError).toBeNull()
 })
+
+// ---- Limited-use abilities --------------------------------------------------
+
+/** Slotted limited ability fixture (3 uses by default, no modifiers). */
+function limitedAbility(overrides: Record<string, unknown> = {}) {
+  const { modifiers: _modifiers, ...base } = modifierAbility()
+  return {
+    ...base,
+    id: 'limited-1',
+    name: 'Frost Nova',
+    uses: { max: 3, current: 3, expendOnActivate: true },
+    ...overrides,
+  }
+}
+
+test('spendAbilityUse: consumes one use and reports it', () => {
+  const char = setupChar({
+    slottedAbilities: [
+      limitedAbility({ uses: { max: 3, current: 3, expendOnActivate: true } }),
+    ] as Character['slottedAbilities'],
+  })
+
+  expect(useCharacterStore.getState().spendAbilityUse(char.id, 'limited-1')).toBe(true)
+  expect(
+    useCharacterStore.getState().currentCharacter!.slottedAbilities[0].uses,
+  ).toEqual({ max: 3, current: 2, expendOnActivate: true })
+})
+
+test('spendAbilityUse: refuses when no uses are left', () => {
+  const char = setupChar({
+    slottedAbilities: [
+      limitedAbility({ uses: { max: 3, current: 0, expendOnActivate: true } }),
+    ] as Character['slottedAbilities'],
+  })
+
+  expect(useCharacterStore.getState().spendAbilityUse(char.id, 'limited-1')).toBe(false)
+  expect(
+    useCharacterStore.getState().currentCharacter!.slottedAbilities[0].uses!.current,
+  ).toBe(0)
+})
+
+test('spendAbilityUse: an unlimited or opted-out ability spends nothing', () => {
+  const char = setupChar({
+    slottedAbilities: [
+      limitedAbility({ uses: undefined }),
+      limitedAbility({ uses: { max: 3, current: 3, expendOnActivate: false } }),
+    ] as Character['slottedAbilities'],
+  })
+
+  expect(useCharacterStore.getState().spendAbilityUse(char.id, 'limited-1')).toBe(false)
+  expect(
+    useCharacterStore.getState().currentCharacter!.slottedAbilities[1].uses!.current,
+  ).toBe(3)
+})
+
+test('spendAbilityUse: reaches an innate ability and a nested sub-ability', () => {
+  const char = setupChar({
+    innateAbilities: [
+      limitedAbility({ id: 'innate-1' }),
+      limitedAbility({
+        id: 'parent-1',
+        subAbilitiesUnderDescription: [limitedAbility({ id: 'sub-1' })],
+      }),
+    ] as Character['innateAbilities'],
+  })
+
+  expect(useCharacterStore.getState().spendAbilityUse(char.id, 'sub-1')).toBe(true)
+  expect(
+    useCharacterStore.getState().currentCharacter!.innateAbilities[1]
+      .subAbilitiesUnderDescription[0].uses!.current,
+  ).toBe(2)
+})
+
+test('spendAbilityUse: an unknown id leaves the store untouched', () => {
+  const char = setupChar({
+    slottedAbilities: [limitedAbility()] as Character['slottedAbilities'],
+  })
+
+  expect(useCharacterStore.getState().spendAbilityUse('nope', 'limited-1')).toBe(false)
+  expect(
+    useCharacterStore.getState().currentCharacter!.slottedAbilities[0].uses!.current,
+  ).toBe(3)
+  expect(useCharacterStore.getState().currentCharacter!.updatedAt).toBe(char.updatedAt)
+})
+
+test('setAbilityUsesRemaining: clamps and ignores unlimited abilities', () => {
+  const char = setupChar({
+    slottedAbilities: [
+      limitedAbility({ uses: { max: 3, current: 3, expendOnActivate: true } }),
+      limitedAbility({ id: 'plain-1', uses: undefined }),
+    ] as Character['slottedAbilities'],
+  })
+
+  useCharacterStore.getState().setAbilityUsesRemaining(char.id, 'limited-1', 99)
+  expect(
+    useCharacterStore.getState().currentCharacter!.slottedAbilities[0].uses!.current,
+  ).toBe(3)
+
+  useCharacterStore.getState().setAbilityUsesRemaining(char.id, 'limited-1', -5)
+  expect(
+    useCharacterStore.getState().currentCharacter!.slottedAbilities[0].uses!.current,
+  ).toBe(0)
+
+  useCharacterStore.getState().setAbilityUsesRemaining(char.id, 'plain-1', 2)
+  expect(
+    useCharacterStore.getState().currentCharacter!.slottedAbilities[1].uses,
+  ).toBeUndefined()
+})
+
+test('fullRestore: refills every limited ability on the sheet', () => {
+  const char = setupChar({
+    currentHP: 1,
+    innateAbilities: [
+      limitedAbility({
+        id: 'innate-1',
+        uses: { max: 3, current: 0, expendOnActivate: true },
+      }),
+    ] as Character['innateAbilities'],
+    slottedAbilities: [
+      limitedAbility({
+        uses: { max: 5, current: 0, expendOnActivate: true },
+      }),
+    ] as Character['slottedAbilities'],
+  })
+
+  useCharacterStore.getState().fullRestore(char.id)
+
+  const restored = useCharacterStore.getState().currentCharacter!
+  expect(restored.innateAbilities[0].uses!.current).toBe(3)
+  expect(restored.slottedAbilities[0].uses!.current).toBe(5)
+})

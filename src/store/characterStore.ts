@@ -27,6 +27,11 @@ import {
   effectiveCombatStats,
   setAbilityModifiersActive as applyAbilityModifiersActive,
 } from '@/lib/abilityModifiers'
+import {
+  restoreAllAbilityUses,
+  setAbilityUsesRemaining as applySetAbilityUsesRemaining,
+  spendAbilityUse as applySpendAbilityUse,
+} from '@/lib/abilityUses'
 import { rollDie } from '@/lib/dice'
 import {
   bumpSemver,
@@ -227,6 +232,22 @@ export interface CharacterStoreActions {
    * Sub-Abilities). Independent from activation and costs nothing.
    */
   setAbilityModifiersActive: (abilityId: string, active: boolean) => void
+  /**
+   * Consume one use of a limited ability for the character with `id`, wherever
+   * the ability lives on that sheet. Returns whether a use was actually spent —
+   * false for an unlimited ability, one whose editor toggle left it out of the
+   * use economy, or one already at 0 uses.
+   */
+  spendAbilityUse: (id: string, abilityId: string) => boolean
+  /**
+   * Set the remaining uses on a limited ability for the character with `id`,
+   * clamped into `[0, max]`. No-op for an unknown or unlimited ability.
+   */
+  setAbilityUsesRemaining: (
+    id: string,
+    abilityId: string,
+    remaining: number,
+  ) => void
   /** Apply damage to the character with `id` (temp HP, armor, resistance, mortal wound overflow). */
   takeDamage: (id: string, amount: number, opts?: {
     /** Whether to apply armor reduction (1d6 per armor point). */
@@ -721,6 +742,22 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
     })
   },
 
+  spendAbilityUse: (id, abilityId) => {
+    let spent = false
+    get().updateCharacter(id, (char) => {
+      const result = applySpendAbilityUse(char, abilityId)
+      spent = result.spent
+      return result.character
+    })
+    return spent
+  },
+
+  setAbilityUsesRemaining: (id, abilityId, remaining) => {
+    get().updateCharacter(id, (char) =>
+      applySetAbilityUsesRemaining(char, abilityId, remaining),
+    )
+  },
+
   // ---- Live play: damage & healing -------------------------------------------
 
   takeDamage: (id, amount, opts = {}) => {
@@ -1075,7 +1112,7 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
   fullRestore: (id) => {
     get().updateCharacter(id, (char) => {
       const maxHP = effectiveCombatStats(char).maxHP
-      return {
+      return restoreAllAbilityUses({
         ...char,
         currentHP: maxHP,
         tempHP: 0,
@@ -1085,7 +1122,7 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
         mortalWounds: [null, null],
         deathSaves: { successes: 0, failures: 0 },
         customResourceBars: char.customResourceBars.map((bar) => ({ ...bar, current: bar.max })),
-      }
+      })
     })
   },
 

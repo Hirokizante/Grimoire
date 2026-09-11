@@ -26,6 +26,7 @@ vi.mock('@/store/characterStore', () => ({
     selector({
       currentCharacter: null,
       setAbilityModifiersActive,
+      spendAbilityUse: vi.fn(() => false),
     }),
 }))
 

@@ -42,7 +42,7 @@ export default function MortalWoundRoller({ character }: MortalWoundRollerProps)
 
   const handleRest = () => {
     fullRestore(character.id)
-    notify('Full Restore: all resources and wound slots cleared.', 'success', 4000)
+    notify('Full Restore: resources, ability uses, and wound slots reset.', 'success', 4000)
   }
 
   return (
@@ -109,7 +109,7 @@ export default function MortalWoundRoller({ character }: MortalWoundRollerProps)
           type="button"
           className="btn btn--ghost mw-rest-btn"
           onClick={handleRest}
-          title="Full restore: HP, END, AP, FP, clear wounds & death saves"
+          title="Full restore: HP, END, AP, FP, ability uses, clear wounds & death saves"
         >
           Rest (Full Restore)
         </button>

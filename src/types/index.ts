@@ -5,6 +5,7 @@ export type {
   AbilityBlock,
   AbilityCost,
   AbilityStatModifier,
+  AbilityUses,
   ModifierTarget,
   ResolvedCustomAbilityCost,
 } from './ability'

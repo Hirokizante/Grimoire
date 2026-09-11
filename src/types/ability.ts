@@ -81,6 +81,32 @@ export interface ResolvedCustomAbilityCost {
 }
 
 /**
+ * A limited-use budget on an Ability: how many times it may be used, how many
+ * uses are left, and whether activating it consumes one. See
+ * lib/abilityUses.ts for the rules and the sheet-tree helpers.
+ */
+export interface AbilityUses {
+  /**
+   * Total uses the Ability has (and is restored to on a rest / full restore).
+   * Always at least 1 and at most {@link MAX_ABILITY_USES}.
+   */
+  max: number
+  /**
+   * Uses left, clamped to `[0, max]`. Live-play state: it moves when the
+   * Ability is activated and is always refilled on a full restore — never
+   * edited directly in the Ability editor (lowering `max` clamps it down,
+   * raising `max` leaves the spent uses spent).
+   */
+  current: number
+  /**
+   * Whether clicking Activate consumes a use. Defaults to true — the point of
+   * the limit — and false lets an Ability display a budget it does not spend
+   * on activation (e.g. a resource tracked by another rule).
+   */
+  expendOnActivate: boolean
+}
+
+/**
  * A structured description of a single Ability, as defined in DESIGN.md's
  * "Ability Block" section. Used for the Innate, Basic Attack, Fatebreaker,
  * Slotted Abilities, and Ability Pool entries on a character sheet.
@@ -136,6 +162,15 @@ export interface AbilityBlock {
    * meaningless (forced false) when there are no modifiers.
    */
   modifiersActive?: boolean
+  /**
+   * Limited-use budget (added with the Limited Uses feature): present only on
+   * Abilities the author flagged as limited in the editor. Unlimited Abilities
+   * omit the key entirely. Uses display on the card (tokens for ≤5, a number
+   * above that), are spent by the Activate button when
+   * {@link AbilityUses.expendOnActivate} is on, and are always restored on a
+   * rest / full restore. See lib/abilityUses.ts.
+   */
+  uses?: AbilityUses
   /**
    * Sub-Abilities nested under the Description field. Bound to their parent
    * — they always move with it and cannot be independently slotted/unslotted.

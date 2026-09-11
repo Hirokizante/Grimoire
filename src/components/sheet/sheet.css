@@ -1348,6 +1348,69 @@
   white-space: nowrap;
 }
 
+/* ---- Limited uses ---------------------------------------------------------
+   The remaining-uses readout sits first in the card's meta row: a small label
+   plus either one circle per use (5 or fewer) or a plain "current / max" number.
+   Filled circles are uses still available; hollow ones are spent. The accent
+   comes from the sheet palette, so the meter follows every theme. */
+
+.ability-uses {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.ability-uses__label {
+  font-family: var(--sheet-label-font, inherit);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.ability-uses__tokens {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.ability-uses__token {
+  width: 0.62rem;
+  height: 0.62rem;
+  border-radius: 50%;
+  background: transparent;
+  border: 1.5px solid var(--accent-violet-soft);
+}
+
+.ability-uses__token--filled {
+  background: var(--accent-violet);
+  border-color: var(--accent-violet);
+}
+
+.ability-uses__count {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--accent-violet-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.ability-uses__count-sep {
+  margin: 0 1px;
+  opacity: 0.6;
+}
+
+/* Exhausted: every use is spent, so the whole readout reads as a warning. */
+.ability-uses--depleted .ability-uses__label,
+.ability-uses--depleted .ability-uses__count {
+  color: var(--danger);
+}
+
+.ability-uses--depleted .ability-uses__token {
+  border-color: color-mix(in srgb, var(--danger) 70%, transparent);
+}
+
 .ability-card__damage {
   font-size: 0.82rem;
   color: var(--text-primary);
@@ -1974,6 +2037,27 @@
   border-radius: 8px;
   border: 1px dashed var(--border-soft);
   background: color-mix(in srgb, var(--accent-violet) 4%, transparent);
+}
+
+/* Ability editor: the limited-uses block — toggle, max-uses input, and the
+   "spends a use on activate" opt-in. Same boxed treatment as the modifier
+   fields so the optional feature groups read consistently. */
+.ability-editor__limited-uses {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.5rem 0.55rem;
+  border-radius: 8px;
+  border: 1px dashed var(--border-soft);
+  background: color-mix(in srgb, var(--accent-violet) 4%, transparent);
+}
+
+/* The max-uses field is a small number, not a full-width text field — half the
+   row, matching the AP/END/FP inputs' proportions. (The row's generic
+   `.ability-editor__row .ability-editor__field { flex: 1 1 0 }` rule wins on
+   specificity, so this one is scoped the same way.) */
+.ability-editor__row .ability-editor__uses-max {
+  flex: 0 1 50%;
 }
 
 .ability-editor__hint {

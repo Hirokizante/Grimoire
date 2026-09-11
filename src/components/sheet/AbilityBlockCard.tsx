@@ -13,9 +13,11 @@
 import DiceHighlighter from '@/components/dice/DiceHighlighter'
 import MarkdownText from '@/components/ui/MarkdownText'
 import AbilityModifierToggle from '@/components/sheet/AbilityModifierToggle'
+import AbilityUsesMeter from '@/components/sheet/AbilityUsesMeter'
 import SubAbilityBlock from '@/components/sheet/SubAbilityBlock'
 import { useCharacterStore } from '@/store/characterStore'
 import { resolveCustomAbilityCosts } from '@/lib/abilityCosts'
+import { isLimitedAbility } from '@/lib/abilityUses'
 import type { AbilityBlock, Character } from '@/types'
 import type { RollSource } from '@/types/rollLog'
 import type { SheetMode } from '@/pages/CharacterSheetPage'
@@ -80,6 +82,11 @@ export default function AbilityBlockCard({
   const hasCost =
     cost.ap != null || cost.end != null || cost.fp != null || hasCustomCosts
 
+  // Limited-use abilities show their remaining uses in the meta row, alongside
+  // the cost badges (the budget itself is authored in the editor — see
+  // AbilityBlockEditor).
+  const hasUses = isLimitedAbility(ability)
+
   // Dice rolls from the damage field are "Damage: [name]"; rolls from
   // description/overcharge/flavor text are generic "Roll: [name]".
   const abilityName = name || 'Untitled Ability'
@@ -113,8 +120,9 @@ export default function AbilityBlockCard({
         )}
       </header>
 
-      {(hasCost || damage) && (
+      {(hasCost || damage || hasUses) && (
         <div className="ability-card__meta">
+          {hasUses && <AbilityUsesMeter ability={ability} />}
           {hasCost && (
             <span className="ability-card__costs">
               {cost.ap != null && (

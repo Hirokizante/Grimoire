@@ -15,14 +15,12 @@
 import DiceHighlighter from '@/components/dice/DiceHighlighter'
 import MarkdownText from '@/components/ui/MarkdownText'
 import AbilityModifierToggle from '@/components/sheet/AbilityModifierToggle'
-import { useNotification } from '@/context/NotificationContext'
+import AbilityUsesMeter from '@/components/sheet/AbilityUsesMeter'
 import { useCharacterStore } from '@/store/characterStore'
+import { useAbilityActivation } from '@/hooks/useAbilityActivation'
 import { SUB_ABILITY_ACCENT_OPTIONS } from '@/lib/themeUtils'
-import {
-  canAffordCustomCosts,
-  insufficientCustomCostParts,
-  resolveCustomAbilityCosts,
-} from '@/lib/abilityCosts'
+import { resolveCustomAbilityCosts } from '@/lib/abilityCosts'
+import { isLimitedAbility } from '@/lib/abilityUses'
 import type { AbilityBlock, Character } from '@/types'
 import type { RollSource } from '@/types/rollLog'
 import type { SheetMode } from '@/pages/CharacterSheetPage'
@@ -42,6 +40,33 @@ export interface SubAbilityBlockProps {
   onToggleModifiers?: (abilityId: string, active: boolean) => void
 }
 
+/**
+ * The Sub-Ability's own Activate button. Split into a child component so
+ * {@link useAbilityActivation} is only mounted when the block is actually
+ * view-mode, activatable, and has a character — hooks cannot be called
+ * conditionally, and the plan is meaningless without an entity to spend from.
+ */
+function SubAbilityActivateButton({
+  ability,
+  character,
+}: {
+  ability: AbilityBlock
+  character: Character
+}) {
+  const plan = useAbilityActivation(ability, character)
+  return (
+    <button
+      type="button"
+      className="btn btn--primary ability-activation__btn"
+      onClick={plan.activate}
+      disabled={!plan.canActivate}
+      title={plan.tooltip}
+    >
+      Activate
+    </button>
+  )
+}
+
 export default function SubAbilityBlock({
   ability,
   mode = 'view',
@@ -50,13 +75,6 @@ export default function SubAbilityBlock({
   onToggleModifiers,
 }: SubAbilityBlockProps) {
   const storeCharacter = useCharacterStore((s) => s.currentCharacter)
-  const spendAP = useCharacterStore((s) => s.spendAP)
-  const spendEND = useCharacterStore((s) => s.spendEND)
-  const spendFP = useCharacterStore((s) => s.spendFP)
-  const spendCustomResourceBar = useCharacterStore(
-    (s) => s.spendCustomResourceBar,
-  )
-  const { notify } = useNotification()
 
   const { name, traits, cost, damage, description, overcharge, flavorText } =
     ability
@@ -72,6 +90,7 @@ export default function SubAbilityBlock({
   const hasCustomCosts = customCosts.length > 0
   const hasCost =
     cost.ap != null || cost.end != null || cost.fp != null || hasCustomCosts
+  const hasUses = isLimitedAbility(ability)
   const isView = mode === 'view'
 
   // Dice rolls from the damage field are "Damage: [name]"; rolls from
@@ -91,8 +110,7 @@ export default function SubAbilityBlock({
   // Resolve the character for both dice notation and resource spending.
   // (activeCharacter is declared above for custom-cost resolution.)
 
-  // Resolve colorOverride (a SheetColors key) to a CSS variable name for
-  // inline styling of the block's border and background.
+  // Resolve colorOverride (a SheetColors key) to a CSS variable name for  // inline styling of the block's border and background.
   const colorVar = ability.colorOverride
     ? SUB_ABILITY_ACCENT_OPTIONS.find((o) => o.key === ability.colorOverride)
         ?.cssVar ?? null
@@ -106,66 +124,17 @@ export default function SubAbilityBlock({
     : undefined
 
   // -- Activate logic (view mode only) ----------------------------------------
-  const canShowActivate = isView && ability.showActivate && activeCharacter
-
-  let activateBtn: React.ReactNode = null
-  if (canShowActivate) {
-    const exhaustionMod =
-      activeCharacter.mortalWounds.includes('Exhaustion') ? 1 : 0
-    const apCost = cost.ap ?? 0
-    const endCost =
-      (cost.end ?? 0) + (cost.end != null ? exhaustionMod : 0)
-    const fpCost = cost.fp ?? 0
-
-    const customAffordable = canAffordCustomCosts(customCosts, activeCharacter.customResourceBars)
-    const canAfford =
-      activeCharacter.currentAP >= apCost &&
-      activeCharacter.currentEND >= endCost &&
-      activeCharacter.currentFP >= fpCost &&
-      customAffordable
-
-    const insufficientParts: string[] = []
-    if (activeCharacter.currentAP < apCost)
-      insufficientParts.push(`${apCost - activeCharacter.currentAP} AP`)
-    if (activeCharacter.currentEND < endCost)
-      insufficientParts.push(`${endCost - activeCharacter.currentEND} END`)
-    if (activeCharacter.currentFP < fpCost)
-      insufficientParts.push(`${fpCost - activeCharacter.currentFP} FP`)
-    insufficientParts.push(
-      ...insufficientCustomCostParts(customCosts, activeCharacter.customResourceBars),
-    )
-    const tooltip =
-      insufficientParts.length > 0
-        ? `Need ${insufficientParts.join(', ')}`
-        : `Activate: ${apCost} AP, ${endCost} END, ${fpCost} FP`
-
-    const handleActivate = () => {
-      let ok = true
-      if (apCost > 0) ok = spendAP(activeCharacter.id, apCost) && ok
-      if (endCost > 0) ok = spendEND(activeCharacter.id, endCost) && ok
-      if (fpCost > 0) ok = spendFP(activeCharacter.id, fpCost) && ok
-      for (const c of customCosts) {
-        ok = spendCustomResourceBar(activeCharacter.id, c.barId, c.amount) && ok
-      }
-      if (ok) {
-        notify(`Activated ${name}`, 'success')
-      } else {
-        notify('Insufficient resources to activate ability.', 'error')
-      }
-    }
-
-    activateBtn = (
-      <button
-        type="button"
-        className="btn btn--primary ability-activation__btn"
-        onClick={handleActivate}
-        disabled={!canAfford}
-        title={tooltip}
-      >
-        Activate
-      </button>
-    )
-  }
+  // Cost deduction, the Exhaustion penalty, and limited-use spending all live
+  // in useAbilityActivation so a Sub-Ability behaves exactly like a regular
+  // ability card.
+  const canShowActivate = isView && ability.showActivate && activeCharacter != null
+  const activateCharacter = canShowActivate ? activeCharacter : null
+  const activateBtn: React.ReactNode = activateCharacter ? (
+    <SubAbilityActivateButton
+      ability={ability}
+      character={activateCharacter}
+    />
+  ) : null
 
   return (
     <article className="sub-ability-block" style={blockStyle}>
@@ -186,8 +155,11 @@ export default function SubAbilityBlock({
         </ul>
       )}
 
-      {(hasCost || damage) && (
+      {(hasCost || damage || hasUses) && (
         <div className="sub-ability-block__meta">
+          {hasUses && (
+            <AbilityUsesMeter ability={ability} className="ability-uses--sub" />
+          )}
           {hasCost && (
             <span className="sub-ability-block__costs">
               {cost.ap != null && (

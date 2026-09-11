@@ -29,6 +29,13 @@ import SelectDropdown from '@/components/ui/SelectDropdown'
 import AbilityModifierFields from '@/components/sheet/AbilityModifierFields'
 import { generateId } from '@/constants/gameData'
 import { normalizeModifiers } from '@/lib/abilityModifiers'
+import {
+  DEFAULT_ABILITY_USES,
+  MAX_ABILITY_USES,
+  abilityUses,
+  buildAbilityUses,
+  normalizeAbilityUses,
+} from '@/lib/abilityUses'
 import { SUB_ABILITY_ACCENT_OPTIONS } from '@/lib/themeUtils'
 import { useCharacterStore } from '@/store/characterStore'
 import type {
@@ -128,6 +135,13 @@ export default function AbilityBlockEditor({
 }: AbilityBlockEditorProps) {
   const [draft, setDraft] = useState<AbilityBlock>(ability ?? blankAbility())
   const [traitsText, setTraitsText] = useState(serializeTraits(draft.traits))
+  // The uses input is text-local so the box can be cleared while retyping; the
+  // committed value lives on the draft (see setUses). Seeded from the ability
+  // being edited — the modal remounts the editor per ability, so it never goes
+  // stale behind a different draft.
+  const [usesMaxText, setUsesMaxText] = useState(
+    ability ? (abilityUses(ability)?.max.toString() ?? '') : '',
+  )
 
   // -- Sub-ability editor state ------------------------------------------------
   const [subEditorAbility, setSubEditorAbility] = useState<AbilityBlock | null>(null)
@@ -194,6 +208,8 @@ export default function AbilityBlockEditor({
       (draft.modifiersActive === true) !== (original.modifiersActive === true) ||
       JSON.stringify(normalizeModifiers(draft.modifiers)) !==
         JSON.stringify(normalizeModifiers(original.modifiers)) ||
+      JSON.stringify(normalizeAbilityUses(draft.uses)) !==
+        JSON.stringify(normalizeAbilityUses(original.uses)) ||
       draft.cost.ap !== original.cost.ap ||
       draft.cost.end !== original.cost.end ||
       draft.cost.fp !== original.cost.fp ||
@@ -222,6 +238,47 @@ export default function AbilityBlockEditor({
       if (Number.isFinite(n)) nextCost[key] = n
     }
     setDraft({ ...draft, cost: nextCost })
+  }
+
+  // -- limited uses -------------------------------------------------------------
+  /** The draft's use limit, or null while the ability is unlimited. */
+  const uses = abilityUses(draft)
+
+  /** Turning the feature on seeds a small budget; turning it off drops the key. */
+  const setLimited = (limited: boolean) => {
+    if (!limited) {
+      const next: AbilityBlock = { ...draft }
+      delete next.uses
+      setDraft(next)
+      setUsesMaxText('')
+      return
+    }
+    setDraft({
+      ...draft,
+      uses: buildAbilityUses({
+        max: DEFAULT_ABILITY_USES,
+        expendOnActivate: true,
+      }),
+    })
+    setUsesMaxText(String(DEFAULT_ABILITY_USES))
+  }
+
+  /**
+   * Edit the use budget. The maximum is clamped into 1…MAX_ABILITY_USES, and
+   * changing it redefines the whole budget — `current` follows the new maximum,
+   * so a freshly authored ability starts full and editing the number can never
+   * leave the meter reading more uses than the ability has. (The text box keeps
+   * whatever was typed; `onBlur` snaps it back to the stored value.)
+   */
+  const setUses = (patch: { max?: number; expendOnActivate?: boolean }) => {
+    if (!uses) return
+    setDraft({
+      ...draft,
+      uses: buildAbilityUses({
+        max: patch.max ?? uses.max,
+        expendOnActivate: patch.expendOnActivate ?? uses.expendOnActivate,
+      }),
+    })
   }
 
   // -- custom resource costs ---------------------------------------------------
@@ -303,6 +360,14 @@ export default function AbilityBlockEditor({
     } else {
       delete final.modifiers
       delete final.modifiersActive
+    }
+    // And for the use limit: sanitize the authored budget, dropping the key
+    // entirely when the ability is unlimited.
+    const finalUses = normalizeAbilityUses(draft.uses)
+    if (finalUses) {
+      final.uses = finalUses
+    } else {
+      delete final.uses
     }
     onSave(final)
   }
@@ -556,6 +621,65 @@ export default function AbilityBlockEditor({
             onChange={setModifiers}
             npcMode={npcMode}
           />
+
+          {/* Limited uses — how many times the ability may be used before it is
+              exhausted. The count renders on the ability card (tokens for ≤5,
+              a number above) and is always restored on a rest / full restore. */}
+          <div className="ability-editor__limited-uses">
+            <label className="ability-editor__field ability-editor__field--inline">
+              <input
+                type="checkbox"
+                checked={uses != null}
+                onChange={(e) => setLimited(e.target.checked)}
+              />
+              <span className="ability-editor__label">Limited uses</span>
+            </label>
+
+            {uses && (
+              <>
+                <div className="ability-editor__row">
+                  <label className="ability-editor__field ability-editor__uses-max">
+                    <span className="ability-editor__label">Max uses</span>
+                    <input
+                      type="number"
+                      className="sheet-input sheet-input--num"
+                      min={1}
+                      max={MAX_ABILITY_USES}
+                      value={usesMaxText}
+                      onChange={(e) => {
+                        const raw = e.target.value
+                        setUsesMaxText(raw)
+                        if (raw === '') return
+                        const n = Number(raw)
+                        if (Number.isFinite(n)) setUses({ max: n })
+                      }}
+                      onBlur={() => setUsesMaxText(String(uses.max))}
+                      placeholder={String(DEFAULT_ABILITY_USES)}
+                    />
+                  </label>
+                </div>
+
+                <label className="ability-editor__field ability-editor__field--inline">
+                  <input
+                    type="checkbox"
+                    checked={uses.expendOnActivate}
+                    onChange={(e) =>
+                      setUses({ expendOnActivate: e.target.checked })
+                    }
+                  />
+                  <span className="ability-editor__label">
+                    Spends one use when activated
+                  </span>
+                </label>
+
+                <p className="ability-editor__hint">
+                  {uses.current} of {uses.max} uses left. Activating spends a
+                  use when the box above is ticked
+                  {draft.showActivate ? '' : ' — this ability has no Activate button right now'}.
+                  Spent uses come back on a rest (full restore).
+                </p>              </>
+            )}
+          </div>
 
           <label className="ability-editor__field">
             <span className="ability-editor__label">Flavor Text</span>

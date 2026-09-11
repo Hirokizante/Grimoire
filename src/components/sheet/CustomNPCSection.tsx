@@ -32,6 +32,7 @@ import {
   setAbilityModifiersActive,
   formatModifierValue,
 } from '@/lib/abilityModifiers'
+import { setAbilityUsesRemaining } from '@/lib/abilityUses'
 import type {
   AbilityBlock,
   AttributeKey,
@@ -186,6 +187,17 @@ export default function CustomNPCSection({
   const toggleAbilityModifiers = (abilityId: string, active: boolean) => {
     updateAttachedNPC(npc.id, (cur) =>
       setAbilityModifiersActive(cur, abilityId, active),
+    )
+  }
+
+  /**
+   * Move an attached NPC ability's remaining uses by hand. Like the modifier
+   * switch, the block lives on the NPC's own record, so the write goes through
+   * {@link updateAttachedNPC} rather than the store's current-character action.
+   */
+  const setAbilityUses = (abilityId: string, remaining: number) => {
+    updateAttachedNPC(npc.id, (cur) =>
+      setAbilityUsesRemaining(cur, abilityId, remaining),
     )
   }
 
@@ -432,6 +444,7 @@ export default function CustomNPCSection({
                   mode={mode}
                   character={npc}
                   onToggleModifiers={toggleAbilityModifiers}
+                  onSetUses={setAbilityUses}
                   actions={
                     isEdit ? (
                       <>

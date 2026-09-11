@@ -15,6 +15,7 @@ import { createDefaultStatuses } from '@/constants/statuses'
 import { MAX_PANEL_STATUS_STACKS, isPanelStatusDuration } from '@/constants/statusDurations'
 import { DEFAULT_SHEET_COLORS, generateId } from '@/constants/gameData'
 import { normalizeModifiers } from '@/lib/abilityModifiers'
+import { normalizeAbilityUses } from '@/lib/abilityUses'
 
 const DB_NAME = 'grimoire'
 const DB_VERSION = 5
@@ -394,6 +395,35 @@ export function normalizeCharacter(raw: Character): Character {
     } else {
       delete (normalized as unknown as Record<string, unknown>).modifiers
       delete (normalized as unknown as Record<string, unknown>).modifiersActive
+    }
+    // Sanitize the limited-use budget (added with the Limited Uses feature):
+    // a malformed entry reads as unlimited, and a negative / over-max remaining
+    // count is clamped back into range so the card's meter can never overflow.
+    const uses = normalizeAbilityUses(a.uses)
+    if (uses) {
+      normalized.uses = uses
+    } else {
+      delete (normalized as unknown as Record<string, unknown>).uses
+    }
+    // Sub-Abilities carry the same shape (and can be limited too) but are never
+    // recursively visited by the caller, so sanitize one nesting level here.
+    // Sub-Abilities cannot have sub-abilities of their own, so one pass ends it.
+    const subArrays: ('subAbilitiesUnderDescription' | 'subAbilitiesUnderOvercharge')[] = [
+      'subAbilitiesUnderDescription',
+      'subAbilitiesUnderOvercharge',
+    ]
+    for (const key of subArrays) {
+      normalized[key] = normalized[key].map((sub) => {
+        const subUses = normalizeAbilityUses(sub.uses)
+        const nextSub: AbilityBlock = {
+          ...sub,
+          cost: (sub.cost ?? {}) as AbilityCost,
+          showActivate: sub.showActivate ?? true,
+        }
+        if (subUses) nextSub.uses = subUses
+        else delete (nextSub as unknown as Record<string, unknown>).uses
+        return nextSub
+      })
     }
     return normalized
   }
