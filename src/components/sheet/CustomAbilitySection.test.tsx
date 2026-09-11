@@ -2,10 +2,16 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, expect, test, vi } from 'vitest'
 
 import CustomAbilitySection from '@/components/sheet/CustomAbilitySection'
-import type { CustomAbilitySection as CustomAbilitySectionType } from '@/types'
+import { NotificationProvider } from '@/context/NotificationContext'
+import { createDefaultCharacter } from '@/constants/gameData'
+import type {
+  AbilityBlock,
+  CustomAbilitySection as CustomAbilitySectionType,
+} from '@/types'
 
-const { removeCustomSection } = vi.hoisted(() => ({
+const { removeCustomSection, setAbilityUsesRemaining } = vi.hoisted(() => ({
   removeCustomSection: vi.fn(),
+  setAbilityUsesRemaining: vi.fn(),
 }))
 
 vi.mock('@/store/characterStore', () => ({
@@ -16,6 +22,8 @@ vi.mock('@/store/characterStore', () => ({
       renameCustomSection: vi.fn(),
       removeCustomSection,
       addCustomNPCSection: vi.fn(() => 'npc-section'),
+      currentCharacter: { ...createDefaultCharacter(), id: 'char-1' },
+      setAbilityUsesRemaining,
     }),
 }))
 
@@ -47,6 +55,7 @@ const section: CustomAbilitySectionType = {
 
 beforeEach(() => {
   removeCustomSection.mockReset()
+  setAbilityUsesRemaining.mockReset()
 })
 
 test('deletes a custom ability section after confirmation in edit mode', () => {
@@ -83,4 +92,80 @@ test('does not show section deletion in view mode', () => {
   expect(
     screen.queryByRole('button', { name: 'Delete Offense section' }),
   ).not.toBeInTheDocument()
+})
+
+// ---- Limited uses ----------------------------------------------------------
+
+/** A custom-tab ability with a 3-use budget. */
+function limitedAbility(): AbilityBlock {
+  return {
+    id: 'ability-1',
+    name: 'Custom Nova',
+    traits: [],
+    cost: {},
+    damage: '',
+    description: '',
+    overcharge: '',
+    flavorText: '',
+    isMinor: false,
+    showActivate: true,
+    subAbilitiesUnderDescription: [],
+    subAbilitiesUnderOvercharge: [],
+    uses: { max: 3, current: 3, expendOnActivate: true },
+  }
+}
+
+/** The section holding one limited ability. */
+function sectionWithAbility(): CustomAbilitySectionType {
+  return { ...section, abilities: [limitedAbility()] }
+}
+
+test('a custom-tab ability keeps its uses meter and steppers in view mode', () => {
+  render(
+    <NotificationProvider>
+      <CustomAbilitySection
+        tabId="tab-1"
+        section={sectionWithAbility()}
+        mode="view"
+      />
+    </NotificationProvider>,
+  )
+
+  expect(
+    screen.getByRole('img', { name: '3 of 3 uses remaining' }),
+  ).toBeInTheDocument()
+
+  fireEvent.click(screen.getByRole('button', { name: /spend one use of/i }))
+  expect(setAbilityUsesRemaining).toHaveBeenCalledWith('char-1', 'ability-1', 2)
+})
+
+test('a custom-tab ability keeps its steppers in edit mode too', () => {
+  render(
+    <NotificationProvider>
+      <CustomAbilitySection
+        tabId="tab-1"
+        section={sectionWithAbility()}
+        mode="edit"
+      />
+    </NotificationProvider>,
+  )
+
+  fireEvent.click(screen.getByRole('button', { name: /spend one use of/i }))
+  expect(setAbilityUsesRemaining).toHaveBeenCalledWith('char-1', 'ability-1', 2)
+})
+
+test('an unlimited custom-tab ability renders no meter at all', () => {
+  const plain: CustomAbilitySectionType = {
+    ...section,
+    abilities: [{ ...limitedAbility(), uses: undefined }],
+  }
+
+  render(
+    <NotificationProvider>
+      <CustomAbilitySection tabId="tab-1" section={plain} mode="view" />
+    </NotificationProvider>,
+  )
+
+  expect(screen.queryByRole('img', { name: /uses remaining/i })).toBeNull()
+  expect(screen.queryByRole('button', { name: /spend one use of/i })).toBeNull()
 })

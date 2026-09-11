@@ -104,20 +104,20 @@ export default function SubAbilityBlock({
   const isView = mode === 'view'
 
   /**
-   * A Sub-Ability carries its own Activate button, so it also gets its own
-   * uses stepper. Same writer contract as the parent card: the parent's
-   * handler wins, otherwise the store is used only when this block's character
-   * is the store's current character (a GM panel's entity stays read-only).
+   * A limited Sub-Ability gets its own uses stepper — even when it (or its
+   * parent) has no Activate button, since the count is still a number the
+   * player tracks while playing. Same writer contract as the parent card: the
+   * parent's handler wins, otherwise the store is used only when this block's
+   * character is the store's current character (a GM panel's entity stays
+   * read-only).
    */
-  const canAdjustUses = isView && ability.showActivate
-
   const storeAdjuster =
-    canAdjustUses && storeCharacter && activeCharacter?.id === storeCharacter.id
+    storeCharacter && activeCharacter?.id === storeCharacter.id
       ? (abilityId: string, next: number) =>
           storeSetUses(activeCharacter.id, abilityId, next)
       : undefined
 
-  const adjustUses = canAdjustUses ? (onSetUses ?? storeAdjuster) : undefined
+  const adjustUses = onSetUses ?? storeAdjuster
 
   // Dice rolls from the damage field are "Damage: [name]"; rolls from
   // description/overcharge/flavor text are generic "Roll: [name]".

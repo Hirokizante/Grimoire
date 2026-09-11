@@ -400,7 +400,9 @@ test('numeric meters get the same steppers', () => {
   expect(slottedUses(useCharacterStore.getState().currentCharacter)).toBe(3)
 })
 
-test('edit mode renders no steppers', () => {
+test('edit mode gets steppers too', () => {
+  // Uses are live-play numbers, and edit mode is where a sheet is most often
+  // adjusted — the card keeps its steppers there.
   const char = setupCharacter()
   render(
     <NotificationProvider>
@@ -409,26 +411,34 @@ test('edit mode renders no steppers', () => {
   )
 
   expect(usesReadout()).toHaveAccessibleName('3 of 3 uses remaining')
-  expect(screen.queryByRole('button', { name: /spend one use of/i })).toBeNull()
-  expect(screen.queryByRole('button', { name: /restore one use of/i })).toBeNull()
+  expect(
+    screen.getByRole('button', { name: /spend one use of/i }),
+  ).toBeInTheDocument()
 })
 
-test('a limited ability with no Activate button gets no steppers', () => {
-  const char = setupCharacter({ showActivate: false })
+test('a limited ability with no Activate button still gets steppers', () => {
+  // The Activate button and the use counter are independent: an ability can be
+  // a manual counter the player tracks without activating it.
+  const char = setupCharacter({
+    showActivate: false,
+    uses: { max: 4, current: 4, expendOnActivate: false },
+  })
   renderActivation(char.slottedAbilities[0])
 
-  expect(usesReadout()).toHaveAccessibleName('3 of 3 uses remaining')
+  expect(usesReadout()).toHaveAccessibleName('4 of 4 uses remaining')
   expect(screen.queryByRole('button', { name: 'Activate' })).toBeNull()
-  expect(screen.queryByRole('button', { name: /spend one use of/i })).toBeNull()
+
+  fireEvent.click(spendStep())
+  expect(slottedUses(useCharacterStore.getState().currentCharacter)).toBe(3)
 })
 
-test('a sub-ability gets its own steppers', () => {
+test('a sub-ability gets steppers even when its parent cannot activate', () => {
   const sub: AbilityBlock = {
     ...limitedAbility(3, 3),
     id: 'sub-1',
     name: 'Sub Step',
   }
-  const char = setupCharacter({ subAbilitiesUnderDescription: [sub] })
+  const char = setupCharacter({ showActivate: false, subAbilitiesUnderDescription: [sub] })
   render(
     <NotificationProvider>
       <AbilityBlockCard ability={char.slottedAbilities[0]} mode="view" />
@@ -437,6 +447,9 @@ test('a sub-ability gets its own steppers', () => {
 
   const subBlock = document.querySelector('.sub-ability-block') as HTMLElement
   expect(subBlock).not.toBeNull()
+  expect(
+    within(subBlock).getByRole('img', { name: /3 of 3 uses remaining/i }),
+  ).toBeInTheDocument()
 
   fireEvent.click(within(subBlock).getByRole('button', { name: /spend one use of/i }))
   const updated = useCharacterStore.getState().currentCharacter as Character

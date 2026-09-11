@@ -1453,7 +1453,9 @@
   }
 }
 
-/* Exhausted: every use is spent, so the whole readout reads as a warning. */
+/* Exhausted: every use is spent, so the readout reads as a warning. The
+   restore stepper keeps its accent tint — in the danger palette it would read
+   as another cost, when it is the way back out. */
 .ability-uses--depleted .ability-uses__label,
 .ability-uses--depleted .ability-uses__count {
   color: var(--danger);
@@ -2476,12 +2478,6 @@
 
 .sortable-ability--dragging {
   z-index: 100;
-}
-
-/* Exhausted: the stepper that is still usable (restore) reads as the way out. */
-.ability-uses--depleted .ability-uses__step.btn {
-  background: color-mix(in srgb, var(--danger) 16%, transparent);
-  color: var(--danger);
 }
 
 /* Drag overlay — follows the cursor */

@@ -98,26 +98,29 @@ export default function AbilityBlockCard({
   const hasUses = isLimitedAbility(ability)
 
   /**
-   * Manual use adjustment is for a *live* ability on a sheet the app owns: view
-   * mode (edit mode is for building — the editor, not the card, owns the
-   * maximum), an ability that actually has an Activate button, and an entity we
-   * can write to. An attached-NPC section supplies its own writer; otherwise
-   * the store action only helps when the card's character *is* the store's
-   * current character, so GM-panel entities and drag overlays stay read-only.
+   * Manual use adjustment needs exactly one thing: a writer for the entity the
+   * card belongs to. It is deliberately NOT gated on `showActivate` — a limited
+   * ability may have its Activate button switched off and still be a counter the
+   * player tracks by hand (and an ability whose *sub-abilities* are activatable
+   * while the parent is not still needs its own uses moved). It is not gated on
+   * the sheet mode either: a use count is a live-play number a player adjusts
+   * while building a sheet just as often as during play.
    *
-   * `adjustUses` stays undefined for those read-only cases, which is exactly
-   * what suppresses the steppers (a control that cannot write must not look
+   * An attached-NPC section supplies its own writer; otherwise the store action
+   * only helps when the card's character *is* the store's current character, so
+   * GM-panel entities stay read-only.
+   *
+   * `adjustUses` stays undefined in those read-only cases, which is exactly what
+   * suppresses the steppers (a control that cannot write must not look
    * clickable).
    */
-  const canAdjustUses = mode === 'view' && ability.showActivate
-
   const storeAdjuster =
-    canAdjustUses && storeCharacter && costCharacter?.id === storeCharacter.id
+    storeCharacter && costCharacter?.id === storeCharacter.id
       ? (abilityId: string, next: number) =>
           storeSetUses(costCharacter.id, abilityId, next)
       : undefined
 
-  const adjustUses = canAdjustUses ? (onSetUses ?? storeAdjuster) : undefined
+  const adjustUses = onSetUses ?? storeAdjuster
 
   // Dice rolls from the damage field are "Damage: [name]"; rolls from
   // description/overcharge/flavor text are generic "Roll: [name]".
