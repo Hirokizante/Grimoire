@@ -3,12 +3,15 @@
  *
  * Covers what the feature promises: an "Add Status" button on BOTH panel
  * kinds opening the compendium picker, the five duration labels, pills that
- * render the status's icon/name/duration inline with the HP number, and the
- * per-status stack stepper (which turns into an explicit remove at one stack).
+ * render the status's icon/name/duration inline with the HP number, the
+ * per-status stack stepper (which turns into an explicit remove at one stack),
+ * and the pill's reference behaviour — clicking it opens the condition's
+ * description in the global status modal and hovering/focusing it shows the
+ * same card a sheet's inline status reference shows.
  *
  * jsdom applies no stylesheets, so the layout guarantees (one line, no taller
- * panel, horizontal scroll) are asserted in the browser suite instead — see
- * `e2e/gm-screen.spec.ts`.
+ * panel, horizontal scroll) and the card's portal placement are asserted in the
+ * browser suite instead — see `e2e/gm-screen.spec.ts`.
  */
 
 import { test, expect, beforeEach, vi } from 'vitest'
@@ -16,6 +19,7 @@ import { render, screen, fireEvent, within, act } from '@testing-library/react'
 
 import CharacterPanel from '@/components/gmscreen/CharacterPanel'
 import NpcInstancePanel from '@/components/gmscreen/NpcInstancePanel'
+import StatusModal from '@/components/status/StatusModal'
 import { NotificationProvider } from '@/context/NotificationContext'
 import { createDefaultCharacter, createDefaultNPC } from '@/constants/gameData'
 import { useCharacterStore } from '@/store/characterStore'
@@ -166,6 +170,9 @@ function renderPanel(kind: 'character' | 'npc' = 'npc') {
   const result = render(
     <NotificationProvider>
       <Harness />
+      {/* Mounted app-wide (App.tsx) so a pill's click reaches the same global
+          detail modal a sheet's inline status reference opens. */}
+      <StatusModal />
     </NotificationProvider>,
   )
   // The harness resolves the same panel the store was seeded with.
@@ -356,6 +363,103 @@ test('at one stack the decrement becomes an explicit remove', () => {
   expect(
     screen.queryByRole('list', { name: 'Statuses on Bandit' }),
   ).not.toBeInTheDocument()
+})
+
+// ---- The pill is the status's reference -------------------------------------
+
+/** The pill for the first tracked status on the seeded panel. */
+function firstPill() {
+  return within(
+    screen.getByRole('list', { name: 'Statuses on Bandit' }),
+  ).getByRole('listitem')
+}
+
+test('clicking a pill opens that status in the global detail modal', () => {
+  renderPanel('npc')
+  addViaPicker('Poisoned', 'countdown')
+
+  expect(useStatusStore.getState().modal.statusId).toBeNull()
+
+  fireEvent.click(within(firstPill()).getByRole('button', { name: 'Poisoned' }))
+
+  // The compendium record is opened by id — a panel holds no copy of its own —
+  // so the GM lands in exactly the modal a sheet's inline reference opens.
+  expect(useStatusStore.getState().modal.statusId).toBe(POISONED.id)
+  const dialog = screen.getByRole('dialog', { name: 'Status details' })
+  expect(within(dialog).getByText(POISONED.name)).toBeInTheDocument()
+  expect(
+    within(dialog).getByText('Poisoned does something unpleasant.'),
+  ).toBeInTheDocument()
+})
+
+test("opening a status from a pill leaves the panel's tracking untouched", () => {
+  renderPanel('npc')
+  addViaPicker('Poisoned', 'countdown')
+  fireEvent.click(
+    within(firstPill()).getByRole('button', {
+      name: 'Add a stack of Poisoned to Bandit',
+    }),
+  )
+  const before = tracked()
+
+  fireEvent.click(within(firstPill()).getByRole('button', { name: 'Poisoned' }))
+
+  expect(tracked()).toEqual(before)
+})
+
+test('hovering a pill shows the card a sheet reference shows', () => {
+  renderPanel('npc')
+  addViaPicker('Poisoned', 'countdown')
+
+  // Nothing until the pointer arrives…
+  expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+
+  const name = within(firstPill()).getByRole('button', { name: 'Poisoned' })
+  fireEvent.mouseEnter(name)
+
+  // …then the shared card: icon, name, and the description as plain text.
+  const card = screen.getByRole('tooltip')
+  expect(card).toHaveTextContent('Poisoned')
+  expect(card).toHaveTextContent('Poisoned does something unpleasant.')
+
+  fireEvent.mouseLeave(name)
+  expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+})
+
+test('focusing a pill shows the card too (keyboard parity with the sheet)', () => {
+  renderPanel('npc')
+  addViaPicker('Poisoned', 'quick')
+
+  const name = within(firstPill()).getByRole('button', { name: 'Poisoned' })
+  fireEvent.focus(name)
+  expect(screen.getByRole('tooltip')).toBeInTheDocument()
+
+  fireEvent.blur(name)
+  expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+})
+
+test('a missing status pill has nothing to open and keeps a plain tooltip', () => {
+  renderPanel('npc')
+  addViaPicker('Poisoned', 'quick')
+
+  act(() => {
+    useStatusStore.setState({ statuses: [PRONE] })
+  })
+
+  const pill = firstPill()
+  expect(within(pill).getByText('Missing status')).toBeInTheDocument()
+  // There is no description left to show, so the name is not a button and no
+  // card can be hovered…
+  expect(
+    within(pill).queryByRole('button', { name: 'Missing status' }),
+  ).not.toBeInTheDocument()
+  fireEvent.mouseEnter(pill)
+  expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+  // …it explains itself the plain way instead.
+  expect(pill).toHaveAttribute(
+    'title',
+    expect.stringContaining('no longer in the compendium'),
+  )
 })
 
 test('a status deleted from the compendium leaves a labelled placeholder pill', () => {

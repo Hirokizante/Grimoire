@@ -11,8 +11,12 @@
  *   `[ icon Name | duration-icon − n + ]`
  * The **left** segment is the filled one — it carries the status's icon and its
  * full name, which is never truncated (pills keep their natural width and the
- * strip scrolls instead). The right segment holds the duration as an icon only
- * (its label and rules reminder live in the tooltip) and the stack stepper.
+ * strip scrolls instead). It doubles as the status's **reference**: clicking it
+ * opens the condition's description in the global status modal and hovering (or
+ * focusing) it shows the same card a sheet's inline `[StatusName]` reference
+ * shows — the two surfaces behave identically (see `StatusTooltip`). The right
+ * segment holds the duration as an icon only (its label and rules reminder live
+ * in the tooltip) and the stack stepper.
  * Both the fill and the duration glyph take the duration's own accent for the
  * active app theme (the GM Screen is app chrome — see
  * `themeUtils.STATUS_DURATION_COLORS`).
@@ -31,6 +35,7 @@ import { CirclePlus, Minus, Plus, X } from 'lucide-react'
 
 import AddStatusModal from '@/components/gmscreen/AddStatusModal'
 import StatusIcon from '@/components/status/StatusIcon'
+import { StatusTooltip } from '@/components/status/StatusTooltip'
 import { MAX_PANEL_STATUS_STACKS, statusDurationMeta } from '@/constants/statusDurations'
 import { statusDurationColor } from '@/lib/themeUtils'
 import { useAppThemeStore } from '@/store/appThemeStore'
@@ -149,19 +154,39 @@ function StatusPill({
   onAdjustStacks: (delta: number) => void
   onRemove: () => void
 }) {
+  const openStatus = useStatusStore((s) => s.openStatus)
   const meta = statusDurationMeta(entry.duration)
   const DurationIcon = meta.Icon
   const name = status?.name || (resolved ? 'Missing status' : '…')
   const lastStack = entry.stacks <= 1
   const atMax = entry.stacks >= MAX_PANEL_STATUS_STACKS
 
-  // Tooltip: the rules reminder plus, for a status still in the compendium, its
-  // description — the pill itself has room for neither.
-  const tooltip = !resolved
-    ? `${meta.label}: ${meta.hint}`
-    : status
-      ? `${name} — ${meta.label}: ${meta.hint}${status.description ? `\n\n${status.description}` : ''}`
-      : `${name} — this status is no longer in the compendium.`
+  /** The name button while it is hovered or focused: the card's anchor, and at
+   *  the same time the "card is open" flag, since it is one piece of state. */
+  const [anchor, setAnchor] = useState<HTMLButtonElement | null>(null)
+
+  // Native tooltip ONLY where there is no card to show. A resolved status reads
+  // its description in the shared card on hover (and opens it on click), so a
+  // `title` here would double up on that — but a status the compendium no
+  // longer has (or has not loaded yet) has no description to render, so it
+  // keeps explaining itself the plain way.
+  const fallbackTitle = status
+    ? undefined
+    : resolved
+      ? `${name} — no longer in the compendium. Remove it or re-create the status.`
+      : 'Reading the status compendium…'
+
+  const label = (
+    <>
+      <StatusIcon
+        icon={status?.icon ?? ''}
+        iconType={status?.iconType ?? 'emoji'}
+        size={12}
+        className="gm-status-pill__icon"
+      />
+      <span className="gm-status-pill__name">{name}</span>
+    </>
+  )
 
   return (
     <span
@@ -170,20 +195,30 @@ function StatusPill({
       }
       style={{ '--status-tone': tone } as CSSProperties}
       role="listitem"
-      title={tooltip}
+      title={fallbackTitle}
     >
       {/* Left segment — the filled one: the status's icon and its FULL name.
         * The name never truncates, so pills keep their natural width and the
-        * strip scrolls; see `.gm-status-pill` in gmscreen.css. */}
-      <span className="gm-status-pill__main">
-        <StatusIcon
-          icon={status?.icon ?? ''}
-          iconType={status?.iconType ?? 'emoji'}
-          size={12}
-          className="gm-status-pill__icon"
-        />
-        <span className="gm-status-pill__name">{name}</span>
-      </span>
+        * strip scrolls; see `.gm-status-pill` in gmscreen.css. When the
+        * compendium still has the status this is a button: click opens the
+        * description, hover/focus shows the card (exactly like a sheet's
+        * inline status reference). A missing status has nothing to open, so it
+        * stays a plain span. */}
+      {status ? (
+        <button
+          type="button"
+          className="gm-status-pill__main"
+          onClick={() => openStatus(status.id)}
+          onMouseEnter={(e) => setAnchor(e.currentTarget)}
+          onMouseLeave={() => setAnchor(null)}
+          onFocus={(e) => setAnchor(e.currentTarget)}
+          onBlur={() => setAnchor(null)}
+        >
+          {label}
+        </button>
+      ) : (
+        <span className="gm-status-pill__main">{label}</span>
+      )}
 
       {/* Right segment — the duration as an icon only (the label and the rules
         * reminder live in its tooltip), then the stack stepper. */}
@@ -237,6 +272,15 @@ function StatusPill({
           </button>
         </span>
       </span>
+
+      {/* Portalled: the pill clips its contents and the strip scrolls, so an
+        * in-place card would be sliced off. See StatusTooltip. The `isConnected`
+        * guard covers a compendium re-read (a delete, or an import landing)
+        * swapping this button back to a plain label under a resting pointer:
+        * the card must not come back measured against a detached node. */}
+      {anchor && anchor.isConnected && status && (
+        <StatusTooltip status={status} anchor={anchor} />
+      )}
     </span>
   )
 }

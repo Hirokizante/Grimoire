@@ -624,7 +624,14 @@
   border-style: dashed;
 }
 
-/* Left segment — the filled one. */
+/* Left segment — the filled one. When the compendium still has the status this
+   is a BUTTON: it is the status's reference, so clicking it opens the
+   condition's description and hovering/focusing it shows the shared status card
+   (see `StatusTooltip`) — the same behaviour as a sheet's inline status
+   reference. `font: inherit` is not optional: the bare button reset leaves the
+   UA's ~13px font in place, which would inflate the pill's 0.7rem type and
+   change the row's height. A missing status has nothing to open and stays a
+   plain span. */
 .gm-status-pill__main {
   display: inline-flex;
   align-items: center;
@@ -632,6 +639,18 @@
   flex: 0 0 auto;
   padding: 0 0.45rem 0 0.3rem;
   background: color-mix(in srgb, var(--status-tone) 26%, transparent);
+}
+
+button.gm-status-pill__main {
+  border: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+}
+
+button.gm-status-pill__main:hover {
+  background: color-mix(in srgb, var(--status-tone) 42%, transparent);
 }
 
 .gm-status-pill__icon {

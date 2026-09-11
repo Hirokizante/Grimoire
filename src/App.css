@@ -1973,16 +1973,20 @@
   background: color-mix(in srgb, var(--accent-violet) 22%, transparent);
 }
 
-.status-ref__tooltip {
-  display: none;
-  position: absolute;
-  bottom: calc(100% + 6px);
-  left: 50%;
-  transform: translateX(-50%);
-  width: 250px;
-  z-index: 1000;
+/* ---- Status tooltip card (sheet references + GM Screen pills) ----------- */
+
+/* One card, shared by every surface that shows a status: the visual half lives
+   here, the anchoring belongs to the surface. A sheet's inline reference anchors
+   it with plain CSS (`.status-tooltip--inline`); a GM Screen pill portals it to
+   `document.body` and drives top/left from the pill's rect
+   (`.status-tooltip--portal`), because a pill clips its contents and its strip
+   scrolls sideways. */
+.status-tooltip {
+  /* Capped for phones: a pill's card must not be wider than the viewport. */
+  width: min(250px, calc(100vw - 1rem));
   align-items: flex-start;
   gap: 0.5rem;
+  z-index: 1000;
   background: var(--bg-surface-raised);
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -1992,24 +1996,45 @@
   pointer-events: none;
 }
 
-.status-ref:hover .status-ref__tooltip,
-.status-ref:focus-within .status-ref__tooltip {
+/* Inline variant — anchored above the sheet's own reference by CSS. */
+.status-tooltip--inline {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.status-ref:hover .status-tooltip--inline,
+.status-ref:focus-within .status-tooltip--inline {
   display: flex;
 }
 
-.status-ref__tooltip-body {
+/* Portalled variant — `top`/`left` come from the pill's measured rect, and the
+   component flips it below the pill when there is no room above. */
+.status-tooltip--portal {
+  display: flex;
+  position: fixed;
+  transform: translate(-50%, -100%);
+}
+
+.status-tooltip--below {
+  transform: translate(-50%, 0);
+}
+
+.status-tooltip__body {
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
   min-width: 0;
 }
 
-.status-ref__tooltip-name {
+.status-tooltip__name {
   font-size: 0.85rem;
   color: var(--accent-violet-soft);
 }
 
-.status-ref__tooltip-desc {
+.status-tooltip__desc {
   font-size: 0.74rem;
   line-height: 1.4;
   color: var(--text-secondary);

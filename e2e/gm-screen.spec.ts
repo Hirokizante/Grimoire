@@ -643,6 +643,34 @@ test.describe('GM Screen', () => {
       .click()
     await expect(poisonedPill.locator('.gm-status-pill__count')).toHaveText('2')
 
+    // ---- The pill is the status's reference (sheet parity) ----------------
+    // Hovering its name shows the same card a sheet's inline `[StatusName]`
+    // reference shows. The card is portalled out of the pill — which clips its
+    // own contents — and out of the sideways-scrolling strip, so the WHOLE card
+    // is readable; a card rendered in place would be a clipped sliver.
+    const rowBefore = (await stripMetrics(npcPanel)).rowHeight
+    await poisonedPill.getByRole('button', { name: 'Poisoned', exact: true }).hover()
+    const statusCard = page.getByRole('tooltip')
+    await expect(statusCard).toBeVisible()
+    await expect(statusCard).toContainText('Poisoned')
+    const cardBox = (await statusCard.boundingBox())!
+    expect(cardBox.x).toBeGreaterThanOrEqual(0)
+    expect(cardBox.y).toBeGreaterThanOrEqual(0)
+    expect(cardBox.x + cardBox.width).toBeLessThanOrEqual(1280)
+    expect(cardBox.width).toBeGreaterThan(200)
+    // Opening the card changes nothing about the pill: still one line, and the
+    // row is exactly as tall as it was.
+    expect((await stripMetrics(npcPanel)).rowHeight).toBe(rowBefore)
+
+    // Clicking the name opens the condition's description — the same global
+    // modal a sheet's inline reference opens, showing the full Markdown text.
+    await poisonedPill.getByRole('button', { name: 'Poisoned', exact: true }).click()
+    const statusDialog = page.locator('.status-modal')
+    await expect(statusDialog).toBeVisible()
+    await expect(statusDialog).toContainText('Poisoned characters take 1d6+POW damage')
+    await statusDialog.locator('.modal-close').click()
+    await expect(statusDialog).toHaveCount(0)
+
     // Statuses are per panel: the player panel is still clean.
     await expect(page.locator('.gm-panel--character .gm-status-pill')).toHaveCount(0)
     await addStatus(page, page.locator('.gm-panel--character'), 'Stunned', 'Quick')
