@@ -8,8 +8,9 @@
  *   - all version snapshots (character history)
  *   - the full status-condition compendium (built-in + custom)
  *   - the persistent dice roll log
+ *   - every saved GM screen
  *
- * Restoring REPLACES the current contents of all four stores with the backup's
+ * Restoring REPLACES the current contents of all five stores with the backup's
  * (in one atomic IndexedDB transaction) and reloads the in-memory stores. This
  * is a disaster-recovery tool, not a merge — the app warns before overwriting.
  *
@@ -18,16 +19,21 @@
  *   {
  *     app: 'grimoire',
  *     kind: 'full-backup',
- *     backupVersion: 1,
+ *     backupVersion: 2,
  *     createdAt: '<ISO timestamp>',
- *     counts: { characters, npcs, versions, rollLogEntries, statuses },
- *     data: { characters, versions, rollLogs, statuses }
+ *     counts: { characters, npcs, versions, rollLogEntries, statuses, screens },
+ *     data: { characters, versions, rollLogs, statuses, screens }
  *   }
+ *
+ * v1 backups (no `screens` key) still restore: screens are treated as an empty
+ * list, so the screens store is wiped like every other store (replace
+ * semantics). Backups newer than {@link BACKUP_VERSION} are refused.
  */
 
 import {
   getAllCharacters,
   getAllRollLogEntries,
+  getAllScreens,
   getAllStatuses,
   getAllVersionSnapshots,
   replaceAllData,
@@ -35,13 +41,14 @@ import {
 import { isCharacterShape, isStatusShape } from '@/lib/exportImport'
 import type {
   Character,
+  GMScreen,
   RollLogEntry,
   StatusCondition,
   VersionSnapshot,
 } from '@/types'
 
 /** Bump when the backup payload shape changes incompatibly. */
-export const BACKUP_VERSION = 1
+export const BACKUP_VERSION = 2
 
 /** The single-file payload written to disk. */
 export interface FullBackup {
@@ -60,6 +67,7 @@ export interface FullBackup {
     versions: number
     rollLogEntries: number
     statuses: number
+    screens: number
   }
   /** The records themselves, keyed by store. */
   data: {
@@ -67,6 +75,7 @@ export interface FullBackup {
     versions: VersionSnapshot[]
     rollLogs: RollLogEntry[]
     statuses: StatusCondition[]
+    screens: GMScreen[]
   }
 }
 
@@ -81,11 +90,12 @@ export interface RestoreResult {
  * (see db.ts) handles schema drift when they come back.
  */
 export async function buildFullBackup(): Promise<FullBackup> {
-  const [characters, versions, rollLogs, statuses] = await Promise.all([
+  const [characters, versions, rollLogs, statuses, screens] = await Promise.all([
     getAllCharacters(),
     getAllVersionSnapshots(),
     getAllRollLogEntries(),
     getAllStatuses(),
+    getAllScreens(),
   ])
   const npcs = characters.filter((c) => c.kind === 'npc')
   return {
@@ -99,8 +109,9 @@ export async function buildFullBackup(): Promise<FullBackup> {
       versions: versions.length,
       rollLogEntries: rollLogs.length,
       statuses: statuses.length,
+      screens: screens.length,
     },
-    data: { characters, versions, rollLogs, statuses },
+    data: { characters, versions, rollLogs, statuses, screens },
   }
 }
 
@@ -138,6 +149,17 @@ function isRollLogEntryShape(data: unknown): data is RollLogEntry {
     typeof o.characterId === 'string' &&
     typeof o.notation === 'string' &&
     typeof o.rolledAt === 'string'
+  )
+}
+
+/** Shape guard for a GM screen (id + name + panels array). */
+function isScreenShape(data: unknown): data is GMScreen {
+  if (typeof data !== 'object' || data === null) return false
+  const o = data as Record<string, unknown>
+  return (
+    typeof o.id === 'string' &&
+    typeof o.name === 'string' &&
+    Array.isArray(o.panels)
   )
 }
 
@@ -185,6 +207,10 @@ export function parseFullBackup(text: string): FullBackup {
   const statuses = Array.isArray(raw.statuses)
     ? raw.statuses.filter(isStatusShape)
     : []
+  // v1 backups predate GM screens — a missing key means "no screens".
+  const screens = Array.isArray(raw.screens)
+    ? (raw.screens as unknown[]).filter(isScreenShape)
+    : []
 
   const npcs = characters.filter((c) => c.kind === 'npc')
   const parsed: FullBackup = {
@@ -199,15 +225,17 @@ export function parseFullBackup(text: string): FullBackup {
       versions: versions.length,
       rollLogEntries: rollLogs.length,
       statuses: statuses.length,
+      screens: screens.length,
     },
-    data: { characters, versions, rollLogs, statuses },
+    data: { characters, versions, rollLogs, statuses, screens },
   }
   if (
     parsed.counts.characters +
       parsed.counts.npcs +
       parsed.counts.statuses +
       parsed.counts.versions +
-      parsed.counts.rollLogEntries ===
+      parsed.counts.rollLogEntries +
+      parsed.counts.screens ===
     0
   ) {
     throw new Error('This backup file contains no data.')

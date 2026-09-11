@@ -187,6 +187,7 @@ export default function CharacterSheet({
             <ProfileSection
               physicalDescription={char.physicalDescription}
               backstory={char.backstory}
+              characterId={char.id}
               mode={mode}
             />
           </div>

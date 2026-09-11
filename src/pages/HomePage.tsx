@@ -7,7 +7,7 @@
  * from homeAnimationStore.
  */
 
-import { Users, Swords, Sparkles, Settings } from 'lucide-react'
+import { Users, Swords, Sparkles, Settings, LayoutDashboard } from 'lucide-react'
 
 import TerminalBootAnimation from '@/components/home/TerminalBootAnimation'
 import { useCharacterStore } from '@/store/characterStore'
@@ -77,6 +77,17 @@ export default function HomePage() {
             <span className="home-nav__btn-inner">
               <Swords size={48} className="home-nav__icon" />
               <span className="home-nav__label">NPCs</span>
+            </span>
+          </button>
+
+          <button
+            type="button"
+            className="home-nav__btn"
+            onClick={() => setView('gmscreen')}
+          >
+            <span className="home-nav__btn-inner">
+              <LayoutDashboard size={48} className="home-nav__icon" />
+              <span className="home-nav__label">GM Screen</span>
             </span>
           </button>
 

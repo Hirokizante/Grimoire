@@ -29,19 +29,19 @@ export default function MortalWoundRoller({ character }: MortalWoundRollerProps)
   const filledCount = character.mortalWounds.filter((w) => w != null).length
 
   const handleRoll = () => {
-    const result = rollMortalWound()
+    const result = rollMortalWound(character.id)
     if (result.knockedOut) {
       notify('Character knocked out! Death Saves begin next turn.', 'error', 5000)
     }
   }
 
   const handleClear = (index: number) => {
-    clearMortalWound(index)
+    clearMortalWound(character.id, index)
     notify('Mortal Wound cleared.', 'info', 2000)
   }
 
   const handleRest = () => {
-    fullRestore()
+    fullRestore(character.id)
     notify('Full Restore: all resources and wound slots cleared.', 'success', 4000)
   }
 

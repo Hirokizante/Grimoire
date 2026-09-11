@@ -27,7 +27,9 @@ export default function SkillsSection({
   skills,
   mode = 'view',
 }: SkillsSectionProps) {
-  const update = useCharacterStore((s) => s.updateCurrentCharacter)
+  const updateCharacter = useCharacterStore((s) => s.updateCharacter)
+  const update = (updater: (c: Character) => Character) =>
+    updateCharacter(character.id, updater)
   const roll = useDiceRollStore((s) => s.roll)
   const isEdit = mode === 'edit'
 

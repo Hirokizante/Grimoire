@@ -33,7 +33,7 @@ import SortableAbilityCard, {
 import { useCharacterStore } from '@/store/characterStore'
 import { useSubAbilityEditor } from '@/hooks/useSubAbilityEditor'
 import { formatSlots, isOverflowed, slotsUsed } from '@/lib/slotLogic'
-import type { AbilityBlock } from '@/types'
+import type { AbilityBlock, Character } from '@/types'
 import type { SheetMode } from '@/pages/CharacterSheetPage'
 
 const SECTION: AbilitySectionId = 'slottedAbilities'
@@ -43,7 +43,18 @@ export interface SlottedAbilitiesSectionProps {
   maxSlots: number
   mode?: SheetMode
   viewMode?: 'grid' | 'list'
+  /**
+   * Omit to render a FIXED view mode with no grid/list toggle. The GM Screen
+   * passes nothing, so panels always read as a list (a grid is unreadable at
+   * panel width). The sheet pages pass this and keep both toggles.
+   */
   onViewModeChange?: (mode: 'grid' | 'list') => void
+  /**
+   * Entity the cards belong to. Defaults to the store's `currentCharacter`;
+   * the GM Screen passes the panel's own entity so dice notation resolves
+   * against the right stats and costs deduct from the right record.
+   */
+  owner?: Character
 }
 
 export default function SlottedAbilitiesSection({
@@ -52,6 +63,7 @@ export default function SlottedAbilitiesSection({
   mode = 'view',
   viewMode = 'grid',
   onViewModeChange,
+  owner,
 }: SlottedAbilitiesSectionProps) {
   const isEdit = mode === 'edit'
   const isView = !isEdit
@@ -202,7 +214,7 @@ export default function SlottedAbilitiesSection({
           }
         >
           {abilities.map((ability) => (
-            <AbilityActivation key={ability.id} ability={ability} />
+            <AbilityActivation key={ability.id} ability={ability} character={owner} />
           ))}
         </div>
       ) : (

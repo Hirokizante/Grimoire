@@ -5,7 +5,7 @@
  * inherit the active character's theme consistently.
  */
 
-import type { SheetColors, SheetConfig } from '@/types'
+import type { PanelStatusDuration, SheetColors, SheetConfig } from '@/types'
 import {
   DEFAULT_SHEET_COLORS,
   MIKAMI_SHEET_COLORS,
@@ -130,6 +130,81 @@ export function appThemeNpcStatColors(
   theme: AppTheme,
 ): Record<NPCStatColorKey, string> {
   return NPC_STAT_TOKEN_COLORS[theme]
+}
+
+/**
+ * Accents for the GM Screen's status-duration pills — one palette per app
+ * theme, mapped by meaning:
+ *   Quick        — amber/yellow (a flash, gone by the next turn)
+ *   Persistent   — blue (a repeating save)
+ *   Countdown    — orange (a clock running down)
+ *   Permanent    — pale neutral/cream (enduring, no urgency)
+ *   Conditional  — teal/green (a state that comes and goes)
+ *
+ * The GM Screen is app chrome, so these follow the active theme like the panel
+ * stat tokens do, and they are tuned per theme rather than picked once: the
+ * five labels sit side by side in a single hairline pill, so they have to stay
+ * tellable from each other AND legible as small text on each theme's surface.
+ * `themeUtils.test.ts` enforces a floor of ΔE(CIE76) >= 16 between every pair
+ * and >= 4.5:1 contrast against the panel surface (the pills' small duration
+ * label is body text, not a 3px stripe).
+ */
+export const STATUS_DURATION_COLORS: Record<
+  AppTheme,
+  Record<PanelStatusDuration, string>
+> = {
+  // Dark indigo: warm amber vs a deeper orange for Quick/Countdown, frost blue
+  // for Persistent, a pale lavender for Permanent, mint for Conditional.
+  midnight: {
+    quick: '#e8c26a',
+    persistent: '#7fa8e8',
+    countdown: '#e08a5f',
+    permanent: '#b9b3d6',
+    conditional: '#5fc9a8',
+  },
+  // Warm charcoal: the same hues dropped into parchment's low-saturation
+  // register, with Permanent a warm sand rather than a cold gray.
+  parchment: {
+    quick: '#dcae6a',
+    persistent: '#8fa8c8',
+    countdown: '#d98a63',
+    permanent: '#c0b79f',
+    conditional: '#8fbfa8',
+  },
+  // Nord on near-black: the aurora set — Nord yellow, frost blue, Nord orange,
+  // Nord purple (which reads as the cooler "enduring" accent here) and teal.
+  mikami: {
+    quick: '#ebcb8b',
+    persistent: '#81a1c1',
+    countdown: '#d08770',
+    permanent: '#b48ead',
+    conditional: '#8fbcbb',
+  },
+  // Pure black with cream and gold: Quick leaves the theme's gold (which is
+  // the HP bar color) for a burnt amber, Countdown a brick red, and Permanent
+  // takes the theme's cream so it reads as the calm, open-ended one.
+  'pitch-black': {
+    quick: '#e0a458',
+    persistent: '#8fa8c8',
+    countdown: '#c96a5f',
+    permanent: '#f3ecd4',
+    conditional: '#8fbfa8',
+  },
+}
+
+/** Status-duration accents for the given app theme. */
+export function appThemeStatusDurationColors(
+  theme: AppTheme,
+): Record<PanelStatusDuration, string> {
+  return STATUS_DURATION_COLORS[theme]
+}
+
+/** The tone for one duration under the active app theme. */
+export function statusDurationColor(
+  theme: AppTheme,
+  duration: PanelStatusDuration,
+): string {
+  return STATUS_DURATION_COLORS[theme][duration]
 }
 
 /**

@@ -1,0 +1,1294 @@
+/**
+ * gmscreen.css — GM Screen page, panel, and picker styles.
+ *
+ * The GM Screen is app chrome: it consumes the active app theme's CSS custom
+ * properties (--bg-surface, --accent-violet, …) like the list pages do, and
+ * never the per-sheet palette. Character panels inject the entity's own
+ * `colorVars()` on their inner sheet container only, so a player's
+ * customization still renders inside a neutral page.
+ *
+ * Z-order: nothing here exceeds the ladder in .hermes.md — panel menus sit at
+ * 40 (below the customize drawer at 60 and every overlay layer), and the
+ * pickers are standard `.modal-overlay` dialogs (2000).
+ */
+
+/* ---- Page ---------------------------------------------------------------- */
+
+.gm-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.gm-screen__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem 0.85rem;
+}
+
+.gm-screen__title-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* The save indicator reserves its own width at all times and only toggles
+   `visibility`, so showing/hiding it can never resize the row. It toggles on
+   EVERY debounced write (i.e. every panel action), and because it sits between
+   the title and the right-aligned actions, an in-flow badge shoved the
+   screen-switcher pills ~57px sideways each time — the "name flickers right"
+   bug. Overlaying it (absolute) is not a fix either: it lands on the switcher.
+   `visibility: hidden` keeps the box while removing it from the a11y tree and
+   from hit-testing. */
+.gm-screen__saving {
+  visibility: hidden;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.gm-screen__saving--active {
+  visibility: visible;
+}
+
+.gm-screen__title {
+  margin: 0;
+  font-size: 1.15rem;
+  letter-spacing: 0.02em;
+}
+
+/* Saved-screen pills — click-to-select, horizontally scrollable on phones. */
+.gm-screen__switcher {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex: 1 1 12rem;
+  min-width: 0;
+  overflow-x: auto;
+  overscroll-behavior: none;
+  scrollbar-width: thin;
+  padding-bottom: 2px;
+}
+
+.gm-screen__screen-pill {
+  flex: 0 0 auto;
+  max-width: 12rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.gm-screen__screen-pill:hover {
+  background: var(--bg-surface-hover);
+  color: var(--text-primary);
+}
+
+.gm-screen__screen-pill--active {
+  background: color-mix(in srgb, var(--accent-violet) 22%, var(--bg-surface));
+  border-color: var(--accent-violet);
+  color: var(--text-primary);
+}
+
+.gm-screen__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-left: auto;
+}
+
+.gm-screen__rename-input {
+  width: 12rem;
+  max-width: 100%;
+}
+
+.gm-screen__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.gm-screen__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  text-align: center;
+  padding: 2rem 1rem;
+}
+
+.gm-screen__empty-icon {
+  color: var(--accent-violet);
+  opacity: 0.7;
+}
+
+.gm-screen__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  text-align: left;
+}
+
+.gm-screen__field-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+}
+
+/* ---- Panel layout -------------------------------------------------------- */
+
+/* Flex columns rather than CSS multi-columns: dnd-kit needs a single ordered
+   flow it can animate, and `break-inside: avoid` columns fight the drag
+   transform. Panels are distributed in array order down each column, which is
+   the documented behaviour. */
+.gm-screen__columns {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.gm-screen__column {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/* ---- Panel shell --------------------------------------------------------- */
+
+.gm-panel-wrap {
+  /* The grip is a real flex column beside the panel, NOT an overlay: an
+     absolutely-positioned handle sat on top of the 48px portrait. */
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+}
+
+.gm-panel-wrap--dragging {
+  opacity: 0.4;
+}
+
+/* Frameless, touch-friendly drag grip in its own gutter. */
+.gm-panel__drag {
+  flex: 0 0 auto;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  margin-right: 0.15rem;
+  border-radius: 8px;
+  /* `--text-muted` was too dim to read as an affordance on the panel surface
+     (under 4.5:1 in most themes, and effectively invisible on the darkest
+     ones). The grip is the ONLY way to reorder a panel, so it must be legible
+     at rest — not only on hover. */
+  color: var(--text-secondary);
+  cursor: grab;
+  touch-action: none;
+}
+
+.gm-panel__drag:hover {
+  color: var(--text-primary);
+  background: var(--bg-surface-hover);
+}
+
+.gm-panel__drag:focus-visible {
+  color: var(--text-primary);
+  outline: 2px solid var(--accent-violet);
+  outline-offset: -2px;
+}
+
+.gm-panel__drag:active {
+  cursor: grabbing;
+}
+
+/* Size the icon in CSS instead of relying on the svg's width/height
+   attributes. Inside this stretched flex column the grip's svg computed to
+   `width: 0px` while its height applied — leaving the handle present but
+   invisible. An explicit size is immune to that quirk. */
+.gm-panel__drag svg {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+}
+
+.gm-panel {
+  position: relative;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 0.7rem 0.75rem 0.75rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-surface);
+  min-width: 0;
+}
+
+.gm-panel--expanded {
+  padding-bottom: 1rem;
+}
+
+.gm-panel--downed {
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--border));
+}
+
+.gm-panel--dead {
+  border-color: color-mix(in srgb, var(--danger) 70%, var(--border));
+  opacity: 0.75;
+}
+
+.gm-panel--overlay {
+  padding: 0.6rem 0.9rem;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 45%);
+  cursor: grabbing;
+}
+
+.gm-panel--missing {
+  border-style: dashed;
+  align-items: center;
+}
+
+.gm-panel__missing-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
+  text-align: center;
+}
+
+.gm-panel__missing-icon {
+  color: var(--text-muted);
+}
+
+.gm-panel__missing-text {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+/* ---- Panel header -------------------------------------------------------- */
+
+.gm-panel__header {
+  display: flex;
+  align-items: center;
+  /* Tight on purpose: the badge and the two icon controls read as one group
+     pinned to the panel's right edge, not as three things floating apart. */
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.gm-panel__portrait {
+  width: 48px;
+  height: 48px;
+  flex: 0 0 48px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid var(--border);
+}
+
+.gm-panel__portrait--empty {
+  background: var(--bg-surface-raised);
+}
+
+.gm-panel__identity {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.gm-panel__name {
+  font-weight: 600;
+  font-size: 0.95rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gm-panel__name--dimmed {
+  text-decoration: line-through;
+  color: var(--text-secondary);
+}
+
+.gm-panel__subtitle {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gm-panel__controls {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+  flex: 0 0 auto;
+}
+
+/* The panel's three square icon buttons: the header's expand and ⋯ controls and
+   the HP row's Add Status ⊕. All three are the SAME 1.6rem square, so their
+   icons stack on one vertical line down the panel's right edge (the header and
+   the HP row share the panel's content edge). They must also centre their icon
+   EXPLICITLY: `.btn` is a flex row with only `align-items: center` — text
+   buttons are centred by their padding — so a single icon in a `padding: 0`
+   box hugs the LEFT edge (~4px off-centre), which is what made the ⋯ sit
+   crooked inside its own hover pill. */
+.gm-panel__density,
+.gm-panel__menu-btn,
+.gm-statuses__add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  padding: 0;
+}
+
+.gm-panel__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  flex: 0 0 auto;
+  padding: 0.15rem 0.4rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border: 1px solid var(--border);
+  background: var(--bg-surface-raised);
+  color: var(--text-secondary);
+}
+
+.gm-panel__badge--active {
+  border-color: color-mix(in srgb, var(--color-success) 50%, var(--border));
+  color: var(--color-success);
+}
+
+.gm-panel__badge--downed {
+  border-color: color-mix(in srgb, var(--accent-blush) 55%, var(--border));
+  color: var(--accent-blush);
+}
+
+.gm-panel__badge--dead {
+  border-color: color-mix(in srgb, var(--danger) 65%, var(--border));
+  color: var(--danger);
+}
+
+/* Panel menu — click-to-toggle popover, never hover-open. */
+.gm-panel__menu-wrap {
+  position: relative;
+}
+
+.gm-panel__menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 40;
+  min-width: 11rem;
+  display: flex;
+  flex-direction: column;
+  padding: 0.25rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-surface-raised);
+  box-shadow: 0 8px 20px rgb(0 0 0 / 45%);
+}
+
+.gm-panel__menu-item {
+  text-align: left;
+  padding: 0.45rem 0.6rem;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  color: var(--text-primary);
+}
+
+.gm-panel__menu-item:hover {
+  background: var(--bg-surface-hover);
+}
+
+.gm-panel__menu-item--danger {
+  color: var(--danger);
+}
+
+.gm-panel__rename {
+  display: flex;
+}
+
+.gm-panel__rename-input {
+  width: 100%;
+}
+
+.gm-panel__hint {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* ---- HP bar -------------------------------------------------------------- */
+
+.gm-hp {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.gm-hp__row {
+  display: flex;
+  /* Never wraps: the status strip scrolls instead (see `.gm-statuses`). */
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+}
+
+.gm-hp__icon {
+  color: var(--accent-blush);
+  flex: 0 0 auto;
+}
+
+.gm-hp__label {
+  color: var(--text-secondary);
+  letter-spacing: 0.05em;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+}
+
+.gm-hp__value {
+  /* The HP number is the panel's anchor: shrink the status strip, never this. */
+  flex: 0 0 auto;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.gm-hp__max {
+  color: var(--text-muted);
+  font-weight: 400;
+  font-size: 0.78rem;
+}
+
+.gm-hp__temp {
+  margin-left: 0.15rem;
+  padding: 0.05rem 0.35rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  background: color-mix(in srgb, var(--fp-bar-color) 25%, transparent);
+  color: var(--text-primary);
+}
+
+.gm-hp__track {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--bg-surface-raised);
+  overflow: hidden;
+}
+
+.gm-hp__fill {
+  height: 100%;
+  /* --hp-bar-color is defined by every app theme (index.css) AND injected per
+     sheet by colorVars(). Falling back to --accent-blush keeps the fill
+     visible even if a future theme forgets the key. */
+  background: var(--hp-bar-color, var(--accent-blush));
+  transition: width 0.2s ease;
+}
+
+.gm-hp__controls {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+/* The global button reset zeroes padding, and a bare text glyph in a fixed box
+   sits high/left depending on the font. Flex centring handles that — but
+   `line-height: 1` must NOT be set here: it clips the glyph's em box to the
+   font size, which for "+"/U+2212 sits above the box centre in most UI fonts
+   and leaves the symbol visibly high. */
+.gm-hp__step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  font-size: 1rem;
+  background: var(--bg-surface-raised);
+  color: var(--text-primary);
+}
+
+.gm-hp__damage {
+  margin-left: auto;
+  padding: 0.3rem 0.6rem;
+  font-size: 0.78rem;
+}
+
+/* ---- Tracked statuses (GM Screen only) ----------------------------------- */
+
+/* The status strip lives INSIDE the HP row, so it must never wrap: a panel
+   whose GM stacked five conditions on it would otherwise grow taller than its
+   neighbour and break the at-a-glance grid. Instead the strip is one line that
+   scrolls sideways, and the pills inside it keep their natural width (a status
+   name must always read in full — see `.gm-status-pill`). The HP value and the
+   add button keep their natural size, and the add button is pinned to the row's
+   right edge so it sits in the same place on every panel. */
+.gm-statuses {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.gm-statuses__strip {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  /* A painted scrollbar would add height to the row it must not change, and
+     the overflowing pill's cut edge is the scroll affordance. */
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+}
+
+.gm-statuses__strip::-webkit-scrollbar {
+  display: none;
+}
+
+.gm-statuses__add {
+  /* Size + icon centring come from the shared square-icon-button rule with the
+     header's expand / ⋯ controls (see `.gm-panel__controls`). */
+  /* `margin-left: auto` pins it to the row's right edge whether or not any
+     pills are present, so the control never moves around the row. */
+  margin-left: auto;
+  flex: 0 0 auto;
+  color: var(--text-secondary);
+}
+
+.gm-statuses__add:hover {
+  background: var(--bg-surface-hover);
+  color: var(--text-primary);
+}
+
+/* One tracked status, in TWO segments:
+
+     [ icon Name | duration-icon − n + ]
+        filled      quiet
+
+   The left segment is the FILLED one and carries the status's icon and its
+   full name — the name never truncates, so a pill keeps its natural width and
+   the strip scrolls instead of squeezing it (that is the whole point: a GM
+   must be able to read "Regeneration" at a glance). The right segment holds
+   the duration as an icon only — its label and rules reminder live in the
+   icon's tooltip — plus the stack stepper. Both the fill and the glyph use the
+   duration's accent (one per duration, per app theme: see
+   `themeUtils.STATUS_DURATION_COLORS`). Height is fixed so a pill can never
+   change the row's height. */
+.gm-status-pill {
+  --status-tone: var(--accent-violet);
+  display: inline-flex;
+  align-items: stretch;
+  /* Pills never compress: the name always reads in full, and the strip is the
+     thing that scrolls. */
+  flex: 0 0 auto;
+  height: 1.35rem;
+  /* Safe here precisely BECAUSE the pill never shrinks: no flex item is being
+     squeezed, so the clipped-corners behaviour that once swallowed the stepper
+     cannot apply. Clipping keeps the filled left cap inside the pill's radius. */
+  overflow: hidden;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--status-tone) 45%, transparent);
+  /* A faint wash under the whole pill, so the right segment still belongs to
+     it while the left one is unmistakably the filled half. */
+  background: color-mix(in srgb, var(--status-tone) 10%, transparent);
+  color: var(--text-primary);
+  font-size: 0.7rem;
+  line-height: 1;
+}
+
+.gm-status-pill--missing {
+  --status-tone: var(--text-muted);
+  border-style: dashed;
+}
+
+/* Left segment — the filled one. */
+.gm-status-pill__main {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex: 0 0 auto;
+  padding: 0 0.45rem 0 0.3rem;
+  background: color-mix(in srgb, var(--status-tone) 26%, transparent);
+}
+
+.gm-status-pill__icon {
+  flex: 0 0 auto;
+}
+
+.gm-status-pill__name {
+  /* Never truncated: no ellipsis, no floor, no shrink. */
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+/* Right segment — duration icon + stack stepper. */
+.gm-status-pill__meta {
+  display: inline-flex;
+  align-items: stretch;
+  flex: 0 0 auto;
+}
+
+.gm-status-pill__duration {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  padding: 0 0.3rem;
+  border-left: 1px solid color-mix(in srgb, var(--status-tone) 30%, transparent);
+  color: var(--status-tone);
+}
+
+/* Stack stepper — its first button either removes a stack (−) or, at one
+   stack, removes the status outright (✕). Both are explicit: a status can
+   never disappear from a mis-click on a decrement. */
+.gm-status-pill__stacks {
+  display: inline-flex;
+  align-items: stretch;
+  flex: 0 0 auto;
+}
+
+.gm-status-pill__step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.05rem;
+  height: auto;
+  padding: 0;
+  border-radius: 0;
+  color: var(--text-secondary);
+}
+
+.gm-status-pill__step:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--status-tone) 30%, transparent);
+  color: var(--text-primary);
+}
+
+.gm-status-pill__step:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.gm-status-pill__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+/* ---- Expand / collapse animation ----------------------------------------- */
+
+/* `grid-template-rows: 0fr → 1fr` is the one way to transition to a
+   content-driven height without measuring anything. The inner element needs
+   `min-height: 0` (and hidden overflow) or the row cannot shrink past its
+   content. Duration/easing are mirrored by DURATION_MS in PanelExpand.tsx. */
+.gm-panel__expand {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition:
+    grid-template-rows 190ms cubic-bezier(0.22, 0.75, 0.3, 1),
+    opacity 150ms ease-out;
+  opacity: 0;
+}
+
+.gm-panel__expand--open {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+.gm-panel__expand-inner {
+  min-height: 0;
+  overflow: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gm-panel__expand {
+    transition: none;
+  }
+}
+
+/* ---- Stat tokens --------------------------------------------------------- */
+
+.gm-tokens {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  align-items: center;
+}
+
+/* Shaped like the sheet's cost badges (`.cost-badge` / `.dice-notation`): a
+   hairline border on ALL edges rather than a thick left stripe. The token's
+   own accent color is kept — this only changes the frame. `box-sizing:
+   border-box` keeps every token the same outer height despite the 1px edge. */
+.gm-token {
+  --token-accent: var(--token-color, var(--accent-violet));
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 6px;
+  border: 1px solid color-mix(in srgb, var(--token-accent) 40%, transparent);
+  font-size: 0.75rem;
+  line-height: 1.5;
+  background: color-mix(in srgb, var(--token-accent) 14%, transparent);
+  color: var(--text-primary);
+  box-sizing: border-box;
+}
+
+.gm-token__label {
+  color: var(--text-secondary);
+  font-size: 0.7rem;
+}
+
+.gm-token__value {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.gm-token--edit {
+  margin-left: auto;
+  background: transparent;
+  border-color: transparent;
+  color: var(--text-muted);
+}
+
+.gm-token--edit:hover {
+  background: var(--bg-surface-hover);
+  color: var(--text-primary);
+}
+
+/* ---- Expanded sheet content ---------------------------------------------- */
+
+/* ---- Expanded panel body (PanelSheet) ------------------------------------ */
+
+/* The embedded sheet keeps its own palette; keep it inside the panel box. */
+.gm-panel__sheet {
+  min-width: 0;
+  margin-top: 0.35rem;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.gm-panel__sheet .character-sheet {
+  padding: 0.6rem 0.55rem;
+  /* A GM reads this at a glance mid-session: tighten the page-scale rhythm
+     that the full sheet uses. */
+  gap: 0.65rem;
+}
+
+/* Panel sections are cards inside a card — drop the doubled surface so the
+   body reads as one sheet rather than a stack of boxes. */
+.gm-panel__sheet .sheet-section {
+  background: transparent;
+  border: none;
+  border-top: 1px solid var(--border-soft);
+  border-radius: 0;
+  padding: 0.55rem 0.15rem 0.15rem;
+  margin: 0;
+}
+
+.gm-panel__sheet .sheet-section:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+
+.gm-panel__sheet .sheet-section__heading,
+.gm-panel__sheet .stat-block__heading {
+  font-size: 0.82rem;
+  letter-spacing: 0.07em;
+}
+
+/* Every multi-column block collapses to one readable column: a panel is
+   narrow, and a grid at this width is what made the old view unreadable. */
+.gm-panel__sheet .ability-grid,
+.gm-panel__sheet .character-sheet__bottom,
+.gm-panel__sheet .attribute-boxes,
+.gm-panel__sheet .stat-tokens {
+  grid-template-columns: 1fr;
+}
+
+/* ...except the stat tokens, which read fine as compact rows and keep the
+   body much shorter. */
+.gm-panel__sheet .stat-tokens {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
+  gap: 0.35rem;
+}
+
+/* Attribute boxes: five EQUAL columns.
+   `repeat(5, 1fr)` is `minmax(auto, 1fr)`, and that `auto` minimum is the
+   column's own content size — so "MAR" and its full name made column 1 wider
+   than column 3 (measured 76/66/70/76/66px). `minmax(0, 1fr)` removes the
+   content floor and makes every box the same width. */
+.gm-panel__sheet .attr-boxes,
+.gm-panel__sheet .attr-boxes--row,
+.gm-panel__sheet .attr-boxes--grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.35rem;
+}
+
+/* The shorthand alone is enough on a panel — the full name made the boxes
+   need the width that broke the equal columns. */
+.gm-panel__sheet .attr-box__name {
+  display: none;
+}
+
+.gm-panel__sheet .attr-box {
+  padding: 0.45rem 0.3rem 0.5rem;
+  gap: 0.15rem;
+}
+
+.gm-panel__sheet .attr-box__value {
+  font-size: 1.4rem;
+  min-width: 0;
+}
+
+/* Skills: two even columns on a wide panel, one on a phone.
+   The sheet's `nth-child(odd)` zebra striping is neutralised here — in a
+   two-column grid every odd row falls in the left column, so the stripes read
+   as "the left column is highlighted" rather than as alternating rows. */
+.gm-panel__sheet .skill-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: 0.1rem 1rem;
+}
+
+.gm-panel__sheet .skill-list__item,
+.gm-panel__sheet .skill-list__item:nth-child(odd) {
+  background: transparent;
+}
+
+.gm-panel__sheet .skill-list__item {
+  padding: 0.22rem 0.35rem;
+  /* A hairline under every row keeps the two columns legible as rows without
+     striping them. */
+  border-bottom: 1px solid color-mix(in srgb, var(--border-soft) 60%, transparent);
+}
+
+.gm-panel__sheet .skill-list__name {
+  color: var(--text-secondary);
+}
+
+.gm-panel__sheet .skill-list__value {
+  min-width: 2rem;
+}
+
+/* Only five columns fit a phone panel; 3+2 reads better than 5 cramped. */
+@media (max-width: 700px) {
+  .gm-panel__sheet .attr-boxes,
+  .gm-panel__sheet .attr-boxes--row,
+  .gm-panel__sheet .attr-boxes--grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 0.25rem;
+  }
+
+  .gm-panel__sheet .attr-box__value {
+    font-size: 1.2rem;
+  }
+}
+
+/* Ability cards: trim their page-scale padding for the narrower column. */
+.gm-panel__sheet .ability-card {
+  padding: 0.55rem 0.6rem;
+}
+
+.gm-panel__sheet .ability-card__name {
+  font-size: 0.92rem;
+}
+
+/* Long prose (description, bio) stays readable but compact. */
+.gm-panel__sheet .sheet-textarea,
+.gm-panel__sheet .profile__text,
+.gm-panel__sheet .core-innate__text {
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+/* The mortal-wound cards are wide, page-scale affordances; let them wrap. */
+.gm-panel__sheet .mw-card-grid {
+  grid-template-columns: 1fr;
+}
+
+/* ---- Pickers ------------------------------------------------------------- */
+
+/* A picker dialog is a three-part shell: pinned header, scrolling list, pinned
+   footer. The DIALOG is the flex column and the BODY is its one flexible child
+   — that is what makes the mouse wheel work anywhere over the list. The body
+   used to carry `overflow-y: auto` while being sized by its content, so it
+   never scrolled itself; because it also sets `overscroll-behavior: none`, it
+   then swallowed wheel events instead of chaining them to `.modal-content`
+   (the only element that could actually scroll), leaving the dialog's own
+   scrollbar strip as the single place a wheel did anything. */
+.modal-content.gm-picker {
+  display: flex;
+  flex-direction: column;
+  /* The body owns the scrolling now; the dialog only clips its rounded corners
+     (and stops a second, redundant scrollbar appearing beside the body's). */
+  overflow: hidden;
+}
+
+.gm-picker__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 0.85rem 1rem;
+  flex: 1 1 auto;
+  /* Required: a flex item refuses to shrink below its content without it, and
+     then nothing ever overflows and nothing scrolls. */
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: none;
+}
+
+/* Header and footer keep their natural height while the body gives way, so the
+   ✕ dismiss and the Done action stay reachable at any scroll position. */
+.modal-content.gm-picker > .modal-header,
+.modal-content.gm-picker > .modal-footer {
+  flex: 0 0 auto;
+}
+
+.gm-picker__search {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--text-muted);
+}
+
+.gm-picker__search .sheet-input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.gm-picker__empty {
+  margin: 0.5rem 0;
+  text-align: center;
+}
+
+.gm-picker__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.gm-picker__item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.45rem 0.55rem;
+  border-radius: 8px;
+  border: 1px solid var(--border-soft);
+  background: var(--bg-surface);
+  text-align: left;
+  min-width: 0;
+}
+
+.gm-picker__item:hover {
+  background: var(--bg-surface-hover);
+}
+
+.gm-picker__item--disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.gm-picker__portrait {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.gm-picker__portrait--empty {
+  background: var(--bg-surface-raised);
+}
+
+.gm-picker__info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.gm-picker__name {
+  font-size: 0.88rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gm-picker__meta {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gm-picker__spawn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  flex: 0 0 auto;
+  font-size: 0.75rem;
+  color: var(--accent-violet-soft);
+}
+
+.gm-picker__create {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--border-soft);
+}
+
+.gm-picker__create-label {
+  font-size: 0.72rem
+  ;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+}
+
+.gm-picker__create-row {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.gm-picker__create-row .sheet-input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* ---- Status picker (Add Status modal) ------------------------------------ */
+
+/* Wider than the default dialog: each row carries a status plus five duration
+   chips, which wrap rather than scroll (a modal may grow tall; a panel may
+   not). */
+.modal-content.gm-status-picker {
+  max-width: 560px;
+}
+
+.gm-status-picker__hint {
+  margin: 0;
+  font-size: 0.74rem;
+  color: var(--text-muted);
+}
+
+.gm-status-picker__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.gm-status-picker__row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  background: var(--bg-surface-raised);
+}
+
+.gm-status-picker__info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.gm-status-picker__icon {
+  flex: 0 0 auto;
+}
+
+.gm-status-picker__text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.gm-status-picker__name {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.86rem;
+  color: var(--text-primary);
+}
+
+.gm-status-picker__on-panel {
+  flex: 0 0 auto;
+  padding: 0.05rem 0.35rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--color-success) 45%, var(--border));
+  color: var(--color-success);
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.gm-status-picker__desc {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gm-status-picker__durations {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+/* A duration chip: its ICON carries the duration's tone, and only the applied
+   duration fills the whole chip. Tinting every chip's frame made the pale
+   tones (Permanent's cream, Quick's amber) look selected at rest — the chip's
+   fill has to mean "this is the duration on this panel". */
+.gm-duration-chip {
+  --status-tone: var(--accent-violet);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-soft);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.gm-duration-chip svg {
+  flex: 0 0 auto;
+  color: var(--status-tone);
+}
+
+.gm-duration-chip:hover {
+  background: var(--bg-surface-hover);
+  /* Only a hint of the tone here: a fully tone-framed chip has to keep meaning
+     "this is the duration on this panel" (a 55% mix read as active at a
+     glance). */
+  border-color: color-mix(in srgb, var(--status-tone) 28%, var(--border));
+  color: var(--text-primary);
+}
+
+.gm-duration-chip--active {
+  background: color-mix(in srgb, var(--status-tone) 26%, transparent);
+  border-color: var(--status-tone);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+/* ---- Responsive ---------------------------------------------------------- */
+
+/* Two columns is the desktop default (set in GMScreenPage): at three, panels
+   were ~320px wide and every sheet name truncated. There is no 3-column tier —
+   `--2` is used for both the ≥700px and wider layouts. */
+
+@media (max-width: 700px) {
+  /* Single column: panels are always full width and never overflow. */
+  .gm-screen__columns {
+    flex-direction: column;
+  }
+
+  .gm-screen__column {
+    width: 100%;
+    flex: 1 1 auto;
+  }
+
+  /* Add actions collapse into a sticky bottom-right FAB group so they stay
+     reachable while scrolling a long screen. */
+  .gm-screen__toolbar {
+    position: sticky;
+    bottom: 0.75rem;
+    z-index: 45;
+    justify-content: flex-end;
+    gap: 0.4rem;
+    pointer-events: none;
+  }
+
+  .gm-screen__toolbar .btn {
+    pointer-events: auto;
+    border-radius: 999px;
+    box-shadow: 0 6px 18px rgb(0 0 0 / 45%);
+  }
+
+  .gm-screen__head {
+    align-items: flex-start;
+  }
+
+  .gm-screen__actions {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .gm-screen__switcher {
+    order: 3;
+    flex-basis: 100%;
+  }
+
+  /* The grip gutter is a real column now, so the panel body needs no extra
+     left padding — it just gets a wider touch target on phones. */
+  .gm-panel__drag {
+    width: 1.75rem;
+    margin-right: 0.1rem;
+  }
+
+  .gm-picker__create-row {
+    flex-wrap: wrap;
+  }
+
+  .gm-picker__create-row .btn {
+    width: 100%;
+  }
+
+  /* Narrow panels: a slightly smaller pill so more of it fits the HP row at
+     360px. Nothing is truncated to achieve that — the name still reads in full
+     and the strip scrolls (see `.gm-status-pill`). */
+  .gm-status-pill {
+    font-size: 0.68rem;
+  }
+
+  .gm-status-pill__main {
+    gap: 0.2rem;
+    padding: 0 0.35rem 0 0.25rem;
+  }
+
+  .gm-status-pill__step {
+    width: 0.95rem;
+  }
+}

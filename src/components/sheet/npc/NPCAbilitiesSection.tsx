@@ -26,10 +26,23 @@ import ConfirmModal from '@/components/sheet/ConfirmModal'
 import { useCharacterStore } from '@/store/characterStore'
 import { useSubAbilityEditor } from '@/hooks/useSubAbilityEditor'
 import type { AbilityBlock } from '@/types'
+import type { Character } from '@/types'
 import type { SheetMode } from '@/pages/CharacterSheetPage'
 
 export interface NPCAbilitiesSectionProps {
   abilities: AbilityBlock[]
+  /**
+   * The NPC these abilities belong to. Defaults to the store's
+   * `currentCharacter`; the GM Screen passes the panel's own entity so edits
+   * target the right record.
+   */
+  ownerId?: string
+  /**
+   * The NPC entity itself, so its ability cards resolve dice notation against
+   * the NPC's own stats (the GM Screen has no `currentCharacter` to fall back
+   * on). Optional: the sheet pages already have the store's current NPC.
+   */
+  owner?: Character
   mode?: SheetMode
   viewMode?: 'grid' | 'list'
   onViewModeChange?: (mode: 'grid' | 'list') => void
@@ -37,13 +50,24 @@ export interface NPCAbilitiesSectionProps {
 
 export default function NPCAbilitiesSection({
   abilities,
+  ownerId,
+  owner,
   mode = 'view',
   viewMode = 'grid',
   onViewModeChange,
 }: NPCAbilitiesSectionProps) {
   const isEdit = mode === 'edit'
   const isListView = viewMode === 'list'
-  const updateCurrentCharacter = useCharacterStore((s) => s.updateCurrentCharacter)
+  const updateCharacter = useCharacterStore((s) => s.updateCharacter)
+  const storeOwnerId = useCharacterStore((s) => s.currentCharacter?.id)
+  const targetId = ownerId ?? storeOwnerId ?? ''
+  // Memoized so handleUpdateParent's dependency array is honest.
+  const updateCurrentCharacter = useCallback(
+    (updater: (c: Character) => Character) => {
+      updateCharacter(targetId, updater)
+    },
+    [targetId, updateCharacter],
+  )
 
   const [editing, setEditing] = useState<AbilityBlock | null>(null)
   const [showEditor, setShowEditor] = useState(false)
@@ -182,6 +206,7 @@ export default function NPCAbilitiesSection({
             <AbilityBlockCard
               key={ability.id}
               ability={ability}
+              character={owner}
               mode={mode}
               subAbilityActions={isEdit ? subAbilityActions : undefined}
               actions={

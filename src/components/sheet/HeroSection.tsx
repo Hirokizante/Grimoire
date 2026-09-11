@@ -23,8 +23,12 @@ export interface HeroSectionProps {
 }
 
 export default function HeroSection({ character, mode = 'view', onLevelUp, onCustomize, onExport }: HeroSectionProps) {
-  const update = useCharacterStore((s) => s.updateCurrentCharacter)
-  const setLabels = useCharacterStore((s) => s.setLabels)
+  const updateCharacter = useCharacterStore((s) => s.updateCharacter)
+  const setCharacterLabels = useCharacterStore((s) => s.setCharacterLabels)
+  const update = (updater: (c: Character) => Character) =>
+    updateCharacter(character.id, updater)
+  const setLabels = (labels: Character['labels']) =>
+    setCharacterLabels(character.id, labels)
   const isEdit = mode === 'edit'
   const [showLabelEditor, setShowLabelEditor] = useState(false)
 

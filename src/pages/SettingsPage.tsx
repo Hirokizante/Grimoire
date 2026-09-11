@@ -28,6 +28,7 @@ import { downloadJson } from '@/lib/exportImport'
 import { useAppThemeStore } from '@/store/appThemeStore'
 import type { AppTheme } from '@/store/appThemeStore'
 import { useCharacterStore } from '@/store/characterStore'
+import { useGMScreenStore } from '@/store/gmScreenStore'
 import { useHomeAnimationStore } from '@/store/homeAnimationStore'
 import type { HomeAnimation } from '@/store/homeAnimationStore'
 import { useRollLogStore } from '@/store/rollLogStore'
@@ -187,7 +188,7 @@ export default function SettingsPage() {
   )
 
   /**
-   * Restore the confirmed backup: atomically replace all four IndexedDB
+   * Restore the confirmed backup: atomically replace all five IndexedDB
    * stores, then reload every in-memory store from the fresh data.
    */
   const handleRestoreConfirmed = useCallback(async () => {
@@ -195,13 +196,14 @@ export default function SettingsPage() {
     setIsRestoring(true)
     try {
       await restoreFullBackup(pendingRestore)
-      // Reload all stores so lists, compendium, and roll log reflect the
-      // restored data. Any sheet is closed defensively (settings is only
-      // reachable with no sheet open, but this guards future changes).
+      // Reload all stores so lists, compendium, roll log, and GM screens
+      // reflect the restored data. Any sheet is closed defensively (settings
+      // is only reachable with no sheet open, but this guards future changes).
       useCharacterStore.setState({ currentCharacter: null })
       await useCharacterStore.getState().loadCharacters()
       await useStatusStore.getState().loadStatuses()
       await useRollLogStore.getState().loadRollLog()
+      await useGMScreenStore.getState().loadScreens()
       notify(
         `✓ Restored ${backupSheetSummary(pendingRestore.counts)} and ${pendingRestore.counts.statuses} statuses.`,
         'success',
@@ -353,9 +355,9 @@ export default function SettingsPage() {
           Backup &amp; Restore
         </h2>
         <p className="muted settings-section__hint">
-          Download everything — characters, NPCs, statuses, version history,
-          and the roll log — as a single JSON file. Restoring from a backup
-          replaces all current data in this browser.
+          Download everything — characters, NPCs, statuses, GM screens, version
+          history, and the roll log — as a single JSON file. Restoring from a
+          backup replaces all current data in this browser.
         </p>
 
         <div className="backup-actions">

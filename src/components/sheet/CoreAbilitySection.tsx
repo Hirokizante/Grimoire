@@ -21,6 +21,7 @@ import AbilityEditorModal from '@/components/sheet/AbilityEditorModal'
 import ConfirmModal from '@/components/sheet/ConfirmModal'
 import MarkdownText from '@/components/ui/MarkdownText'
 import { useCharacterStore } from '@/store/characterStore'
+import type { Character } from '@/types'
 import { useSubAbilityEditor } from '@/hooks/useSubAbilityEditor'
 import type { AbilityBlock } from '@/types'
 import type { SheetMode } from '@/pages/CharacterSheetPage'
@@ -30,8 +31,23 @@ export interface CoreAbilitySectionProps {
   innateAbilities: AbilityBlock[]
   basicAttack: AbilityBlock
   fatebreaker: AbilityBlock
+  /**
+   * The entity these core abilities belong to. Defaults to the store's
+   * `currentCharacter`; the GM Screen passes the panel's own entity so edits
+   * land on the right record and dice resolve against the right stats.
+   */
+  ownerId?: string
+  /** Explicit entity for dice notation (GM-screen panels). */
+  owner?: Character
   mode?: SheetMode
 }
+
+/** Core ability fields editable through this section (mirrors the store). */
+type CoreAbilityField =
+  | 'innateDescription'
+  | 'innateAbilities'
+  | 'basicAttack'
+  | 'fatebreaker'
 
 /** Which core ability is currently being edited, if any. */
 type EditingField =
@@ -45,10 +61,27 @@ export default function CoreAbilitySection({
   innateAbilities,
   basicAttack,
   fatebreaker,
+  ownerId,
+  owner,
   mode = 'view',
 }: CoreAbilitySectionProps) {
   const isEdit = mode === 'edit'
-  const updateCoreAbility = useCharacterStore((s) => s.updateCoreAbility)
+  const storeOwnerId = useCharacterStore((s) => s.currentCharacter?.id)
+  const updateCharacter = useCharacterStore((s) => s.updateCharacter)
+  const targetId = ownerId ?? storeOwnerId ?? ''
+  // Memoized so the sub-ability editor's callback identity is stable.
+  const updateCoreAbility = useCallback(
+    (
+      field: CoreAbilityField,
+      value: string | AbilityBlock | AbilityBlock[] | null,
+    ) => {
+      updateCharacter(targetId, (char) => ({
+        ...char,
+        [field]: value,
+      }))
+    },
+    [targetId, updateCharacter],
+  )
 
   const [editingField, setEditingField] = useState<EditingField>(null)
   const [editingAbility, setEditingAbility] = useState<AbilityBlock | null>(
@@ -200,7 +233,7 @@ export default function CoreAbilitySection({
               />
             </div>
           ) : (
-            <AbilityActivation key={ability.id} ability={ability} />
+            <AbilityActivation key={ability.id} ability={ability} character={owner} />
           ),
         )}
 
@@ -234,7 +267,7 @@ export default function CoreAbilitySection({
             />
           </div>
         ) : (
-          <AbilityActivation ability={basicAttack} />
+          <AbilityActivation ability={basicAttack} character={owner} />
         )}
 
         {isEdit ? (
@@ -257,7 +290,7 @@ export default function CoreAbilitySection({
             />
           </div>
         ) : (
-          <AbilityActivation ability={fatebreaker} />
+          <AbilityActivation ability={fatebreaker} character={owner} />
         )}
       </div>
 

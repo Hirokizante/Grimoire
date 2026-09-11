@@ -9,6 +9,12 @@
  * After applying damage, the dialog shows a breakdown of the calculation and
  * notifies the player if a Mortal Wound was incurred or the character was
  * knocked out.
+ *
+ * The dialog is **target-agnostic**: `characterId` drives a live character
+ * sheet (mortal wounds, death saves, healing rules) while `npcInstance`
+ * drives a GM-screen NPC instance (armor/max HP come from the base record,
+ * damage to 0 HP downs the instance — NPCs have no death saves). Same dialog,
+ * two target descriptors — deliberately not forked.
  */
 
 import { useState } from 'react'
@@ -16,15 +22,51 @@ import { useState } from 'react'
 import { useModalDialog } from '@/hooks/useModalDialog'
 import { useNotification } from '@/context/NotificationContext'
 import { useCharacterStore, type DamageResult } from '@/store/characterStore'
+import { useGMScreenStore } from '@/store/gmScreenStore'
 import { effectiveCombatStats } from '@/lib/abilityModifiers'
+import type { Character } from '@/types'
+
+/**
+ * Describes an NPC instance panel as a damage target. The instance's armor,
+ * max HP, and temp HP live on the base record / panel state, not on a
+ * Character's live-play fields.
+ */
+export interface NpcInstanceTarget {
+  /** The owning screen (for `updateInstanceState`). */
+  screenId: string
+  /** The panel id inside that screen. */
+  panelId: string
+  /** Display label, shown in the dialog title. */
+  label: string
+  /** The base NPC record (armor + max HP source). */
+  base: Character
+  /** Current instance HP. */
+  currentHP: number
+  /** Current instance temp HP. */
+  tempHP: number
+}
 
 export interface DamageDialogProps {
   onClose: () => void
+  /**
+   * Character whose sheet this dialog damages/heals. Defaults to the store's
+   * `currentCharacter` so existing sheet call sites keep working.
+   */
+  characterId?: string
+  /** NPC-instance target. Mutually exclusive with `characterId`. */
+  npcInstance?: NpcInstanceTarget
 }
 
-export default function DamageDialog({ onClose }: DamageDialogProps) {
+export default function DamageDialog({
+  onClose,
+  characterId,
+  npcInstance,
+}: DamageDialogProps) {
   const takeDamage = useCharacterStore((s) => s.takeDamage)
-  const character = useCharacterStore((s) => s.currentCharacter)
+  const storeCharacter = useCharacterStore((s) => s.currentCharacter)
+  const damageInstance = useGMScreenStore((s) => s.damageInstance)
+  const healInstance = useGMScreenStore((s) => s.healInstance)
+  const setInstanceTempHP = useGMScreenStore((s) => s.setInstanceTempHP)
   const { notify } = useNotification()
 
   const [amount, setAmount] = useState('')
@@ -35,13 +77,48 @@ export default function DamageDialog({ onClose }: DamageDialogProps) {
 
   const dialogRef = useModalDialog(onClose)
 
-  // Armor includes any ability modifiers currently switched on.
-  const armor = character ? effectiveCombatStats(character).armor : 0
+  const character = useCharacterStore((s) =>
+    characterId ? (s.characters.find((c) => c.id === characterId) ?? null) : null,
+  )
+  const target: Character | null = npcInstance
+    ? npcInstance.base
+    : (character ?? (characterId ? null : storeCharacter))
+
+  // Armor for characters includes any ability modifiers currently switched on;
+  // NPC instances use the base record's manual `npcStats.armor`.
+  const armor = npcInstance
+    ? (npcInstance.base.npcStats?.armor ?? 0)
+    : target
+      ? effectiveCombatStats(target).armor
+      : 0
+
+  const title = npcInstance
+    ? `Apply Damage — ${npcInstance.label}`
+    : 'Apply Damage'
 
   const handleApply = () => {
     const n = parseInt(amount, 10)
     if (!Number.isFinite(n) || n <= 0) return
-    const res = takeDamage(n, { applyArmor, resistant, ignoreTempHP })
+
+    if (npcInstance) {
+      const res = damageInstance(npcInstance.screenId, npcInstance.panelId, n, {
+        applyArmor,
+        resistant,
+        ignoreTempHP,
+      })
+      if (!res) return
+      setResult(res)
+      notify(
+        res.downed
+          ? `${npcInstance.label} is DOWNED!`
+          : `Applied ${res.hpLost} damage to ${npcInstance.label}.`,
+        res.downed ? 'error' : 'warning',
+      )
+      return
+    }
+
+    if (!target) return
+    const res = takeDamage(target.id, n, { applyArmor, resistant, ignoreTempHP })
     setResult(res)
     if (res.causedMortalWound) {
       notify(`${res.hpLost} damage taken! Mortal Wound incurred.`, 'error')
@@ -53,16 +130,25 @@ export default function DamageDialog({ onClose }: DamageDialogProps) {
   const handleHeal = () => {
     const n = parseInt(amount, 10)
     if (!Number.isFinite(n) || n <= 0) return
-    useCharacterStore.getState().heal(n)
+    if (npcInstance) {
+      healInstance(npcInstance.screenId, npcInstance.panelId, n)
+      notify(`Healed ${n} HP on ${npcInstance.label}.`, 'success')
+    } else if (target) {
+      useCharacterStore.getState().heal(target.id, n)
+      notify(`Healed ${n} HP.`, 'success')
+    }
     setResult(null)
     setAmount('')
-    notify(`Healed ${n} HP.`, 'success')
   }
 
   const handleSetTempHP = () => {
     const n = parseInt(amount, 10)
     if (!Number.isFinite(n) || n < 0) return
-    useCharacterStore.getState().setTempHP(n)
+    if (npcInstance) {
+      setInstanceTempHP(npcInstance.screenId, npcInstance.panelId, n)
+    } else if (target) {
+      useCharacterStore.getState().setTempHP(target.id, n)
+    }
     setResult(null)
     setAmount('')
     notify(`Temp HP set to ${n}.`, 'info')
@@ -72,7 +158,7 @@ export default function DamageDialog({ onClose }: DamageDialogProps) {
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content damage-dialog" ref={dialogRef} tabIndex={-1} onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h3>Apply Damage</h3>
+          <h3>{title}</h3>
           <button type="button" className="btn btn--icon modal-close" onClick={onClose}>✕</button>
         </div>
 

@@ -18,6 +18,11 @@
   --border: #34344f;
   --border-soft: #2a2a47;
   --accent-blush: #e8a0bf;
+  /* App-chrome HP color — mirrors --accent-blush. Sheet cards override this
+     via colorVars(); app chrome (GM Screen panels, list pages) has no sheet
+     palette, so the theme must define it or `var(--hp-bar-color)` is invalid
+     and any fill painted with it renders transparent. */
+  --hp-bar-color: #e8a0bf;
   --accent-violet: #9b7ed6;
   --accent-violet-soft: #c4b1eb;
   --danger: #e57373;
@@ -61,6 +66,7 @@
   --border: #464036;
   --border-soft: #37332c;
   --accent-blush: #c98f74;
+  --hp-bar-color: #c98f74;
   --accent-violet: #b3a48a;
   --accent-violet-soft: #c5b8a0;
   --danger: #d97070;
@@ -85,6 +91,7 @@
   --border: #323232;
   --border-soft: #242424;
   --accent-blush: #b48ead;
+  --hp-bar-color: #b48ead;
   --accent-violet: #81a1c1;
   --accent-violet-soft: #88c0d0;
   --danger: #bf616a;
@@ -110,6 +117,7 @@
   --border: #2c2c2c;
   --border-soft: #1c1c1c;
   --accent-blush: #eecc6c;
+  --hp-bar-color: #eecc6c;
   --accent-violet: #f3ecd4;
   --accent-violet-soft: #f3ecd4;
   --danger: #9e5a5a;

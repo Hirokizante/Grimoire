@@ -41,3 +41,11 @@ export type {
   StatusCondition,
   StatusIconType,
 } from './status'
+export type {
+  GMScreen,
+  NpcInstanceState,
+  PanelStatus,
+  PanelStatusDuration,
+  ScreenPanel,
+  ScreenPanelDensity,
+} from './gmScreen'

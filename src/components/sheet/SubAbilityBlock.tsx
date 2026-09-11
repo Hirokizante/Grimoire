@@ -141,11 +141,11 @@ export default function SubAbilityBlock({
 
     const handleActivate = () => {
       let ok = true
-      if (apCost > 0) ok = spendAP(apCost) && ok
-      if (endCost > 0) ok = spendEND(endCost) && ok
-      if (fpCost > 0) ok = spendFP(fpCost) && ok
+      if (apCost > 0) ok = spendAP(activeCharacter.id, apCost) && ok
+      if (endCost > 0) ok = spendEND(activeCharacter.id, endCost) && ok
+      if (fpCost > 0) ok = spendFP(activeCharacter.id, fpCost) && ok
       for (const c of customCosts) {
-        ok = spendCustomResourceBar(c.barId, c.amount) && ok
+        ok = spendCustomResourceBar(activeCharacter.id, c.barId, c.amount) && ok
       }
       if (ok) {
         notify(`Activated ${name}`, 'success')

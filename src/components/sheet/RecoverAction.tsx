@@ -16,12 +16,30 @@ import { effectiveCombatStats } from '@/lib/abilityModifiers'
 import { useNotification } from '@/context/NotificationContext'
 import { useCharacterStore } from '@/store/characterStore'
 
-export default function RecoverAction() {
+export interface RecoverActionProps {
+  /**
+   * Character whose turn is being managed. Defaults to the store's
+   * `currentCharacter` (the normal sheet page); the GM Screen passes the
+   * id of the panel's own character so several sheets can be run at once.
+   */
+  characterId?: string
+}
+
+export default function RecoverAction({ characterId }: RecoverActionProps) {
   const recover = useCharacterStore((s) => s.recover)
   const endTurn = useCharacterStore((s) => s.endTurn)
-  const character = useCharacterStore((s) => s.currentCharacter)
-  const currentAP = useCharacterStore((s) => s.currentCharacter?.currentAP ?? 0)
-  const currentEND = useCharacterStore((s) => s.currentCharacter?.currentEND ?? 0)
+  const storeCharacter = useCharacterStore((s) => s.currentCharacter)
+  // Resolve by id from the list so an expanded GM-screen panel never reads
+  // the wrong entity's resources.
+  const character = useCharacterStore(
+    (s) =>
+      (characterId
+        ? s.characters.find((c) => c.id === characterId)
+        : s.currentCharacter) ?? null,
+  )
+  const activeId = character?.id ?? storeCharacter?.id ?? ''
+  const currentAP = character?.currentAP ?? 0
+  const currentEND = character?.currentEND ?? 0
   const { notify } = useNotification()
 
   // END Recovery includes any ability modifiers currently switched on.
@@ -37,7 +55,7 @@ export default function RecoverAction() {
     : endRecovery
 
   const handleRecover = () => {
-    const success = recover()
+    const success = activeId ? recover(activeId) : false
     if (success) {
       notify('Recovered! All END restored.', 'success')
     } else {
@@ -46,7 +64,7 @@ export default function RecoverAction() {
   }
 
   const handleEndTurn = () => {
-    const gained = endTurn()
+    const gained = activeId ? endTurn(activeId) : 0
     if (gained > 0) {
       notify(`End Turn: +${gained} END`, 'success')
     } else {

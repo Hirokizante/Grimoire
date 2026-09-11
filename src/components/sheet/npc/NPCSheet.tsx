@@ -140,6 +140,7 @@ export default function NPCSheet({
       {isNPC && (
         <NPCAbilitiesSection
           abilities={entity.slottedAbilities}
+          ownerId={entity.id}
           mode={mode}
           viewMode={entity.viewModes.slottedAbilities}
           onViewModeChange={setAbilitiesViewMode}

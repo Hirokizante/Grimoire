@@ -7,7 +7,7 @@
  */
 
 import { useEffect, useRef } from 'react'
-import { Users, Swords, Sparkles, Settings } from 'lucide-react'
+import { Users, Swords, Sparkles, Settings, LayoutDashboard } from 'lucide-react'
 
 import { useCharacterStore } from '@/store/characterStore'
 import type { AppView } from '@/store/characterStore'
@@ -81,6 +81,11 @@ export default function TitleBar() {
       view: 'npcs',
       label: 'NPCs',
       icon: <Swords size={18} />,
+    },
+    {
+      view: 'gmscreen',
+      label: 'GM Screen',
+      icon: <LayoutDashboard size={18} />,
     },
     {
       view: 'statuses',

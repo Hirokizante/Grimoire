@@ -2,9 +2,9 @@
  * Unit tests for the full-app backup & restore flow (lib/backup.ts).
  *
  * The IndexedDB layer (@/lib/db) is mocked: buildFullBackup reads through
- * getAllCharacters/getAllVersionSnapshots/getAllRollLogEntries/getAllStatuses,
- * and restoreFullBackup writes through replaceAllData. parseFullBackup and
- * backupFilename are pure and tested directly.
+ * getAllCharacters/getAllVersionSnapshots/getAllRollLogEntries/getAllStatuses/
+ * getAllScreens, and restoreFullBackup writes through replaceAllData.
+ * parseFullBackup and backupFilename are pure and tested directly.
  */
 
 import { beforeEach, expect, test, vi } from 'vitest'
@@ -14,6 +14,7 @@ const dbState = {
   versions: [] as unknown[],
   rollLogs: [] as unknown[],
   statuses: [] as unknown[],
+  screens: [] as unknown[],
 }
 
 vi.mock('@/lib/db', () => ({
@@ -21,6 +22,7 @@ vi.mock('@/lib/db', () => ({
   getAllVersionSnapshots: vi.fn(async () => structuredClone(dbState.versions)),
   getAllRollLogEntries: vi.fn(async () => structuredClone(dbState.rollLogs)),
   getAllStatuses: vi.fn(async () => structuredClone(dbState.statuses)),
+  getAllScreens: vi.fn(async () => structuredClone(dbState.screens)),
   replaceAllData: vi.fn(async () => {}),
 }))
 
@@ -39,7 +41,7 @@ const { createDefaultStatuses } = await import('@/constants/statuses')
 const typeHelpers = await import('@/lib/exportImport')
 const { createSnapshot } = typeHelpers
 
-import type { Character, StatusCondition } from '@/types'
+import type { Character, GMScreen, StatusCondition } from '@/types'
 
 /** Minimal valid roll-log entry fixture. */
 function makeRollLog(id: string, characterId: string) {
@@ -61,11 +63,31 @@ function makeRollLog(id: string, characterId: string) {
   }
 }
 
+/** Minimal valid GM screen fixture. */
+function makeScreen(id: string): GMScreen {
+  return {
+    id,
+    name: 'Session 4',
+    panels: [
+      {
+        kind: 'character',
+        id: `${id}-p1`,
+        characterId: 'c1',
+        density: 'compact',
+        statuses: [],
+      },
+    ],
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+  }
+}
+
 beforeEach(() => {
   dbState.characters = []
   dbState.versions = []
   dbState.rollLogs = []
   dbState.statuses = []
+  dbState.screens = []
   vi.clearAllMocks()
 })
 
@@ -78,7 +100,7 @@ test('backupFilename: local-date format with padded month and day', () => {
 
 // ---- buildFullBackup --------------------------------------------------------
 
-test('buildFullBackup: snapshots all four stores with correct counts', async () => {
+test('buildFullBackup: snapshots all five stores with correct counts', async () => {
   const pc = createDefaultCharacter()
   const npc = createDefaultNPC()
   const status: StatusCondition = { ...createDefaultStatuses()[0] }
@@ -86,6 +108,7 @@ test('buildFullBackup: snapshots all four stores with correct counts', async () 
   dbState.versions = [createSnapshot(pc)]
   dbState.rollLogs = [makeRollLog('r1', pc.id)]
   dbState.statuses = [status]
+  dbState.screens = [makeScreen('s1')]
 
   const backup = await buildFullBackup()
 
@@ -98,9 +121,11 @@ test('buildFullBackup: snapshots all four stores with correct counts', async () 
     versions: 1,
     rollLogEntries: 1,
     statuses: 1,
+    screens: 1,
   })
   expect(backup.data.characters).toHaveLength(2)
   expect(backup.data.statuses).toEqual([status])
+  expect(backup.data.screens).toHaveLength(1)
 })
 
 test('buildFullBackup: JSON round-trips through parseFullBackup', async () => {
@@ -182,6 +207,56 @@ test('parseFullBackup: throws when every record is invalid', () => {
     data: { characters: [], versions: [], rollLogs: [], statuses: [] },
   }
   expect(() => parseFullBackup(JSON.stringify(payload))).toThrow('no data')
+})
+
+// ---- GM screens (backup v2) -------------------------------------------------
+
+test('parseFullBackup: keeps valid screens and filters malformed ones', () => {
+  const pc = createDefaultCharacter()
+  const payload = {
+    app: 'grimoire',
+    kind: 'full-backup',
+    backupVersion: BACKUP_VERSION,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    data: {
+      characters: [pc],
+      versions: [],
+      rollLogs: [],
+      statuses: [],
+      screens: [makeScreen('s1'), { id: 'bad' }, 'nope', { id: 's2', name: 'B', panels: [] }],
+    },
+  }
+  const parsed = parseFullBackup(JSON.stringify(payload))
+  expect(parsed.counts.screens).toBe(2)
+  expect(parsed.data.screens.map((s) => s.id)).toEqual(['s1', 's2'])
+})
+
+test('parseFullBackup: accepts a v1 backup with no screens key', () => {
+  const pc = createDefaultCharacter()
+  const payload = {
+    app: 'grimoire',
+    kind: 'full-backup',
+    backupVersion: 1,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    counts: { characters: 1, npcs: 0, versions: 0, rollLogEntries: 0, statuses: 0 },
+    data: { characters: [pc], versions: [], rollLogs: [], statuses: [] },
+  }
+  const parsed = parseFullBackup(JSON.stringify(payload))
+  expect(parsed.backupVersion).toBe(BACKUP_VERSION)
+  expect(parsed.data.screens).toEqual([])
+  expect(parsed.counts.screens).toBe(0)
+})
+
+test('parseFullBackup: a screens-only backup still counts as data', () => {
+  const payload = {
+    app: 'grimoire',
+    kind: 'full-backup',
+    backupVersion: BACKUP_VERSION,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    data: { characters: [], versions: [], rollLogs: [], statuses: [], screens: [makeScreen('s1')] },
+  }
+  const parsed = parseFullBackup(JSON.stringify(payload))
+  expect(parsed.counts.screens).toBe(1)
 })
 
 // ---- restoreFullBackup ------------------------------------------------------

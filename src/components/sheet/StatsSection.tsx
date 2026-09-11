@@ -58,6 +58,12 @@ export interface StatsSectionProps {
    * embedded inside the hero section.
    */
   variant?: 'section' | 'flat'
+  /**
+   * Hide the HP bar (and its dialog trigger). Used by GM Screen panels, whose
+   * header already carries an HP bar with its own steppers and Damage dialog —
+   * showing both was redundant and pushed the rest of the sheet down.
+   */
+  hideHP?: boolean
 }
 
 /** Metadata for each derived stat token: icon, label, accent class. */
@@ -79,6 +85,7 @@ export default function StatsSection({
   character,
   mode = 'view',
   variant = 'section',
+  hideHP = false,
 }: StatsSectionProps) {
   const { attributes, milestones } = character
 
@@ -92,7 +99,8 @@ export default function StatsSection({
   const saveDC = stats.saveDC
   const endRecovery = stats.endRecovery
 
-  // Store actions for resource bars
+  // Store actions for resource bars. Every action is id-targeted so this
+  // section can render for ANY entity — the open sheet or a GM-screen panel.
   const spendAP = useCharacterStore((s) => s.spendAP)
   const restoreAP = useCharacterStore((s) => s.restoreAP)
   const spendEND = useCharacterStore((s) => s.spendEND)
@@ -105,7 +113,9 @@ export default function StatsSection({
   const removeCustomResourceBar = useCharacterStore((s) => s.removeCustomResourceBar)
   const spendCustomResourceBar = useCharacterStore((s) => s.spendCustomResourceBar)
   const restoreCustomResourceBar = useCharacterStore((s) => s.restoreCustomResourceBar)
-  const customResourceBars = useCharacterStore((s) => s.currentCharacter?.customResourceBars ?? [])
+  // Read the bars off the character being rendered, not off `currentCharacter`:
+  // an expanded GM-screen panel shows a character that may not be selected.
+  const customResourceBars = character.customResourceBars ?? []
 
   const [showDamageDialog, setShowDamageDialog] = useState(false)
   const [showAddBar, setShowAddBar] = useState(false)
@@ -172,22 +182,23 @@ export default function StatsSection({
       </div>
 
       <div className="stat-bars">
-        <ResourceBar
-          label="HP"
-          value={character.currentHP}
-          max={maxHP}
-          color="var(--hp-bar-color)"
-          continuous={maxHP > 30}
-          interactive={isView}
-          onSpend={() => {
-            // Spending HP = taking 1 raw damage
-            const store = useCharacterStore.getState()
-            store.takeDamage(1)
-          }}
-          onRestore={() => heal(1)}
-          onLabelClick={isView ? () => setShowDamageDialog(true) : undefined}
-          labelTitle={isView ? 'Click to apply damage or heal' : undefined}
-        />
+        {!hideHP && (
+          <ResourceBar
+            label="HP"
+            value={character.currentHP}
+            max={maxHP}
+            color="var(--hp-bar-color)"
+            continuous={maxHP > 30}
+            interactive={isView}
+            onSpend={() => {
+              // Spending HP = taking 1 raw damage
+              useCharacterStore.getState().takeDamage(character.id, 1)
+            }}
+            onRestore={() => heal(character.id, 1)}
+            onLabelClick={isView ? () => setShowDamageDialog(true) : undefined}
+            labelTitle={isView ? 'Click to apply damage or heal' : undefined}
+          />
+        )}
         {character.tempHP > 0 && (
           <ResourceBar
             label="Temp HP"
@@ -202,8 +213,8 @@ export default function StatsSection({
           max={character.maxFP}
           color="var(--fp-bar-color)"
           interactive={isView}
-          onSpend={() => spendFP(1)}
-          onRestore={() => restoreFP(1)}
+          onSpend={() => spendFP(character.id, 1)}
+          onRestore={() => restoreFP(character.id, 1)}
         />
         <ResourceBar
           label="Action Points"
@@ -211,8 +222,8 @@ export default function StatsSection({
           max={MAX_AP}
           color="var(--ap-bar-color)"
           interactive={isView}
-          onSpend={() => spendAP(1)}
-          onRestore={() => restoreAP(1)}
+          onSpend={() => spendAP(character.id, 1)}
+          onRestore={() => restoreAP(character.id, 1)}
         />
         <ResourceBar
           label="Endurance"
@@ -220,8 +231,8 @@ export default function StatsSection({
           max={MAX_END}
           color="var(--end-bar-color)"
           interactive={isView}
-          onSpend={() => spendEND(1)}
-          onRestore={() => restoreEND(1)}
+          onSpend={() => spendEND(character.id, 1)}
+          onRestore={() => restoreEND(character.id, 1)}
         />
         {customResourceBars.map((bar) => (
           <div key={bar.id} className="resource-bar-wrapper">
@@ -231,8 +242,8 @@ export default function StatsSection({
               max={bar.max}
               color={bar.color}
               interactive={isView}
-              onSpend={() => spendCustomResourceBar(bar.id)}
-              onRestore={() => restoreCustomResourceBar(bar.id)}
+              onSpend={() => spendCustomResourceBar(character.id, bar.id)}
+              onRestore={() => restoreCustomResourceBar(character.id, bar.id)}
             />
             {isEdit && (
               <button
@@ -281,7 +292,7 @@ export default function StatsSection({
         onClose={() => setBarToEdit(null)}
       />
 
-      {isView && <RecoverAction />}
+      {isView && <RecoverAction characterId={character.id} />}
 
       {character.mortalWounds.some((w) => w != null) && (
         <div className="stat-mortals">
@@ -319,7 +330,10 @@ export default function StatsSection({
       )}
 
       {showDamageDialog && (
-        <DamageDialog onClose={() => setShowDamageDialog(false)} />
+        <DamageDialog
+          characterId={character.id}
+          onClose={() => setShowDamageDialog(false)}
+        />
       )}
 
       {barToRemove && (

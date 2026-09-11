@@ -43,6 +43,12 @@ vi.mock('@/lib/db', () => ({
   normalizeStatus: (s: Character) => s,
   getAllVersionSnapshots: vi.fn(async () => []),
   replaceAllData: vi.fn(async () => {}),
+  // GM Screens — every new db.ts helper is mirrored here (see .hermes.md).
+  getAllScreens: vi.fn(async () => []),
+  getScreen: vi.fn(async () => null),
+  putScreen: vi.fn(async () => {}),
+  deleteScreen: vi.fn(async () => {}),
+  normalizeScreen: (screen: unknown) => screen,
 }))
 
 // ---- Helpers --------------------------------------------------------------
@@ -86,88 +92,88 @@ beforeEach(() => {
 // ---- Milestone flow -------------------------------------------------------
 
 test('addMilestone: increases milestone count by 1', () => {
-  setupChar({ milestones: 0 })
+  let char = setupChar({ milestones: 0 })
   useCharacterStore.getState().addMilestone({
     attribute: 'POW',
     skill: 'Sneak',
   })
-  const char = useCharacterStore.getState().currentCharacter!
+  char = useCharacterStore.getState().currentCharacter!
   expect(char.milestones).toBe(1)
 })
 
 test('addMilestone: increases chosen attribute by 1', () => {
-  setupChar({ milestones: 0 })
+  let char = setupChar({ milestones: 0 })
   useCharacterStore.getState().addMilestone({
     attribute: 'POW',
     skill: 'Sneak',
   })
-  const char = useCharacterStore.getState().currentCharacter!
+  char = useCharacterStore.getState().currentCharacter!
   expect(char.attributes.POW).toBe(5) // 4 + 1
 })
 
 test('addMilestone: increases chosen skill by 2', () => {
-  setupChar({ milestones: 0 })
+  let char = setupChar({ milestones: 0 })
   useCharacterStore.getState().addMilestone({
     attribute: 'POW',
     skill: 'Sneak',
   })
-  const char = useCharacterStore.getState().currentCharacter!
+  char = useCharacterStore.getState().currentCharacter!
   expect(char.skills.Sneak).toBe(2) // 0 + 2
 })
 
 test('addMilestone: even milestone with slot choice increases slots', () => {
-  setupChar({ milestones: 1, maxAbilitySlots: 3 })
+  let char = setupChar({ milestones: 1, maxAbilitySlots: 3 })
   useCharacterStore.getState().addMilestone({
     attribute: 'POW',
     skill: 'Sneak',
     choice: 'slot',
   })
-  const char = useCharacterStore.getState().currentCharacter!
+  char = useCharacterStore.getState().currentCharacter!
   expect(char.milestones).toBe(2)
   expect(char.maxAbilitySlots).toBe(4) // 3 + 1
 })
 
 test('addMilestone: even milestone with FP choice increases maxFP', () => {
-  setupChar({ milestones: 1, maxFP: 3 })
+  let char = setupChar({ milestones: 1, maxFP: 3 })
   useCharacterStore.getState().addMilestone({
     attribute: 'POW',
     skill: 'Sneak',
     choice: 'fp',
   })
-  const char = useCharacterStore.getState().currentCharacter!
+  char = useCharacterStore.getState().currentCharacter!
   expect(char.milestones).toBe(2)
   expect(char.maxFP).toBe(4) // 3 + 1
 })
 
 test('addMilestone: odd milestone does not apply choice even if given', () => {
-  setupChar({ milestones: 0, maxAbilitySlots: 3, maxFP: 3 })
+  let char = setupChar({ milestones: 0, maxAbilitySlots: 3, maxFP: 3 })
   useCharacterStore.getState().addMilestone({
     attribute: 'POW',
     skill: 'Sneak',
     choice: 'slot',
   })
-  const char = useCharacterStore.getState().currentCharacter!
+  char = useCharacterStore.getState().currentCharacter!
   expect(char.milestones).toBe(1)
   expect(char.maxAbilitySlots).toBe(3) // unchanged
   expect(char.maxFP).toBe(3) // unchanged
 })
 
 test('addMilestone: no choice on even milestone = no slot/FP change', () => {
-  setupChar({ milestones: 1, maxAbilitySlots: 3, maxFP: 3 })
+  let char = setupChar({ milestones: 1, maxAbilitySlots: 3, maxFP: 3 })
   useCharacterStore.getState().addMilestone({
     attribute: 'POW',
     skill: 'Sneak',
   })
-  const char = useCharacterStore.getState().currentCharacter!
+  char = useCharacterStore.getState().currentCharacter!
   expect(char.milestones).toBe(2)
   expect(char.maxAbilitySlots).toBe(3)
   expect(char.maxFP).toBe(3)
 })
 
 test('skipMilestone: increases count only, no bonuses', () => {
-  setupChar({ milestones: 0, attributes: { MAR: 3, POW: 4, AGI: 1, VIT: 2, GRT: 3 } })
+  let char = setupChar({ milestones: 0, attributes: { MAR: 3, POW: 4, AGI: 1, VIT: 2, GRT: 3 } })
   useCharacterStore.getState().skipMilestone()
-  const char = useCharacterStore.getState().currentCharacter!
+  char = useCharacterStore.getState().currentCharacter!
   expect(char.milestones).toBe(1)
   expect(char.attributes.POW).toBe(4) // unchanged
   expect(char.maxAbilitySlots).toBe(3) // unchanged
@@ -177,101 +183,101 @@ test('skipMilestone: increases count only, no bonuses', () => {
 // ---- Resource spending ----------------------------------------------------
 
 test('spendAP: deducts AP and returns true', () => {
-  setupChar({ currentAP: 3 })
-  expect(useCharacterStore.getState().spendAP(2)).toBe(true)
+  const char = setupChar({ currentAP: 3 })
+  expect(useCharacterStore.getState().spendAP(char.id, 2)).toBe(true)
   expect(useCharacterStore.getState().currentCharacter!.currentAP).toBe(1)
 })
 
 test('spendAP: insufficient AP returns false and does not deduct', () => {
-  setupChar({ currentAP: 1 })
-  expect(useCharacterStore.getState().spendAP(2)).toBe(false)
+  const char = setupChar({ currentAP: 1 })
+  expect(useCharacterStore.getState().spendAP(char.id, 2)).toBe(false)
   expect(useCharacterStore.getState().currentCharacter!.currentAP).toBe(1)
 })
 
 test('spendEND: deducts END and returns true', () => {
-  setupChar({ currentEND: 10 })
-  expect(useCharacterStore.getState().spendEND(4)).toBe(true)
+  const char = setupChar({ currentEND: 10 })
+  expect(useCharacterStore.getState().spendEND(char.id, 4)).toBe(true)
   expect(useCharacterStore.getState().currentCharacter!.currentEND).toBe(6)
 })
 
 test('spendEND: insufficient END returns false', () => {
-  setupChar({ currentEND: 2 })
-  expect(useCharacterStore.getState().spendEND(4)).toBe(false)
+  const char = setupChar({ currentEND: 2 })
+  expect(useCharacterStore.getState().spendEND(char.id, 4)).toBe(false)
   expect(useCharacterStore.getState().currentCharacter!.currentEND).toBe(2)
 })
 
 test('spendFP: deducts FP and returns true', () => {
-  setupChar({ currentFP: 3 })
-  expect(useCharacterStore.getState().spendFP(1)).toBe(true)
+  const char = setupChar({ currentFP: 3 })
+  expect(useCharacterStore.getState().spendFP(char.id, 1)).toBe(true)
   expect(useCharacterStore.getState().currentCharacter!.currentFP).toBe(2)
 })
 
 test('spendFP: insufficient FP returns false', () => {
-  setupChar({ currentFP: 0 })
-  expect(useCharacterStore.getState().spendFP(1)).toBe(false)
+  const char = setupChar({ currentFP: 0 })
+  expect(useCharacterStore.getState().spendFP(char.id, 1)).toBe(false)
 })
 
 test('restoreAP: caps at MAX_AP (3)', () => {
-  setupChar({ currentAP: 2 })
-  useCharacterStore.getState().restoreAP(5)
+  const char = setupChar({ currentAP: 2 })
+  useCharacterStore.getState().restoreAP(char.id, 5)
   expect(useCharacterStore.getState().currentCharacter!.currentAP).toBe(3)
 })
 
 test('restoreEND: caps at MAX_END (10)', () => {
-  setupChar({ currentEND: 8 })
-  useCharacterStore.getState().restoreEND(5)
+  const char = setupChar({ currentEND: 8 })
+  useCharacterStore.getState().restoreEND(char.id, 5)
   expect(useCharacterStore.getState().currentCharacter!.currentEND).toBe(10)
 })
 
 test('restoreFP: caps at maxFP', () => {
-  setupChar({ currentFP: 2, maxFP: 3 })
-  useCharacterStore.getState().restoreFP(5)
+  const char = setupChar({ currentFP: 2, maxFP: 3 })
+  useCharacterStore.getState().restoreFP(char.id, 5)
   expect(useCharacterStore.getState().currentCharacter!.currentFP).toBe(3)
 })
 
 // ---- Recover & End Turn ---------------------------------------------------
 
 test('recover: resets END to max (10)', () => {
-  setupChar({ currentEND: 3, currentAP: 3 })
-  useCharacterStore.getState().recover()
+  const char = setupChar({ currentEND: 3, currentAP: 3 })
+  useCharacterStore.getState().recover(char.id)
   expect(useCharacterStore.getState().currentCharacter!.currentEND).toBe(10)
 })
 
 test('recover: with Damaged Throat, restores half END (5)', () => {
-  setupChar({
+  const char = setupChar({
     currentEND: 2,
     mortalWounds: ['Damaged Throat', null],
   })
-  useCharacterStore.getState().recover()
+  useCharacterStore.getState().recover(char.id)
   expect(useCharacterStore.getState().currentCharacter!.currentEND).toBe(5)
 })
 
 test('endTurn: converts AP to END and applies recovery', () => {
   // VIT 2, GRT 3 → END Recovery = max(1, 1 + floor(3/2)) = 2
-  setupChar({ currentAP: 2, currentEND: 5 })
-  const gained = useCharacterStore.getState().endTurn()
+  let char = setupChar({ currentAP: 2, currentEND: 5 })
+  const gained = useCharacterStore.getState().endTurn(char.id)
   // AP to END: min(2, 10-5) = 2, Recovery: 2, total = 4
   expect(gained).toBe(4)
-  const char = useCharacterStore.getState().currentCharacter!
+  char = useCharacterStore.getState().currentCharacter!
   expect(char.currentEND).toBe(9) // 5 + 4
   expect(char.currentAP).toBe(3) // reset to max
 })
 
 test('endTurn: Damaged Throat prevents END recovery', () => {
-  setupChar({
+  const char = setupChar({
     currentAP: 2,
     currentEND: 5,
     mortalWounds: ['Damaged Throat', null],
   })
-  const gained = useCharacterStore.getState().endTurn()
+  const gained = useCharacterStore.getState().endTurn(char.id)
   // AP to END: 2, Recovery: 0 (Damaged Throat), total = 2
   expect(gained).toBe(2)
   expect(useCharacterStore.getState().currentCharacter!.currentEND).toBe(7)
 })
 
 test('endTurn: at max END, END stays at max and AP resets', () => {
-  setupChar({ currentAP: 2, currentEND: 10 })
-  useCharacterStore.getState().endTurn()
+  const char = setupChar({ currentAP: 2, currentEND: 10 })
+  useCharacterStore.getState().endTurn(char.id)
   // END stays at max (10), AP resets to 3
   expect(useCharacterStore.getState().currentCharacter!.currentEND).toBe(10)
   expect(useCharacterStore.getState().currentCharacter!.currentAP).toBe(3)
@@ -280,62 +286,62 @@ test('endTurn: at max END, END stays at max and AP resets', () => {
 // ---- Damage ---------------------------------------------------------------
 
 test('takeDamage: simple damage reduces HP', () => {
-  setupChar({ currentHP: 30 })
-  const result = useCharacterStore.getState().takeDamage(10)
+  const char = setupChar({ currentHP: 30 })
+  const result = useCharacterStore.getState().takeDamage(char.id, 10)
   expect(result.finalHP).toBe(20)
   expect(result.hpLost).toBe(10)
   expect(result.causedMortalWound).toBe(false)
 })
 
 test('takeDamage: temp HP absorbed first', () => {
-  setupChar({ currentHP: 30, tempHP: 5 })
-  const result = useCharacterStore.getState().takeDamage(10)
+  const char = setupChar({ currentHP: 30, tempHP: 5 })
+  const result = useCharacterStore.getState().takeDamage(char.id, 10)
   expect(result.tempHPConsumed).toBe(5)
   expect(result.hpLost).toBe(5)
   expect(result.finalHP).toBe(25)
 })
 
 test('takeDamage: damage exceeding HP causes mortal wound', () => {
-  setupChar({ currentHP: 5 })
-  const result = useCharacterStore.getState().takeDamage(15)
+  let char = setupChar({ currentHP: 5 })
+  const result = useCharacterStore.getState().takeDamage(char.id, 15)
   expect(result.causedMortalWound).toBe(true)
   expect(result.mortalWoundsIncurred).toBe(1)
   expect(result.knockedOut).toBe(false)
   // HP resets to max after mortal wound, overflow spills
-  const char = useCharacterStore.getState().currentCharacter!
+  char = useCharacterStore.getState().currentCharacter!
   expect(char.mortalWounds[0]).toBe('Pending Roll')
 })
 
 test('takeDamage: damage causing 2 mortal wounds → knocked out', () => {
-  setupChar({ currentHP: 5, mortalWounds: ['Sprain', null] })
+  const char = setupChar({ currentHP: 5, mortalWounds: ['Sprain', null] })
   // One slot already filled, so one more mortal wound fills both → knocked out
-  const result = useCharacterStore.getState().takeDamage(40)
+  const result = useCharacterStore.getState().takeDamage(char.id, 40)
   expect(result.mortalWoundsIncurred).toBeGreaterThanOrEqual(1)
   expect(result.knockedOut).toBe(true)
 })
 
 test('takeDamage: with resistance, halves damage', () => {
-  setupChar({ currentHP: 30 })
-  const result = useCharacterStore.getState().takeDamage(10, { resistant: true })
+  const char = setupChar({ currentHP: 30 })
+  const result = useCharacterStore.getState().takeDamage(char.id, 10, { resistant: true })
   expect(result.afterResistance).toBe(5)
   expect(result.finalHP).toBe(25)
 })
 
 test('heal: increases HP up to max', () => {
-  setupChar({ currentHP: 10 })
-  useCharacterStore.getState().heal(5)
+  const char = setupChar({ currentHP: 10 })
+  useCharacterStore.getState().heal(char.id, 5)
   expect(useCharacterStore.getState().currentCharacter!.currentHP).toBe(15)
 })
 
 test('heal: caps at max HP', () => {
-  setupChar({ currentHP: 28 })
-  useCharacterStore.getState().heal(10)
+  const char = setupChar({ currentHP: 28 })
+  useCharacterStore.getState().heal(char.id, 10)
   expect(useCharacterStore.getState().currentCharacter!.currentHP).toBe(30) // VIT 2 → maxHP 30
 })
 
 test('heal: Circulatory Dysfunction halves healing', () => {
-  setupChar({ currentHP: 10, mortalWounds: ['Circulatory Dysfunction', null] })
-  useCharacterStore.getState().heal(10)
+  const char = setupChar({ currentHP: 10, mortalWounds: ['Circulatory Dysfunction', null] })
+  useCharacterStore.getState().heal(char.id, 10)
   // Halved: floor(10/2) = 5 → HP 15
   expect(useCharacterStore.getState().currentCharacter!.currentHP).toBe(15)
 })
@@ -343,25 +349,25 @@ test('heal: Circulatory Dysfunction halves healing', () => {
 // ---- Temp HP --------------------------------------------------------------
 
 test('setTempHP: higher value takes precedence (does not stack)', () => {
-  setupChar({ tempHP: 5 })
-  useCharacterStore.getState().setTempHP(3)
+  const char = setupChar({ tempHP: 5 })
+  useCharacterStore.getState().setTempHP(char.id, 3)
   // 3 < 5, so it should stay 5
   expect(useCharacterStore.getState().currentCharacter!.tempHP).toBe(5)
 })
 
 test('setTempHP: higher value replaces', () => {
-  setupChar({ tempHP: 3 })
-  useCharacterStore.getState().setTempHP(8)
+  const char = setupChar({ tempHP: 3 })
+  useCharacterStore.getState().setTempHP(char.id, 8)
   expect(useCharacterStore.getState().currentCharacter!.tempHP).toBe(8)
 })
 
 // ---- Death Saves ----------------------------------------------------------
 
 test('rollDeathSave: roll >= 10 = 1 success', () => {
-  setupChar({ currentHP: 0, mortalWounds: ['Sprain', 'Exhaustion'] })
+  const char = setupChar({ currentHP: 0, mortalWounds: ['Sprain', 'Exhaustion'] })
   // Mock the die roll
   vi.spyOn(Math, 'random').mockReturnValue(14 / 20) // roll 15
-  const result = useCharacterStore.getState().rollDeathSave()
+  const result = useCharacterStore.getState().rollDeathSave(char.id)
   expect(result.roll).toBe(15)
   expect(result.successes).toBe(1)
   expect(result.failures).toBe(0)
@@ -369,26 +375,26 @@ test('rollDeathSave: roll >= 10 = 1 success', () => {
 })
 
 test('rollDeathSave: roll < 10 = 1 failure', () => {
-  setupChar({
+  const char = setupChar({
     currentHP: 0,
     mortalWounds: ['Sprain', 'Exhaustion'],
     deathSaves: { successes: 0, failures: 0 },
   })
   vi.spyOn(Math, 'random').mockReturnValue(4 / 20) // roll 5
-  const result = useCharacterStore.getState().rollDeathSave()
+  const result = useCharacterStore.getState().rollDeathSave(char.id)
   expect(result.roll).toBe(5)
   expect(result.failures).toBe(1)
   vi.restoreAllMocks()
 })
 
 test('rollDeathSave: nat 20 = 2 successes', () => {
-  setupChar({
+  const char = setupChar({
     currentHP: 0,
     mortalWounds: ['Sprain', 'Exhaustion'],
     deathSaves: { successes: 0, failures: 0 },
   })
   vi.spyOn(Math, 'random').mockReturnValue(19 / 20) // roll 20
-  const result = useCharacterStore.getState().rollDeathSave()
+  const result = useCharacterStore.getState().rollDeathSave(char.id)
   expect(result.roll).toBe(20)
   expect(result.successes).toBe(2)
   expect(result.doubled).toBe(true)
@@ -396,13 +402,13 @@ test('rollDeathSave: nat 20 = 2 successes', () => {
 })
 
 test('rollDeathSave: nat 1 = 2 failures', () => {
-  setupChar({
+  const char = setupChar({
     currentHP: 0,
     mortalWounds: ['Sprain', 'Exhaustion'],
     deathSaves: { successes: 0, failures: 0 },
   })
   vi.spyOn(Math, 'random').mockReturnValue(0) // roll 1
-  const result = useCharacterStore.getState().rollDeathSave()
+  const result = useCharacterStore.getState().rollDeathSave(char.id)
   expect(result.roll).toBe(1)
   expect(result.failures).toBe(2)
   expect(result.doubled).toBe(true)
@@ -410,13 +416,13 @@ test('rollDeathSave: nat 1 = 2 failures', () => {
 })
 
 test('rollDeathSave: 3 successes → revived at 1 HP', () => {
-  setupChar({
+  const char = setupChar({
     currentHP: 0,
     mortalWounds: ['Sprain', 'Exhaustion'],
     deathSaves: { successes: 2, failures: 0 },
   })
   vi.spyOn(Math, 'random').mockReturnValue(14 / 20) // roll 15 → 1 more success
-  const result = useCharacterStore.getState().rollDeathSave()
+  const result = useCharacterStore.getState().rollDeathSave(char.id)
   expect(result.successes).toBe(3)
   expect(result.revived).toBe(true)
   expect(useCharacterStore.getState().currentCharacter!.currentHP).toBe(1)
@@ -424,13 +430,13 @@ test('rollDeathSave: 3 successes → revived at 1 HP', () => {
 })
 
 test('rollDeathSave: 3 failures → died', () => {
-  setupChar({
+  const char = setupChar({
     currentHP: 0,
     mortalWounds: ['Sprain', 'Exhaustion'],
     deathSaves: { successes: 0, failures: 2 },
   })
   vi.spyOn(Math, 'random').mockReturnValue(4 / 20) // roll 5 → 1 more failure
-  const result = useCharacterStore.getState().rollDeathSave()
+  const result = useCharacterStore.getState().rollDeathSave(char.id)
   expect(result.failures).toBe(3)
   expect(result.died).toBe(true)
   vi.restoreAllMocks()
@@ -439,29 +445,29 @@ test('rollDeathSave: 3 failures → died', () => {
 // ---- Mortal Wounds --------------------------------------------------------
 
 test('rollMortalWound: fills first empty slot', () => {
-  setupChar({ mortalWounds: [null, null] })
+  let char = setupChar({ mortalWounds: [null, null] })
   vi.spyOn(Math, 'random').mockReturnValue(6 / 20) // roll 7 → Hemorrhage
-  const result = useCharacterStore.getState().rollMortalWound()
+  const result = useCharacterStore.getState().rollMortalWound(char.id)
   expect(result.roll).toBe(7)
   expect(result.woundName).toBe('Hemorrhage')
   expect(result.slotIndex).toBe(0)
-  const char = useCharacterStore.getState().currentCharacter!
+  char = useCharacterStore.getState().currentCharacter!
   expect(char.mortalWounds[0]).toBe('Hemorrhage')
   vi.restoreAllMocks()
 })
 
 test('rollMortalWound: fills second slot and detects knockout', () => {
-  setupChar({ mortalWounds: ['Sprain', null] })
+  const char = setupChar({ mortalWounds: ['Sprain', null] })
   vi.spyOn(Math, 'random').mockReturnValue(0) // roll 1 → Grave Danger
-  const result = useCharacterStore.getState().rollMortalWound()
+  const result = useCharacterStore.getState().rollMortalWound(char.id)
   expect(result.slotIndex).toBe(1)
   expect(result.knockedOut).toBe(true)
   vi.restoreAllMocks()
 })
 
 test('clearMortalWound: sets slot to null', () => {
-  setupChar({ mortalWounds: ['Sprain', 'Exhaustion'] })
-  useCharacterStore.getState().clearMortalWound(0)
+  const char = setupChar({ mortalWounds: ['Sprain', 'Exhaustion'] })
+  useCharacterStore.getState().clearMortalWound(char.id, 0)
   expect(useCharacterStore.getState().currentCharacter!.mortalWounds[0]).toBe(null)
   expect(useCharacterStore.getState().currentCharacter!.mortalWounds[1]).toBe('Exhaustion')
 })
@@ -469,7 +475,7 @@ test('clearMortalWound: sets slot to null', () => {
 // ---- Full Restore ---------------------------------------------------------
 
 test('fullRestore: resets everything', () => {
-  setupChar({
+  let char = setupChar({
     currentHP: 5,
     tempHP: 3,
     currentEND: 2,
@@ -478,8 +484,8 @@ test('fullRestore: resets everything', () => {
     mortalWounds: ['Sprain', 'Exhaustion'],
     deathSaves: { successes: 2, failures: 1 },
   })
-  useCharacterStore.getState().fullRestore()
-  const char = useCharacterStore.getState().currentCharacter!
+  useCharacterStore.getState().fullRestore(char.id)
+  char = useCharacterStore.getState().currentCharacter!
   expect(char.currentHP).toBe(30) // VIT 2 → maxHP 30
   expect(char.tempHP).toBe(0)
   expect(char.currentEND).toBe(10)
@@ -554,21 +560,21 @@ test('reorderAbility: reorders within slotted', () => {
 // (saveVersion auto-bumps by patch level)
 
 test('saveVersion: defaults to auto-incrementing patch bump', async () => {
-  setupChar({ version: '5.0.0' })
+  let char = setupChar({ version: '5.0.0' })
   const snap = await useCharacterStore.getState().saveVersion()
   expect(snap).not.toBeNull()
   expect(snap!.version).toBe('5.0.1')
   // Character's internal counter matches the bumped version.
-  const char = useCharacterStore.getState().currentCharacter!
+  char = useCharacterStore.getState().currentCharacter!
   expect(char.version).toBe('5.0.1')
 })
 
 test('saveVersion: overrides version counter with the provided value', async () => {
-  setupChar({ version: '3.0.0' })
+  let char = setupChar({ version: '3.0.0' })
   const snap = await useCharacterStore.getState().saveVersion('9.1.2')
   expect(snap).not.toBeNull()
   expect(snap!.version).toBe('9.1.2')
-  const char = useCharacterStore.getState().currentCharacter!
+  char = useCharacterStore.getState().currentCharacter!
   expect(char.version).toBe('9.1.2')
 })
 
@@ -583,75 +589,75 @@ test('saveVersion: consecutive auto bumps start from the overridden value', asyn
 // ---- View-mode persistence ---------------------------------------------------
 
 test('updateSectionViewMode: sets slotted view mode to list', () => {
-  setupChar()
+  let char = setupChar()
   useCharacterStore.getState().updateSectionViewMode('slottedAbilities', 'list')
-  const char = useCharacterStore.getState().currentCharacter!
+  char = useCharacterStore.getState().currentCharacter!
   expect(char.viewModes.slottedAbilities).toBe('list')
   // Pool untouched.
   expect(char.viewModes.abilityPool).toBe('grid')
 })
 
 test('updateSectionViewMode: sets pool view mode to list', () => {
-  setupChar()
+  let char = setupChar()
   useCharacterStore.getState().updateSectionViewMode('abilityPool', 'list')
-  const char = useCharacterStore.getState().currentCharacter!
+  char = useCharacterStore.getState().currentCharacter!
   expect(char.viewModes.abilityPool).toBe('list')
 })
 
 test('updateCustomSectionViewMode: sets a custom section view mode', () => {
-  setupChar()
+  let char = setupChar()
   const tabId = useCharacterStore.getState().addCustomTab('Powers')
   const secId = useCharacterStore.getState().addCustomSection(tabId, 'Offense')
   useCharacterStore.getState().updateCustomSectionViewMode(tabId, secId, 'list')
-  const char = useCharacterStore.getState().currentCharacter!
+  char = useCharacterStore.getState().currentCharacter!
   expect(char.viewModes.customTabs[tabId][secId]).toBe('list')
 })
 
 test('addCustomSection: seeds viewModes with grid by default', () => {
-  setupChar()
+  let char = setupChar()
   const tabId = useCharacterStore.getState().addCustomTab('Powers')
   const secId = useCharacterStore.getState().addCustomSection(tabId, 'Offense')
-  const char = useCharacterStore.getState().currentCharacter!
+  char = useCharacterStore.getState().currentCharacter!
   expect(char.viewModes.customTabs[tabId][secId]).toBe('grid')
 })
 
 test('removeCustomSection: cleans up viewModes entry', () => {
-  setupChar()
+  let char = setupChar()
   const tabId = useCharacterStore.getState().addCustomTab('Powers')
   const secId = useCharacterStore.getState().addCustomSection(tabId, 'Offense')
   useCharacterStore.getState().updateCustomSectionViewMode(tabId, secId, 'list')
   useCharacterStore.getState().removeCustomSection(tabId, secId)
-  const char = useCharacterStore.getState().currentCharacter!
+  char = useCharacterStore.getState().currentCharacter!
   expect(char.viewModes.customTabs[tabId]?.[secId]).toBeUndefined()
 })
 
 test('removeCustomTab: cleans up viewModes entry for the whole tab', () => {
-  setupChar()
+  let char = setupChar()
   const tabId = useCharacterStore.getState().addCustomTab('Powers')
   useCharacterStore.getState().addCustomSection(tabId, 'Offense')
   useCharacterStore.getState().removeCustomTab(tabId)
-  const char = useCharacterStore.getState().currentCharacter!
+  char = useCharacterStore.getState().currentCharacter!
   expect(char.viewModes.customTabs[tabId]).toBeUndefined()
 })
 
 test('updateCustomSectionViewMode: overrides a previously-set custom section mode', () => {
-  setupChar()
+  let char = setupChar()
   const tabId = useCharacterStore.getState().addCustomTab('Powers')
   const secId = useCharacterStore.getState().addCustomSection(tabId, 'Defense')
   useCharacterStore.getState().updateCustomSectionViewMode(tabId, secId, 'list')
   useCharacterStore.getState().updateCustomSectionViewMode(tabId, secId, 'grid')
-  const char = useCharacterStore.getState().currentCharacter!
+  char = useCharacterStore.getState().currentCharacter!
   expect(char.viewModes.customTabs[tabId][secId]).toBe('grid')
 })
 
 // ---- Custom NPC sections ------------------------------------------------------
 
 test('addCustomNPCSection: adds an npc-kind section referencing a new NPC record', async () => {
-  setupChar()
+  let char = setupChar()
   const tabId = useCharacterStore.getState().addCustomTab('Allies')
   const secId = useCharacterStore.getState().addCustomNPCSection(tabId, 'Goblin')
 
-  const char = useCharacterStore.getState().currentCharacter!
+  char = useCharacterStore.getState().currentCharacter!
   const section = char.customTabs
     .find((t) => t.id === tabId)!
     .sections.find((s) => s.id === secId)!
@@ -669,12 +675,12 @@ test('addCustomNPCSection: adds an npc-kind section referencing a new NPC record
 })
 
 test('removeCustomSection: keeps the attached NPC record for an npc section', async () => {
-  setupChar()
+  let char = setupChar()
   const tabId = useCharacterStore.getState().addCustomTab('Allies')
   const secId = useCharacterStore.getState().addCustomNPCSection(tabId, 'Goblin')
   await Promise.resolve()
 
-  const char = useCharacterStore.getState().currentCharacter!
+  char = useCharacterStore.getState().currentCharacter!
   const section = char.customTabs
     .find((t) => t.id === tabId)!
     .sections.find((s) => s.id === secId)!
@@ -707,8 +713,8 @@ test('addCustomNPCReference: attaches an existing saved NPC by reference', () =>
     .getState()
     .addCustomNPCReference(tabId, existingNpc.id)
 
-  const char = useCharacterStore.getState().currentCharacter!
-  const section = char.customTabs
+  const target = useCharacterStore.getState().currentCharacter!
+  const section = target.customTabs
     .find((t) => t.id === tabId)!
     .sections.find((s) => s.id === secId)!
 
@@ -736,10 +742,10 @@ test('createAttachedNPC: creates a named NPC and attaches it without navigating'
   const tabId = useCharacterStore.getState().addCustomTab('Encounters')
   const secId = useCharacterStore.getState().createAttachedNPC(tabId, 'Goblin')
 
-  const char = useCharacterStore.getState().currentCharacter!
-  expect(char.id).toBe(current.id) // currentCharacter is NOT changed
+  const target = useCharacterStore.getState().currentCharacter!
+  expect(target.id).toBe(current.id) // currentCharacter is NOT changed
 
-  const section = char.customTabs
+  const section = target.customTabs
     .find((t) => t.id === tabId)!
     .sections.find((s) => s.id === secId)!
   expect(section.kind).toBe('npc')
@@ -769,11 +775,11 @@ test('createAttachedNPC: falls back to default NPC name when blank', async () =>
 // ---- Custom text sections ------------------------------------------------------
 
 test('addCustomTextSection: adds a text-kind section with empty content', () => {
-  setupChar()
+  let char = setupChar()
   const tabId = useCharacterStore.getState().addCustomTab('Lore')
   const secId = useCharacterStore.getState().addCustomTextSection(tabId, 'Backstory')
 
-  const char = useCharacterStore.getState().currentCharacter!
+  char = useCharacterStore.getState().currentCharacter!
   const section = char.customTabs
     .find((t) => t.id === tabId)!
     .sections.find((s) => s.id === secId)!
@@ -784,7 +790,7 @@ test('addCustomTextSection: adds a text-kind section with empty content', () => 
 })
 
 test('updateCustomTextSectionContent: sets the markdown body of a text section', () => {
-  setupChar()
+  let char = setupChar()
   const tabId = useCharacterStore.getState().addCustomTab('Lore')
   const secId = useCharacterStore.getState().addCustomTextSection(tabId, 'Backstory')
 
@@ -792,7 +798,7 @@ test('updateCustomTextSectionContent: sets the markdown body of a text section',
     .getState()
     .updateCustomTextSectionContent(tabId, secId, 'Born under a blood moon.')
 
-  const char = useCharacterStore.getState().currentCharacter!
+  char = useCharacterStore.getState().currentCharacter!
   const section = char.customTabs
     .find((t) => t.id === tabId)!
     .sections.find((s) => s.id === secId)!
@@ -800,7 +806,7 @@ test('updateCustomTextSectionContent: sets the markdown body of a text section',
 })
 
 test('updateCustomTextSectionContent: leaves non-text sections untouched', () => {
-  setupChar()
+  let char = setupChar()
   const tabId = useCharacterStore.getState().addCustomTab('Lore')
   const textSecId = useCharacterStore.getState().addCustomTextSection(tabId, 'Backstory')
   const abilitySecId = useCharacterStore.getState().addCustomSection(tabId, 'Offense')
@@ -809,7 +815,7 @@ test('updateCustomTextSectionContent: leaves non-text sections untouched', () =>
     .getState()
     .updateCustomTextSectionContent(tabId, abilitySecId, 'should not apply')
 
-  const char = useCharacterStore.getState().currentCharacter!
+  char = useCharacterStore.getState().currentCharacter!
   const textSection = char.customTabs
     .find((t) => t.id === tabId)!
     .sections.find((s) => s.id === textSecId)!
@@ -943,27 +949,27 @@ test('setAbilityModifiersActive: unknown ability ids leave the sheet untouched',
 })
 
 test('active modifiers raise the effective HP cap used by heal and fullRestore', () => {
-  setupChar({
+  const char = setupChar({
     slottedAbilities: [modifierAbility()] as Character['slottedAbilities'],
     currentHP: 5,
   })
 
   // Modifiers are off: healing caps at the base 30 HP.
-  useCharacterStore.getState().heal(100)
+  useCharacterStore.getState().heal(char.id, 100)
   expect(useCharacterStore.getState().currentCharacter!.currentHP).toBe(30)
 
   useCharacterStore.getState().setAbilityModifiersActive('buff-1', true)
-  useCharacterStore.getState().heal(100)
+  useCharacterStore.getState().heal(char.id, 100)
   expect(useCharacterStore.getState().currentCharacter!.currentHP).toBe(40)
 
   // Switching the modifier off again drops the cap back to the base value.
   useCharacterStore.getState().setAbilityModifiersActive('buff-1', false)
-  useCharacterStore.getState().resetHP()
+  useCharacterStore.getState().resetHP(char.id)
   expect(useCharacterStore.getState().currentCharacter!.currentHP).toBe(30)
 })
 
 test('active END Recovery modifiers feed into endTurn', () => {
-  setupChar({
+  const char = setupChar({
     currentEND: 0,
     currentAP: 0,
     slottedAbilities: [
@@ -973,20 +979,204 @@ test('active END Recovery modifiers feed into endTurn', () => {
 
   // Base END Recovery with GRT 3 is 1 + floor(3/2) = 2.
   useCharacterStore.getState().setAbilityModifiersActive('buff-1', true)
-  expect(useCharacterStore.getState().endTurn()).toBe(4)
+  expect(useCharacterStore.getState().endTurn(char.id)).toBe(4)
   expect(useCharacterStore.getState().currentCharacter!.currentEND).toBe(4)
 })
 
 test('switching off a Max HP modifier clamps current HP to the new maximum', () => {
-  setupChar({
+  const char = setupChar({
     slottedAbilities: [modifierAbility()] as Character['slottedAbilities'],
     currentHP: 5,
   })
 
   useCharacterStore.getState().setAbilityModifiersActive('buff-1', true)
-  useCharacterStore.getState().heal(100)
+  useCharacterStore.getState().heal(char.id, 100)
   expect(useCharacterStore.getState().currentCharacter!.currentHP).toBe(40)
 
   useCharacterStore.getState().setAbilityModifiersActive('buff-1', false)
   expect(useCharacterStore.getState().currentCharacter!.currentHP).toBe(30)
+})
+
+// ---- Id-targeted mutations (GM Screen support) ------------------------------
+
+test('updateCharacter: mutates a non-current character and leaves current alone', () => {
+  const current = setupChar()
+  const other: Character = { ...createDefaultCharacter(), id: 'other', name: 'Other', currentHP: 20 }
+  useCharacterStore.setState({ characters: [current, other] })
+
+  useCharacterStore.getState().updateCharacter('other', (c) => ({ ...c, currentHP: 7 }))
+
+  const state = useCharacterStore.getState()
+  expect(state.characters.find((c) => c.id === 'other')!.currentHP).toBe(7)
+  expect(state.currentCharacter!.id).toBe(current.id)
+  expect(state.currentCharacter!.currentHP).toBe(30)
+})
+
+test('updateCharacter: syncs currentCharacter when it is the target', () => {
+  const char = setupChar()
+  useCharacterStore.getState().updateCharacter(char.id, (c) => ({ ...c, currentHP: 3 }))
+  expect(useCharacterStore.getState().currentCharacter!.currentHP).toBe(3)
+})
+
+test('updateCharacter: unknown id is a no-op', () => {
+  const char = setupChar()
+  useCharacterStore.getState().updateCharacter('nope', (c) => ({ ...c, currentHP: 1 }))
+  expect(useCharacterStore.getState().characters[0].currentHP).toBe(char.currentHP)
+})
+
+test('takeDamage: applies to the targeted character, not the current one', () => {
+  const current = setupChar()
+  const other: Character = { ...createDefaultCharacter(), id: 'other', currentHP: 20, tempHP: 0 }
+  useCharacterStore.setState({ characters: [current, other] })
+
+  const result = useCharacterStore.getState().takeDamage('other', 5)
+
+  expect(result.finalHP).toBe(15)
+  expect(useCharacterStore.getState().characters.find((c) => c.id === 'other')!.currentHP).toBe(15)
+  expect(useCharacterStore.getState().currentCharacter!.currentHP).toBe(30)
+})
+
+test('spendAP: targets a non-current character and reports insufficiency', () => {
+  const current = setupChar()
+  const other: Character = { ...createDefaultCharacter(), id: 'other', currentAP: 1 }
+  useCharacterStore.setState({ characters: [current, other] })
+
+  expect(useCharacterStore.getState().spendAP('other', 2)).toBe(false)
+  expect(useCharacterStore.getState().spendAP('other', 1)).toBe(true)
+  expect(useCharacterStore.getState().characters.find((c) => c.id === 'other')!.currentAP).toBe(0)
+  // The current character's AP is untouched.
+  expect(useCharacterStore.getState().currentCharacter!.currentAP).toBe(3)
+})
+
+test('endTurn: reports the END gained for the targeted character only', () => {
+  const current = setupChar()
+  const other: Character = {
+    ...createDefaultCharacter(),
+    id: 'other',
+    currentAP: 2,
+    currentEND: 5,
+    attributes: { MAR: 3, POW: 4, AGI: 1, VIT: 2, GRT: 3 },
+    mortalWounds: [null, null],
+  }
+  useCharacterStore.setState({ characters: [current, other] })
+
+  // AP 2 → END (capped at 10: +2) then END Recovery 2 → 9, total gained 4.
+  expect(useCharacterStore.getState().endTurn('other')).toBe(4)
+  expect(useCharacterStore.getState().characters.find((c) => c.id === 'other')!.currentEND).toBe(9)
+  expect(useCharacterStore.getState().currentCharacter!.currentEND).toBe(10)
+})
+
+test('heal and fullRestore: id-targeted and independent per character', () => {
+  const current = setupChar()
+  const other: Character = { ...createDefaultCharacter(), id: 'other', currentHP: 5, tempHP: 4 }
+  useCharacterStore.setState({ characters: [current, other] })
+
+  useCharacterStore.getState().heal('other', 3)
+  expect(useCharacterStore.getState().characters.find((c) => c.id === 'other')!.currentHP).toBe(8)
+
+  useCharacterStore.getState().fullRestore('other')
+  const restored = useCharacterStore.getState().characters.find((c) => c.id === 'other')!
+  expect(restored.tempHP).toBe(0)
+  expect(restored.currentEND).toBe(10)
+  expect(restored.currentAP).toBe(3)
+})
+
+test('spendCustomResourceBar: targets the right character and right bar', () => {
+  const barA = { id: 'bar-a', name: 'A', max: 3, current: 3, color: '#fff', refillsOnRecover: false }
+  const barB = { id: 'bar-b', name: 'B', max: 3, current: 2, color: '#fff', refillsOnRecover: false }
+  const current = setupChar({ customResourceBars: [barA] })
+  const other: Character = { ...createDefaultCharacter(), id: 'other', customResourceBars: [barB] }
+  useCharacterStore.setState({ characters: [current, other] })
+
+  expect(useCharacterStore.getState().spendCustomResourceBar('other', 'bar-a')).toBe(false)
+  expect(useCharacterStore.getState().spendCustomResourceBar('other', 'bar-b')).toBe(true)
+
+  expect(useCharacterStore.getState().characters.find((c) => c.id === 'other')!.customResourceBars[0].current).toBe(1)
+  expect(useCharacterStore.getState().currentCharacter!.customResourceBars[0].current).toBe(3)
+
+  useCharacterStore.getState().restoreCustomResourceBar('other', 'bar-b', 5)
+  expect(useCharacterStore.getState().characters.find((c) => c.id === 'other')!.customResourceBars[0].current).toBe(3)
+})
+
+test('autosave: each edited character gets its own debounced write', async () => {
+  vi.useFakeTimers()
+  try {
+    const current = setupChar()
+    const other: Character = { ...createDefaultCharacter(), id: 'other', currentHP: 20 }
+    useCharacterStore.setState({ characters: [current, other] })
+    dbMap.clear()
+
+    // Two different characters edited in the same tick must BOTH persist.
+    useCharacterStore.getState().updateCharacter(current.id, (c) => ({ ...c, currentHP: 11 }))
+    useCharacterStore.getState().updateCharacter('other', (c) => ({ ...c, currentHP: 12 }))
+
+    await vi.advanceTimersByTimeAsync(600)
+
+    expect((dbMap.get(current.id) as Character).currentHP).toBe(11)
+    expect((dbMap.get('other') as Character).currentHP).toBe(12)
+  } finally {
+    vi.useRealTimers()
+  }
+})
+
+test('saveCharacter: persists immediately and cancels the pending autosave', async () => {
+  vi.useFakeTimers()
+  try {
+    const char = setupChar()
+    dbMap.clear()
+    useCharacterStore.getState().updateCharacter(char.id, (c) => ({ ...c, currentHP: 9 }))
+
+    await useCharacterStore.getState().saveCharacter(char.id)
+    expect((dbMap.get(char.id) as Character).currentHP).toBe(9)
+
+    // The debounced write was cancelled — advancing timers writes nothing new.
+    dbMap.delete(char.id)
+    await vi.advanceTimersByTimeAsync(600)
+    expect(dbMap.has(char.id)).toBe(false)
+  } finally {
+    vi.useRealTimers()
+  }
+})
+
+test('createNpcBase: persists a named NPC without selecting it', async () => {
+  const current = setupChar()
+  const npc = await useCharacterStore.getState().createNpcBase('Bandit')
+
+  expect(npc).not.toBeNull()
+  expect(npc!.kind).toBe('npc')
+  expect(npc!.name).toBe('Bandit')
+  expect(useCharacterStore.getState().currentCharacter!.id).toBe(current.id)
+  expect(useCharacterStore.getState().characters.map((c) => c.id)).toContain(npc!.id)
+  expect(dbMap.has(npc!.id)).toBe(true)
+})
+
+test('createNpcBase: a blank name creates nothing', async () => {
+  const current = setupChar()
+  const npc = await useCharacterStore.getState().createNpcBase('   ')
+  expect(npc).toBeNull()
+  expect(useCharacterStore.getState().characters).toHaveLength(1)
+  expect(useCharacterStore.getState().currentCharacter!.id).toBe(current.id)
+})
+
+// ---- Load failure handling -------------------------------------------------
+
+test('loadCharacters: a storage failure still completes the load', async () => {
+  const db = await import('@/lib/db')
+  vi.spyOn(db, 'getAllCharacters').mockRejectedValueOnce(
+    new Error('local database is locked'),
+  )
+  useCharacterStore.setState({ isLoaded: false, loadError: null })
+
+  await useCharacterStore.getState().loadCharacters()
+
+  const state = useCharacterStore.getState()
+  expect(state.isLoaded).toBe(true)
+  expect(state.loadError).toBe('local database is locked')
+  expect(state.characters).toEqual([])
+})
+
+test('loadCharacters: a successful load clears a previous error', async () => {
+  useCharacterStore.setState({ isLoaded: true, loadError: 'stale failure' })
+  await useCharacterStore.getState().loadCharacters()
+  expect(useCharacterStore.getState().loadError).toBeNull()
 })

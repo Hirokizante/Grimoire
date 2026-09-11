@@ -22,7 +22,9 @@ export default function NPCDescriptionSection({
   npc,
   mode = 'view',
 }: NPCDescriptionSectionProps) {
-  const update = useCharacterStore((s) => s.updateCurrentCharacter)
+  const updateCharacter = useCharacterStore((s) => s.updateCharacter)
+  const update = (updater: (c: Character) => Character) =>
+    updateCharacter(npc.id, updater)
   const isEdit = mode === 'edit'
   const description = npc.description ?? ''
 

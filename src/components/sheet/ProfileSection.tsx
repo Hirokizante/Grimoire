@@ -9,25 +9,36 @@
  * top of the sheet; this component no longer handles them.
  *
  * In edit mode the description and backstory become textareas.
- * All edits are persisted immediately via `updateCurrentCharacter`.
+ * All edits are persisted immediately via the id-targeted `updateCharacter`.
  */
 
 import { useCharacterStore } from '@/store/characterStore'
 import MarkdownText from '@/components/ui/MarkdownText'
+import type { Character } from '@/types'
 import type { SheetMode } from '@/pages/CharacterSheetPage'
 
 export interface ProfileSectionProps {
   physicalDescription: string
   backstory: string
+  /**
+   * Character these fields belong to. Defaults to the store's
+   * `currentCharacter`; the GM Screen passes the panel's own id.
+   */
+  characterId?: string
   mode?: SheetMode
 }
 
 export default function ProfileSection({
   physicalDescription,
   backstory,
+  characterId,
   mode = 'view',
 }: ProfileSectionProps) {
-  const update = useCharacterStore((s) => s.updateCurrentCharacter)
+  const updateCharacter = useCharacterStore((s) => s.updateCharacter)
+  const storeCharacterId = useCharacterStore((s) => s.currentCharacter?.id)
+  const targetId = characterId ?? storeCharacterId ?? ''
+  const update = (updater: (c: Character) => Character) =>
+    updateCharacter(targetId, updater)
   const isEdit = mode === 'edit'
 
   const setPhysicalDescription = (value: string) =>

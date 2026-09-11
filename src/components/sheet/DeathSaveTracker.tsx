@@ -24,7 +24,7 @@ export interface DeathSaveTrackerProps {
 
 export default function DeathSaveTracker({ character }: DeathSaveTrackerProps) {
   const rollDeathSave = useCharacterStore((s) => s.rollDeathSave)
-  const updateCurrentCharacter = useCharacterStore((s) => s.updateCurrentCharacter)
+  const updateCharacter = useCharacterStore((s) => s.updateCharacter)
   const [lastRoll, setLastRoll] = useState<DeathSaveResult | null>(null)
   const { notify } = useNotification()
 
@@ -33,7 +33,7 @@ export default function DeathSaveTracker({ character }: DeathSaveTrackerProps) {
   const isRevived = successes >= 3
 
   const handleRoll = () => {
-    const result = rollDeathSave()
+    const result = rollDeathSave(character.id)
     setLastRoll(result)
     if (result.revived) {
       notify('Revived at 1 HP!', 'success', 5000)
@@ -45,7 +45,7 @@ export default function DeathSaveTracker({ character }: DeathSaveTrackerProps) {
   }
 
   const adjustSuccess = (delta: number) => {
-    updateCurrentCharacter((char) => ({
+    updateCharacter(character.id, (char) => ({
       ...char,
       deathSaves: {
         ...char.deathSaves,
@@ -55,7 +55,7 @@ export default function DeathSaveTracker({ character }: DeathSaveTrackerProps) {
   }
 
   const adjustFailure = (delta: number) => {
-    updateCurrentCharacter((char) => ({
+    updateCharacter(character.id, (char) => ({
       ...char,
       deathSaves: {
         ...char.deathSaves,

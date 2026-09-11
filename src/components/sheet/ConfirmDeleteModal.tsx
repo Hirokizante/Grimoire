@@ -11,6 +11,11 @@ import { useModalDialog } from '@/hooks/useModalDialog'
 export interface ConfirmDeleteModalProps {
   /** The character/item name being deleted (shown in the message). */
   itemName: string
+  /**
+   * Optional extra warning rendered under the main message — used to list the
+   * GM screens that reference this record (panels become placeholders).
+   */
+  referenceNote?: string
   /** Called when the user confirms the deletion. */
   onConfirm: () => void
   /** Called when the user cancels (Esc, overlay, or close button). */
@@ -19,6 +24,7 @@ export interface ConfirmDeleteModalProps {
 
 export default function ConfirmDeleteModal({
   itemName,
+  referenceNote,
   onConfirm,
   onClose,
 }: ConfirmDeleteModalProps) {
@@ -47,6 +53,11 @@ export default function ConfirmDeleteModal({
             </strong>
             ? This cannot be undone.
           </p>
+          {referenceNote && (
+            <p className="confirm-delete-modal__message confirm-delete-modal__reference">
+              {referenceNote}
+            </p>
+          )}
         </div>
 
         <div className="modal-footer">

@@ -10,69 +10,302 @@
  * All functions here are framework-agnostic and safe to call from anywhere.
  */
 
-import type { AbilityBlock, AbilityCost, Character, CharacterViewModes, NPCStats, SheetColors, SheetLabel, StatusCondition, VersionSnapshot } from '@/types'
+import type { AbilityBlock, AbilityCost, Character, CharacterViewModes, GMScreen, NPCStats, NpcInstanceState, PanelStatus, ScreenPanel, SheetColors, SheetLabel, StatusCondition, VersionSnapshot } from '@/types'
 import { createDefaultStatuses } from '@/constants/statuses'
+import { MAX_PANEL_STATUS_STACKS, isPanelStatusDuration } from '@/constants/statusDurations'
 import { DEFAULT_SHEET_COLORS, generateId } from '@/constants/gameData'
 import { normalizeModifiers } from '@/lib/abilityModifiers'
 
 const DB_NAME = 'grimoire'
-const DB_VERSION = 4
+const DB_VERSION = 5
 const CHAR_STORE = 'characters'
 const VERSION_STORE = 'versions'
 const ROLL_LOG_STORE = 'roll_logs'
 const STATUS_STORE = 'statuses'
+const SCREEN_STORE = 'screens'
+
+/**
+ * How long to wait for an `indexedDB.open()` that never settles before giving
+ * up with a diagnosable error.
+ *
+ * A version upgrade is BLOCKED (not failed) while any other connection to the
+ * database stays open — most commonly the same app in another tab, or a cached
+ * older build whose `DB_VERSION` is lower. In that state the browser fires no
+ * useful event and the request simply never settles, so without a deadline
+ * every caller awaits forever and the UI spins on "Loading…".
+ */
+const OPEN_TIMEOUT_MS = 10_000
+
+/**
+ * The object stores every Grimoire database must contain. A connection that
+ * reports {@link DB_VERSION} but is missing any of these is a half-applied
+ * upgrade (see {@link openDB}).
+ */
+const REQUIRED_STORES = [
+  CHAR_STORE,
+  VERSION_STORE,
+  ROLL_LOG_STORE,
+  STATUS_STORE,
+  SCREEN_STORE,
+] as const
+
+/** Stores missing from an open connection, if any. */
+function missingStores(db: IDBDatabase): string[] {
+  return REQUIRED_STORES.filter((name) => !db.objectStoreNames.contains(name))
+}
+
+/** Create every store this schema needs that the connection doesn't have yet. */
+function createMissingStores(db: IDBDatabase) {
+  if (!db.objectStoreNames.contains(CHAR_STORE)) {
+    db.createObjectStore(CHAR_STORE, { keyPath: 'id' })
+  }
+
+  if (!db.objectStoreNames.contains(VERSION_STORE)) {
+    const versionStore = db.createObjectStore(VERSION_STORE, { keyPath: 'id' })
+    versionStore.createIndex('characterId', 'characterId', { unique: false })
+  }
+
+  if (!db.objectStoreNames.contains(ROLL_LOG_STORE)) {
+    const rollLogStore = db.createObjectStore(ROLL_LOG_STORE, { keyPath: 'id' })
+    rollLogStore.createIndex('characterId', 'characterId', { unique: false })
+  }
+
+  if (!db.objectStoreNames.contains(STATUS_STORE)) {
+    const statusStore = db.createObjectStore(STATUS_STORE, { keyPath: 'id' })
+    // Seed the built-in Divergence status conditions exactly once, when the
+    // store is first created. Later upgrades never re-seed, so a user who
+    // deletes a default won't have it resurrected.
+    for (const status of createDefaultStatuses()) {
+      statusStore.put(status)
+    }
+  }
+
+  if (!db.objectStoreNames.contains(SCREEN_STORE)) {
+    // Saved GM Screens. No indexes: the panel lists are stored inline and the
+    // whole set is always read at once (see getAllScreens).
+    db.createObjectStore(SCREEN_STORE, { keyPath: 'id' })
+  }
+}
+
+/** True once a connection has been opened with a repaired (bumped) version. */
+let schemaRepaired = false
+
+/**
+ * Whether {@link openDB} had to force a schema repair this session.
+ *
+ * Read by App so a silent repair can be reported to the user once.
+ */
+export function wasSchemaRepaired(): boolean {
+  return schemaRepaired
+}
 
 /**
  * Open (and initialise) the Grimoire IndexedDB database.
  *
  * Creates the object stores on first run / version bump. Resolves with the
- * ready {@link IDBDatabase}; rejects on any open/upgrade error.
+ * ready {@link IDBDatabase}; rejects on any open/upgrade error, when another
+ * connection blocks the upgrade (after {@link OPEN_TIMEOUT_MS}), or when the
+ * browser makes IndexedDB unavailable.
+ *
+ * **Self-healing:** an upgrade can be interrupted (the browser kills the
+ * upgrade transaction, or an abandoned open lands late), leaving the database
+ * stamped at the current version while an object store was never created.
+ * Re-opening at the same version can never fire `upgradeneeded` again, so such
+ * a database would fail every query forever. The connection is therefore
+ * verified on open: if a required store is missing, the connection is closed
+ * and reopened at `version + 1`, which re-runs the (idempotent) store creation.
+ * An upgrade never touches existing records.
  */
 export function openDB(): Promise<IDBDatabase> {
+  // SERIALIZED: `loadCharacters` and `loadScreens` both run on mount, so two
+  // opens (and therefore two competing version upgrades) would otherwise be in
+  // flight at once. That race is what let one connection mint version 6 while
+  // the other was still asking for version 5, and the loser failed with
+  // `VersionError`. Every caller now shares one open.
+  if (openPromise) return openPromise
+  openPromise = openDatabase()
+  // A failed open must not be cached forever — the next caller retries.
+  openPromise.catch(() => {
+    openPromise = null
+  })
+  return openPromise
+}
+
+/** The shared in-flight / completed open, or null when none is established. */
+let openPromise: Promise<IDBDatabase> | null = null
+
+/**
+ * Close and forget the shared connection (used by tests and by flows that need
+ * a guaranteed-fresh connection).
+ */
+export function resetDBConnection() {
+  const existing = openPromise
+  openPromise = null
+  void existing?.then((db) => db.close()).catch(() => {})
+}
+
+function openDatabase(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION)
+    /** Guards against settling twice (timeout racing the real outcome). */
+    let settled = false
+    let timer: ReturnType<typeof setTimeout> | null = null
+    /** The most recent in-flight request, so a late arrival can be closed. */
+    let pending: IDBOpenDBRequest | null = null
 
-    request.onerror = () => reject(request.error)
-    request.onsuccess = () => resolve(request.result)
+    const finish = (fn: () => void) => {
+      if (settled) return
+      settled = true
+      if (timer) clearTimeout(timer)
+      timer = null
+      fn()
+    }
 
-    request.onupgradeneeded = () => {
-      const db = request.result
-
-      if (!db.objectStoreNames.contains(CHAR_STORE)) {
-        db.createObjectStore(CHAR_STORE, { keyPath: 'id' })
+    timer = setTimeout(() => {
+      const abandoned = pending
+      pending = null
+      // The request may STILL succeed after we give up. If it does, that
+      // connection must be closed: an unreferenced open connection holds the
+      // database at its current version and blocks every later upgrade.
+      if (abandoned) {
+        abandoned.onsuccess = () => abandoned.result?.close()
+        abandoned.onerror = null
+        abandoned.onupgradeneeded = null
       }
+      finish(() =>
+        reject(
+          new Error(
+            'The local database is locked by another Grimoire tab or window. ' +
+              'Close the other tabs (or reload them so they run this version) and try again.',
+          ),
+        ),
+      )
+    }, OPEN_TIMEOUT_MS)
 
-      if (!db.objectStoreNames.contains(VERSION_STORE)) {
-        const versionStore = db.createObjectStore(VERSION_STORE, {
-          keyPath: 'id',
-        })
-        versionStore.createIndex('characterId', 'characterId', {
-          unique: false,
-        })
+    /**
+     * One open attempt. `version === undefined` opens whatever version exists
+     * (no upgrade); `allowRepair` permits one version bump to create missing
+     * stores, and one no-version retry if we lose a version race.
+     */
+    const attempt = (version: number | undefined, allowRepair: boolean) => {
+      let request: IDBOpenDBRequest
+      try {
+        request =
+          version === undefined
+            ? indexedDB.open(DB_NAME)
+            : indexedDB.open(DB_NAME, version)
+      } catch (err) {
+        // Private-mode / disabled storage throws synchronously.
+        finish(() =>
+          reject(
+            new Error(
+              `Could not open the local database: ${
+                err instanceof Error ? err.message : String(err)
+              }`,
+            ),
+          ),
+        )
+        return
       }
+      pending = request
 
-      if (!db.objectStoreNames.contains(ROLL_LOG_STORE)) {
-        const rollLogStore = db.createObjectStore(ROLL_LOG_STORE, {
-          keyPath: 'id',
-        })
-        rollLogStore.createIndex('characterId', 'characterId', {
-          unique: false,
-        })
-      }
-
-      if (!db.objectStoreNames.contains(STATUS_STORE)) {
-        const statusStore = db.createObjectStore(STATUS_STORE, {
-          keyPath: 'id',
-        })
-        // Seed the built-in Divergence status conditions exactly once, when
-        // the store is first created. Later upgrades never re-seed, so a user
-        // who deletes a default won't have it resurrected.
-        for (const status of createDefaultStatuses()) {
-          statusStore.put(status)
+      request.onerror = () => {
+        const err = request.error
+        // Another context (tab) upgraded the database past our version while
+        // this open was in flight, or we lost a race to mint the bumped
+        // version. Re-open at whatever version now exists and re-verify.
+        if (err?.name === 'VersionError' && allowRepair) {
+          attempt(undefined, false)
+          return
         }
+        finish(() => reject(err))
+      }
+      request.onblocked = () => {
+        // Another connection is holding the database open. The request may
+        // still proceed if that tab closes, so let the timeout decide — but
+        // give the real reason in the console immediately.
+        console.warn(
+          '[grimoire] IndexedDB upgrade blocked by another open connection; ' +
+            'close other Grimoire tabs to continue.',
+        )
+      }
+
+      request.onupgradeneeded = () => {
+        const db = request.result
+        // Fresh connections must yield to a later upgrade.
+        db.onversionchange = () => db.close()
+        createMissingStores(db)
+      }
+
+      request.onsuccess = () => {
+        const db = request.result
+        if (pending === request) pending = null
+        // An older tab asking to upgrade would otherwise deadlock behind us:
+        // release our connection so its `versionchange` can proceed.
+        db.onversionchange = () => db.close()
+
+        const missing = missingStores(db)
+        if (missing.length > 0) {
+          if (allowRepair) {
+            // Bump the version so `upgradeneeded` runs again and creates the
+            // missing stores. Upgrading never touches existing records.
+            console.warn(
+              `[grimoire] database is missing store(s) ${missing.join(
+                ', ',
+              )} — repairing schema`,
+            )
+            const bumped = db.version + 1
+            db.close()
+            attempt(bumped, false)
+            return
+          }
+          db.close()
+          finish(() =>
+            reject(
+              new Error(
+                `The local database is missing required storage (${missing.join(
+                  ', ',
+                )}) and could not be repaired automatically.`,
+              ),
+            ),
+          )
+          return
+        }
+
+        if ((version ?? db.version) > DB_VERSION) schemaRepaired = true
+        finish(() => resolve(db))
       }
     }
+
+    attempt(DB_VERSION, true)
   })
+}
+
+/**
+ * Run `fn` against the shared connection, reconnecting once if the connection
+ * turns out to be dead.
+ *
+ * The connection is a long-lived singleton (see {@link openDB}), so it can be
+ * closed underneath us — most commonly when another tab asks to upgrade the
+ * schema and our `versionchange` handler releases it. Rather than failing the
+ * user's action, drop the dead connection and retry once on a fresh one.
+ */
+async function withConnection<T>(
+  fn: (db: IDBDatabase) => Promise<T>,
+): Promise<T> {
+  try {
+    return await fn(await openDB())
+  } catch (err) {
+    if (!isConnectionError(err)) throw err
+    console.warn('[grimoire] storage connection was closed; reconnecting')
+    resetDBConnection()
+    return fn(await openDB())
+  }
+}
+
+/** True for errors that mean "this connection is unusable", not "bad data". */
+function isConnectionError(err: unknown): boolean {
+  const name = (err as { name?: string } | null)?.name
+  return name === 'InvalidStateError' || name === 'DatabaseClosedError'
 }
 
 /**
@@ -355,44 +588,56 @@ export function stripLabels(character: Character): Character {
   return rest as Character
 }
 
-/** Load every stored character, ordered by creation date (oldest first). */
+/**
+ * Load every stored character, ordered by creation date (oldest first).
+ *
+ * A single unreadable record is skipped (and logged) rather than failing the
+ * whole load — losing the entire roster because one sheet is malformed would
+ * be far worse than losing the one.
+ */
 export async function getAllCharacters(): Promise<Character[]> {
-  const db = await openDB()
-  const tx = db.transaction(CHAR_STORE, 'readonly')
-  const store = tx.objectStore(CHAR_STORE)
-  const all = await promisifyRequest<Character[]>(store.getAll())
-  db.close()
-  return all
-    .map(normalizeCharacter)
-    .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+  return withConnection(async (db) => {
+    const tx = db.transaction(CHAR_STORE, 'readonly')
+    const store = tx.objectStore(CHAR_STORE)
+    const all = await promisifyRequest<Character[]>(store.getAll())
+    const characters: Character[] = []
+    for (const raw of all) {
+      try {
+        characters.push(normalizeCharacter(raw))
+      } catch (err) {
+        console.error('[grimoire] skipping an unreadable character record:', err, raw)
+      }
+    }
+    return characters.sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+  })
 }
 
 /**
  * Fetch a single character by id, or `null` if not found.
  */
 export async function getCharacter(id: string): Promise<Character | null> {
-  const db = await openDB()
-  const tx = db.transaction(CHAR_STORE, 'readonly')
-  const store = tx.objectStore(CHAR_STORE)
-  const result = await promisifyRequest<Character | undefined>(store.get(id))
-  db.close()
-  return result ? normalizeCharacter(result) : null
+  return withConnection(async (db) => {
+    const tx = db.transaction(CHAR_STORE, 'readonly')
+    const store = tx.objectStore(CHAR_STORE)
+    const result = await promisifyRequest<Character | undefined>(store.get(id))
+    return result ? normalizeCharacter(result) : null
+  })
 }
 
 /** Insert or replace a character record. */
 export async function putCharacter(char: Character): Promise<void> {
-  const db = await openDB()
-  const tx = db.transaction(CHAR_STORE, 'readwrite')
-  await promisifyRequest(tx.objectStore(CHAR_STORE).put(char))
-  db.close()
+  return withConnection(async (db) => {
+    const tx = db.transaction(CHAR_STORE, 'readwrite')
+    await promisifyRequest(tx.objectStore(CHAR_STORE).put(char))
+  })
 }
 
 /** Remove a character record by id. No-op if the id doesn't exist. */
 export async function deleteCharacter(id: string): Promise<void> {
-  const db = await openDB()
-  const tx = db.transaction(CHAR_STORE, 'readwrite')
-  await promisifyRequest(tx.objectStore(CHAR_STORE).delete(id))
-  db.close()
+  return withConnection(async (db) => {
+    const tx = db.transaction(CHAR_STORE, 'readwrite')
+    await promisifyRequest(tx.objectStore(CHAR_STORE).delete(id))
+  })
 }
 
 // ---- Version snapshots --------------------------------------------------------
@@ -403,10 +648,10 @@ export async function deleteCharacter(id: string): Promise<void> {
 export async function putVersionSnapshot(
   snapshot: VersionSnapshot,
 ): Promise<void> {
-  const db = await openDB()
-  const tx = db.transaction(VERSION_STORE, 'readwrite')
-  await promisifyRequest(tx.objectStore(VERSION_STORE).put(snapshot))
-  db.close()
+  return withConnection(async (db) => {
+    const tx = db.transaction(VERSION_STORE, 'readwrite')
+    await promisifyRequest(tx.objectStore(VERSION_STORE).put(snapshot))
+  })
 }
 
 /**
@@ -415,23 +660,23 @@ export async function putVersionSnapshot(
 export async function getVersionHistory(
   characterId: string,
 ): Promise<VersionSnapshot[]> {
-  const db = await openDB()
-  const tx = db.transaction(VERSION_STORE, 'readonly')
-  const store = tx.objectStore(VERSION_STORE)
-  const index = store.index('characterId')
-  const all = await promisifyRequest<VersionSnapshot[]>(
-    index.getAll(characterId),
-  )
-  db.close()
-  return all.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+  return withConnection(async (db) => {
+    const tx = db.transaction(VERSION_STORE, 'readonly')
+    const store = tx.objectStore(VERSION_STORE)
+    const index = store.index('characterId')
+    const all = await promisifyRequest<VersionSnapshot[]>(
+      index.getAll(characterId),
+    )
+    return all.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+  })
 }
 
 /** Delete a single version snapshot by id. */
 export async function deleteVersionSnapshot(id: string): Promise<void> {
-  const db = await openDB()
-  const tx = db.transaction(VERSION_STORE, 'readwrite')
-  await promisifyRequest(tx.objectStore(VERSION_STORE).delete(id))
-  db.close()
+  return withConnection(async (db) => {
+    const tx = db.transaction(VERSION_STORE, 'readwrite')
+    await promisifyRequest(tx.objectStore(VERSION_STORE).delete(id))
+  })
 }
 
 // ---- Roll log --------------------------------------------------------
@@ -440,64 +685,64 @@ import type { RollLogEntry } from '@/types'
 
 /** Persist a roll-log entry. */
 export async function putRollLogEntry(entry: RollLogEntry): Promise<void> {
-  const db = await openDB()
-  const tx = db.transaction(ROLL_LOG_STORE, 'readwrite')
-  await promisifyRequest(tx.objectStore(ROLL_LOG_STORE).put(entry))
-  db.close()
+  return withConnection(async (db) => {
+    const tx = db.transaction(ROLL_LOG_STORE, 'readwrite')
+    await promisifyRequest(tx.objectStore(ROLL_LOG_STORE).put(entry))
+  })
 }
 
 /** Fetch every roll-log entry for a character, newest first. */
 export async function getRollLogForCharacter(
   characterId: string,
 ): Promise<RollLogEntry[]> {
-  const db = await openDB()
-  const tx = db.transaction(ROLL_LOG_STORE, 'readonly')
-  const store = tx.objectStore(ROLL_LOG_STORE)
-  const index = store.index('characterId')
-  const all = await promisifyRequest<RollLogEntry[]>(
-    index.getAll(characterId),
-  )
-  db.close()
-  return all.sort((a, b) => b.rolledAt.localeCompare(a.rolledAt))
+  return withConnection(async (db) => {
+    const tx = db.transaction(ROLL_LOG_STORE, 'readonly')
+    const store = tx.objectStore(ROLL_LOG_STORE)
+    const index = store.index('characterId')
+    const all = await promisifyRequest<RollLogEntry[]>(
+      index.getAll(characterId),
+    )
+    return all.sort((a, b) => b.rolledAt.localeCompare(a.rolledAt))
+  })
 }
 
 /** Fetch every roll-log entry across all characters, newest first. */
 export async function getAllRollLogEntries(): Promise<RollLogEntry[]> {
-  const db = await openDB()
-  const tx = db.transaction(ROLL_LOG_STORE, 'readonly')
-  const store = tx.objectStore(ROLL_LOG_STORE)
-  const all = await promisifyRequest<RollLogEntry[]>(store.getAll())
-  db.close()
-  return all.sort((a, b) => b.rolledAt.localeCompare(a.rolledAt))
+  return withConnection(async (db) => {
+    const tx = db.transaction(ROLL_LOG_STORE, 'readonly')
+    const store = tx.objectStore(ROLL_LOG_STORE)
+    const all = await promisifyRequest<RollLogEntry[]>(store.getAll())
+    return all.sort((a, b) => b.rolledAt.localeCompare(a.rolledAt))
+  })
 }
 
 /** Delete a single roll-log entry by id. */
 export async function deleteRollLogEntry(id: string): Promise<void> {
-  const db = await openDB()
-  const tx = db.transaction(ROLL_LOG_STORE, 'readwrite')
-  await promisifyRequest(tx.objectStore(ROLL_LOG_STORE).delete(id))
-  db.close()
+  return withConnection(async (db) => {
+    const tx = db.transaction(ROLL_LOG_STORE, 'readwrite')
+    await promisifyRequest(tx.objectStore(ROLL_LOG_STORE).delete(id))
+  })
 }
 
 /** Delete every roll-log entry for a character. */
 export async function clearRollLogForCharacter(
   characterId: string,
 ): Promise<void> {
-  const db = await openDB()
-  const tx = db.transaction(ROLL_LOG_STORE, 'readwrite')
-  const store = tx.objectStore(ROLL_LOG_STORE)
-  const index = store.index('characterId')
-  const keys = await promisifyRequest<IDBValidKey[]>(
-    index.getAllKeys(characterId),
-  )
-  for (const key of keys) {
-    store.delete(key)
-  }
-  await new Promise<void>((resolve, reject) => {
-    tx.oncomplete = () => resolve()
-    tx.onerror = () => reject(tx.error)
+  return withConnection(async (db) => {
+    const tx = db.transaction(ROLL_LOG_STORE, 'readwrite')
+    const store = tx.objectStore(ROLL_LOG_STORE)
+    const index = store.index('characterId')
+    const keys = await promisifyRequest<IDBValidKey[]>(
+      index.getAllKeys(characterId),
+    )
+    for (const key of keys) {
+      store.delete(key)
+    }
+    await new Promise<void>((resolve, reject) => {
+      tx.oncomplete = () => resolve()
+      tx.onerror = () => reject(tx.error)
+    })
   })
-  db.close()
 }
 
 // ---- Status conditions --------------------------------------------------------
@@ -522,42 +767,193 @@ export function normalizeStatus(raw: StatusCondition): StatusCondition {
 
 /** Load every stored status condition, ordered by name. */
 export async function getAllStatuses(): Promise<StatusCondition[]> {
-  const db = await openDB()
-  const tx = db.transaction(STATUS_STORE, 'readonly')
-  const store = tx.objectStore(STATUS_STORE)
-  const all = await promisifyRequest<StatusCondition[]>(store.getAll())
-  db.close()
-  return all
-    .map(normalizeStatus)
-    .sort((a, b) => a.name.localeCompare(b.name))
+  return withConnection(async (db) => {
+    const tx = db.transaction(STATUS_STORE, 'readonly')
+    const store = tx.objectStore(STATUS_STORE)
+    const all = await promisifyRequest<StatusCondition[]>(store.getAll())
+    return all
+      .map(normalizeStatus)
+      .sort((a, b) => a.name.localeCompare(b.name))
+  })
 }
 
 /** Fetch a single status condition by id, or `null` if not found. */
 export async function getStatus(id: string): Promise<StatusCondition | null> {
-  const db = await openDB()
-  const tx = db.transaction(STATUS_STORE, 'readonly')
-  const store = tx.objectStore(STATUS_STORE)
-  const result = await promisifyRequest<StatusCondition | undefined>(
-    store.get(id),
-  )
-  db.close()
-  return result ? normalizeStatus(result) : null
+  return withConnection(async (db) => {
+    const tx = db.transaction(STATUS_STORE, 'readonly')
+    const store = tx.objectStore(STATUS_STORE)
+    const result = await promisifyRequest<StatusCondition | undefined>(
+      store.get(id),
+    )
+    return result ? normalizeStatus(result) : null
+  })
 }
 
 /** Insert or replace a status condition record. */
 export async function putStatus(status: StatusCondition): Promise<void> {
-  const db = await openDB()
-  const tx = db.transaction(STATUS_STORE, 'readwrite')
-  await promisifyRequest(tx.objectStore(STATUS_STORE).put(status))
-  db.close()
+  return withConnection(async (db) => {
+    const tx = db.transaction(STATUS_STORE, 'readwrite')
+    await promisifyRequest(tx.objectStore(STATUS_STORE).put(status))
+  })
 }
 
 /** Remove a status condition record by id. No-op if the id doesn't exist. */
 export async function deleteStatus(id: string): Promise<void> {
-  const db = await openDB()
-  const tx = db.transaction(STATUS_STORE, 'readwrite')
-  await promisifyRequest(tx.objectStore(STATUS_STORE).delete(id))
-  db.close()
+  return withConnection(async (db) => {
+    const tx = db.transaction(STATUS_STORE, 'readwrite')
+    await promisifyRequest(tx.objectStore(STATUS_STORE).delete(id))
+  })
+}
+
+// ---- GM Screens ---------------------------------------------------------------
+
+/**
+ * Normalize a freshly-loaded {@link GMScreen} to the latest schema.
+ *
+ * Follows the established migration pattern: backfill on read rather than
+ * running a bulk migration. Guarantees `panels` is an array, that every panel
+ * carries `id`/`density`/`statuses`, that NPC-instance panels carry a complete
+ * {@link NpcInstanceState}, and that both timestamps are present. Idempotent,
+ * so it is safe to run on already-normalized records.
+ */
+export function normalizeScreen(raw: GMScreen): GMScreen {
+  const o = (raw ?? {}) as unknown as Record<string, unknown>
+  const now = new Date().toISOString()
+  const createdAt = typeof o.createdAt === 'string' ? o.createdAt : now
+  const rawPanels = Array.isArray(o.panels) ? o.panels : []
+
+  const panels: ScreenPanel[] = []
+  for (const rawPanel of rawPanels) {
+    if (!rawPanel || typeof rawPanel !== 'object') continue
+    const p = rawPanel as unknown as Record<string, unknown>
+    const id = typeof p.id === 'string' && p.id ? p.id : generateId()
+    const density = p.density === 'expanded' ? 'expanded' : 'compact'
+    const statuses = normalizePanelStatuses(p.statuses)
+
+    if (p.kind === 'npc-instance') {
+      if (typeof p.baseNpcId !== 'string' || !p.baseNpcId) continue
+      const rawState = (p.state ?? {}) as Partial<NpcInstanceState>
+      const currentHP =
+        typeof rawState.currentHP === 'number' && Number.isFinite(rawState.currentHP)
+          ? rawState.currentHP
+          : 0
+      const tempHP =
+        typeof rawState.tempHP === 'number' && Number.isFinite(rawState.tempHP)
+          ? Math.max(0, rawState.tempHP)
+          : 0
+      const condition: NpcInstanceState['condition'] =
+        rawState.condition === 'downed' || rawState.condition === 'dead'
+          ? rawState.condition
+          : 'active'
+      panels.push({
+        kind: 'npc-instance',
+        id,
+        baseNpcId: p.baseNpcId,
+        label: typeof p.label === 'string' ? p.label : '',
+        density,
+        statuses,
+        state: { currentHP: Math.max(0, currentHP), tempHP, condition },
+      })
+      continue
+    }
+
+    // Character panels are the default: the union's other arm.
+    if (typeof p.characterId !== 'string' || !p.characterId) continue
+    panels.push({
+      kind: 'character',
+      id,
+      characterId: p.characterId,
+      density,
+      statuses,
+    })
+  }
+
+  return {
+    id: typeof o.id === 'string' ? o.id : generateId(),
+    name: typeof o.name === 'string' && o.name ? o.name : 'Untitled Screen',
+    panels,
+    createdAt,
+    updatedAt: typeof o.updatedAt === 'string' ? o.updatedAt : createdAt,
+  }
+}
+
+/**
+ * Normalize a panel's tracked-status list: drop entries that carry no usable
+ * status reference or an unknown duration, repair the stack count to a whole
+ * number in `[1, MAX_PANEL_STATUS_STACKS]`, and drop duplicate references
+ * (one entry per status per panel — the picker's upsert semantic).
+ *
+ * Screens written before status tracking existed simply have no `statuses`
+ * field, which backfills to an empty list.
+ */
+function normalizePanelStatuses(raw: unknown): PanelStatus[] {
+  if (!Array.isArray(raw)) return []
+  const seen = new Set<string>()
+  const statuses: PanelStatus[] = []
+  for (const entry of raw) {
+    if (!entry || typeof entry !== 'object') continue
+    const e = entry as Record<string, unknown>
+    const statusId = typeof e.statusId === 'string' ? e.statusId : ''
+    if (!statusId || seen.has(statusId)) continue
+    if (!isPanelStatusDuration(e.duration)) continue
+    seen.add(statusId)
+    const stacks =
+      typeof e.stacks === 'number' && Number.isFinite(e.stacks)
+        ? Math.min(MAX_PANEL_STATUS_STACKS, Math.max(1, Math.floor(e.stacks)))
+        : 1
+    statuses.push({ statusId, duration: e.duration, stacks })
+  }
+  return statuses
+}
+
+/**
+ * Load every saved GM screen, ordered by creation date (oldest first).
+ *
+ * A single unreadable record is skipped (and logged) rather than failing the
+ * whole load — losing every screen because one is malformed would be far worse
+ * than losing the one.
+ */
+export async function getAllScreens(): Promise<GMScreen[]> {
+  return withConnection(async (db) => {
+    const tx = db.transaction(SCREEN_STORE, 'readonly')
+    const store = tx.objectStore(SCREEN_STORE)
+    const all = await promisifyRequest<GMScreen[]>(store.getAll())
+    const screens: GMScreen[] = []
+    for (const raw of all) {
+      try {
+        screens.push(normalizeScreen(raw))
+      } catch (err) {
+        console.error('[grimoire] skipping an unreadable GM screen record:', err, raw)
+      }
+    }
+    return screens.sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+  })
+}
+
+/** Fetch a single GM screen by id, or `null` if not found. */
+export async function getScreen(id: string): Promise<GMScreen | null> {
+  return withConnection(async (db) => {
+    const tx = db.transaction(SCREEN_STORE, 'readonly')
+    const store = tx.objectStore(SCREEN_STORE)
+    const result = await promisifyRequest<GMScreen | undefined>(store.get(id))
+    return result ? normalizeScreen(result) : null
+  })
+}
+
+/** Insert or replace a GM screen record. */
+export async function putScreen(screen: GMScreen): Promise<void> {
+  return withConnection(async (db) => {
+    const tx = db.transaction(SCREEN_STORE, 'readwrite')
+    await promisifyRequest(tx.objectStore(SCREEN_STORE).put(screen))
+  })
+}
+
+/** Remove a GM screen record by id. No-op if the id doesn't exist. */
+export async function deleteScreen(id: string): Promise<void> {
+  return withConnection(async (db) => {
+    const tx = db.transaction(SCREEN_STORE, 'readwrite')
+    await promisifyRequest(tx.objectStore(SCREEN_STORE).delete(id))
+  })
 }
 
 // ---- Full backup / restore --------------------------------------------------
@@ -567,13 +963,13 @@ export async function deleteStatus(id: string): Promise<void> {
  * Used by the full-backup export (Settings → Backup & Restore).
  */
 export async function getAllVersionSnapshots(): Promise<VersionSnapshot[]> {
-  const db = await openDB()
-  const tx = db.transaction(VERSION_STORE, 'readonly')
-  const all = await promisifyRequest<VersionSnapshot[]>(
-    tx.objectStore(VERSION_STORE).getAll(),
-  )
-  db.close()
-  return all.sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+  return withConnection(async (db) => {
+    const tx = db.transaction(VERSION_STORE, 'readonly')
+    const all = await promisifyRequest<VersionSnapshot[]>(
+      tx.objectStore(VERSION_STORE).getAll(),
+    )
+    return all.sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+  })
 }
 
 /** Record payload for a wholesale data replacement ({@link replaceAllData}). */
@@ -582,10 +978,11 @@ export interface ReplaceAllDataInput {
   versions: VersionSnapshot[]
   rollLogs: RollLogEntry[]
   statuses: StatusCondition[]
+  screens: GMScreen[]
 }
 
 /**
- * Replace the ENTIRE contents of all four object stores with the provided
+ * Replace the ENTIRE contents of all five object stores with the provided
  * records — the restore half of the full-backup flow.
  *
  * Everything happens in a SINGLE readwrite transaction over all stores: the
@@ -593,30 +990,35 @@ export interface ReplaceAllDataInput {
  * never leave the database half-old / half-new.
  */
 export async function replaceAllData(data: ReplaceAllDataInput): Promise<void> {
-  const db = await openDB()
-  const tx = db.transaction(
-    [CHAR_STORE, VERSION_STORE, ROLL_LOG_STORE, STATUS_STORE],
-    'readwrite',
-  )
-  const charStore = tx.objectStore(CHAR_STORE)
-  const versionStore = tx.objectStore(VERSION_STORE)
-  const rollLogStore = tx.objectStore(ROLL_LOG_STORE)
-  const statusStore = tx.objectStore(STATUS_STORE)
+  return withConnection(async (db) => {
+    const tx = db.transaction(
+      [CHAR_STORE, VERSION_STORE, ROLL_LOG_STORE, STATUS_STORE, SCREEN_STORE],
+      'readwrite',
+    )
+    const charStore = tx.objectStore(CHAR_STORE)
+    const versionStore = tx.objectStore(VERSION_STORE)
+    const rollLogStore = tx.objectStore(ROLL_LOG_STORE)
+    const statusStore = tx.objectStore(STATUS_STORE)
+    const screenStore = tx.objectStore(SCREEN_STORE)
 
-  charStore.clear()
-  for (const char of data.characters) charStore.put(char)
-  versionStore.clear()
-  for (const snapshot of data.versions) versionStore.put(snapshot)
-  rollLogStore.clear()
-  for (const entry of data.rollLogs) rollLogStore.put(entry)
-  statusStore.clear()
-  for (const status of data.statuses) statusStore.put(status)
+    charStore.clear()
+    for (const char of data.characters) charStore.put(char)
+    versionStore.clear()
+    for (const snapshot of data.versions) versionStore.put(snapshot)
+    rollLogStore.clear()
+    for (const entry of data.rollLogs) rollLogStore.put(entry)
+    statusStore.clear()
+    for (const status of data.statuses) statusStore.put(status)
+    screenStore.clear()
+    // Older payloads (backup v1) carry no screens — that intentionally wipes
+    // the store, matching the documented replace-everything semantics.
+    for (const screen of data.screens ?? []) screenStore.put(screen)
 
-  await new Promise<void>((resolve, reject) => {
-    tx.oncomplete = () => resolve()
-    tx.onabort = () =>
-      reject(tx.error ?? new Error('Restore transaction aborted'))
-    tx.onerror = () => reject(tx.error)
+    await new Promise<void>((resolve, reject) => {
+      tx.oncomplete = () => resolve()
+      tx.onabort = () =>
+        reject(tx.error ?? new Error('Restore transaction aborted'))
+      tx.onerror = () => reject(tx.error)
+    })
   })
-  db.close()
 }

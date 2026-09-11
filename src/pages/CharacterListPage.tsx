@@ -16,6 +16,8 @@ import FilterDropdown, { type FilterGroup } from '@/components/ui/FilterDropdown
 import SortDropdown, { type SortOption } from '@/components/ui/SortDropdown'
 
 import { parseCharacterJSON } from '@/lib/exportImport'
+import { screenReferenceNote } from '@/lib/gmScreenUtils'
+import { useGMScreenStore } from '@/store/gmScreenStore'
 import type { Character } from '@/types'
 
 type ViewMode = 'grid' | 'list'
@@ -49,6 +51,8 @@ export default function CharacterListPage() {
   /** Filter to only player character records (exclude NPCs). */
   const characters = allCharacters.filter((c) => c.kind !== 'npc')
   const isLoaded = useCharacterStore((s) => s.isLoaded)
+  const loadError = useCharacterStore((s) => s.loadError)
+  const loadCharacters = useCharacterStore((s) => s.loadCharacters)
   const isSaving = useCharacterStore((s) => s.isSaving)
   const selectCharacter = useCharacterStore((s) => s.selectCharacter)
   const importCharacterFile = useCharacterStore((s) => s.importCharacterFile)
@@ -66,6 +70,9 @@ export default function CharacterListPage() {
   const PAGE_ID: ListPageId = 'characters'
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [characterToDelete, setCharacterToDelete] = useState<Character | null>(null)
+  // Subscribed so a delete confirmation lists the GM screens that reference
+  // the record (deletion still proceeds — those panels become placeholders).
+  const screensReferencing = useGMScreenStore((s) => s.screensReferencing)
   /** Pending import JSON file that has a matching character by name. */
   const [pendingImport, setPendingImport] = useState<{
     existing: Character
@@ -195,6 +202,32 @@ export default function CharacterListPage() {
     return (
       <div className="page">
         <p className="muted">Loading characters…</p>
+      </div>
+    )
+  }
+
+  // Storage failed rather than merely being slow — offer a retry instead of
+  // an endless "Loading…".
+  if (loadError) {
+    return (
+      <div className="page page--empty">
+        <div className="empty-state" role="alert">
+          <h2 className="empty-title">Couldn’t load your library</h2>
+          <p className="muted">{loadError}</p>
+          <p className="muted">
+            Everything is stored in this browser only — nothing has been
+            changed or deleted.
+          </p>
+          <div className="empty-state__actions">
+            <button
+              type="button"
+              className="btn btn--primary"
+              onClick={() => void loadCharacters()}
+            >
+              Try again
+            </button>
+          </div>
+        </div>
       </div>
     )
   }
@@ -422,6 +455,9 @@ export default function CharacterListPage() {
       {characterToDelete && (
         <ConfirmDeleteModal
           itemName={characterToDelete.name}
+          referenceNote={screenReferenceNote(
+            screensReferencing(characterToDelete.id),
+          )}
           onConfirm={() => {
             void useCharacterStore.getState().deleteCharacter(characterToDelete.id)
             setCharacterToDelete(null)

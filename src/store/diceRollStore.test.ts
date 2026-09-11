@@ -105,3 +105,38 @@ test('standalone NPC sheet rolls follow the app theme palette', () => {
   expect(entity?.id).toBe('npc-1')
   expect(entity?.config.colors).toEqual(PARCHMENT_SHEET_COLORS)
 })
+
+// ---- GM Screen rolls --------------------------------------------------------
+
+test('GM screen NPC-instance rolls fall back to the app-theme palette', () => {
+  // On the GM Screen no player sheet is open (`currentCharacter` is null), and
+  // an instance rolls against its BASE NPC record — so the theme must resolve
+  // to the app theme's NPC palette, exactly like a standalone NPC sheet.
+  useCharacterStore.setState({
+    currentCharacter: null,
+    characters: [makeNPC()],
+  })
+  useDiceRollStore.setState({ rollCharacter: makeNPC() })
+
+  const entity = themeEntity()
+  expect(entity?.id).toBe('npc-1')
+  expect(entity?.config.colors).toEqual(PARCHMENT_SHEET_COLORS)
+})
+
+test('GM screen player-panel rolls use that player’s own sheet colors', () => {
+  // A player panel passes the real Character, and the GM screen deliberately
+  // never sets `currentCharacter` — the panel's own config must win.
+  const player = makePlayer({
+    id: 'player-2',
+    config: {
+      ...createDefaultCharacter().config,
+      colors: { ...DEFAULT_SHEET_COLORS, accent: '#654321' },
+    },
+  })
+  useCharacterStore.setState({ currentCharacter: null, characters: [player] })
+  useDiceRollStore.setState({ rollCharacter: player })
+
+  const entity = themeEntity()
+  expect(entity?.id).toBe('player-2')
+  expect(entity?.config.colors.accent).toBe('#654321')
+})

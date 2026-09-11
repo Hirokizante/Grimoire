@@ -10,6 +10,7 @@ A character sheet creation and management app for the homebrew TTRPG **Divergenc
 
 - [About Divergence](#about-divergence)
 - [Features](#features)
+- [GM Screen](#gm-screen)
 - [Tech Stack](#tech-stack)
 - [Prerequisites](#prerequisites)
 - [Getting Started](#getting-started)
@@ -64,6 +65,7 @@ Divergence is a DIY tabletop RPG system — there is no compendium of spells or 
 - **Death Save tracking** — success/failure pips, auto-roll with nat 20/nat 1 doubling, revive at 3 successes or die at 3 failures.
 - **Exhaustion support** — the Exhaustion mortal wound adds +1 to all END costs automatically.
 - **Ability modifier switches** — each ability that declares modifiers (see above) carries an on/off switch on its card. Switching it on instantly applies the ability's stat/attribute changes to the sheet; switching it off removes them. It is independent from the Activate button, costs no resources, and does not require the ability to be activated — so passive stances, forms, and auras work without spending AP.
+- **GM Screen** — run several sheets at once on one surface; see [GM Screen](#gm-screen).
 
 ### Dice Roller
 - **Inline dice notation** — `d20`, `2d6+4`, `1d6+POW`, `2d6+POW/MAR` are auto-detected in any text field and become clickable in view mode.
@@ -77,6 +79,7 @@ Divergence is a DIY tabletop RPG system — there is no compendium of spells or 
 - **Inline references** — write `[StatusName]` in any sheet markdown (ability descriptions, overcharge, flavor text, innate description, custom text sections); it renders as a highlighted, clickable reference with a tooltip showing the condition's details. Matching is case-insensitive.
 - **Compendium page** — browse, sort, create, edit, and delete conditions; pick an icon from emoji, the bundled icon pack, or an uploaded image.
 - **Referencing sheets** — the compendium shows which characters reference each condition, and character exports bundle every status the sheet references.
+- **GM Screen tracking** — the same records back the GM Screen's per-panel status pills (see [GM Screen](#gm-screen)); that tracking state lives on the panel, not on any character sheet.
 
 ### Customization
 - **Full color palette** — every sheet element (surfaces, text, borders, accents, resource bars, stat tokens, etc.) exposed as color swatches — no custom CSS required.
@@ -101,8 +104,86 @@ Divergence is a DIY tabletop RPG system — there is no compendium of spells or 
 - **Update existing** — importing a sheet whose name matches an existing character offers to update in place (preserving live-play state: HP, END, AP, FP, mortal wounds, death saves) or import as a new copy.
 - **Version resolution** — when updating, the imported version is used if strictly newer; otherwise the existing version is bumped forward.
 - **Attached NPCs** — when a character has NPC sections, the export includes those NPCs as a bundle (`attachedNpcs`). On import, each NPC is persisted as its own record and the parent's section references are rewritten to the fresh IDs, so the parent↔NPC link round-trips intact.
-- **Full backup & restore** — Settings → Backup & Restore downloads *everything* (all characters and NPCs, the status compendium, version history, and the roll log) as a single JSON file (`Grimoire Backup YYYY-MM-DD.json`). Restoring from a backup **replaces** all current data in one atomic IndexedDB transaction, after an explicit confirmation. Backups carry a `backupVersion`; newer-version backups are refused with a clear message. Single-character exports are *not* backups — restore points you at the Characters page import instead.
+- **Full backup & restore** — Settings → Backup & Restore downloads *everything* (all characters and NPCs, the status compendium, GM screens, version history, and the roll log) as a single JSON file (`Grimoire Backup YYYY-MM-DD.json`). Restoring from a backup **replaces** all current data in one atomic IndexedDB transaction, after an explicit confirmation. Backups carry a `backupVersion` (currently **2**); newer-version backups are refused with a clear message, and **v1 backups still restore** — they simply carry no screens. Single-character exports are *not* backups — restore points you at the Characters page import instead.
 - **Attached statuses** — statuses referenced by a sheet are bundled into the export (`attachedStatuses`). On import they are restored by id and name conflicts are resolved — references match by name, so they keep working even after a condition is renamed.
+
+---
+
+## GM Screen
+
+The GM Screen is a saved, named surface that holds **panels** — one per sheet you want to run. It lives behind the **GM Screen** entry in the title bar (and on the home page) and is deliberately app chrome: it uses the active app theme, while each panel's sheet content keeps its own customization.
+
+That split is deliberate and precise. The **panel chrome** — header, name, HP bar, the tracked status pills, the AP/END/FP and Evasion/Armor stat tokens, HP steppers — always follows the **app theme**, never the sheet's palette. A screen shows several sheets side by side, so per-sheet token colors would make every panel read differently and destroy the at-a-glance consistency that is the whole point of the GM Screen; a player panel and an NPC panel therefore color their shared stats identically. The sheet's own palette is injected only inside the **expanded panel's sheet content**, where a player's customization belongs.
+
+### Two kinds of panel
+
+| Panel | What it is |
+| --- | --- |
+| **Character panel** | A live **reference** to a player `Character`. HP/AP/END/FP changed from the panel is the same state the player sees on their own sheet, and vice versa — one source of truth, no copies. |
+| **NPC instance** | A spawned instance of an NPC sheet used as a **template**. |
+
+NPC instances follow one rule: **instances are deltas, not clones.** Spawning "Bandit" three times creates three panels with independent HP, temp HP, and condition, while stats, abilities, portrait, and description are all read from the base record at render time. Editing the base updates every instance of it, and the NPC list keeps showing only bases — there is never a "which Bandit is the real one?" question.
+
+### Using it
+
+- **Screens** — create as many as you like ("Session 4", "Dungeon Run"), switch between them with the pill row, rename inline, and delete with a confirmation. Screens persist in IndexedDB and survive reloads; the screen you had open reopens automatically.
+- **Add Character** — searchable picker over your player sheets. A character can only appear once per screen (the row is disabled with "Already on this screen"); use NPC instances when you need multiples of one statblock.
+- **Add NPC** — pick an NPC base to spawn an instance, with each row showing how many instances are already on the screen. **New NPC…** creates a base record *and* spawns an instance in one step, without navigating away.
+- **Compact / expanded** — compact is a glance-height card (portrait, name, HP bar with −/+/Damage…, key stat tokens, condition badge); expanded renders the sheet content inline.
+  - Expanded player and NPC panels use the **same condensed body** (`PanelSheet`), so a panel reads identically whichever kind of sheet it holds: Combat Stats → Attributes → (Core Ability) → Abilities → Skills. It is deliberately *not* the full `CharacterSheet`/`NPCSheet`, which are page-scale views far too tall for a panel sharing its row with another.
+  - Three sections are deliberately omitted: the **player HP block** (the panel header already carries an HP bar with its own steppers and Damage dialog), the **NPC Core Ability** section (NPCs have no core abilities — those fields only ever hold the generated Basic Attack / Fatebreaker defaults), and **Description / Character Background** on both (reference material, not at-the-table information).
+  - The `saving…` indicator reserves its width permanently and toggles only `visibility`, so it can never resize the header — saves fire on every panel action, and an in-flow badge made the screen name and pills jump sideways on each one.
+  - Expanding a panel **animates** (~190ms, ease-out) rather than snapping. The body mounts and unmounts, so height cannot be transitioned directly; it transitions `grid-template-rows: 0fr → 1fr` instead, which needs no measurement, and the body stays mounted only for the duration of the collapse so a collapsed screen is not carrying every sheet's DOM. `prefers-reduced-motion` disables it.
+  - Panel **stat tokens** are shaped like the sheet's cost badges (`.cost-badge` / `.dice-notation`): a 1px accent-tinted border on all four edges rather than a thick left stripe, keeping each token's own colour.
+  - **Attributes** show the shorthand only (MAR/POW/…) in five strictly equal columns — the full names were what forced uneven column widths, since `repeat(5, 1fr)` is `minmax(auto, 1fr)` and that `auto` floor is the column's own content size. **Skills** render in even columns with uniform rows: the sheet's `nth-child(odd)` striping is neutralised inside panels, where a two-column grid would otherwise put every striped row in the left column and read as "the left column is highlighted".
+  - The ability section is player *Slotted Abilities* (the Ability Pool is a build-time concept with no place on a live panel) or the NPC's *Abilities*, and is **always list view with no grid/list toggle** — a grid at panel width is unreadable, so grid is not offered at all.
+  - Both render their ability cards against the panel's own entity, so dice notation like `1d6+MAR` resolves against *that* sheet's stats and Activate deducts from *that* record (previously the cards fell back to `currentCharacter`, which is null on the GM Screen).
+- **Damage** — the same `DamageDialog` used on character sheets, targeting whichever panel opened it. Armor for an NPC instance comes from the base's `npcStats.armor` and max HP from `npcStats.hp`; temp HP is the instance's own. Reaching 0 HP **downs** an instance (NPCs roll no death saves); healing it revives it, and the panel menu can flag it `dead` (which healing never clears).
+- **Statuses** — every panel (player *and* NPC instance) has an **Add Status** icon button at the end of its HP row that opens the compendium picker: search it, then pick one of the five SRD durations (Quick, Persistent, Countdown, Permanent, Conditional). Tracked statuses render as two-segment pills **inline with the HP number** — the **filled left segment** carries the status's icon and its full name, the quiet right segment the duration and the stack stepper — in a single line that scrolls sideways rather than wrapping, so a panel never grows taller because the GM stacked conditions on it.
+  - The duration is shown as an **icon only** (label and rules reminder in its tooltip), which is what buys the room for the rest of the pill. It is a **label, not a timer**: nothing expires on its own, and a Countdown is ticked down by hand with the stepper.
+  - Status names are **never truncated** — a pill keeps its natural width and the strip scrolls instead, so "Regeneration" always reads in full.
+  - Each pill's `−`/`+` adjusts stacks; at one stack the `−` becomes an explicit `✕` remove, so a status can never vanish from a mis-click on a decrement. Stacks are clamped to `[1, 99]`.
+  - Picking a duration chip on a status already on the panel **changes its duration in place** (the chips double as the duration editor and the applied one is filled in), and the modal stays open so several conditions can be applied in one pass.
+  - Statuses are **GM Screen state only** — they live on the `ScreenPanel`, never on the character or NPC record, so nothing about them reaches a player's own sheet. They reference the compendium record by id (name/icon are read at render time), so a rename propagates and a deleted status leaves a clearly-marked "Missing status" pill that is still removable.
+  - Each duration carries its own accent per app theme (`STATUS_DURATION_COLORS`), like the panel stat tokens: those tones sit shoulder to shoulder in one hairline pill (and as the picker's chips), so `themeUtils.test.ts` enforces ΔE ≥ 16 between every pair and ≥ 4.5:1 contrast on every theme's surface.
+- **Rolls** — attribute, skill, and ability rolls from a panel resolve against that panel's entity and land in the roll log. Rolls from an instance are noted with the instance label ("Bandit 2"), so they stay distinguishable. The roll-log drawer is available on the screen in "all characters" mode.
+- **Reordering** — drag a panel by its grip handle (a 6px activation distance keeps it from fighting page scrolling) to reorder it; panels flow in array order down each column.
+- **Layout** — 2 columns above 700px, 1 column at ≤700px. Two wide columns beat three narrow ones: at three, panels were ~320px and every sheet name truncated. On phones the Add buttons collapse into a sticky bottom-right group, and panels never overflow horizontally.
+- **Placeholders** — deleting an NPC base or a character that a screen references is still allowed; the delete confirmation lists the affected screens ("Referenced on GM screen: Session 4"), and those panels become a **Missing NPC / Missing character** placeholder with a Remove button. Nothing cascades, and the placeholder state is derived at render time rather than stored.
+
+### Data model
+
+A `GMScreen` is `{ id, name, panels, createdAt, updatedAt }`, where `ScreenPanel` is a discriminated union:
+
+| Variant | Shape |
+| --- | --- |
+| `kind: 'character'` | `{ id, characterId, density, statuses }` — a reference to a player `Character` |
+| `kind: 'npc-instance'` | `{ id, baseNpcId, label, density, statuses, state }` where `state` is `{ currentHP, tempHP, condition }` and `condition` is `'active' \| 'downed' \| 'dead'` |
+
+`statuses` is the GM's own tracking list — `{ statusId, duration, stacks }[]`, where `duration` is `'quick' \| 'persistent' \| 'countdown' \| 'permanent' \| 'conditional'` and `statusId` references a compendium `StatusCondition`. It never leaves the panel: the referenced character/NPC record is untouched, and duplicating an NPC instance deliberately spawns a *fresh* instance with no inherited statuses.
+
+Screens live in their own IndexedDB object store (`screens`, DB version 5) with no indexes — the panel lists are stored inline and the whole set is read at once. Like characters, screens are **normalized on read** (`normalizeScreen`), which backfills `panels: []`, guarantees every panel's `id`/`density`/`statuses`, completes instance state, and stamps timestamps — so hand-edited or older records load cleanly with no bulk migration (unusable status entries are dropped, and stacks are repaired into `[1, 99]`).
+
+Screens travel **only** in full backups; there is no per-screen JSON export (yet).
+
+### Store API
+
+`gmScreenStore` mirrors `characterStore` conventions, autosaving the affected screen with a 500ms debounce:
+
+| Action | Notes |
+| --- | --- |
+| `loadScreens`, `createScreen`, `renameScreen`, `deleteScreen`, `selectScreen`, `saveScreen` | Screen CRUD; the open screen id is mirrored to `localStorage` |
+| `addCharacterPanel` | Returns `false` (no state change) for a character already on the screen |
+| `addNpcInstancePanel` | Spawns at full HP with an auto-numbered label ("Bandit", "Bandit 2", …) |
+| `duplicatePanel` | NPC instances only — spawns a *fresh* instance, never a copy of its HP |
+| `createNpcBaseAndInstance` | Quick-create: writes a base NPC record without navigating, then spawns |
+| `removePanel`, `movePanel`, `setPanelDensity`, `renameInstance` | Panel management (reorder is wired to @dnd-kit sortable) |
+| `setPanelStatus`, `adjustPanelStatusStacks`, `removePanelStatus` | GM-screen-only status tracking on a panel (add/change duration, ±stacks clamped to `[1, 99]`, remove) |
+| `updateInstanceState`, `setInstanceCondition` | Replace an instance's live state / condition |
+| `damageInstance`, `healInstance`, `setInstanceTempHP`, `adjustInstanceHP` | Instance live play (armor → resistance → temp HP → HP) |
+| `baseFor`, `screensReferencing` | Reference lookups used for placeholders and delete warnings |
+
+Every live-play character mutation was refactored to be **id-targeted** (`takeDamage(id, …)`, `spendAP(id, …)`, …) so the GM Screen can drive several sheets in one tick. `updateCurrentCharacter(updater)` remains as a thin wrapper over `updateCharacter(id, updater)` for the sheet pages, and autosave now uses per-character debounce timers so edits to several panels each persist their own record.
 
 ---
 
@@ -217,6 +298,17 @@ Grimoire/
 │   ├── App.css            # App-level layout styles
 │   ├── components/
 │   │   ├── TitleBar.tsx    # Top navigation bar
+│   │   ├── gmscreen/       # GM Screen panels & pickers
+│   │   │   ├── CharacterPanel.tsx      # Live reference to a player sheet
+│   │   │   ├── NpcInstancePanel.tsx    # NPC base + independent live state
+│   │   │   ├── MissingPanel.tsx        # Placeholder for a deleted record
+│   │   │   ├── PanelHeader.tsx         # Portrait, name, density, ⋯ menu
+│   │   │   ├── PanelStatuses.tsx       # Tracked status pills + Add Status
+│   │   │   ├── SortablePanel.tsx       # dnd-kit drag-handle shell
+│   │   │   ├── AddCharacterModal.tsx   # Player-character picker
+│   │   │   ├── AddNpcModal.tsx         # NPC spawner + quick-create
+│   │   │   ├── AddStatusModal.tsx      # Compendium status + duration picker
+│   │   │   └── gmscreen.css            # GM Screen styles
 │   │   ├── sheet/          # Character sheet layout & editing
 │   │   │   ├── CharacterSheet.tsx      # Full sheet layout
 │   │   │   ├── HeroSection.tsx         # Portrait, name, stats, attributes
@@ -288,11 +380,13 @@ Grimoire/
 │   │   └── NotificationContext.tsx # Toast notification system
 │   ├── hooks/
 │   │   ├── useModalDialog.ts      # Shared modal behavior: scroll lock, Esc, focus trap/restore
+│   │   ├── useMediaQuery.ts        # CSS media-query subscription (GM Screen columns)
 │   │   └── useImportedFonts.ts     # Google Fonts link injection
 │   ├── lib/
 │   │   ├── calculations.ts  # Pure derived-stat formulas (HP, EVA, etc.)
 │   │   ├── abilityModifiers.ts # Ability stat/attribute modifiers → effective values
-│   │   ├── db.ts            # IndexedDB wrapper (characters, versions, roll logs, statuses)
+│   │   ├── db.ts            # IndexedDB wrapper (characters, versions, roll logs, statuses, screens)
+│   │   ├── gmScreenUtils.ts # Panel resolution, placeholders, column distribution
 │   │   ├── dice.ts          # Single die roll utility
 │   │   ├── diceParser.ts    # Tokenizer + parser for dice notation
 │   │   ├── diceRoller.ts    # Evaluates parsed expressions with stats
@@ -308,11 +402,13 @@ Grimoire/
 │   │   ├── CharacterSheetPage.tsx # Sheet wrapper with mode toggle
 │   │   ├── NPCListPage.tsx       # Grid/list of all NPCs
 │   │   ├── NPCSheetPage.tsx      # NPC sheet wrapper with mode toggle
+│   │   ├── GMScreenPage.tsx      # Multi-sheet GM view (panels, pickers, reorder)
 │   │   ├── StatusCompendiumPage.tsx # Status compendium browser
 │   │   └── SettingsPage.tsx         # App preferences (theme picker)
 │   ├── store/
 │   │   ├── appThemeStore.ts   # Zustand store: app theme (localStorage)
-│   │   ├── characterStore.ts  # Zustand store: characters + live play
+│   │   ├── characterStore.ts  # Zustand store: characters + live play (id-targeted)
+│   │   ├── gmScreenStore.ts   # Zustand store: saved GM screens + panels
 │   │   ├── diceRollStore.ts    # Zustand store: dice roll modal lifecycle
 │   │   ├── listPrefsStore.ts   # Zustand store: list sort/filter prefs (localStorage)
 │   │   ├── rollLogStore.ts     # Zustand store: persistent roll log
@@ -321,10 +417,14 @@ Grimoire/
 │   │   ├── index.ts       # Barrel re-exports
 │   │   ├── ability.ts     # AbilityBlock, AbilityCost
 │   │   ├── character.ts   # Character, SheetConfig, SheetColors, etc.
+│   │   ├── gmScreen.ts    # GMScreen, ScreenPanel, NpcInstanceState
 │   │   ├── rollLog.ts      # RollLogEntry, RollSource
 │   │   └── status.ts       # StatusCondition, StatusIconType
 │   └── test/
 │       └── setup.ts        # Vitest setup (jest-dom matchers)
+├── e2e/
+│   └── gm-screen.spec.ts   # Playwright: assemble, damage, persist, placeholders
+└── playwright.config.ts    # E2E config (runs against `vite preview`)
 ```
 
 ---
@@ -379,6 +479,16 @@ The central domain object is a **`Character`**, which holds everything about a s
 | `CustomAbilitySection` (`kind: 'ability'`) | `{ kind, id, name, abilities: AbilityBlock[] }` — a free-form group of abilities |
 | `CustomNPCSection` (`kind: 'npc'`) | `{ kind, id, name, npcId }` — a reference to a bundled NPC `Character` (with `kind: 'npc'`) |
 | `CustomTextSection` (`kind: 'text'`) | `{ kind, id, name, content }` — a free-form Markdown body (mechanics, flavor text, lore) |
+
+**GMScreen** is a saved, named list of panels (see [GM Screen](#gm-screen)):
+
+| Field | Purpose |
+| --- | --- |
+| `id`, `name` | Identity; the name is shown in the screen switcher |
+| `panels` | Ordered `ScreenPanel[]` — array order is display order |
+| `createdAt`, `updatedAt` | Timestamps |
+
+`ScreenPanel` is a discriminated union on `kind`: `'character'` carries `{ id, characterId, density }` (a reference to a player sheet), and `'npc-instance'` carries `{ id, baseNpcId, label, density, state }` where `state` is the instance's own `{ currentHP, tempHP, condition }`.
 
 **StatusCondition** is a compendium record referenced from any sheet text:
 
@@ -437,9 +547,10 @@ The dice parser supports:
 
 ### State Management
 
-Four Zustand stores manage all application state:
+Six Zustand stores manage all application state:
 
-- **`characterStore`** — the character list, the currently-selected sheet, live-play mutations (damage, healing, resource spending, milestone application), and version history. Mutations made through `updateCurrentCharacter` are debounce-autosaved (500ms) to IndexedDB.
+- **`characterStore`** — the character list, the currently-selected sheet, live-play mutations (damage, healing, resource spending, milestone application), and version history. Every live-play action is **id-targeted** (`takeDamage(id, …)`, `spendAP(id, …)`, …) so several sheets can be driven at once; `updateCurrentCharacter` is a thin wrapper over `updateCharacter(id, …)`. Mutations are debounce-autosaved (500ms, per-character timers) to IndexedDB.
+- **`gmScreenStore`** — saved GM screens and their panels: screen CRUD, panel add/remove/reorder, NPC instancing (spawn, duplicate, auto-labelling), instance live state (damage/heal/condition), and reference lookups for placeholders and delete warnings. Autosaved per screen with the same 500ms debounce.
 - **`diceRollStore`** — the dice roll modal lifecycle: parse notation → evaluate with character stats → show result → forward to the roll log.
 - **`rollLogStore`** — persistent roll history across all characters, stored in IndexedDB and filterable by character.
 - **`statusStore`** — the status-condition compendium: CRUD, icon picking, and bundling referenced statuses into character exports. Persisted to IndexedDB.
@@ -447,14 +558,23 @@ Four Zustand stores manage all application state:
 
 ### Persistence
 
-A thin promise wrapper around the native IndexedDB API (`src/lib/db.ts`) manages three object stores:
+A thin promise wrapper around the native IndexedDB API (`src/lib/db.ts`) manages five object stores (DB version 5):
 
 - `characters` — live `Character` records keyed by `id`.
 - `versions` — `VersionSnapshot` records for export history, indexed by `characterId`.
 - `roll_logs` — `RollLogEntry` records for the dice roll log, indexed by `characterId`.
 - `statuses` — `StatusCondition` records for the status compendium, seeded with the built-in Divergence conditions on first run.
+- `screens` — `GMScreen` records (panel lists stored inline; no indexes).
 
-Schema migrations are handled on read via `normalizeCharacter`, which upgrades older records to the latest shape (e.g. migrating `innateAbility` → `innateAbilities`, adding `showActivate`, ensuring `customTabs` and `customResourceBars` exist, sanitizing ability `modifiers` (unknown targets / non-finite values dropped; the modifier switch is dropped when nothing survives), and stamping the `kind` discriminator on legacy custom-tab sections). No bulk migration is needed.
+Schema migrations are handled on read via `normalizeCharacter` and `normalizeScreen`, which upgrade older records to the latest shape (e.g. migrating `innateAbility` → `innateAbilities`, adding `showActivate`, ensuring `customTabs` and `customResourceBars` exist, sanitizing ability `modifiers` (unknown targets / non-finite values dropped; the modifier switch is dropped when nothing survives), stamping the `kind` discriminator on legacy custom-tab sections, and completing GM-screen panels). No bulk migration is needed.
+
+**Autosave durability:** debounced writes are flushed on `visibilitychange`/`pagehide` (`flushPendingCharacterSaves`, `flushPendingScreenSaves`, installed by `App`), which covers switching tabs and backgrounding. A write that is *initiated* during page unload is cancelled by the browser before it can commit, so reloading within the 500ms debounce window can still lose the last keystroke-level edit — the same last-writer-wins reality as running two tabs.
+
+**The storage layer is self-healing.** Three failure modes are handled explicitly, because IndexedDB's are unusually hostile:
+
+- **Blocked upgrade → no hang.** `indexedDB.open()` has a **10-second deadline** (`OPEN_TIMEOUT_MS`). A version upgrade is *blocked* — not failed — while another connection holds the database open (a stale tab, or a cached older build), and in that state the browser fires no useful event and the request never settles. Now `openDB` rejects, `loadCharacters`/`loadScreens` record a `loadError`, and the page shows the reason with a **Try again** button instead of spinning forever.
+- **Half-applied upgrade → repaired on open.** If an upgrade is interrupted, the database can be stamped at the current version while an object store was never created. Re-opening at the same version can never fire `upgradeneeded` again, so every query fails with *"One of the specified object stores was not found."* `openDB` therefore **verifies the schema on every open** and, if a store is missing, closes and reopens at `version + 1` to create it — an upgrade never touches existing records. The repair is announced once via a toast (`wasSchemaRepaired()`).
+- **One shared connection.** All helpers share a single long-lived connection (`withConnection`), which is what makes the repair safe: concurrent opens from `loadCharacters` and `loadScreens` used to race, and one of them minted a newer version while the other was still asking for the old one (`VersionError`). The connection is released on `versionchange` so another tab can upgrade, and `withConnection` transparently reconnects and retries if a connection was closed underneath a call. A single unreadable record is skipped and logged rather than failing an entire load.
 
 ### Theming
 
@@ -462,7 +582,7 @@ Every configurable color lives in `SheetColors`. `themeUtils.colorVars()` maps t
 
 ### Drag and Drop
 
-Built on `@dnd-kit`. The `AbilitiesDndContext` wraps the Slotted Abilities and Ability Pool sections, enabling cross-list moves (slotted ↔ pool) and reordering within a list. Custom ability sections have their own `CustomTabDndContext` (NPC sections are excluded from drag-and-drop and render inline instead).
+Built on `@dnd-kit`. The `AbilitiesDndContext` wraps the Slotted Abilities and Ability Pool sections, enabling cross-list moves (slotted ↔ pool) and reordering within a list. Custom ability sections have their own `CustomTabDndContext` (NPC sections are excluded from drag-and-drop and render inline instead). The GM Screen wraps its panel canvas in a `SortableContext` (`SortablePanel` + `verticalListSortingStrategy`); only the frameless grip handle activates a drag, with a 6px `PointerSensor` distance so touch scrolling and in-panel controls keep working.
 
 ---
 
@@ -482,7 +602,9 @@ npm run test:e2e
 npm run test:e2e:ui
 ```
 
-Unit tests cover the pure logic modules (`calculations`, `diceParser`, `diceRoller`, `slotLogic`, `exportImport`, `db`) and the character store. E2E tests cover critical user flows in the browser.
+Unit tests cover the pure logic modules (`calculations`, `diceParser`, `diceRoller`, `slotLogic`, `exportImport`, `db`, `backup`), the character store's id-targeted mutations and autosave, the GM Screen store (CRUD, panel ops, duplicate guard, auto-labelling, instance damage/heal/downed flow, panel status tracking, per-screen autosave), and the GM Screen components (panels, pickers, placeholder, status pills + Add Status picker, `DamageDialog` against an NPC instance).
+
+End-to-end tests live in `e2e/` and run against the **production build** served by `vite preview` (not a dev server). `e2e/gm-screen.spec.ts` covers screen creation, mixing a character with two NPC instances, damaging one instance to 0 HP while its sibling is unaffected, persistence across a reload, player/panel state parity, delete-reference placeholders, status tracking (per-panel pills, durations, stacks, and a panel that stays exactly as tall with five statuses as with one — on desktop and at 360px), and a 360px-wide layout with no horizontal overflow. `e2e/storage-failure.spec.ts` pins the recovery contract for all three failure modes: a blocked upgrade must not hang (it must explain itself, and Retry must succeed once the blocking connection goes away), a half-applied upgrade must repair itself **without losing data**, and a sequence of mixed reads and writes must keep working on the shared connection (every helper used to close it on exit, silently breaking everything after the first call). Run `npx playwright install chromium` once before the first `npm run test:e2e`.
 
 ---
 

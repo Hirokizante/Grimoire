@@ -10,9 +10,9 @@
  */
 
 import { test, expect } from 'vitest'
-import { normalizeCharacter } from '@/lib/db'
+import { normalizeCharacter, normalizeScreen } from '@/lib/db'
 import { DEFAULT_SHEET_COLORS, createDefaultCharacter } from '@/constants/gameData'
-import type { Character } from '@/types'
+import type { Character, GMScreen, ScreenPanel } from '@/types'
 
 /** Cast an object to Character (bypassing TS for legacy-shape fixtures). */
 function asCharacter(value: Record<string, unknown>): Character {
@@ -425,4 +425,212 @@ test('normalizeCharacter: backfills palette colors missing from old records', ()
   expect(out.config.colors.accent).toBe('#123456')
   // Idempotent.
   expect(normalizeCharacter(out).config.colors).toEqual(out.config.colors)
+})
+
+// ---- normalizeScreen (GM Screens) -------------------------------------------
+
+/** Cast an object to GMScreen (bypassing TS for legacy-shape fixtures). */
+function asScreen(value: Record<string, unknown>): GMScreen {
+  return value as unknown as GMScreen
+}
+
+test('normalizeScreen: a well-formed screen is unchanged and idempotent', () => {
+  const screen: GMScreen = {
+    id: 's1',
+    name: 'Session 4',
+    panels: [
+      {
+        kind: 'character',
+        id: 'p1',
+        characterId: 'c1',
+        density: 'compact',
+        statuses: [],
+      },
+      {
+        kind: 'npc-instance',
+        id: 'p2',
+        baseNpcId: 'n1',
+        label: 'Bandit',
+        density: 'expanded',
+        statuses: [],
+        state: { currentHP: 12, tempHP: 3, condition: 'active' },
+      },
+    ],
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-02T00:00:00.000Z',
+  }
+  const out = normalizeScreen(screen)
+  expect(out).toEqual(screen)
+  expect(normalizeScreen(out)).toEqual(out)
+})
+
+test('normalizeScreen: backfills an empty panel list and timestamps', () => {
+  const out = normalizeScreen(asScreen({ id: 's1', name: 'Fresh' }))
+  expect(out.panels).toEqual([])
+  expect(out.name).toBe('Fresh')
+  expect(typeof out.createdAt).toBe('string')
+  expect(out.updatedAt).toBe(out.createdAt)
+})
+
+test('normalizeScreen: guarantees density and panel id on every panel', () => {
+  const out = normalizeScreen(
+    asScreen({
+      id: 's1',
+      name: 'Legacy',
+      panels: [
+        { kind: 'character', characterId: 'c1' },
+        {
+          kind: 'character',
+          id: 'p2',
+          characterId: 'c2',
+          density: 'expanded',
+          statuses: [],
+        },
+      ],
+    }),
+  )
+  expect(out.panels).toHaveLength(2)
+  for (const panel of out.panels) {
+    expect(typeof panel.id).toBe('string')
+    expect(panel.id.length).toBeGreaterThan(0)
+  }
+  expect(out.panels[0].density).toBe('compact')
+  expect(out.panels[1].density).toBe('expanded')
+  // Distinct ids (the missing one is generated, not shared).
+  expect(out.panels[0].id).not.toBe(out.panels[1].id)
+})
+
+test('normalizeScreen: backfills complete instance state', () => {
+  const out = normalizeScreen(
+    asScreen({
+      id: 's1',
+      name: 'Spawns',
+      panels: [{ kind: 'npc-instance', id: 'p1', baseNpcId: 'n1' }],
+    }),
+  )
+  const panel = out.panels[0] as Extract<ScreenPanel, { kind: 'npc-instance' }>
+  expect(panel.state).toEqual({ currentHP: 0, tempHP: 0, condition: 'active' })
+  expect(panel.label).toBe('')
+})
+
+test('normalizeScreen: keeps a valid instance state and clamps negatives', () => {
+  const out = normalizeScreen(
+    asScreen({
+      id: 's1',
+      name: 'Spawns',
+      panels: [
+        {
+          kind: 'npc-instance',
+          id: 'p1',
+          baseNpcId: 'n1',
+          label: 'Bandit 2',
+          state: { currentHP: -4, tempHP: -2, condition: 'downed' },
+        },
+      ],
+    }),
+  )
+  const panel = out.panels[0] as Extract<ScreenPanel, { kind: 'npc-instance' }>
+  expect(panel.label).toBe('Bandit 2')
+  expect(panel.state).toEqual({ currentHP: 0, tempHP: 0, condition: 'downed' })
+})
+
+test('normalizeScreen: drops panels that reference nothing', () => {
+  const out = normalizeScreen(
+    asScreen({
+      id: 's1',
+      name: 'Broken',
+      panels: [
+        { kind: 'character' },
+        { kind: 'npc-instance', id: 'p1' },
+        null,
+        'nope',
+        { kind: 'character', id: 'ok', characterId: 'c1' },
+      ],
+    }),
+  )
+  expect(out.panels).toHaveLength(1)
+  expect((out.panels[0] as Extract<ScreenPanel, { kind: 'character' }>).characterId).toBe('c1')
+})
+
+test('normalizeScreen: falls back to a default name', () => {
+  const out = normalizeScreen(asScreen({ id: 's1', name: '' }))
+  expect(out.name).toBe('Untitled Screen')
+})
+
+// ---- normalizeScreen: tracked panel statuses --------------------------------
+
+test('normalizeScreen: backfills an empty status list on both panel kinds', () => {
+  const out = normalizeScreen(
+    asScreen({
+      id: 's1',
+      name: 'Pre-status screens',
+      panels: [
+        { kind: 'character', id: 'p1', characterId: 'c1' },
+        { kind: 'npc-instance', id: 'p2', baseNpcId: 'n1' },
+      ],
+    }),
+  )
+  expect(out.panels[0].statuses).toEqual([])
+  expect(out.panels[1].statuses).toEqual([])
+})
+
+test('normalizeScreen: keeps valid tracked statuses untouched (idempotent)', () => {
+  const screen: GMScreen = {
+    id: 's1',
+    name: 'Session 4',
+    panels: [
+      {
+        kind: 'character',
+        id: 'p1',
+        characterId: 'c1',
+        density: 'compact',
+        statuses: [
+          { statusId: 'poisoned', duration: 'countdown', stacks: 3 },
+          { statusId: 'prone', duration: 'quick', stacks: 1 },
+        ],
+      },
+    ],
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+  }
+  const out = normalizeScreen(screen)
+  expect(out).toEqual(screen)
+  expect(normalizeScreen(out)).toEqual(out)
+})
+
+test('normalizeScreen: drops unusable status entries and repairs the rest', () => {
+  const out = normalizeScreen(
+    asScreen({
+      id: 's1',
+      name: 'Hand-edited',
+      panels: [
+        {
+          kind: 'character',
+          id: 'p1',
+          characterId: 'c1',
+          statuses: [
+            { statusId: 'poisoned', duration: 'countdown', stacks: 2 },
+            // No reference, unknown duration, junk value, duplicate reference.
+            { duration: 'quick', stacks: 1 },
+            { statusId: 'stunned', duration: 'forever', stacks: 1 },
+            'nope',
+            null,
+            { statusId: 'poisoned', duration: 'permanent', stacks: 9 },
+            // Stack counts are repaired to whole numbers within [1, 99].
+            { statusId: 'blinded', duration: 'quick', stacks: -3 },
+            { statusId: 'hidden', duration: 'persistent', stacks: 12.7 },
+            { statusId: 'prone', duration: 'conditional', stacks: 500 },
+            { statusId: 'dazed', duration: 'permanent' },
+          ],
+        },
+      ],
+    }),
+  )
+  expect(out.panels[0].statuses).toEqual([
+    { statusId: 'poisoned', duration: 'countdown', stacks: 2 },
+    { statusId: 'blinded', duration: 'quick', stacks: 1 },
+    { statusId: 'hidden', duration: 'persistent', stacks: 12 },
+    { statusId: 'prone', duration: 'conditional', stacks: 99 },
+    { statusId: 'dazed', duration: 'permanent', stacks: 1 },
+  ])
 })

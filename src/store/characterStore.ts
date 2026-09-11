@@ -3,8 +3,15 @@
  *
  * Owns the in-memory list of characters plus the currently-selected sheet,
  * mirroring all mutations to the IndexedDB persistence layer (see db.ts).
- * Edits made through {@link updateCurrentCharacter} are debounced-autosaved;
- * an explicit {@link saveCurrentCharacter} is also available for manual saves.
+ * Edits made through {@link CharacterStoreActions.updateCharacter} (or the
+ * current-character wrapper {@link CharacterStoreActions.updateCurrentCharacter})
+ * are debounced-autosaved per character id; an explicit
+ * {@link CharacterStoreActions.saveCharacter} is also available for manual saves.
+ *
+ * Live-play actions are **id-targeted**: every mutation takes the id of the
+ * entity it applies to, so the GM Screen can drive several sheets at once
+ * without hijacking `currentCharacter` (which would navigate the app away and
+ * corrupt `diceRollStore.themeEntity()`).
  */
 
 import { create } from 'zustand'
@@ -46,7 +53,13 @@ import type {
 const AUTOSAVE_DEBOUNCE_MS = 500
 
 /** Top-level navigation view (home screen sections). */
-export type AppView = 'home' | 'characters' | 'npcs' | 'statuses' | 'settings'
+export type AppView =
+  | 'home'
+  | 'characters'
+  | 'npcs'
+  | 'gmscreen'
+  | 'statuses'
+  | 'settings'
 
 export interface CharacterStoreState {
   /** All characters loaded from IndexedDB. */
@@ -55,6 +68,12 @@ export interface CharacterStoreState {
   currentCharacter: Character | null
   /** Whether the initial load from IndexedDB has completed. */
   isLoaded: boolean
+  /**
+   * Human-readable reason the last character load failed, or null. When set,
+   * the list pages show the error plus a Retry action instead of a permanent
+   * loading state.
+   */
+  loadError: string | null
   /** True while a save to IndexedDB is pending / in flight. */
   isSaving: boolean
   /** Version history for the current character (null until loaded). */
@@ -95,6 +114,12 @@ export interface DamageResult {
   mortalWoundsIncurred: number
   /** Whether the character is now knocked out. */
   knockedOut: boolean
+  /**
+   * Whether the target was driven to 0 HP. Meaningful for NPC instances,
+   * which have no mortal wounds or death saves and simply go `downed`;
+   * characters express the same situation through `knockedOut`.
+   */
+  downed?: boolean
 }
 
 /** Result of a Death Save roll, for UI feedback. */
@@ -122,12 +147,23 @@ export interface MortalWoundResult {
 }
 
 export interface CharacterStoreActions {
-  /** Load all characters from IndexedDB into the store. */
+  /**
+   * Load all characters from IndexedDB into the store. Never rejects: a
+   * failure sets `loadError` and still marks `isLoaded`.
+   */
   loadCharacters: () => Promise<void>
   /** Create a fresh default character, persist it, and select it. */
   createCharacter: (name: string) => Promise<void>
   /** Create a fresh default NPC, persist it, and select it. */
   createNPC: (name: string) => Promise<void>
+  /**
+   * Create a fresh default NPC and persist it WITHOUT selecting it or
+   * navigating. Returns the new record (or null if the name is empty).
+   *
+   * Used by the GM Screen's "New NPC…" quick-create, which wants the base
+   * record to attach an instance to — not a page navigation.
+   */
+  createNpcBase: (name: string) => Promise<Character | null>
   /** Select a loaded character as current by id. */
   selectCharacter: (id: string) => void
   /** Clear current character and return to list view. */
@@ -136,12 +172,20 @@ export interface CharacterStoreActions {
   closeNPC: () => void
   /** Navigate to a top-level view (home, characters, npcs, settings). */
   setView: (view: AppView) => void
+  /**
+   * Apply an updater to the character with the given id, autosave it (per-id
+   * debounce), and sync both the list and `currentCharacter` if it is the one
+   * being edited. No-op when no such character exists.
+   */
+  updateCharacter: (id: string, updater: (char: Character) => Character) => void
   /** Apply an updater to the current character, autosave, and sync the list. */
   updateCurrentCharacter: (updater: (char: Character) => Character) => void
   /** Delete a character from DB and the store, clearing current if needed. */
   deleteCharacter: (id: string) => Promise<void>
   /** Explicitly persist the current character to IndexedDB. */
   saveCurrentCharacter: () => Promise<void>
+  /** Explicitly persist one character to IndexedDB (cancels its pending autosave). */
+  saveCharacter: (id: string) => Promise<void>
   /** Import a character from JSON text, persist it, and select it as current. */
   importCharacterFile: (text: string) => Promise<void>
   /** Import an NPC from JSON text, persist it, and select it as current. */
@@ -183,8 +227,8 @@ export interface CharacterStoreActions {
    * Sub-Abilities). Independent from activation and costs nothing.
    */
   setAbilityModifiersActive: (abilityId: string, active: boolean) => void
-  /** Apply damage to the character (handles temp HP, armor, resistance, mortal wound overflow). */
-  takeDamage: (amount: number, opts?: {
+  /** Apply damage to the character with `id` (temp HP, armor, resistance, mortal wound overflow). */
+  takeDamage: (id: string, amount: number, opts?: {
     /** Whether to apply armor reduction (1d6 per armor point). */
     applyArmor?: boolean
     /** Whether the character has Resistance (halves damage after armor). */
@@ -192,47 +236,47 @@ export interface CharacterStoreActions {
     /** Whether to bypass temp HP. */
     ignoreTempHP?: boolean
   }) => DamageResult
-  /** Heal the character (respecting Circulatory Dysfunction mortal wound if present). */
-  heal: (amount: number) => void
-  /** Add or replace Temporary HP (higher value takes precedence). */
-  setTempHP: (amount: number) => void
-  /** Spend AP; returns false if insufficient. */
-  spendAP: (amount: number) => boolean
-  /** Restore AP (e.g. at the start of a turn). */
-  restoreAP: (amount: number) => void
-  /** Reset AP to max (3). */
-  resetAP: () => void
-  /** Spend END; returns false if insufficient. */
-  spendEND: (amount: number) => boolean
-  /** Restore END (e.g. at end of turn via END Recovery). */
-  restoreEND: (amount: number) => void
-  /** Reset END to max (10). */
-  resetEND: () => void
-  /** Spend FP; returns false if insufficient. */
-  spendFP: (amount: number) => boolean
-  /** Restore FP. */
-  restoreFP: (amount: number) => void
+  /** Heal the character with `id` (respecting Circulatory Dysfunction if present). */
+  heal: (id: string, amount: number) => void
+  /** Add or replace Temporary HP on the character with `id` (higher value wins). */
+  setTempHP: (id: string, amount: number) => void
+  /** Spend AP from the character with `id`; returns false if insufficient. */
+  spendAP: (id: string, amount: number) => boolean
+  /** Restore AP to the character with `id` (e.g. at the start of a turn). */
+  restoreAP: (id: string, amount: number) => void
+  /** Reset AP to max (3) for the character with `id`. */
+  resetAP: (id: string) => void
+  /** Spend END from the character with `id`; returns false if insufficient. */
+  spendEND: (id: string, amount: number) => boolean
+  /** Restore END to the character with `id` (e.g. at end of turn). */
+  restoreEND: (id: string, amount: number) => void
+  /** Reset END to max (10) for the character with `id`. */
+  resetEND: (id: string) => void
+  /** Spend FP from the character with `id`; returns false if insufficient. */
+  spendFP: (id: string, amount: number) => boolean
+  /** Restore FP to the character with `id`. */
+  restoreFP: (id: string, amount: number) => void
   /** Recover action: spend 3 AP, regain all END. Returns false if insufficient AP. */
-  recover: () => boolean
-  /** Regenerate END at end of turn (END Recovery from GRT). */
-  regenerateEND: () => void
+  recover: (id: string) => boolean
+  /** Regenerate END at end of turn (END Recovery from GRT) for the character with `id`. */
+  regenerateEND: (id: string) => void
   /** Convert unspent AP to END at end of turn (1:1, capped at max END). */
-  convertAPtoEND: () => void
+  convertAPtoEND: (id: string) => void
   /**
-   * End the character's turn: convert unspent AP to END (1:1), apply END
-   * Recovery, and reset AP to max. Returns the total END gained.
+   * End the turn of the character with `id`: convert unspent AP to END (1:1),
+   * apply END Recovery, and reset AP to max. Returns the total END gained.
    */
-  endTurn: () => number
+  endTurn: (id: string) => number
   /** Roll a Death Save (d20, DC 10). Returns the roll and updated tracker. */
-  rollDeathSave: () => DeathSaveResult
+  rollDeathSave: (id: string) => DeathSaveResult
   /** Roll on the Mortal Wounds table (d20). Returns the wound and applies it. */
-  rollMortalWound: () => MortalWoundResult
+  rollMortalWound: (id: string) => MortalWoundResult
   /** Clear a Mortal Wound at the given index. */
-  clearMortalWound: (index: number) => void
+  clearMortalWound: (id: string, index: number) => void
   /** Reset to full HP, clear mortal wounds, clear death saves (end of encounter / Rest). */
-  fullRestore: () => void
+  fullRestore: (id: string) => void
   /** Reset only HP to max (end of encounter). */
-  resetHP: () => void
+  resetHP: (id: string) => void
   /** Apply a milestone increase with attribute/skill/choice selections. */
   addMilestone: (opts: {
     attribute: AttributeKey
@@ -298,15 +342,17 @@ export interface CharacterStoreActions {
   updateCustomResourceBar: (id: string, updater: (bar: CustomResourceBar) => CustomResourceBar) => void
   /** Remove a custom resource bar by id. */
   removeCustomResourceBar: (id: string) => void
-  /** Spend 1 from a custom resource bar; returns false if insufficient. */
-  spendCustomResourceBar: (id: string, amount?: number) => boolean
-  /** Restore 1 to a custom resource bar (capped at max). */
-  restoreCustomResourceBar: (id: string, amount?: number) => void
+  /** Spend from a custom resource bar; returns false if insufficient. */
+  spendCustomResourceBar: (id: string, barId: string, amount?: number) => boolean
+  /** Restore to a custom resource bar (capped at max). */
+  restoreCustomResourceBar: (id: string, barId: string, amount?: number) => void
   /**
    * Replace the current character's labels (the Edit Labels modal saves the
    * whole list). Local-only metadata — never exported.
    */
   setLabels: (labels: SheetLabel[]) => void
+  /** Replace one character's labels by id (same as {@link setLabels}, targeted). */
+  setCharacterLabels: (id: string, labels: SheetLabel[]) => void
   /** Update the view mode of a single ability section (builtin or custom). */
   updateSectionViewMode: (key: 'slottedAbilities' | 'abilityPool', mode: 'grid' | 'list') => void
   /** Update the view mode of a custom-tab section. */
@@ -336,21 +382,84 @@ export interface CharacterStoreActions {
 
 export type CharacterStore = CharacterStoreState & CharacterStoreActions
 
-/** Handle for the pending autosave timeout, if any. */
-let saveTimer: ReturnType<typeof setTimeout> | null = null
+/**
+ * Pending autosave timeouts, keyed by character id.
+ *
+ * Per-id (not a single module-level timer) so rapid edits to several entities
+ * in one tick — the whole point of the GM Screen — each persist their own
+ * record instead of the last write cancelling the others' saves.
+ */
+const saveTimers = new Map<string, ReturnType<typeof setTimeout>>()
+
+/** Cancel a character's pending autosave, if any. */
+function clearSaveTimer(id: string) {
+  const timer = saveTimers.get(id)
+  if (timer) {
+    clearTimeout(timer)
+    saveTimers.delete(id)
+  }
+}
+
+/**
+ * Flush every pending debounced character write immediately.
+ *
+ * The GM Screen can drive several sheets in one tick; without this a page
+ * unload inside the 500ms debounce window would drop the last edits to every
+ * one of them. {@link installCharacterAutosaveFlush} wires it to the unload
+ * events, and App calls that once at startup.
+ */
+export function flushPendingCharacterSaves() {
+  const ids = [...saveTimers.keys()]
+  saveTimers.clear()
+  for (const id of ids) {
+    const character = useCharacterStore
+      .getState()
+      .characters.find((c) => c.id === id)
+    if (!character) continue
+    try {
+      void putCharacter(character)
+    } catch {
+      // Best-effort during unload; in-memory state is already correct.
+    }
+  }
+}
+
+/** Wire the unload-time flush exactly once. */
+let flushInstalled = false
+export function installCharacterAutosaveFlush() {
+  if (flushInstalled || typeof window === 'undefined') return
+  flushInstalled = true
+  // `pagehide` also covers bfcache navigations on iOS, where `beforeunload`
+  // and even `visibilitychange` can be skipped.
+  window.addEventListener('pagehide', flushPendingCharacterSaves)
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flushPendingCharacterSaves()
+  })
+}
 
 export const useCharacterStore = create<CharacterStore>()((set, get) => ({
   characters: [],
   currentCharacter: null,
   isLoaded: false,
+  loadError: null,
   isSaving: false,
   versionHistory: null,
   isRestoring: false,
   view: 'home',
 
   loadCharacters: async () => {
-    const characters = await getAllCharacters()
-    set({ characters, isLoaded: true })
+    try {
+      const characters = await getAllCharacters()
+      set({ characters, isLoaded: true, loadError: null })
+    } catch (err) {
+      // NEVER leave the list pages spinning forever on a storage failure.
+      const message =
+        err instanceof Error && err.message
+          ? err.message
+          : 'Could not read your saved sheets from this browser’s storage.'
+      console.error('[grimoire] loadCharacters failed:', err)
+      set({ characters: [], isLoaded: true, loadError: message })
+    }
   },
 
   createCharacter: async (name: string) => {
@@ -377,6 +486,22 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
     }))
   },
 
+  createNpcBase: async (name: string) => {
+    const trimmed = name.trim()
+    if (!trimmed) return null
+    const base = createDefaultNPC()
+    const npc: Character = { ...base, name: trimmed, id: generateId() }
+    set({ isSaving: true })
+    await putCharacter(npc)
+    // Deliberately does NOT touch currentCharacter / view: the caller (GM
+    // Screen quick-create) stays where it is and attaches an instance.
+    set((state) => ({
+      characters: [...state.characters, npc],
+      isSaving: false,
+    }))
+    return npc
+  },
+
   selectCharacter: (id: string) => {
     const found = get().characters.find((c) => c.id === id) ?? null
     set({ currentCharacter: found })
@@ -394,24 +519,36 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
     set({ view })
   },
 
+  updateCharacter: (id, updater) => {
+    const target = get().characters.find((c) => c.id === id)
+    if (!target) return
+
+    const updated = { ...updater(target), updatedAt: new Date().toISOString() }
+
+    set((state) => ({
+      currentCharacter:
+        state.currentCharacter?.id === id ? updated : state.currentCharacter,
+      characters: state.characters.map((c) => (c.id === id ? updated : c)),
+    }))
+
+    clearSaveTimer(id)
+    saveTimers.set(
+      id,
+      setTimeout(() => {
+        saveTimers.delete(id)
+        void get().saveCharacter(id)
+      }, AUTOSAVE_DEBOUNCE_MS),
+    )
+  },
+
   updateCurrentCharacter: (updater) => {
     const current = get().currentCharacter
     if (!current) return
-
-    const updated = { ...updater(current), updatedAt: new Date().toISOString() }
-
-    set((state) => ({
-      currentCharacter: updated,
-      characters: state.characters.map((c) => (c.id === updated.id ? updated : c)),
-    }))
-
-    if (saveTimer) clearTimeout(saveTimer)
-    saveTimer = setTimeout(() => {
-      void get().saveCurrentCharacter()
-    }, AUTOSAVE_DEBOUNCE_MS)
+    get().updateCharacter(current.id, updater)
   },
 
   deleteCharacter: async (id: string) => {
+    clearSaveTimer(id)
     await dbDeleteCharacter(id)
     set((state) => {
       const characters = state.characters.filter((c) => c.id !== id)
@@ -422,14 +559,17 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
   },
 
   saveCurrentCharacter: async () => {
-    if (saveTimer) {
-      clearTimeout(saveTimer)
-      saveTimer = null
-    }
     const current = get().currentCharacter
     if (!current) return
+    await get().saveCharacter(current.id)
+  },
+
+  saveCharacter: async (id: string) => {
+    clearSaveTimer(id)
+    const target = get().characters.find((c) => c.id === id)
+    if (!target) return
     set({ isSaving: true })
-    await putCharacter(current)
+    await putCharacter(target)
     set({ isSaving: false })
   },
 
@@ -568,7 +708,9 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
   },
 
   setAbilityModifiersActive: (abilityId, active) => {
-    get().updateCurrentCharacter((char) => {
+    const current = get().currentCharacter
+    if (!current) return
+    get().updateCharacter(current.id, (char) => {
       const next = applyAbilityModifiersActive(char, abilityId, active)
       if (next === char || next.kind === 'npc') return next
       // Switching a Max HP modifier off (or a penalty on) can leave current HP
@@ -581,8 +723,8 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
 
   // ---- Live play: damage & healing -------------------------------------------
 
-  takeDamage: (amount, opts = {}) => {
-    const current = get().currentCharacter
+  takeDamage: (id, amount, opts = {}) => {
+    const current = get().characters.find((c) => c.id === id)
     if (!current) {
       return {
         rawDamage: amount, afterArmor: amount, afterResistance: amount,
@@ -657,7 +799,7 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
       }
     }
 
-    get().updateCurrentCharacter((char) => ({
+    get().updateCharacter(id, (char) => ({
       ...char,
       currentHP: newHP,
       tempHP: newTempHP,
@@ -677,21 +819,21 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
     } satisfies DamageResult
   },
 
-  heal: (amount) => {
-    const current = get().currentCharacter
+  heal: (id, amount) => {
+    const current = get().characters.find((c) => c.id === id)
     if (!current) return
     const maxHP = effectiveCombatStats(current).maxHP
     // Check for Circulatory Dysfunction (halves healing, rounded down).
     const hasCirculatory = current.mortalWounds.includes('Circulatory Dysfunction')
     const effective = hasCirculatory ? Math.floor(amount / 2) : amount
-    get().updateCurrentCharacter((char) => ({
+    get().updateCharacter(id, (char) => ({
       ...char,
       currentHP: Math.min(maxHP, char.currentHP + effective),
     }))
   },
 
-  setTempHP: (amount) => {
-    get().updateCurrentCharacter((char) => ({
+  setTempHP: (id, amount) => {
+    get().updateCharacter(id, (char) => ({
       ...char,
       tempHP: Math.max(char.tempHP, amount),
     }))
@@ -699,66 +841,66 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
 
   // ---- Live play: resource spend/restore ------------------------------------
 
-  spendAP: (amount) => {
-    const current = get().currentCharacter
+  spendAP: (id, amount) => {
+    const current = get().characters.find((c) => c.id === id)
     if (!current || current.currentAP < amount) return false
-    get().updateCurrentCharacter((char) => ({
+    get().updateCharacter(id, (char) => ({
       ...char,
       currentAP: char.currentAP - amount,
     }))
     return true
   },
 
-  restoreAP: (amount) => {
-    get().updateCurrentCharacter((char) => ({
+  restoreAP: (id, amount) => {
+    get().updateCharacter(id, (char) => ({
       ...char,
       currentAP: Math.min(MAX_AP, char.currentAP + amount),
     }))
   },
 
-  resetAP: () => {
-    get().updateCurrentCharacter((char) => ({
+  resetAP: (id) => {
+    get().updateCharacter(id, (char) => ({
       ...char,
       currentAP: MAX_AP,
     }))
   },
 
-  spendEND: (amount) => {
-    const current = get().currentCharacter
+  spendEND: (id, amount) => {
+    const current = get().characters.find((c) => c.id === id)
     if (!current || current.currentEND < amount) return false
-    get().updateCurrentCharacter((char) => ({
+    get().updateCharacter(id, (char) => ({
       ...char,
       currentEND: char.currentEND - amount,
     }))
     return true
   },
 
-  restoreEND: (amount) => {
-    get().updateCurrentCharacter((char) => ({
+  restoreEND: (id, amount) => {
+    get().updateCharacter(id, (char) => ({
       ...char,
       currentEND: Math.min(MAX_END, char.currentEND + amount),
     }))
   },
 
-  resetEND: () => {
-    get().updateCurrentCharacter((char) => ({
+  resetEND: (id) => {
+    get().updateCharacter(id, (char) => ({
       ...char,
       currentEND: MAX_END,
     }))
   },
 
-  spendFP: (amount) => {
-    const current = get().currentCharacter
+  spendFP: (id, amount) => {
+    const current = get().characters.find((c) => c.id === id)
     if (!current || current.currentFP < amount) return false
-    get().updateCurrentCharacter((char) => ({
+    get().updateCharacter(id, (char) => ({
       ...char,
       currentFP: char.currentFP - amount,
     }))
     return true
   },
 
-  restoreFP: (amount) => {
-    get().updateCurrentCharacter((char) => ({
+  restoreFP: (id, amount) => {
+    get().updateCharacter(id, (char) => ({
       ...char,
       currentFP: Math.min(char.maxFP, char.currentFP + amount),
     }))
@@ -766,13 +908,13 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
 
   // ---- Live play: recover & end-of-turn -------------------------------------
 
-  recover: () => {
-    const current = get().currentCharacter
+  recover: (id) => {
+    const current = get().characters.find((c) => c.id === id)
     if (!current) return false
     // Check for Damaged Throat (Recover only restores half END).
     const hasDamagedThroat = current.mortalWounds.includes('Damaged Throat')
     const restoredEND = hasDamagedThroat ? Math.floor(MAX_END / 2) : MAX_END
-    get().updateCurrentCharacter((char) => ({
+    get().updateCharacter(id, (char) => ({
       ...char,
       currentEND: restoredEND,
       // Refill any custom bars that opt in to refill on Recover.
@@ -783,20 +925,20 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
     return true
   },
 
-  regenerateEND: () => {
-    const current = get().currentCharacter
+  regenerateEND: (id) => {
+    const current = get().characters.find((c) => c.id === id)
     if (!current) return
     // Damaged Throat: unable to regain END passively.
     if (current.mortalWounds.includes('Damaged Throat')) return
     const recovery = effectiveCombatStats(current).endRecovery
-    get().updateCurrentCharacter((char) => ({
+    get().updateCharacter(id, (char) => ({
       ...char,
       currentEND: Math.min(MAX_END, char.currentEND + recovery),
     }))
   },
 
-  convertAPtoEND: () => {
-    get().updateCurrentCharacter((char) => {
+  convertAPtoEND: (id) => {
+    get().updateCharacter(id, (char) => {
       const converted = Math.min(char.currentAP, MAX_END - char.currentEND)
       return {
         ...char,
@@ -806,9 +948,9 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
     })
   },
 
-  endTurn: () => {
+  endTurn: (id) => {
     let totalGained = 0
-    get().updateCurrentCharacter((char) => {
+    get().updateCharacter(id, (char) => {
       // 1. Convert unspent AP to END (1:1, capped at max END).
       const apToEND = Math.min(char.currentAP, MAX_END - char.currentEND)
       let newEND = char.currentEND + apToEND
@@ -830,8 +972,8 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
 
   // ---- Live play: death saves & mortal wounds --------------------------------
 
-  rollDeathSave: () => {
-    const current = get().currentCharacter
+  rollDeathSave: (id) => {
+    const current = get().characters.find((c) => c.id === id)
     if (!current) {
       return { roll: 0, successes: 0, failures: 0, doubled: false, revived: false, died: false }
     }
@@ -867,7 +1009,7 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
       died = true
     }
 
-    get().updateCurrentCharacter((char) => ({
+    get().updateCharacter(id, (char) => ({
       ...char,
       deathSaves: { successes, failures },
       ...hpUpdate,
@@ -876,8 +1018,8 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
     return { roll, successes, failures, doubled, revived, died } satisfies DeathSaveResult
   },
 
-  rollMortalWound: () => {
-    const current = get().currentCharacter
+  rollMortalWound: (id) => {
+    const current = get().characters.find((c) => c.id === id)
     if (!current) {
       return { roll: 0, woundName: '', woundDescription: '', slotIndex: -1, knockedOut: false }
     }
@@ -904,7 +1046,7 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
 
     const knockedOut = newMortalWounds.filter((w) => w != null).length >= MAX_MORTAL_WOUNDS
 
-    get().updateCurrentCharacter((char) => ({
+    get().updateCharacter(id, (char) => ({
       ...char,
       mortalWounds: newMortalWounds,
     }))
@@ -918,8 +1060,8 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
     } satisfies MortalWoundResult
   },
 
-  clearMortalWound: (index) => {
-    get().updateCurrentCharacter((char) => {
+  clearMortalWound: (id, index) => {
+    get().updateCharacter(id, (char) => {
       const wounds = [...char.mortalWounds]
       if (index >= 0 && index < wounds.length) {
         wounds[index] = null
@@ -930,8 +1072,8 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
 
   // ---- Live play: full restore & reset ---------------------------------------
 
-  fullRestore: () => {
-    get().updateCurrentCharacter((char) => {
+  fullRestore: (id) => {
+    get().updateCharacter(id, (char) => {
       const maxHP = effectiveCombatStats(char).maxHP
       return {
         ...char,
@@ -947,8 +1089,8 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
     })
   },
 
-  resetHP: () => {
-    get().updateCurrentCharacter((char) => ({
+  resetHP: (id) => {
+    get().updateCharacter(id, (char) => ({
       ...char,
       currentHP: effectiveCombatStats(char).maxHP,
     }))
@@ -1487,25 +1629,25 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
     }))
   },
 
-  spendCustomResourceBar: (id, amount = 1) => {
-    const current = get().currentCharacter
+  spendCustomResourceBar: (id, barId, amount = 1) => {
+    const current = get().characters.find((c) => c.id === id)
     if (!current) return false
-    const bar = current.customResourceBars.find((b) => b.id === id)
+    const bar = current.customResourceBars.find((b) => b.id === barId)
     if (!bar || bar.current < amount) return false
-    get().updateCurrentCharacter((char) => ({
+    get().updateCharacter(id, (char) => ({
       ...char,
       customResourceBars: char.customResourceBars.map((b) =>
-        b.id === id ? { ...b, current: b.current - amount } : b,
+        b.id === barId ? { ...b, current: b.current - amount } : b,
       ),
     }))
     return true
   },
 
-  restoreCustomResourceBar: (id, amount = 1) => {
-    get().updateCurrentCharacter((char) => ({
+  restoreCustomResourceBar: (id, barId, amount = 1) => {
+    get().updateCharacter(id, (char) => ({
       ...char,
       customResourceBars: char.customResourceBars.map((bar) =>
-        bar.id === id ? { ...bar, current: Math.min(bar.max, bar.current + amount) } : bar,
+        bar.id === barId ? { ...bar, current: Math.min(bar.max, bar.current + amount) } : bar,
       ),
     }))
   },
@@ -1513,7 +1655,13 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
   // ---- Labels ------------------------------------------------------------------
 
   setLabels: (labels) => {
-    get().updateCurrentCharacter((char) => ({
+    const current = get().currentCharacter
+    if (!current) return
+    get().setCharacterLabels(current.id, labels)
+  },
+
+  setCharacterLabels: (id, labels) => {
+    get().updateCharacter(id, (char) => ({
       ...char,
       labels,
     }))

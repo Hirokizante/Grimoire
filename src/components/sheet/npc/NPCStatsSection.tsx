@@ -60,7 +60,9 @@ export default function NPCStatsSection({
   mode = 'view',
   variant = 'section',
 }: NPCStatsSectionProps) {
-  const update = useCharacterStore((s) => s.updateCurrentCharacter)
+  const updateCharacter = useCharacterStore((s) => s.updateCharacter)
+  const update = (updater: (c: Character) => Character) =>
+    updateCharacter(npc.id, updater)
   // Standalone NPC sheets follow the app theme (see NPCSheet) — including the
   // Combat Stats accents, which come from the theme's NPC stat palette.
   const appTheme = useAppThemeStore((s) => s.theme)

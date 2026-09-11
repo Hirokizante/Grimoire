@@ -20,14 +20,24 @@ import {
   insufficientCustomCostParts,
   resolveCustomAbilityCosts,
 } from '@/lib/abilityCosts'
-import type { AbilityBlock } from '@/types'
+import type { AbilityBlock, Character } from '@/types'
 
 export interface AbilityActivationProps {
   ability: AbilityBlock
+  /**
+   * Entity the costs are deducted from and whose stats resolve the cards'
+   * dice notation. Defaults to the store's `currentCharacter` (the normal
+   * sheet page); GM-screen panels pass their own entity.
+   */
+  character?: Character
 }
 
-export default function AbilityActivation({ ability }: AbilityActivationProps) {
-  const character = useCharacterStore((s) => s.currentCharacter)
+export default function AbilityActivation({
+  ability,
+  character: explicitCharacter,
+}: AbilityActivationProps) {
+  const storeCharacter = useCharacterStore((s) => s.currentCharacter)
+  const character = explicitCharacter ?? storeCharacter
   const spendAP = useCharacterStore((s) => s.spendAP)
   const spendEND = useCharacterStore((s) => s.spendEND)
   const spendFP = useCharacterStore((s) => s.spendFP)
@@ -39,7 +49,7 @@ export default function AbilityActivation({ ability }: AbilityActivationProps) {
   if (!character) return null
 
   if (!ability.showActivate) {
-    return <AbilityBlockCard ability={ability} mode="view" />
+    return <AbilityBlockCard ability={ability} mode="view" character={character} />
   }
 
   // Exhaustion: +1 END cost
@@ -74,11 +84,11 @@ export default function AbilityActivation({ ability }: AbilityActivationProps) {
   const handleActivate = () => {
     // Deduct costs (order matters: check all first, then deduct).
     let ok = true
-    if (apCost > 0) ok = spendAP(apCost) && ok
-    if (endCost > 0) ok = spendEND(endCost) && ok
-    if (fpCost > 0) ok = spendFP(fpCost) && ok
+    if (apCost > 0) ok = spendAP(character.id, apCost) && ok
+    if (endCost > 0) ok = spendEND(character.id, endCost) && ok
+    if (fpCost > 0) ok = spendFP(character.id, fpCost) && ok
     for (const c of customCosts) {
-      ok = spendCustomResourceBar(c.barId, c.amount) && ok
+      ok = spendCustomResourceBar(character.id, c.barId, c.amount) && ok
     }
 
     if (ok) {
@@ -90,7 +100,7 @@ export default function AbilityActivation({ ability }: AbilityActivationProps) {
 
   return (
     <div className="ability-activation">
-      <AbilityBlockCard ability={ability} mode="view" />
+      <AbilityBlockCard ability={ability} mode="view" character={character} />
       <div className="ability-activation__footer">
         <button
           type="button"

@@ -5,8 +5,11 @@ import {
   appThemeColorVars,
   appThemeNpcStatColors,
   appThemeSheetPageBackground,
+  appThemeStatusDurationColors,
   colorVars,
   NPC_STAT_TOKEN_COLORS,
+  STATUS_DURATION_COLORS,
+  statusDurationColor,
 } from '@/lib/themeUtils'
 import type { NPCStatColorKey } from '@/lib/themeUtils'
 import { APP_THEMES } from '@/store/appThemeStore'
@@ -16,7 +19,7 @@ import {
   PARCHMENT_SHEET_COLORS,
   PITCH_BLACK_SHEET_COLORS,
 } from '@/constants/gameData'
-import type { SheetConfig } from '@/types'
+import type { PanelStatusDuration, SheetConfig } from '@/types'
 
 /** The six NPC Combat Stats tokens, in sheet order. */
 const NPC_STAT_KEYS: NPCStatColorKey[] = [
@@ -183,6 +186,54 @@ test('NPC stat accents stay distinct and visible on every theme card', () => {
 
       for (let j = i + 1; j < NPC_STAT_KEYS.length; j++) {
         const other = NPC_STAT_KEYS[j]
+        expect(
+          deltaE76(palette[key], palette[other]),
+          `${theme}: ${key} vs ${other}`,
+        ).toBeGreaterThanOrEqual(16)
+      }
+    }
+  }
+})
+
+// ---- Status-duration accents (GM Screen pills) ------------------------------
+
+/** The five status durations, in picker order. */
+const DURATION_KEYS: PanelStatusDuration[] = [
+  'quick',
+  'persistent',
+  'countdown',
+  'permanent',
+  'conditional',
+]
+
+test('every app theme has a full status-duration palette', () => {
+  for (const theme of APP_THEMES) {
+    const palette = appThemeStatusDurationColors(theme)
+    expect(palette).toBe(STATUS_DURATION_COLORS[theme])
+    for (const key of DURATION_KEYS) {
+      expect(palette[key], `${theme}.${key}`).toMatch(/^#[0-9a-f]{6}$/i)
+      expect(statusDurationColor(theme, key)).toBe(palette[key])
+    }
+  }
+})
+
+test('status-duration accents stay distinct and legible on every theme', () => {
+  for (const theme of APP_THEMES) {
+    const palette = appThemeStatusDurationColors(theme)
+    const surface = appThemeSheetColors(theme).bgSurface
+
+    for (let i = 0; i < DURATION_KEYS.length; i++) {
+      const key = DURATION_KEYS[i]
+      // The tone paints each pill's duration icon and the duration chip's
+      // frame: small text and glyphs, so it needs body-text contrast, not the
+      // 3px-stripe floor the NPC tokens use.
+      expect(
+        contrastRatio(palette[key], surface),
+        `${theme}.${key} vs panel surface`,
+      ).toBeGreaterThanOrEqual(4.5)
+
+      for (let j = i + 1; j < DURATION_KEYS.length; j++) {
+        const other = DURATION_KEYS[j]
         expect(
           deltaE76(palette[key], palette[other]),
           `${theme}: ${key} vs ${other}`,

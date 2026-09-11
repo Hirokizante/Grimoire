@@ -1,0 +1,93 @@
+/**
+ * Shared helpers for GM Screen panels.
+ *
+ * These live outside the components so the list pages (delete confirmations)
+ * and the GM Screen page itself describe screen references identically.
+ */
+
+import type { Character, ScreenPanel } from '@/types'
+
+/**
+ * One-line warning for a delete confirmation: which GM screens reference the
+ * record about to be deleted. Returns `undefined` when nothing references it,
+ * so callers can omit the line entirely.
+ *
+ * Deletion always proceeds — the referencing panels simply render as
+ * placeholders afterwards (no cascade, no orphan cleanup).
+ */
+export function screenReferenceNote(
+  referencingScreenNames: string[],
+): string | undefined {
+  if (referencingScreenNames.length === 0) return undefined
+  const list = referencingScreenNames.join(', ')
+  return `Referenced on GM screen${referencingScreenNames.length === 1 ? '' : 's'}: ${list}`
+}
+
+/**
+ * Display fields for one GM Screen panel, resolved against the live character
+ * list. `missing` marks a panel whose referenced record was deleted — the
+ * panel then renders as a placeholder. This state is derived at render time,
+ * never stored.
+ */
+export interface ResolvedPanel {
+  panel: ScreenPanel
+  /** The referenced record: the player character, or the NPC base. */
+  entity: Character | null
+  /** True when the referenced record no longer exists. */
+  missing: boolean
+  /**
+   * Name shown on the panel: the instance label for NPC instances, the
+   * character's name otherwise.
+   */
+  displayName: string
+  /**
+   * Secondary line: the base NPC's name for an instance whose label differs
+   * from it ("Bandit 2" over "Bandit"), otherwise null.
+   */
+  subtitle: string | null
+}
+
+/** Resolve every panel of a screen against the character list. */
+export function resolvePanels(
+  panels: ScreenPanel[],
+  characters: Character[],
+): ResolvedPanel[] {
+  const byId = new Map(characters.map((c) => [c.id, c]))
+  return panels.map((panel) => {
+    if (panel.kind === 'character') {
+      const entity = byId.get(panel.characterId) ?? null
+      return {
+        panel,
+        entity,
+        missing: entity === null,
+        displayName: entity?.name ?? 'Missing character',
+        subtitle: null,
+      }
+    }
+    const base = byId.get(panel.baseNpcId) ?? null
+    return {
+      panel,
+      entity: base,
+      missing: base === null,
+      displayName: panel.label || base?.name || 'NPC',
+      subtitle: base && panel.label && panel.label !== base.name ? base.name : null,
+    }
+  })
+}
+
+/**
+ * Split an ordered panel list into `columnCount` vertical columns, keeping
+ * the array order flowing down each column (then across), the way the GM
+ * Screen lays panels out at desktop widths.
+ */
+export function distributeIntoColumns<T>(items: T[], columnCount: number): T[][] {
+  const count = Math.max(1, columnCount)
+  const columns: T[][] = Array.from({ length: count }, () => [])
+  const perColumn = Math.ceil(items.length / count)
+  items.forEach((item, index) => {
+    // Guard against the last column overflowing when perColumn is 0.
+    const column = perColumn === 0 ? 0 : Math.min(count - 1, Math.floor(index / perColumn))
+    columns[column].push(item)
+  })
+  return columns
+}
