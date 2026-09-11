@@ -1173,10 +1173,15 @@
   }
 }
 
+/* All five buttons share a single row on desktop. The tracks are capped at
+   9.5rem so the tiles keep their size on a wide screen, but they are allowed
+   to shrink (down to 4rem) rather than wrap, and the grid itself never
+   exceeds the viewport — so the row stays on one line without overflowing. */
 .home-nav {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 9.5rem));
+  grid-template-columns: repeat(5, minmax(4rem, 9.5rem));
   justify-content: center;
+  width: min(100%, 57.25rem);
   gap: 1.25rem;
   animation: homeNavFade 1.2s ease-out 0.55s both;
 }
