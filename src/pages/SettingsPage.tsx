@@ -15,6 +15,8 @@
 import { useCallback, useRef, useState } from 'react'
 import { ArchiveRestore, Check, DatabaseBackup } from 'lucide-react'
 
+import BokehMote from '@/components/home/BokehMote'
+import { buildPreviewMotes } from '@/components/home/bokehField'
 import ConfirmModal from '@/components/sheet/ConfirmModal'
 import { useNotification } from '@/context/NotificationContext'
 import {
@@ -50,28 +52,21 @@ interface AnimationOption {
   preview: React.ReactNode
 }
 
+/** The thumbnail's dust: a deterministic sample of the scene's own field,
+ *  resized for the card by `buildPreviewMotes`. */
+const PREVIEW_MOTES = buildPreviewMotes()
+
 const ANIMATION_OPTIONS: AnimationOption[] = [
   {
     id: 'arcane',
     name: 'Arcane Glow',
-    description: 'Drifting light and floating dust particles (the default).',
+    description: 'A shaft of light through the dark, dust drifting in it.',
     preview: (
-      <>
-        <span
-          className="animation-preview__orb"
-          style={{
-            background:
-              'radial-gradient(circle, var(--accent-violet), transparent 70%)',
-          }}
-        />
-        <span
-          className="animation-preview__orb animation-preview__orb--small"
-          style={{
-            background:
-              'radial-gradient(circle, var(--accent-blush), transparent 70%)',
-          }}
-        />
-      </>
+      <span className="animation-preview__arcane" aria-hidden="true">
+        {PREVIEW_MOTES.map((mote) => (
+          <BokehMote key={mote.id} mote={mote} />
+        ))}
+      </span>
     ),
   },
   {

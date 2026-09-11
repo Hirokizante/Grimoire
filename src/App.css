@@ -763,81 +763,262 @@
   isolation: isolate;
 }
 
-/* Ambient background glows — part of the Arcane Glow animation only, so
-   they render exclusively under .home-page--arcane. */
-.home-page--arcane::before,
-.home-page--arcane::after {
-  content: '';
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(120px);
-  opacity: 0.25;
-  pointer-events: none;
-  z-index: -2;
-  animation: homeGlow 12s ease-in-out infinite alternate;
-}
+/* ---- Arcane Glow --------------------------------------------------------
+   The default home page background: one volumetric shaft of light falling
+   from the top-left corner through a dark room, air haze where it lands, and
+   a slow field of out-of-focus dust motes at three depths. Markup lives in
+   components/home/ArcaneGlowAnimation.tsx.
 
-.home-page--arcane::before {
-  width: min(60vw, 520px);
-  height: min(60vw, 520px);
-  top: -10%;
-  left: -10%;
-  background: radial-gradient(circle, var(--accent-violet), transparent 70%);
-}
+   Layers are painted back to front by DOM order — floor haze, shafts, motes,
+   vignette — and the whole scene sits at z-index -1 inside the `.home-page`
+   stacking context, so it stays behind the title and nav.
 
-.home-page--arcane::after {
-  width: min(55vw, 480px);
-  height: min(55vw, 480px);
-  bottom: -10%;
-  right: -10%;
-  background: radial-gradient(circle, var(--accent-blush), transparent 70%);
-  animation-delay: -6s;
-}
+   Cost is kept low deliberately: the light layers are static gradients blurred
+   once and blended with `screen`, and every mote animates only `transform` /
+   `opacity`, so the scene composites on the GPU instead of repainting. */
 
-@keyframes homeGlow {
-  0% {
-    transform: scale(1) translate(0, 0);
-    opacity: 0.22;
-  }
-  100% {
-    transform: scale(1.12) translate(5%, 5%);
-    opacity: 0.32;
-  }
-}
-
-/* Floating dust particles */
-.home-page__particles {
+.home-page__arcane {
+  /* Warm light, with just enough of the app accent mixed in that the shaft
+     still belongs to the active theme. */
+  --arcane-light: color-mix(in srgb, var(--accent-violet-soft) 14%, #fff4e2);
   position: absolute;
   inset: 0;
-  pointer-events: none;
   z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  /* The beam only reads against a near-black ground — darken the page canvas
+     toward black for this effect, while letting a trace of the theme tint
+     through. */
+  background:
+    /* Ambient lift: the room is foggy, so even the far side of the frame
+       keeps a few percent of light (reference: ~10-20 luminance at 90% across). */
+    linear-gradient(
+      58deg,
+      rgba(255, 244, 226, 0.06) 0%,
+      rgba(255, 244, 226, 0.04) 42%,
+      rgba(255, 244, 226, 0.02) 68%,
+      transparent 88%
+    ),
+    radial-gradient(
+      130% 100% at 0% -10%,
+      rgba(255, 236, 208, 0.07),
+      transparent 52%
+    ),
+    linear-gradient(180deg, rgba(22, 24, 30, 0.62), rgba(10, 11, 15, 0.8));
+}
+
+/* Every light layer is additive: light in air adds to the dark room behind
+   it, it does not paint over it. */
+.home-page__arcane-mist,
+.home-page__arcane-shafts {
+  position: absolute;
+  pointer-events: none;
+  mix-blend-mode: screen;
+}
+
+/* Cool haze pooled in the bottom-left, where the shafts meet the floor. The
+   reference frame is brightest here — the light lands and spreads. */
+.home-page__arcane-mist {
+  left: -22%;
+  bottom: -32%;
+  width: 88vw;
+  height: 86vh;
+  background: radial-gradient(
+    ellipse 105% 62% at 40% 74%,
+    rgba(204, 222, 240, 1) 0%,
+    rgba(182, 204, 228, 0.85) 20%,
+    rgba(152, 176, 204, 0.5) 40%,
+    rgba(126, 150, 180, 0.24) 60%,
+    transparent 82%
+  );
+  filter: blur(30px);
+  animation: arcaneMistDrift 44s ease-in-out infinite alternate;
+}
+
+/* The shafts: a fan of light entering from above the frame. The geometry is
+   SVG polygons (see ArcaneGlowAnimation.tsx) so the edges converge on an apex
+   off-screen — a rotated rectangle cannot diverge, and a conic gradient from a
+   single apex read as a blob. This wrapper blurs them, blends them additively
+   and breathes; the polygons themselves fade along their length, so the light
+   is gone by the lower third and the floor haze carries on from there.
+
+   Blurring the wrapper (rather than each shape) costs one filter pass, and
+   only this wrapper animates, so the blur is never re-rasterized. */
+.home-page__arcane-shafts {
+  position: absolute;
+  inset: 0;
+  filter: blur(19px);
+  mix-blend-mode: screen;
+  transform-origin: 18% 0%;
+  animation: arcaneShaftBreathe 24s ease-in-out infinite alternate;
+}
+
+/* preserveAspectRatio="none" maps the viewBox across the frame — x directly
+   as a percentage, y shifted by the -14 origin the polygons start from — so
+   the shaft geometry reads off the reference frame. */
+.home-page__arcane-shafts-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Dust in the light. Each mote carries its size, opacity, drift and twinkle
+   period as inline custom properties (see ArcaneGlowAnimation.tsx). */
+.home-page__arcane-bokeh {
+  position: absolute;
+  inset: 0;
   overflow: hidden;
 }
 
-.home-page__particle {
+.arcane-mote {
+  --bokeh-core: rgba(255, 248, 236, 0.95);
+  --bokeh-mid: rgba(255, 216, 164, 0.38);
   position: absolute;
-  width: 4px;
-  height: 4px;
+  width: var(--bokeh-size, 3px);
+  height: var(--bokeh-size, 3px);
+  margin: calc(var(--bokeh-size, 3px) / -2) 0 0
+    calc(var(--bokeh-size, 3px) / -2);
   border-radius: 50%;
-  background: var(--accent-violet-soft);
-  opacity: 0;
-  animation: floatUp 10s linear infinite;
+  opacity: var(--bokeh-opacity, 0.4);
+  background: radial-gradient(
+    circle,
+    var(--bokeh-core) 0%,
+    var(--bokeh-mid) 38%,
+    transparent 72%
+  );
+  animation:
+    arcaneBokehDrift var(--drift-duration, 120s) ease-in-out
+      var(--drift-delay, 0s) infinite,
+    arcaneBokehPulse var(--pulse-duration, 12s) ease-in-out
+      var(--pulse-delay, 0s) infinite;
 }
 
-@keyframes floatUp {
+/* Depth of field: far motes are near-pinpoint specks, near motes are wide
+   out-of-focus discs with a bright centre and a soft falloff. */
+.arcane-mote--far {
+  background: radial-gradient(
+    circle,
+    var(--bokeh-core) 0 22%,
+    var(--bokeh-mid) 42%,
+    transparent 72%
+  );
+}
+
+.arcane-mote--mid {
+  background: radial-gradient(
+    circle,
+    var(--bokeh-core) 0 16%,
+    var(--bokeh-mid) 44%,
+    transparent 74%
+  );
+}
+
+.arcane-mote--near {
+  background: radial-gradient(
+    circle,
+    var(--bokeh-core) 0 8%,
+    var(--bokeh-mid) 26%,
+    color-mix(in srgb, var(--bokeh-mid) 55%, transparent) 48%,
+    transparent 70%
+  );
+}
+
+/* A near disc with a bright rim — a real out-of-focus highlight. */
+.arcane-mote--ring {
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--bokeh-core) 38%, transparent) 0 34%,
+    var(--bokeh-core) 58%,
+    color-mix(in srgb, var(--bokeh-mid) 80%, transparent) 74%,
+    transparent 90%
+  );
+}
+
+/* Tints: light-caught dust runs warm, background dust runs cool, and a few
+   motes carry the app accent. */
+.arcane-mote--cool {
+  --bokeh-core: rgba(240, 248, 255, 0.92);
+  --bokeh-mid: rgba(150, 186, 226, 0.34);
+}
+
+.arcane-mote--arcane {
+  --bokeh-core: color-mix(in srgb, var(--accent-violet-soft) 55%, #fff);
+  --bokeh-mid: color-mix(in srgb, var(--accent-violet) 40%, transparent);
+}
+
+/* Motes sitting inside the shaft, lit by it. */
+.arcane-mote--lit {
+  --bokeh-core: #fffaf0;
+  --bokeh-mid: rgba(255, 224, 170, 0.5);
+}
+
+.home-page__arcane-vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      120% 88% at 46% 40%,
+      transparent 36%,
+      rgba(0, 0, 0, 0.38) 100%
+    ),
+    linear-gradient(
+      180deg,
+      rgba(0, 0, 0, 0.24),
+      transparent 22%,
+      transparent 64%,
+      rgba(0, 0, 0, 0.4)
+    );
+}
+
+/* Motes drift a few dozen pixels at most over a lap, then return; the
+   twinkle is what makes the field feel alive without any fast motion. */
+@keyframes arcaneBokehDrift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(var(--drift-x, 0), var(--drift-y, 0), 0);
+  }
+}
+
+@keyframes arcaneBokehPulse {
+  0%,
+  100% {
+    opacity: var(--bokeh-opacity, 0.4);
+  }
+  50% {
+    opacity: calc(var(--bokeh-opacity, 0.4) * 0.42);
+  }
+}
+
+@keyframes arcaneShaftBreathe {
   0% {
-    transform: translateY(100vh) scale(0.6);
-    opacity: 0;
-  }
-  10% {
-    opacity: 0.45;
-  }
-  90% {
-    opacity: 0.35;
+    opacity: 0.84;
+    transform: rotate(-0.5deg);
   }
   100% {
-    transform: translateY(-10vh) scale(1);
-    opacity: 0;
+    opacity: 1;
+    transform: rotate(0.5deg);
+  }
+}
+
+@keyframes arcaneMistDrift {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  100% {
+    transform: translate3d(4%, -3%, 0) scale(1.08);
+  }
+}
+
+/* Reduced motion: keep the scene, freeze everything in it. */
+@media (prefers-reduced-motion: reduce) {
+  .home-page__arcane-shafts,
+  .home-page__arcane-mist,
+  .arcane-mote {
+    animation: none;
   }
 }
 
@@ -2288,18 +2469,18 @@
   overflow: hidden;
 }
 
-.animation-preview__orb {
-  width: 1.9rem;
-  height: 1.9rem;
-  border-radius: 50%;
-  filter: blur(2px);
-}
+/* Thumbnail of the arcane scene: a sample of its own dust field, rendered
+   with the shared `.arcane-mote` styles (see SettingsPage / BokehMote).
 
-.animation-preview__orb--small {
-  width: 1.3rem;
-  height: 1.3rem;
-  margin-left: -0.6rem;
-  margin-top: 0.9rem;
+   No backdrop of its own — like the Terminal Boot preview, the dust sits
+   directly on the option card, so the preview reads as part of it rather than
+   as a black tile. It only claims the slot the other previews occupy, which
+   keeps the two options aligned. */
+.animation-preview__arcane {
+  position: relative;
+  flex: 0 0 auto;
+  width: 3.6rem;
+  height: 2.2rem;
 }
 
 .animation-preview__term {

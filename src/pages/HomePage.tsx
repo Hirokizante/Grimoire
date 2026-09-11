@@ -3,12 +3,13 @@
  *
  * Displays the app title "GRIMOIRE" in Camiro font, with three navigation
  * buttons: Characters, NPCs, and Settings. The ambient background effect
- * (glow + particles, terminal boot, or none) is chosen in Settings and read
- * from homeAnimationStore.
+ * (arcane glow, terminal boot, or none) is chosen in Settings and read from
+ * homeAnimationStore.
  */
 
 import { Users, Swords, Sparkles, Settings, LayoutDashboard } from 'lucide-react'
 
+import ArcaneGlowAnimation from '@/components/home/ArcaneGlowAnimation'
 import TerminalBootAnimation from '@/components/home/TerminalBootAnimation'
 import { useCharacterStore } from '@/store/characterStore'
 import { useHomeAnimationStore } from '@/store/homeAnimationStore'
@@ -27,26 +28,10 @@ export default function HomePage() {
           : '')
       }
     >
-      {animationsEnabled && animation === 'arcane' && (
-        <div className="home-page__particles" aria-hidden="true">
-          {Array.from({ length: 18 }).map((_, i) => (
-            <span
-              key={i}
-              className="home-page__particle"
-              style={{
-                left: `${Math.random() * 100}%`,
-                animationDuration: `${8 + Math.random() * 10}s`,
-                animationDelay: `${Math.random() * 8}s`,
-                width: `${3 + Math.random() * 3}px`,
-                height: `${3 + Math.random() * 3}px`,
-              }}
-            />
-          ))}
-        </div>
-      )}
       {animationsEnabled && animation === 'terminal' && (
         <TerminalBootAnimation />
       )}
+      {animationsEnabled && animation === 'arcane' && <ArcaneGlowAnimation />}
 
       <div className="home-page__content">
         <div>
