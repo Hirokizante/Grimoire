@@ -7,7 +7,7 @@
  */
 
 import { useState, useCallback } from 'react'
-import { LayoutGrid, List, Pencil, Check, Trash2 } from 'lucide-react'
+import { Pencil, Check, Trash2 } from 'lucide-react'
 
 import { useDroppable } from '@dnd-kit/core'
 import {
@@ -19,6 +19,7 @@ import {
 import AbilityActivation from '@/components/sheet/AbilityActivation'
 import AbilityEditorModal from '@/components/sheet/AbilityEditorModal'
 import ConfirmModal from '@/components/sheet/ConfirmModal'
+import SectionViewToggle from '@/components/sheet/SectionViewToggle'
 import SortableAbilityCard from '@/components/sheet/SortableAbilityCard'
 import { useCharacterStore } from '@/store/characterStore'
 import { useSubAbilityEditor } from '@/hooks/useSubAbilityEditor'
@@ -145,38 +146,11 @@ export default function CustomAbilitySection({
         )}
           <div className="sheet-section__heading-row-right">
             {onViewModeChange && (
-              <div
-                className="mode-toggle mode-toggle--compact"
-                role="tablist"
-                aria-label={`${section.name} view`}
-              >
-                <button
-                  className={
-                    'mode-toggle__btn' +
-                    (viewMode === 'grid' ? ' mode-toggle__btn--active' : '')
-                  }
-                  type="button"
-                  role="tab"
-                  aria-selected={viewMode === 'grid'}
-                  aria-label="Grid view"
-                  onClick={() => onViewModeChange('grid')}
-                >
-                  <LayoutGrid size={16} />
-                </button>
-                <button
-                  className={
-                    'mode-toggle__btn' +
-                    (viewMode === 'list' ? ' mode-toggle__btn--active' : '')
-                  }
-                  type="button"
-                  role="tab"
-                  aria-selected={viewMode === 'list'}
-                  aria-label="List view"
-                  onClick={() => onViewModeChange('list')}
-                >
-                  <List size={16} />
-                </button>
-              </div>
+              <SectionViewToggle
+                viewMode={viewMode}
+                onChange={onViewModeChange}
+                ariaLabel={`${section.name} view`}
+              />
             )}
             {isEdit && (
               <button

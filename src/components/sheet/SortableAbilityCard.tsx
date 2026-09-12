@@ -16,7 +16,7 @@ import { CSS } from '@dnd-kit/utilities'
 
 import AbilityBlockCard from '@/components/sheet/AbilityBlockCard'
 import type { AbilityActivationOverrideResolver } from '@/hooks/useAbilityActivation'
-import type { AbilityBlock } from '@/types'
+import type { AbilityBlock, Character } from '@/types'
 import type { SheetMode } from '@/pages/CharacterSheetPage'
 
 /** Which ability list a sortable card belongs to. */
@@ -26,6 +26,21 @@ export interface SortableAbilityCardProps {
   ability: AbilityBlock
   section: AbilitySectionId
   mode?: SheetMode
+  /**
+   * Entity the card belongs to, so its dice notation resolves against the
+   * right stats. Omitted on the player sheet (the store's `currentCharacter`
+   * is the owner there); an NPC section embedded in a player sheet passes the
+   * NPC, which is not the current character.
+   */
+  character?: Character
+  /**
+   * Persist the modifier switch / manual use adjustment for an ability that
+   * does not live on the store's current character (an NPC attached to a
+   * character sheet tab). Omitted where the card's own character is the
+   * current character — the store action is the writer there.
+   */
+  onToggleModifiers?: (abilityId: string, active: boolean) => void
+  onSetUses?: (abilityId: string, remaining: number) => void
   /** Optional action buttons rendered below the card (Edit, Move, Remove). */
   actions?: React.ReactNode
   /**
@@ -46,6 +61,9 @@ export default function SortableAbilityCard({
   ability,
   section,
   mode = 'view',
+  character,
+  onToggleModifiers,
+  onSetUses,
   actions,
   subAbilityActions,
   activateOverride,
@@ -95,6 +113,9 @@ export default function SortableAbilityCard({
       <AbilityBlockCard
         ability={ability}
         mode={mode}
+        character={character}
+        onToggleModifiers={onToggleModifiers}
+        onSetUses={onSetUses}
         actions={actions}
         subAbilityActions={subAbilityActions}
         activateOverride={activateOverride}

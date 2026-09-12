@@ -16,7 +16,6 @@
  */
 
 import { useState, useCallback } from 'react'
-import { LayoutGrid, List } from 'lucide-react'
 import {
   SortableContext,
   rectSortingStrategy,
@@ -27,6 +26,7 @@ import { useDroppable } from '@dnd-kit/core'
 import AbilityActivation from '@/components/sheet/AbilityActivation'
 import AbilityEditorModal from '@/components/sheet/AbilityEditorModal'
 import ConfirmModal from '@/components/sheet/ConfirmModal'
+import SectionViewToggle from '@/components/sheet/SectionViewToggle'
 import SortableAbilityCard, {
   type AbilitySectionId,
 } from '@/components/sheet/SortableAbilityCard'
@@ -135,38 +135,11 @@ export default function SlottedAbilitiesSection({
         <h3 className="sheet-section__heading">Slotted Abilities</h3>
         <div className="sheet-section__heading-row-right">
           {onViewModeChange && (
-            <div
-              className="mode-toggle mode-toggle--compact"
-              role="tablist"
-              aria-label="Slotted abilities view"
-            >
-              <button
-                className={
-                  'mode-toggle__btn' +
-                  (viewMode === 'grid' ? ' mode-toggle__btn--active' : '')
-                }
-                type="button"
-                role="tab"
-                aria-selected={viewMode === 'grid'}
-                aria-label="Grid view"
-                onClick={() => onViewModeChange('grid')}
-              >
-                <LayoutGrid size={16} />
-              </button>
-              <button
-                className={
-                  'mode-toggle__btn' +
-                  (viewMode === 'list' ? ' mode-toggle__btn--active' : '')
-                }
-                type="button"
-                role="tab"
-                aria-selected={viewMode === 'list'}
-                aria-label="List view"
-                onClick={() => onViewModeChange('list')}
-              >
-                <List size={16} />
-              </button>
-            </div>
+            <SectionViewToggle
+              viewMode={viewMode}
+              onChange={onViewModeChange}
+              ariaLabel="Slotted abilities view"
+            />
           )}
           <span
             className={

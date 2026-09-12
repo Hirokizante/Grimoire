@@ -1,33 +1,65 @@
 /**
- * NPCAbilitiesSection — a container for AbilityBlockCards on an NPC sheet.
+ * NPCAbilitiesSection — an NPC's ability list, shared by every surface an NPC
+ * sheet appears on:
  *
- * Similar to the CharacterSheet's SlottedAbilitiesSection but simpler:
- *   - No slot tracking (NPCs have no slot limit)
- *   - No drag-and-drop reordering (static reference, not encounter management)
- *   - No "Move to Pool" button
- *   - On the NPC **sheet pages** the Activate button is never rendered — NPC
- *     sheets are static references, not active participants in turn-based
- *     combat. The GM Screen passes an `activation` resolver instead, and only
- *     the abilities that resolver returns an override for (any ability with a
- *     cost, plus anything on Recharge cooldown) get a working Activate button
- *     backed by the panel's own AP. See hooks/useNpcInstanceActivation.
+ *   - the standalone NPC sheet page ({@link NPCSheet}), where the section is
+ *     the same `sheet-section` shell the player sheet's Slotted Abilities use,
+ *   - an NPC attached to a custom tab of a player sheet
+ *     ({@link CustomNPCSection}), rendered through `variant="embedded"` inside
+ *     the bundled NPC's own block layout,
+ *   - an expanded GM Screen panel ({@link PanelSheet}), always in list view.
  *
- * In edit mode, an "Add Ability" button opens the AbilityEditorModal, and
- * each card gains Edit and Remove buttons.
+ * **One component, so the surfaces cannot drift.** The standalone and embedded
+ * variants render the same heading row (title left, grid/list toggle right),
+ * the same `+ Add Ability` button below it, and the same `.ability-grid` cards
+ * (3-column masonry or a full-width list) — the embedded variant only swaps the
+ * section shell for a block wrapper and the `h3` heading for the compact `h5`
+ * block heading the NPC's other blocks use, because there the NPC's name is the
+ * section heading.
  *
- * In view mode, cards render as static AbilityBlockCards with clickable dice
- * notation in the damage field (DiceHighlighter works because the NPC is the
- * store's currentCharacter, so variable substitution uses the NPC's
- * attributes/skills).
+ * **Drag and drop matches the player sheet's Slotted Abilities.** In edit mode
+ * every card is a {@link SortableAbilityCard} with the same grip handle, inside
+ * an {@link NpcAbilitiesDndContext} that reorders the list on drop (an NPC has
+ * one ability list, so there is no cross-list move to make). The empty list is
+ * a drop zone and the list highlights while a card hovers it, exactly as the
+ * slotted section does. Reordering writes through `updateCharacter(ownerId, …)`,
+ * so the standalone sheet reorders the NPC it is showing and an embedded
+ * section reorders the attached NPC record.
+ *
+ * **NPCs have no slots and no pool.** There is no slot counter, no overflow
+ * warning, and no "Move to Pool" button — an NPC's list is a stat block, not an
+ * encounter loadout.
+ *
+ * **Activation follows the resolver rule.** On the sheet pages the Activate
+ * button is never rendered — NPC sheets are static references, not active
+ * participants in turn-based combat — because a section always supplies a
+ * resolver (`NO_ACTIVATION` unless the GM Screen passes its own). The GM Screen
+ * passes `activation`, and only the abilities it returns an override for (any
+ * ability with a cost, plus anything on Recharge cooldown) get a working
+ * Activate button backed by the panel's own AP. See
+ * hooks/useNpcInstanceActivation.
+ *
+ * In edit mode, an "Add Ability" button opens the AbilityEditorModal, and each
+ * card gains Edit and Remove buttons.
  */
 
 import { useState, useCallback } from 'react'
-import { LayoutGrid, List } from 'lucide-react'
+import { useDroppable } from '@dnd-kit/core'
+import {
+  SortableContext,
+  rectSortingStrategy,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
 
 import AbilityActivation from '@/components/sheet/AbilityActivation'
 import AbilityBlockCard from '@/components/sheet/AbilityBlockCard'
 import AbilityEditorModal from '@/components/sheet/AbilityEditorModal'
 import ConfirmModal from '@/components/sheet/ConfirmModal'
+import SectionViewToggle from '@/components/sheet/SectionViewToggle'
+import SortableAbilityCard from '@/components/sheet/SortableAbilityCard'
+import NpcAbilitiesDndContext, {
+  NPC_ABILITIES_SECTION_ID,
+} from '@/components/sheet/npc/NpcAbilitiesDndContext'
 import { useCharacterStore } from '@/store/characterStore'
 import { useSubAbilityEditor } from '@/hooks/useSubAbilityEditor'
 import {
@@ -42,18 +74,24 @@ export interface NPCAbilitiesSectionProps {
   abilities: AbilityBlock[]
   /**
    * The NPC these abilities belong to. Defaults to the store's
-   * `currentCharacter`; the GM Screen passes the panel's own entity so edits
-   * target the right record.
+   * `currentCharacter`; an attached NPC section and the GM Screen pass the
+   * record's own id so edits target the right sheet.
    */
   ownerId?: string
   /**
    * The NPC entity itself, so its ability cards resolve dice notation against
-   * the NPC's own stats (the GM Screen has no `currentCharacter` to fall back
-   * on). Optional: the sheet pages already have the store's current NPC.
+   * the NPC's own stats (an attached NPC is not the store's current character).
+   * Optional: the sheet pages already have the store's current NPC.
    */
   owner?: Character
   mode?: SheetMode
   viewMode?: 'grid' | 'list'
+  /**
+   * Omit to render a FIXED view mode with no grid/list toggle. A GM panel
+   * passes nothing, so panels always read as a list (a grid is unreadable at
+   * panel width); the NPC sheet page and an embedded NPC section pass this and
+   * keep both toggles.
+   */
   onViewModeChange?: (mode: 'grid' | 'list') => void
   /**
    * GM Screen live-play resolver. When supplied (view mode only), every ability
@@ -63,6 +101,21 @@ export interface NPCAbilitiesSectionProps {
    * static reference cards.
    */
   activation?: AbilityActivationOverrideResolver
+  /**
+   * `'section'` (default) is the standalone sheet section: its own
+   * `sheet-section` shell with an `h3` heading. `'embedded'` drops the shell
+   * and uses the compact `h5` block heading of a bundled NPC's block layout —
+   * everything inside the section is identical.
+   */
+  variant?: 'section' | 'embedded'
+  /**
+   * Persist the modifier switch / manual use adjustment for an ability that
+   * does not live on the store's current character (an NPC attached to a
+   * character sheet tab). Omitted on the standalone sheet, where the store
+   * action already targets the right record.
+   */
+  onToggleModifiers?: (abilityId: string, active: boolean) => void
+  onSetUses?: (abilityId: string, remaining: number) => void
 }
 
 export default function NPCAbilitiesSection({
@@ -73,9 +126,13 @@ export default function NPCAbilitiesSection({
   viewMode = 'grid',
   onViewModeChange,
   activation,
+  variant = 'section',
+  onToggleModifiers,
+  onSetUses,
 }: NPCAbilitiesSectionProps) {
   const isEdit = mode === 'edit'
   const isListView = viewMode === 'list'
+  const isEmbedded = variant === 'embedded'
   // A resolver is always supplied — the GM panel's, or the "nothing activates"
   // one for the sheet pages. An NPC sheet is a **static reference**, so a sheet
   // page must pass NO_ACTIVATION rather than nothing at all: a resolver is the
@@ -116,6 +173,34 @@ export default function NPCAbilitiesSection({
     // outside a GM Screen never renders an Activate button, so it offers no
     // "Show Activate button" toggle (nor the character-only END/FP costs).
     npcMode: true,
+  })
+
+  /**
+   * Drop handler for the reorder drag. Mirrors the store's `reorderAbility`
+   * (same bounds checks, same splice) but writes through the section's own
+   * owner, which is what lets an attached NPC reorder its list without being
+   * the store's current character.
+   */
+  const handleReorder = useCallback(
+    (fromIndex: number, toIndex: number) => {
+      if (fromIndex === toIndex) return
+      updateCurrentCharacter((char) => {
+        const list = [...char.slottedAbilities]
+        if (fromIndex < 0 || fromIndex >= list.length) return char
+        if (toIndex < 0 || toIndex >= list.length) return char
+        const [moved] = list.splice(fromIndex, 1)
+        list.splice(toIndex, 0, moved)
+        return { ...char, slottedAbilities: list }
+      })
+    },
+    [updateCurrentCharacter],
+  )
+
+  // Droppable — the list itself accepts a card dropped past its last one and
+  // highlights while a card is dragged over it (same as the slotted section).
+  const { setNodeRef, isOver } = useDroppable({
+    id: NPC_ABILITIES_SECTION_ID,
+    data: { section: NPC_ABILITIES_SECTION_ID },
   })
 
   const openNew = () => {
@@ -163,79 +248,85 @@ export default function NPCAbilitiesSection({
     setAbilityToRemove(null)
   }
 
-  return (
-    <section className="sheet-section sheet-section--slotted">
-      <div className="sheet-section__heading-row">
-        <h3 className="sheet-section__heading">Abilities</h3>
-        <div className="sheet-section__heading-row-right">
-          {onViewModeChange && (
-            <div
-              className="mode-toggle mode-toggle--compact"
-              role="tablist"
-              aria-label="Abilities view"
-            >
-              <button
-                className={
-                  'mode-toggle__btn' +
-                  (viewMode === 'grid' ? ' mode-toggle__btn--active' : '')
-                }
-                type="button"
-                role="tab"
-                aria-selected={viewMode === 'grid'}
-                aria-label="Grid view"
-                onClick={() => onViewModeChange('grid')}
-              >
-                <LayoutGrid size={16} />
-              </button>
-              <button
-                className={
-                  'mode-toggle__btn' +
-                  (viewMode === 'list' ? ' mode-toggle__btn--active' : '')
-                }
-                type="button"
-                role="tab"
-                aria-selected={viewMode === 'list'}
-                aria-label="List view"
-                onClick={() => onViewModeChange('list')}
-              >
-                <List size={16} />
-              </button>
-            </div>
-          )}
-        </div>
+  /**
+   * The list itself — identical in both variants and both modes; only the cards
+   * differ (sortable with action buttons while editing).
+   */
+  const list =
+    abilities.length === 0 && !isEdit ? (
+      <p className="sheet-section__empty muted">
+        No abilities defined for this NPC.
+      </p>
+    ) : abilities.length === 0 ? (
+      <div
+        ref={setNodeRef}
+        className={
+          'ability-dropzone ability-dropzone--empty' +
+          (isOver ? ' ability-dropzone--over' : '')
+        }
+      >
+        <p className="sheet-section__empty muted">
+          No abilities yet — click &ldquo;Add Ability&rdquo; to create one.
+        </p>
       </div>
-
-      {isEdit && (
-        <button
-          type="button"
-          className="btn btn--ghost section-add-btn"
-          onClick={openNew}
-        >
-          + Add Ability
-        </button>
-      )}
-
-      {abilities.length === 0 && !isEdit ? (
-        <p className="sheet-section__empty muted">
-          No abilities defined for this NPC.
-        </p>
-      ) : abilities.length === 0 ? (
-        <p className="sheet-section__empty muted">
-          No abilities yet — click "Add Ability" to create one.
-        </p>
-      ) : (
-        <div
-          className={
-            isListView
-              ? 'ability-grid ability-grid--list'
-              : 'ability-grid ability-grid--cards'
-          }
-        >
-          {abilities.map((ability) => {
+    ) : (
+      <div
+        ref={setNodeRef}
+        className={
+          (isListView
+            ? 'ability-grid ability-grid--list'
+            : 'ability-grid ability-grid--cards') +
+          (isOver ? ' ability-dropzone--over' : '')
+        }
+      >
+        {isEdit ? (
+          <SortableContext
+            items={abilities.map((a) => a.id)}
+            strategy={isListView ? verticalListSortingStrategy : rectSortingStrategy}
+          >
+            {abilities.map((ability) => (
+              <SortableAbilityCard
+                key={ability.id}
+                ability={ability}
+                section={NPC_ABILITIES_SECTION_ID}
+                mode={mode}
+                character={owner}
+                onToggleModifiers={onToggleModifiers}
+                onSetUses={onSetUses}
+                subAbilityActions={subAbilityActions}
+                // The parent is not activatable here, but its sub-abilities may
+                // be — the resolver travels with the card either way.
+                activateOverride={activateOverride}
+                actions={
+                  <>
+                    <button
+                      type="button"
+                      className="btn btn--ghost ability-card__action-btn"
+                      onClick={() => openEdit(ability)}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn--ghost ability-card__action-btn ability-card__action-btn--danger"
+                      onClick={() => handleRemoveRequest(ability.id)}
+                    >
+                      Remove
+                    </button>
+                  </>
+                }
+              />
+            ))}
+          </SortableContext>
+        ) : (
+          abilities.map((ability) => {
             // A GM panel resolves an override per ability: one with a cost (or
             // on Recharge cooldown) activates, the rest stay reference cards.
-            const override = isEdit ? null : activateOverride(ability)
+            const override = activateOverride(ability)
             if (override) {
+              // An override only ever comes from a GM panel, which is read-only
+              // for modifiers and uses, so this card needs no writers: the
+              // steppers are suppressed there by design.
               return (
                 <AbilityActivation
                   key={ability.id}
@@ -251,34 +342,60 @@ export default function NPCAbilitiesSection({
                 ability={ability}
                 character={owner}
                 mode={mode}
-                subAbilityActions={isEdit ? subAbilityActions : undefined}
+                onToggleModifiers={onToggleModifiers}
+                onSetUses={onSetUses}
                 // The parent is not activatable here, but its sub-abilities may
                 // be — the resolver travels with the card either way.
                 activateOverride={activateOverride}
-                actions={
-                  isEdit ? (
-                    <>
-                      <button
-                        type="button"
-                        className="btn btn--ghost ability-card__action-btn"
-                        onClick={() => openEdit(ability)}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn--ghost ability-card__action-btn ability-card__action-btn--danger"
-                        onClick={() => handleRemoveRequest(ability.id)}
-                      >
-                        Remove
-                      </button>
-                    </>
-                  ) : undefined
-                }
               />
             )
-          })}
+          })
+        )}
+      </div>
+    )
+
+  const viewToggle = onViewModeChange ? (
+    <SectionViewToggle
+      viewMode={viewMode}
+      onChange={onViewModeChange}
+      ariaLabel="Abilities view"
+    />
+  ) : null
+
+  const content = (
+    <>
+      {isEmbedded ? (
+        <div className="custom-npc-section__block-heading custom-npc-section__block-heading--row">
+          <h5 className="custom-npc-section__block-heading">Abilities</h5>
+          <div className="sheet-section__heading-row-right">{viewToggle}</div>
         </div>
+      ) : (
+        <div className="sheet-section__heading-row">
+          <h3 className="sheet-section__heading">Abilities</h3>
+          <div className="sheet-section__heading-row-right">{viewToggle}</div>
+        </div>
+      )}
+
+      {isEdit && (
+        <button
+          type="button"
+          className="btn btn--ghost section-add-btn"
+          onClick={openNew}
+        >
+          + Add Ability
+        </button>
+      )}
+
+      {isEdit ? (
+        <NpcAbilitiesDndContext
+          abilities={abilities}
+          onReorder={handleReorder}
+          owner={owner}
+        >
+          {list}
+        </NpcAbilitiesDndContext>
+      ) : (
+        list
       )}
 
       <AbilityEditorModal
@@ -308,6 +425,16 @@ export default function NPCAbilitiesSection({
           onClose={() => setAbilityToRemove(null)}
         />
       )}
+    </>
+  )
+
+  return isEmbedded ? (
+    <div className="npc-abilities-section npc-abilities-section--embedded">
+      {content}
+    </div>
+  ) : (
+    <section className="sheet-section sheet-section--slotted npc-abilities-section">
+      {content}
     </section>
   )
 }

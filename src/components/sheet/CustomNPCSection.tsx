@@ -8,8 +8,12 @@
  * sheet is in edit mode.
  *
  * The NPC is stored as a standalone Character record (kind='npc') in the
- * shared `characters` IndexedDB store. Edits target that NPC record directly
- * via the store's NPC patching helper, then persist via the shared db layer.
+ * shared `characters` IndexedDB store. The plain fields (stats, attributes,
+ * skills, description, portrait) patch that record through
+ * {@link updateAttachedNPC}; the abilities block is the shared
+ * {@link NPCAbilitiesSection} in its `embedded` variant, which writes through
+ * the store's id-targeted `updateCharacter` — the same path the NPC's own
+ * sheet page uses, so the two surfaces can never behave differently.
  */
 
 import { useState } from 'react'
@@ -20,11 +24,9 @@ import { useCharacterStore } from '@/store/characterStore'
 import { useDiceRollStore } from '@/store/diceRollStore'
 import { putCharacter } from '@/lib/db'
 import PortraitUploader from '@/components/sheet/PortraitUploader'
-import AbilityBlockCard from '@/components/sheet/AbilityBlockCard'
-import AbilityEditorModal from '@/components/sheet/AbilityEditorModal'
 import ConfirmModal from '@/components/sheet/ConfirmModal'
+import NPCAbilitiesSection from '@/components/sheet/npc/NPCAbilitiesSection'
 import MarkdownText from '@/components/ui/MarkdownText'
-import { NO_ACTIVATION } from '@/hooks/useAbilityActivation'
 import { ATTRIBUTE_LIST, SKILL_LIST } from '@/constants/gameData'
 import {
   DEFAULT_NPC_STATS,
@@ -35,7 +37,6 @@ import {
 } from '@/lib/abilityModifiers'
 import { setAbilityUsesRemaining } from '@/lib/abilityUses'
 import type {
-  AbilityBlock,
   AttributeKey,
   Character,
   CustomNPCSection as CustomNPCSectionType,
@@ -48,6 +49,14 @@ export interface CustomNPCSectionProps {
   tabId: string
   section: CustomNPCSectionType
   mode?: SheetMode
+  /**
+   * Grid/list choice for the NPC's ability list. The parent tab owns it (like
+   * every other custom section's view mode), so the embedded list offers the
+   * very same toggle the NPC's own sheet page does. Omitted only by callers
+   * that want the section locked to a single mode — no toggle is rendered.
+   */
+  viewMode?: 'grid' | 'list'
+  onViewModeChange?: (mode: 'grid' | 'list') => void
 }
 
 const STAT_COLORS = {
@@ -104,6 +113,8 @@ export default function CustomNPCSection({
   tabId,
   section,
   mode = 'view',
+  viewMode = 'grid',
+  onViewModeChange,
 }: CustomNPCSectionProps) {
   const isEdit = mode === 'edit'
   const characters = useCharacterStore((s) => s.characters)
@@ -113,11 +124,6 @@ export default function CustomNPCSection({
   const npc = characters.find((c) => c.id === section.npcId) ?? null
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
-  const [showAbilityEditor, setShowAbilityEditor] = useState(false)
-  const [editingAbility, setEditingAbility] = useState<AbilityBlock | null>(null)
-  const [abilityToRemove, setAbilityToRemove] = useState<
-    { id: string; name: string } | null
-  >(null)
 
   if (!npc) {
     return (
@@ -210,52 +216,6 @@ export default function CustomNPCSection({
       character: npc,
       source: { type: 'skill-check', skillName: skill },
     })
-  }
-
-  const openNewAbility = () => {
-    setEditingAbility(null)
-    setShowAbilityEditor(true)
-  }
-  const openEditAbility = (ability: AbilityBlock) => {
-    setEditingAbility(ability)
-    setShowAbilityEditor(true)
-  }
-  const handleSaveAbility = (ability: AbilityBlock) => {
-    updateAttachedNPC(npc.id, (cur) => {
-      const existing = cur.slottedAbilities
-      if (
-        editingAbility &&
-        existing.some((a) => a.id === editingAbility.id)
-      ) {
-        return {
-          ...cur,
-          slottedAbilities: existing.map((a) =>
-            a.id === editingAbility.id ? ability : a,
-          ),
-        }
-      }
-      return {
-        ...cur,
-        slottedAbilities: [...existing, ability],
-      }
-    })
-    setShowAbilityEditor(false)
-    setEditingAbility(null)
-  }
-  const handleRemoveAbility = (abilityId: string) => {
-    const ability = npc.slottedAbilities.find((a) => a.id === abilityId)
-    if (!ability) return
-    setAbilityToRemove({ id: abilityId, name: ability.name })
-  }
-  const handleConfirmRemoveAbility = () => {
-    if (!abilityToRemove) return
-    updateAttachedNPC(npc.id, (cur) => ({
-      ...cur,
-      slottedAbilities: cur.slottedAbilities.filter(
-        (a) => a.id !== abilityToRemove.id,
-      ),
-    }))
-    setAbilityToRemove(null)
   }
 
   const description = npc.description ?? ''
@@ -416,66 +376,23 @@ export default function CustomNPCSection({
           </div>
         </div>
 
-        {/* Abilities — compact cards, no Activate button, edit-mode Edit/Remove.
-            An attached NPC is a static reference like the standalone NPC sheet,
-            so the "nothing activates" resolver travels with the card: without
-            it a sub-ability would fall back to its own `showActivate` flag and
-            grow a button that spends resources from a card that never plays. */}
-        <div className="custom-npc-section__block">
-          <div className="custom-npc-section__block-heading custom-npc-section__block-heading--row">
-            <h5 className="custom-npc-section__block-heading">Abilities</h5>
-            {isEdit && (
-              <button
-                type="button"
-                className="btn btn--ghost section-add-btn"
-                onClick={openNewAbility}
-              >
-                + Add Ability
-              </button>
-            )}
-          </div>
-          {npc.slottedAbilities.length === 0 ? (
-            <p className="sheet-section__empty muted">
-              {isEdit
-                ? 'No abilities yet — click "Add Ability" to create one.'
-                : 'No abilities defined for this NPC.'}
-            </p>
-          ) : (
-            <div className="custom-npc-section__abilities">
-              {npc.slottedAbilities.map((ability) => (
-                <AbilityBlockCard
-                  key={ability.id}
-                  ability={ability}
-                  mode={mode}
-                  character={npc}
-                  onToggleModifiers={toggleAbilityModifiers}
-                  onSetUses={setAbilityUses}
-                  activateOverride={NO_ACTIVATION}
-                  actions={
-                    isEdit ? (
-                      <>
-                        <button
-                          type="button"
-                          className="btn btn--ghost ability-card__action-btn"
-                          onClick={() => openEditAbility(ability)}
-                        >
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn--ghost ability-card__action-btn ability-card__action-btn--danger"
-                          onClick={() => handleRemoveAbility(ability.id)}
-                        >
-                          Remove
-                        </button>
-                      </>
-                    ) : undefined
-                  }
-                />
-              ))}
-            </div>
-          )}
-        </div>
+        {/* Abilities — the very same section the standalone NPC sheet renders
+            (NPCAbilitiesSection, embedded variant): heading row with the
+            grid/list toggle, "+ Add Ability" below it, the same card grid, and
+            the same drag-to-reorder handles in edit mode. An attached NPC is a
+            static reference like the standalone sheet, so "nothing activates"
+            (the section's own default resolver) travels with every card. */}
+        <NPCAbilitiesSection
+          variant="embedded"
+          abilities={npc.slottedAbilities}
+          ownerId={npc.id}
+          owner={npc}
+          mode={mode}
+          viewMode={viewMode}
+          onViewModeChange={onViewModeChange}
+          onToggleModifiers={toggleAbilityModifiers}
+          onSetUses={setAbilityUses}
+        />
 
         {/* Skills — compact horizontal list */}
         <div className="custom-npc-section__block">
@@ -541,35 +458,6 @@ export default function CustomNPCSection({
           )}
         </div>
       </div>
-
-      <AbilityEditorModal
-        ability={editingAbility}
-        open={showAbilityEditor}
-        onSave={handleSaveAbility}
-        onClose={() => {
-          setShowAbilityEditor(false)
-          setEditingAbility(null)
-        }}
-        npcMode
-      />
-
-      {abilityToRemove && (
-        <ConfirmModal
-          title="Remove Ability?"
-          message={
-            <>
-              Are you sure you want to remove{' '}
-              <strong>{abilityToRemove.name || 'Untitled Ability'}</strong> from
-              this NPC? This cannot be undone.
-            </>
-          }
-          confirmLabel="Remove"
-          cancelLabel="Cancel"
-          variant="danger"
-          onConfirm={handleConfirmRemoveAbility}
-          onClose={() => setAbilityToRemove(null)}
-        />
-      )}
 
       {showDeleteConfirm && (
         <ConfirmModal

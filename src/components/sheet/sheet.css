@@ -4997,10 +4997,6 @@
   gap: 0.5rem;
 }
 
-.custom-npc-section__block-heading--row .section-add-btn {
-  margin: 0;
-}
-
 /* Attributes — compact inline chips */
 .custom-npc-section__attr-list {
   display: flex;
@@ -5110,15 +5106,27 @@
   font-size: 0.8rem;
 }
 
-/* Abilities — compact grid */
-.custom-npc-section__abilities {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 0.6rem;
+/* Abilities — the embedded variant of NPCAbilitiesSection. It renders the
+   standalone section's exact internals (heading row, "+ Add Ability", the same
+   `.ability-grid` cards and drag handles) without the `sheet-section` shell,
+   because the bundled-NPC card already provides one. */
+.npc-abilities-section--embedded {
+  display: flex;
+  flex-direction: column;
 }
 
-.custom-npc-section__abilities .ability-card {
-  font-size: 0.9rem;
+/* A flex column stretches its children, which would blow the content-sized
+   "+ Add Ability" button (a plain inline-block on the standalone section) up to
+   the full width. Keep it the same size in both variants. */
+.npc-abilities-section--embedded > .section-add-btn {
+  align-self: flex-start;
+}
+
+/* Keep the standalone section's heading rhythm (`sheet-section__heading-row`
+   carries the same 0.75rem), so the button and the cards start at the same
+   distance below the title on both surfaces. */
+.npc-abilities-section--embedded .custom-npc-section__block-heading--row {
+  margin-bottom: 0.75rem;
 }
 
 /* Description */

@@ -99,6 +99,8 @@ export default function CustomTabContent({
                     tabId={tab.id}
                     section={section}
                     mode={mode}
+                    viewMode={tabViewModes[section.id] ?? 'grid'}
+                    onViewModeChange={(m) => handleViewModeChange(section.id, m)}
                   />
                 )
               case 'text':

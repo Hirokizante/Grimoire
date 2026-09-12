@@ -1,7 +1,8 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, expect, test, vi } from 'vitest'
 
 import CustomNPCSection from '@/components/sheet/CustomNPCSection'
+import NPCAbilitiesSection from '@/components/sheet/npc/NPCAbilitiesSection'
 import { NotificationProvider } from '@/context/NotificationContext'
 import { createDefaultNPC } from '@/constants/gameData'
 import type {
@@ -13,11 +14,28 @@ import type {
 // Shared mock state recreated per test so the NPC lookups are easy to control.
 // `charactersRef` must live in vi.hoisted so the hoisted vi.mock factory can
 // reach it (the classic vi.mock hoisting gotcha).
-const { roll, removeCustomSection, charactersRef } = vi.hoisted(() => ({
-  roll: vi.fn(),
-  removeCustomSection: vi.fn(),
-  charactersRef: { current: [] as Character[] },
-}))
+const { roll, removeCustomSection, updateCharacter, charactersRef, dragEndRef } =
+  vi.hoisted(() => ({
+    roll: vi.fn(),
+    removeCustomSection: vi.fn(),
+    // The section's only store write: an id-targeted updater. Applied to the
+    // shared list so a test can read the resulting record back.
+    updateCharacter: vi.fn((id: string, updater: (c: Character) => Character) => {
+      charactersRef.current = charactersRef.current.map((c) =>
+        c.id === id ? updater(c) : c,
+      )
+    }),
+    charactersRef: { current: [] as Character[] },
+    // Captures the drag handler from the section's (nested) DndContext: jsdom
+    // has no layout, so a real drag cannot resolve a drop target here. The
+    // pointer path is covered end to end by e2e/npc-abilities.spec.ts.
+    dragEndRef: {
+      current: null as null | ((event: {
+        active: { id: string }
+        over: { id: string } | null
+      }) => void),
+    },
+  }))
 
 // The NPC is selected from the character store's `characters` list, so the
 // mock must expose a real `characters` array the test can populate.
@@ -26,8 +44,27 @@ vi.mock('@/store/characterStore', () => ({
     selector({
       characters: charactersRef.current,
       removeCustomSection,
+      updateCharacter,
     }),
 }))
+
+vi.mock('@dnd-kit/core', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@dnd-kit/core')>()
+  const React = await import('react')
+  return {
+    ...actual,
+    DndContext: (props: {
+      children: React.ReactNode
+      onDragEnd?: (event: {
+        active: { id: string }
+        over: { id: string } | null
+      }) => void
+    }) => {
+      dragEndRef.current = props.onDragEnd ?? null
+      return React.createElement(React.Fragment, null, props.children)
+    },
+  }
+})
 
 vi.mock('@/store/diceRollStore', () => ({
   useDiceRollStore: (selector: (state: Record<string, unknown>) => unknown) =>
@@ -60,6 +97,8 @@ beforeEach(() => {
   charactersRef.current = []
   roll.mockReset()
   removeCustomSection.mockReset()
+  updateCharacter.mockClear()
+  dragEndRef.current = null
 })
 
 function makeNPC(): Character {
@@ -168,4 +207,114 @@ test('an attached NPC never renders an Activate button — sub-abilities include
 
   expect(document.querySelector('.sub-ability-block')).not.toBeNull()
   expect(screen.queryByRole('button', { name: 'Activate' })).toBeNull()
+})
+
+// ---- Shared ability section (layout + drag and drop) ------------------------
+
+/** A bare ability with nothing but an id and a name. */
+function plainAbility(id: string, name: string): AbilityBlock {
+  return {
+    id,
+    name,
+    traits: [],
+    cost: {},
+    damage: '',
+    description: '',
+    overcharge: '',
+    flavorText: '',
+    isMinor: false,
+    showActivate: false,
+    subAbilitiesUnderDescription: [],
+    subAbilitiesUnderOvercharge: [],
+  }
+}
+
+/** An attached NPC holding three abilities. */
+function npcWithThreeAbilities(): Character {
+  const npc = makeNPC()
+  npc.slottedAbilities = [
+    plainAbility('a1', 'Claw'),
+    plainAbility('a2', 'Bite'),
+    plainAbility('a3', 'Howl'),
+  ]
+  return npc
+}
+
+/** The attached NPC's ability order, read back from the shared record. */
+function attachedAbilityIds(): string[] {
+  return (charactersRef.current[0]?.slottedAbilities ?? []).map((a) => a.id)
+}
+
+test('the embedded abilities section is the standalone one: same grid, button and toggle', () => {
+  const npc = npcWithThreeAbilities()
+  charactersRef.current = [npc]
+  const onViewModeChange = vi.fn()
+
+  const { container, unmount } = render(
+    <CustomNPCSection
+      tabId="tab-1"
+      section={section}
+      mode="edit"
+      viewMode="grid"
+      onViewModeChange={onViewModeChange}
+    />,
+  )
+
+  // The exact classes the standalone NPC sheet's section renders — a 3-column
+  // card grid, one grip handle per card, and the same "+ Add Ability" button.
+  const embedded = container.querySelector('.npc-abilities-section--embedded')
+  expect(embedded).not.toBeNull()
+  const embeddedGridClass = container.querySelector('.ability-grid')?.className
+  expect(container.querySelector('.ability-grid--cards')).not.toBeNull()
+  expect(container.querySelectorAll('.drag-handle')).toHaveLength(3)
+  expect(screen.getByRole('button', { name: '+ Add Ability' })).toBeInTheDocument()
+  // The old embedded-only grid (fixed auto-fill columns, no toggle) is gone.
+  expect(container.querySelector('.custom-npc-section__abilities')).toBeNull()
+
+  // The heading row carries the same grid/list toggle the sheet page does…
+  fireEvent.click(screen.getByRole('tab', { name: 'List view' }))
+  expect(onViewModeChange).toHaveBeenCalledWith('list')
+
+  unmount()
+
+  // …and the standalone section renders the identical list markup.
+  const { container: standalone } = render(
+    <NPCAbilitiesSection
+      abilities={npc.slottedAbilities}
+      ownerId={npc.id}
+      owner={npc}
+      mode="edit"
+      viewMode="grid"
+      onViewModeChange={onViewModeChange}
+    />,
+  )
+  expect(standalone.querySelector('.ability-grid')?.className).toBe(embeddedGridClass)
+})
+
+test('dragging an attached NPC ability card reorders that NPC record', () => {
+  const npc = npcWithThreeAbilities()
+  charactersRef.current = [npc]
+
+  render(
+    <CustomNPCSection tabId="tab-1" section={section} mode="edit" />,
+  )
+
+  // Drag "Howl" (last) onto "Claw" (first). The write targets the attached NPC
+  // record — not the player character whose sheet the section lives on.
+  act(() => dragEndRef.current?.({ active: { id: 'a3' }, over: { id: 'a1' } }))
+
+  expect(updateCharacter).toHaveBeenCalledWith('npc-1', expect.any(Function))
+  expect(attachedAbilityIds()).toEqual(['a3', 'a1', 'a2'])
+})
+
+test('an attached NPC list is not draggable in view mode', () => {
+  const npc = npcWithThreeAbilities()
+  charactersRef.current = [npc]
+
+  const { container } = render(
+    <CustomNPCSection tabId="tab-1" section={section} mode="view" />,
+  )
+
+  expect(container.querySelectorAll('.ability-card')).toHaveLength(3)
+  expect(container.querySelectorAll('.drag-handle')).toHaveLength(0)
 })

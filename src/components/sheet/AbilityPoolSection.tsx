@@ -18,7 +18,6 @@
  */
 
 import { useState, useCallback } from 'react'
-import { LayoutGrid, List } from 'lucide-react'
 import {
   SortableContext,
   rectSortingStrategy,
@@ -28,6 +27,7 @@ import { useDroppable } from '@dnd-kit/core'
 
 import AbilityEditorModal from '@/components/sheet/AbilityEditorModal'
 import ConfirmModal from '@/components/sheet/ConfirmModal'
+import SectionViewToggle from '@/components/sheet/SectionViewToggle'
 import SortableAbilityCard, {
   type AbilitySectionId,
 } from '@/components/sheet/SortableAbilityCard'
@@ -116,38 +116,11 @@ export default function AbilityPoolSection({
         <h3 className="sheet-section__heading">Ability Pool</h3>
         <div className="sheet-section__heading-row-right">
           {onViewModeChange && (
-            <div
-              className="mode-toggle mode-toggle--compact"
-              role="tablist"
-              aria-label="Ability pool view"
-            >
-              <button
-                className={
-                  'mode-toggle__btn' +
-                  (viewMode === 'grid' ? ' mode-toggle__btn--active' : '')
-                }
-                type="button"
-                role="tab"
-                aria-selected={viewMode === 'grid'}
-                aria-label="Grid view"
-                onClick={() => onViewModeChange('grid')}
-              >
-                <LayoutGrid size={16} />
-              </button>
-              <button
-                className={
-                  'mode-toggle__btn' +
-                  (viewMode === 'list' ? ' mode-toggle__btn--active' : '')
-                }
-                type="button"
-                role="tab"
-                aria-selected={viewMode === 'list'}
-                aria-label="List view"
-                onClick={() => onViewModeChange('list')}
-              >
-                <List size={16} />
-              </button>
-            </div>
+            <SectionViewToggle
+              viewMode={viewMode}
+              onChange={onViewModeChange}
+              ariaLabel="Ability pool view"
+            />
           )}
         </div>
       </div>

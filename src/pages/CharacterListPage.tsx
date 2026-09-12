@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
-import { ArrowDownFromLine, LayoutGrid, List, Plus } from 'lucide-react'
+import { ArrowDownFromLine, Plus } from 'lucide-react'
 
 import { useCharacterStore } from '@/store/characterStore'
 import {
@@ -12,6 +12,7 @@ import CreateCharacterModal from '@/components/sheet/CreateCharacterModal'
 import ConfirmDeleteModal from '@/components/sheet/ConfirmDeleteModal'
 import UpdateCharacterModal from '@/components/sheet/UpdateCharacterModal'
 import SheetLabelPills from '@/components/sheet/SheetLabelPills'
+import SectionViewToggle from '@/components/sheet/SectionViewToggle'
 import FilterDropdown, { type FilterGroup } from '@/components/ui/FilterDropdown'
 import SortDropdown, { type SortOption } from '@/components/ui/SortDropdown'
 
@@ -299,38 +300,11 @@ export default function CharacterListPage() {
             onChange={(v) => setSortKey(v as ListSortKey)}
             label="Sort characters"
           />
-          <div
-            className="mode-toggle mode-toggle--compact"
-            role="tablist"
-            aria-label="Character list view"
-          >
-            <button
-              className={
-                'mode-toggle__btn' +
-                (viewMode === 'grid' ? ' mode-toggle__btn--active' : '')
-              }
-              type="button"
-              role="tab"
-              aria-selected={viewMode === 'grid'}
-              aria-label="Grid view"
-              onClick={() => setViewMode('grid')}
-            >
-              <LayoutGrid size={16} />
-            </button>
-            <button
-              className={
-                'mode-toggle__btn' +
-                (viewMode === 'list' ? ' mode-toggle__btn--active' : '')
-              }
-              type="button"
-              role="tab"
-              aria-selected={viewMode === 'list'}
-              aria-label="List view"
-              onClick={() => setViewMode('list')}
-            >
-              <List size={16} />
-            </button>
-          </div>
+          <SectionViewToggle
+            viewMode={viewMode}
+            onChange={setViewMode}
+            ariaLabel="Character list view"
+          />
           <button
             className="btn btn--primary page-head__btn"
             type="button"

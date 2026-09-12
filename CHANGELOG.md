@@ -6,6 +6,40 @@ characters regularly.
 
 ## Unreleased
 
+### NPC abilities — one section, two surfaces, drag to reorder
+
+- **An NPC's abilities can be dragged into order.** In edit mode every NPC
+  ability card now carries the same grip handle the player sheet's Slotted
+  Abilities use: drag a card onto another and the list reorders, on the NPC's
+  own sheet page **and** in an NPC bundled into a player sheet's custom tab.
+  The drop writes to whichever record owns the list — the NPC the page is
+  showing, or the attached NPC inside the player's tab — so the order matches
+  everywhere the NPC appears and survives a reload. An NPC has a single list,
+  so there is no cross-list move (and no "Move to Pool"); a card can never be
+  dragged out of an ability section into an NPC.
+- **The two NPC surfaces are now one component, so they cannot drift.** A
+  bundled NPC's abilities block used to be its own compact grid with an inline
+  add button and no view toggle; it now renders the very section the NPC's
+  sheet page renders — same heading row with the grid/list toggle on the right,
+  same "+ Add Ability" button below it, same card grid (3-column masonry or a
+  full-width list), same drag handles, same empty and drop-zone states. Only
+  the section shell and the heading give way to the bundled NPC's compact `h5`
+  block label, because there the NPC's name is the heading. The embedded
+  section's grid/list choice belongs to the parent sheet's tab, exactly like a
+  custom ability section's.
+- **The grid/list toggle is one control again.** Slotted Abilities, Ability
+  Pool, custom ability sections, an NPC's abilities and the character/NPC list
+  pages all render the same `SectionViewToggle` instead of five hand-rolled
+  copies of the same two buttons.
+- **Nothing about live play changed.** NPC sheets outside the GM Screen are
+  still static references — no Activate button, no AP meter, no cooldowns — and
+  a GM panel's ability list stays a fixed list view with no toggle, read-only
+  and undraggable.
+- **Testing.** Unit tests pin the drop handler on both mount points (including
+  the attached-NPC write and the layout parity), and a new Playwright spec
+  (`e2e/npc-abilities.spec.ts`) performs the drag with a real pointer in a real
+  browser on both surfaces, then reloads to prove the order persisted.
+
 ### GM Screen — NPC turns: Action Points & Recharge
 
 - **NPC instances now take turns.** Every spawned instance is initialised with
