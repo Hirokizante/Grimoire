@@ -14,18 +14,22 @@
  * real one?" problem. The NPC list page continues to show only bases.
  */
 
+import type { MortalWoundRoll } from './character'
+
 /**
  * Live state that belongs to ONE spawned instance of an NPC base.
  *
- * NPCs have no death saves, so `downed` is set automatically when damage drives
- * `currentHP` to 0; `dead` is a GM-set flag applied from the panel menu.
+ * NPCs have no death saves. Reaching 0 HP rolls on the Mortal Wounds table
+ * while the base still allows a wound (see {@link NpcInstanceState.mortalWounds});
+ * once the instance can take no more, damage to 0 sets `downed` automatically.
+ * `dead` is a GM-set flag applied from the panel menu.
  *
  * The instance also owns its **live play** resources: Action Points (3 per
- * turn, exactly like a player's sheet) and the Recharge cooldowns of its
- * abilities. Both live here rather than on the base record because they are
- * per-instance: three spawned Bandits each spend their own AP, and nothing a GM
- * does at the table may leak into the standalone NPC sheet, which stays a static
- * reference.
+ * turn, exactly like a player's sheet), the Recharge cooldowns of its
+ * abilities, and its Mortal Wound track. All of them live here rather than on
+ * the base record because they are per-instance: three spawned Bandits each
+ * spend their own AP and bleed their own wounds, and nothing a GM does at the
+ * table may leak into the standalone NPC sheet, which stays a static reference.
  */
 export interface NpcInstanceState {
   /** Current HP. Spawned at the base's `npcStats.hp`. */
@@ -34,7 +38,8 @@ export interface NpcInstanceState {
   tempHP: number
   /**
    * Combat condition. `downed` is set automatically when damage drives
-   * currentHP to 0 (NPCs have no death saves). `dead` is a GM-set flag.
+   * currentHP to 0 and the instance has no Mortal Wound left to take; `dead` is
+   * a GM-set flag.
    */
   condition: 'active' | 'downed' | 'dead'
   /**
@@ -51,6 +56,19 @@ export interface NpcInstanceState {
    * cooling forever.
    */
   cooldowns: string[]
+  /**
+   * Mortal Wounds this instance has sustained, in the order they were rolled.
+   *
+   * The instance's **allowance** is the base's `npcStats.mortalWounds` (read at
+   * damage/render time like every other base stat — never copied onto the
+   * instance): at 0 HP the store rolls a D20 on the Mortal Wounds table, resets
+   * HP to max with the excess spilling over, and appends the wound here. A base
+   * with `mortalWounds: 0` never rolls and simply goes `downed` at 0 HP; an
+   * instance whose track is full (or whose base allows none) does the same.
+   * Wounds persist until cleared from the panel or a Rest — healing does not
+   * erase them.
+   */
+  mortalWounds: MortalWoundRoll[]
 }
 
 /** How much detail a panel renders: a glance-height card, or the full sheet. */

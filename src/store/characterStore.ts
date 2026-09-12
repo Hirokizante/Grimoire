@@ -15,7 +15,7 @@
  */
 
 import { create } from 'zustand'
-import { createDefaultCharacter, createDefaultNPC, generateId, MORTAL_WOUNDS, MAX_AP, MAX_END, MAX_MORTAL_WOUNDS, DEATH_SAVE_DC, MAX_CUSTOM_TABS } from '@/constants/gameData'
+import { createDefaultCharacter, createDefaultNPC, generateId, MAX_AP, MAX_END, MAX_MORTAL_WOUNDS, DEATH_SAVE_DC, MAX_CUSTOM_TABS } from '@/constants/gameData'
 import { useStatusStore } from '@/store/statusStore'
 import {
   deleteCharacter as dbDeleteCharacter,
@@ -33,6 +33,7 @@ import {
   spendAbilityUse as applySpendAbilityUse,
 } from '@/lib/abilityUses'
 import { rollDie } from '@/lib/dice'
+import { rollOnMortalWoundTable } from '@/lib/mortalWounds'
 import {
   bumpSemver,
   deleteVersion,
@@ -47,6 +48,7 @@ import type {
   AttributeKey,
   Character,
   CustomResourceBar,
+  MortalWoundRoll,
   Semver,
   SheetConfig,
   SheetLabel,
@@ -115,8 +117,15 @@ export interface DamageResult {
   finalHP: number
   /** Whether a Mortal Wound was incurred. */
   causedMortalWound: boolean
-  /** Number of Mortal Wounds incurred (0, 1, or 2). */
+  /** Number of Mortal Wounds incurred (0, 1, or 2 — an NPC instance can burn through more in one hit). */
   mortalWoundsIncurred: number
+  /**
+   * The wounds rolled by this application, when the target resolves them
+   * itself — an NPC instance rolls automatically at 0 HP, so its panel can name
+   * what was rolled. Absent for player sheets, whose slots go to `Pending Roll`
+   * until the player rolls from the Mortal Wound card.
+   */
+  mortalWoundRolls?: MortalWoundRoll[]
   /** Whether the character is now knocked out. */
   knockedOut: boolean
   /**
@@ -1061,8 +1070,9 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
       return { roll: 0, woundName: '', woundDescription: '', slotIndex: -1, knockedOut: false }
     }
 
-    const roll = rollDie(20)
-    const wound = MORTAL_WOUNDS.find((w) => w.id === roll) ?? MORTAL_WOUNDS[0]
+    // Table resolution is shared with the GM Screen's instance rolls — see
+    // lib/mortalWounds.ts.
+    const wound = rollOnMortalWoundTable()
 
     // Find first empty slot.
     const newMortalWounds = [...current.mortalWounds]
@@ -1089,7 +1099,7 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
     }))
 
     return {
-      roll,
+      roll: wound.roll,
       woundName: wound.name,
       woundDescription: wound.description,
       slotIndex,

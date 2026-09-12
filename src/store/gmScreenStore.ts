@@ -22,10 +22,11 @@ import {
 import { MAX_AP, generateId } from '@/constants/gameData'
 import { MAX_PANEL_STATUS_STACKS } from '@/constants/statusDurations'
 import { rollDie } from '@/lib/dice'
+import { rollOnMortalWoundTable } from '@/lib/mortalWounds'
 import { resolveRecharge, rollRechargeDie, type RechargeOutcome } from '@/lib/abilityRecharge'
 import { useCharacterStore } from '@/store/characterStore'
 import type { DamageResult } from '@/store/characterStore'
-import type { Character, GMScreen, NpcInstanceState, PanelStatusDuration, ScreenPanel, ScreenPanelDensity } from '@/types'
+import type { Character, GMScreen, MortalWoundRoll, NpcInstanceState, PanelStatusDuration, ScreenPanel, ScreenPanelDensity } from '@/types'
 
 /** Debounce window for autosave (ms), matching characterStore. */
 const AUTOSAVE_DEBOUNCE_MS = 500
@@ -225,8 +226,29 @@ export interface GMScreenActions {
   healInstance: (screenId: string, panelId: string, amount: number) => void
   /** Add or replace an instance's temp HP (higher value wins). */
   setInstanceTempHP: (screenId: string, panelId: string, amount: number) => void
-  /** Nudge an instance's HP by ±amount, clamped to [0, base max]. */
-  adjustInstanceHP: (screenId: string, panelId: string, delta: number) => void
+  /**
+   * Nudge an instance's HP by ±amount, clamped to [0, base max]. A downward
+   * step runs through the full damage pipeline (temp HP first, and a Mortal
+   * Wound roll at 0 HP), so the panel's `−` stepper behaves exactly like the
+   * Damage dialog; its result is returned so the caller can announce a wound or
+   * a knockout. Returns null on an upward/no-op step.
+   */
+  adjustInstanceHP: (
+    screenId: string,
+    panelId: string,
+    delta: number,
+  ) => DamageResult | null
+  /**
+   * Clear one Mortal Wound from an instance's track (a wound healed by an
+   * ability, or one the GM tracked by mistake). No-op for an unknown index.
+   */
+  clearInstanceMortalWound: (
+    screenId: string,
+    panelId: string,
+    index: number,
+  ) => void
+  /** Clear an instance's whole Mortal Wound track (the panel's Rest equivalent). */
+  clearInstanceMortalWounds: (screenId: string, panelId: string) => void
   /**
    * Spend AP from an NPC instance's own turn budget. Returns false when the
    * instance cannot afford it (the caller decides what to tell the GM).
@@ -277,6 +299,21 @@ export type GMScreenStore = GMScreenState & GMScreenActions
 function baseMaxHP(base: Character | null): number {
   const hp = base?.npcStats?.hp
   return typeof hp === 'number' && Number.isFinite(hp) ? hp : 0
+}
+
+/**
+ * How many Mortal Wounds an NPC instance may sustain before 0 HP downs it.
+ *
+ * This is the base's `npcStats.mortalWounds` — the GM-entered stat on the NPC
+ * sheet — read live (like max HP, armor, Evasion, …) so editing the base
+ * updates every instance of it. `0` is the mook case: no roll on the Mortal
+ * Wounds table, 0 HP simply downs the instance.
+ */
+export function npcMortalWoundAllowance(base: Character | null | undefined): number {
+  const allowance = base?.npcStats?.mortalWounds
+  return typeof allowance === 'number' && Number.isFinite(allowance)
+    ? Math.max(0, Math.floor(allowance))
+    : 0
 }
 
 /**
@@ -486,6 +523,9 @@ export const useGMScreenStore = create<GMScreenStore>()((set, get) => {
           condition: 'active',
           currentAP: MAX_AP,
           cooldowns: [],
+          // A fresh instance has taken no wounds. Its allowance is the base's
+          // `npcStats.mortalWounds`, read at damage time — not copied here.
+          mortalWounds: [],
         },
       }
       commit({ ...screen, panels: [...screen.panels, panel] })
@@ -505,8 +545,8 @@ export const useGMScreenStore = create<GMScreenStore>()((set, get) => {
         id,
         label: base ? autoInstanceLabel(screen, base) : panel.label,
         // A duplicate is a FRESH instance at full HP — never a HP copy, and no
-        // inherited statuses either: the GM applied those to the original. Its
-        // turn is fresh too: full AP and nothing on cooldown.
+        // inherited statuses or Mortal Wounds either: the GM applied those to
+        // the original. Its turn is fresh too: full AP and nothing on cooldown.
         statuses: [],
         state: {
           currentHP: baseMaxHP(base ?? null),
@@ -514,6 +554,7 @@ export const useGMScreenStore = create<GMScreenStore>()((set, get) => {
           condition: 'active',
           currentAP: MAX_AP,
           cooldowns: [],
+          mortalWounds: [],
         },
       }
       withPanels(screenId, (panels) => [...panels, copy])
@@ -659,9 +700,25 @@ export const useGMScreenStore = create<GMScreenStore>()((set, get) => {
         remaining -= tempHPConsumed
       }
 
-      // Step 4: remaining damage hits HP. NPCs have no mortal wounds or death
-      // saves — reaching 0 simply downs the instance.
+      // Step 4: remaining damage hits HP. An instance rolls a Mortal Wound
+      // whenever it reaches 0 HP while the base still allows one — the same
+      // rule a player sheet follows (HP resets to max, the excess spills over) —
+      // except that the D20 is rolled here rather than by a card button, so the
+      // GM sees the wound land without another click. Once the instance can
+      // take no more (or the base allows none, the `mortalWounds: 0` mook case)
+      // reaching 0 downs it instead. A downed or dead instance rolls nothing:
+      // it is already out of the fight, so further damage just clamps at 0.
+      const allowance =
+        prev.condition === 'active' ? npcMortalWoundAllowance(base) : 0
+      const mortalWounds: MortalWoundRoll[] = [...prev.mortalWounds]
       let newHP = prev.currentHP - remaining
+      while (newHP <= 0 && mortalWounds.length < allowance) {
+        const wound = rollOnMortalWoundTable()
+        mortalWounds.push({ roll: wound.roll, name: wound.name })
+        // HP resets to max after a mortal wound, excess spills over — which can
+        // drive it to 0 again and cost a second wound, exactly as on a sheet.
+        newHP = baseMaxHP(base ?? null) - Math.abs(newHP)
+      }
       const downedNow = newHP <= 0
       if (downedNow) newHP = 0
 
@@ -669,6 +726,7 @@ export const useGMScreenStore = create<GMScreenStore>()((set, get) => {
         ...state,
         currentHP: newHP,
         tempHP: newTempHP,
+        mortalWounds,
         condition:
           downedNow && state.condition !== 'dead' ? 'downed' : state.condition,
       }))
@@ -678,10 +736,13 @@ export const useGMScreenStore = create<GMScreenStore>()((set, get) => {
         afterArmor,
         afterResistance,
         tempHPConsumed,
-        hpLost: prev.currentHP - newHP,
+        // HP can end the exchange HIGHER than it started (a wound resets it to
+        // max), so this is the drop in the pool, never a negative "damage".
+        hpLost: Math.max(0, prev.currentHP - newHP),
         finalHP: newHP,
-        causedMortalWound: false,
-        mortalWoundsIncurred: 0,
+        causedMortalWound: mortalWounds.length > prev.mortalWounds.length,
+        mortalWoundsIncurred: mortalWounds.length - prev.mortalWounds.length,
+        mortalWoundRolls: mortalWounds.slice(prev.mortalWounds.length),
         knockedOut: downedNow,
         downed: downedNow,
       } satisfies DamageResult
@@ -712,21 +773,43 @@ export const useGMScreenStore = create<GMScreenStore>()((set, get) => {
 
     adjustInstanceHP: (screenId, panelId, delta) => {
       const found = findInstance(screenId, panelId)
-      if (!found) return
+      if (!found) return null
       const base = useCharacterStore
         .getState()
         .characters.find((c) => c.id === found.panel.baseNpcId)
       const maxHP = baseMaxHP(base ?? null)
       if (delta < 0) {
-        // Downward steps run through the full damage pipeline (temp HP first),
-        // so stepping the bar matches applying damage.
-        get().damageInstance(screenId, panelId, -delta)
-        return
+        // Downward steps run through the full damage pipeline (temp HP first,
+        // Mortal Wounds at 0 HP), so stepping the bar matches applying damage.
+        return get().damageInstance(screenId, panelId, -delta)
       }
       get().updateInstanceState(screenId, panelId, (state) => ({
         ...state,
         currentHP: Math.min(maxHP, state.currentHP + delta),
         condition: state.condition === 'downed' ? 'active' : state.condition,
+      }))
+      return null
+    },
+
+    // ---- Live play: instance Mortal Wounds ------------------------------------
+
+    clearInstanceMortalWound: (screenId, panelId, index) => {
+      const found = findInstance(screenId, panelId)
+      if (!found) return
+      const wounds = found.panel.state.mortalWounds
+      if (index < 0 || index >= wounds.length) return
+      get().updateInstanceState(screenId, panelId, (state) => ({
+        ...state,
+        mortalWounds: state.mortalWounds.filter((_, i) => i !== index),
+      }))
+    },
+
+    clearInstanceMortalWounds: (screenId, panelId) => {
+      const found = findInstance(screenId, panelId)
+      if (!found || found.panel.state.mortalWounds.length === 0) return
+      get().updateInstanceState(screenId, panelId, (state) => ({
+        ...state,
+        mortalWounds: [],
       }))
     },
 

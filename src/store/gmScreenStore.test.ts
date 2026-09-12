@@ -8,7 +8,7 @@
  */
 
 import { test, expect, beforeEach, afterEach, vi } from 'vitest'
-import { useGMScreenStore } from '@/store/gmScreenStore'
+import { useGMScreenStore, npcMortalWoundAllowance } from '@/store/gmScreenStore'
 import { useCharacterStore } from '@/store/characterStore'
 import { createDefaultCharacter, createDefaultNPC } from '@/constants/gameData'
 import type { Character, GMScreen } from '@/types'
@@ -464,6 +464,231 @@ test('adjustInstanceHP: +1 clamps at max, −1 routes through temp HP', async ()
   after = useGMScreenStore.getState().screens[0].panels[0]
   expect(after.kind === 'npc-instance' && after.state.tempHP).toBe(1)
   expect(after.kind === 'npc-instance' && after.state.currentHP).toBe(20)
+})
+
+// ---- Instance Mortal Wounds ------------------------------------------------
+
+/** A base that can sustain `allowance` Mortal Wounds (20 HP unless overridden). */
+function makeToughNpc(allowance: number, overrides: Partial<Character> = {}) {
+  return makeNpc({
+    id: 'n1',
+    npcStats: { evasion: 10, armor: 0, movement: 5, saveDC: 10, hp: 20, mortalWounds: allowance },
+    ...overrides,
+  })
+}
+
+/** Pin the Mortal Wounds D20 to a known face (14 → Fracture). */
+function mockMortalWoundRoll(face: number) {
+  // Restore first so a test can re-pin the die partway through.
+  vi.restoreAllMocks()
+  vi.spyOn(Math, 'random').mockReturnValue((face - 0.5) / 20)
+}
+
+test('npcMortalWoundAllowance: reads the base stat, clamped to a whole count ≥ 0', () => {
+  expect(npcMortalWoundAllowance(makeToughNpc(3))).toBe(3)
+  expect(npcMortalWoundAllowance(makeToughNpc(2.7))).toBe(2)
+  expect(npcMortalWoundAllowance(makeToughNpc(-4))).toBe(0)
+  // A base record with no stats at all (or none loaded) allows none.
+  expect(npcMortalWoundAllowance(makeNpc({ npcStats: undefined }))).toBe(0)
+  expect(npcMortalWoundAllowance(null)).toBe(0)
+})
+
+test('addNpcInstancePanel: a fresh instance starts with an empty wound track', async () => {
+  const screen = await useGMScreenStore.getState().createScreen('S')
+  seedCharacters(makeToughNpc(2))
+  useGMScreenStore.getState().addNpcInstancePanel(screen.id, 'n1')
+
+  expect(instanceState().mortalWounds).toEqual([])
+})
+
+test('damageInstance: reaching 0 HP rolls a Mortal Wound and resets HP with the spill-over', async () => {
+  const screen = await useGMScreenStore.getState().createScreen('S')
+  seedCharacters(makeToughNpc(2))
+  useGMScreenStore.getState().addNpcInstancePanel(screen.id, 'n1')
+  const panel = useGMScreenStore.getState().screens[0].panels[0]
+  mockMortalWoundRoll(14)
+
+  const result = useGMScreenStore.getState().damageInstance(screen.id, panel.id, 25)
+
+  // 20 HP − 25 damage → 0 HP, wound rolled, HP reset to 20 with 5 spilling over.
+  expect(result?.causedMortalWound).toBe(true)
+  expect(result?.mortalWoundsIncurred).toBe(1)
+  expect(result?.mortalWoundRolls).toEqual([{ roll: 14, name: 'Fracture' }])
+  expect(result?.downed).toBe(false)
+  expect(result?.finalHP).toBe(15)
+  expect(instanceState().currentHP).toBe(15)
+  expect(instanceState().condition).toBe('active')
+  expect(instanceState().mortalWounds).toEqual([{ roll: 14, name: 'Fracture' }])
+})
+
+test('damageInstance: a base with mortalWounds 0 downs the instance without rolling', async () => {
+  const screen = await useGMScreenStore.getState().createScreen('S')
+  seedCharacters(makeNpc({ id: 'n1' }))
+  useGMScreenStore.getState().addNpcInstancePanel(screen.id, 'n1')
+  const panel = useGMScreenStore.getState().screens[0].panels[0]
+
+  const result = useGMScreenStore.getState().damageInstance(screen.id, panel.id, 999)
+
+  expect(result?.causedMortalWound).toBe(false)
+  expect(result?.mortalWoundsIncurred).toBe(0)
+  expect(result?.downed).toBe(true)
+  expect(result?.finalHP).toBe(0)
+  expect(instanceState().mortalWounds).toEqual([])
+  expect(instanceState().condition).toBe('downed')
+})
+
+test('damageInstance: one huge hit can burn several wounds before downing the instance', async () => {
+  const screen = await useGMScreenStore.getState().createScreen('S')
+  seedCharacters(makeToughNpc(3))
+  useGMScreenStore.getState().addNpcInstancePanel(screen.id, 'n1')
+  const panel = useGMScreenStore.getState().screens[0].panels[0]
+
+  const result = useGMScreenStore.getState().damageInstance(screen.id, panel.id, 100)
+
+  // -80 → wound → -60 → wound → -40 → wound → the track is full, so it goes down.
+  expect(result?.mortalWoundsIncurred).toBe(3)
+  expect(result?.downed).toBe(true)
+  expect(result?.finalHP).toBe(0)
+  expect(instanceState().mortalWounds).toHaveLength(3)
+  expect(instanceState().condition).toBe('downed')
+})
+
+test('damageInstance: a full track downs the instance on the next 0 HP', async () => {
+  const screen = await useGMScreenStore.getState().createScreen('S')
+  seedCharacters(makeToughNpc(1))
+  useGMScreenStore.getState().addNpcInstancePanel(screen.id, 'n1')
+  const panel = useGMScreenStore.getState().screens[0].panels[0]
+
+  // First knockout: the one allowed wound, HP resets to max.
+  useGMScreenStore.getState().damageInstance(screen.id, panel.id, 30)
+  expect(instanceState().currentHP).toBe(10)
+  expect(instanceState().mortalWounds).toHaveLength(1)
+
+  // Second knockout: nothing left to take, so the instance goes down.
+  const result = useGMScreenStore.getState().damageInstance(screen.id, panel.id, 30)
+  expect(result?.causedMortalWound).toBe(false)
+  expect(result?.downed).toBe(true)
+  expect(instanceState().currentHP).toBe(0)
+  expect(instanceState().condition).toBe('downed')
+  expect(instanceState().mortalWounds).toHaveLength(1)
+})
+
+test('damageInstance: a downed instance takes no more wounds', async () => {
+  const screen = await useGMScreenStore.getState().createScreen('S')
+  seedCharacters(makeToughNpc(2))
+  useGMScreenStore.getState().addNpcInstancePanel(screen.id, 'n1')
+  const panel = useGMScreenStore.getState().screens[0].panels[0]
+  useGMScreenStore.getState().setInstanceCondition(screen.id, panel.id, 'downed')
+
+  const result = useGMScreenStore.getState().damageInstance(screen.id, panel.id, 999)
+
+  expect(result?.causedMortalWound).toBe(false)
+  expect(instanceState().mortalWounds).toEqual([])
+  expect(instanceState().condition).toBe('downed')
+})
+
+test('adjustInstanceHP: a − step that reaches 0 HP rolls the wound too', async () => {
+  const screen = await useGMScreenStore.getState().createScreen('S')
+  seedCharacters(makeToughNpc(2))
+  useGMScreenStore.getState().addNpcInstancePanel(screen.id, 'n1')
+  const panel = useGMScreenStore.getState().screens[0].panels[0]
+  mockMortalWoundRoll(12)
+
+  // The stepper runs the same pipeline as the Damage dialog, and 20 − 20 lands
+  // exactly on 0 HP, so the wound is rolled and the pool refills to max.
+  const result = useGMScreenStore.getState().adjustInstanceHP(screen.id, panel.id, -20)
+
+  expect(result?.mortalWoundRolls).toEqual([{ roll: 12, name: 'Sprain' }])
+  expect(instanceState().mortalWounds).toHaveLength(1)
+  expect(instanceState().currentHP).toBe(20)
+  expect(instanceState().condition).toBe('active')
+})
+
+test('healInstance: healing revives but never clears the wound track', async () => {
+  const screen = await useGMScreenStore.getState().createScreen('S')
+  seedCharacters(makeToughNpc(1))
+  useGMScreenStore.getState().addNpcInstancePanel(screen.id, 'n1')
+  const panel = useGMScreenStore.getState().screens[0].panels[0]
+  useGMScreenStore.getState().damageInstance(screen.id, panel.id, 30) // wound
+  useGMScreenStore.getState().damageInstance(screen.id, panel.id, 30) // downed
+  expect(instanceState().condition).toBe('downed')
+
+  useGMScreenStore.getState().healInstance(screen.id, panel.id, 5)
+
+  expect(instanceState().condition).toBe('active')
+  expect(instanceState().mortalWounds).toHaveLength(1)
+})
+
+test('clearInstanceMortalWound: removes one wound and leaves the rest', async () => {
+  const screen = await useGMScreenStore.getState().createScreen('S')
+  seedCharacters(makeToughNpc(2))
+  useGMScreenStore.getState().addNpcInstancePanel(screen.id, 'n1')
+  const panel = useGMScreenStore.getState().screens[0].panels[0]
+  mockMortalWoundRoll(8)
+  useGMScreenStore.getState().damageInstance(screen.id, panel.id, 25)
+  mockMortalWoundRoll(9)
+  useGMScreenStore.getState().damageInstance(screen.id, panel.id, 25)
+  expect(instanceState().mortalWounds).toEqual([
+    { roll: 8, name: 'Damaged Throat' },
+    { roll: 9, name: 'Exhaustion' },
+  ])
+
+  useGMScreenStore.getState().clearInstanceMortalWound(screen.id, panel.id, 0)
+
+  expect(instanceState().mortalWounds).toEqual([{ roll: 9, name: 'Exhaustion' }])
+
+  // Out-of-range indexes are a no-op, not a crash.
+  useGMScreenStore.getState().clearInstanceMortalWound(screen.id, panel.id, 5)
+  expect(instanceState().mortalWounds).toHaveLength(1)
+})
+
+test('clearInstanceMortalWounds: empties the whole track', async () => {
+  const screen = await useGMScreenStore.getState().createScreen('S')
+  seedCharacters(makeToughNpc(2))
+  useGMScreenStore.getState().addNpcInstancePanel(screen.id, 'n1')
+  const panel = useGMScreenStore.getState().screens[0].panels[0]
+  useGMScreenStore.getState().damageInstance(screen.id, panel.id, 25)
+  useGMScreenStore.getState().damageInstance(screen.id, panel.id, 25)
+
+  useGMScreenStore.getState().clearInstanceMortalWounds(screen.id, panel.id)
+
+  expect(instanceState().mortalWounds).toEqual([])
+})
+
+test('duplicatePanel: a duplicate never inherits the original’s wounds', async () => {
+  const screen = await useGMScreenStore.getState().createScreen('S')
+  seedCharacters(makeToughNpc(2))
+  useGMScreenStore.getState().addNpcInstancePanel(screen.id, 'n1')
+  const original = useGMScreenStore.getState().screens[0].panels[0]
+  useGMScreenStore.getState().damageInstance(screen.id, original.id, 25)
+  expect(instanceState(0).mortalWounds).toHaveLength(1)
+
+  const copyId = useGMScreenStore.getState().duplicatePanel(screen.id, original.id)
+
+  const copy = useGMScreenStore
+    .getState()
+    .screens[0].panels.find((p) => p.id === copyId)
+  expect(copy?.kind === 'npc-instance' && copy.state.mortalWounds).toEqual([])
+})
+
+test('instance wounds are per-panel: damaging one instance never touches its sibling', async () => {
+  const screen = await useGMScreenStore.getState().createScreen('S')
+  seedCharacters(makeToughNpc(2))
+  const store = useGMScreenStore.getState()
+  store.addNpcInstancePanel(screen.id, 'n1')
+  store.addNpcInstancePanel(screen.id, 'n1')
+  const [first] = useGMScreenStore.getState().screens[0].panels
+
+  useGMScreenStore.getState().damageInstance(screen.id, first.id, 25)
+
+  expect(instanceState(0).mortalWounds).toHaveLength(1)
+  expect(instanceState(1).mortalWounds).toEqual([])
+  expect(instanceState(1).currentHP).toBe(20)
+
+  // The base record itself is never written to.
+  expect(
+    useCharacterStore.getState().characters.find((c) => c.id === 'n1')?.mortalWounds,
+  ).toEqual([null, null])
 })
 
 // ---- Instance AP & Recharge (live play) ------------------------------------

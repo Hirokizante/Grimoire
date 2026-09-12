@@ -10,7 +10,7 @@
  * All functions here are framework-agnostic and safe to call from anywhere.
  */
 
-import type { AbilityBlock, AbilityCost, Character, CharacterViewModes, GMScreen, NPCStats, NpcInstanceState, PanelStatus, ScreenPanel, SheetColors, SheetLabel, StatusCondition, VersionSnapshot } from '@/types'
+import type { AbilityBlock, AbilityCost, Character, CharacterViewModes, GMScreen, MortalWoundRoll, NPCStats, NpcInstanceState, PanelStatus, ScreenPanel, SheetColors, SheetLabel, StatusCondition, VersionSnapshot } from '@/types'
 import { createDefaultStatuses } from '@/constants/statuses'
 import { MAX_PANEL_STATUS_STACKS, isPanelStatusDuration } from '@/constants/statusDurations'
 import { DEFAULT_SHEET_COLORS, MAX_AP, generateId } from '@/constants/gameData'
@@ -892,6 +892,11 @@ export function normalizeScreen(raw: GMScreen): GMScreen {
             ),
           ]
         : []
+      // Mortal Wound track, added with NPC-instance mortal wounds. Screens
+      // written before it existed have no `mortalWounds` on the instance, which
+      // backfills to an empty track; the allowance itself is never stored here
+      // (it is read from the base's `npcStats` at damage/render time).
+      const mortalWounds = normalizeInstanceMortalWounds(rawState.mortalWounds)
       panels.push({
         kind: 'npc-instance',
         id,
@@ -905,6 +910,7 @@ export function normalizeScreen(raw: GMScreen): GMScreen {
           condition,
           currentAP,
           cooldowns,
+          mortalWounds,
         },
       })
       continue
@@ -957,6 +963,29 @@ function normalizePanelStatuses(raw: unknown): PanelStatus[] {
     statuses.push({ statusId, duration: e.duration, stacks })
   }
   return statuses
+}
+
+/**
+ * Normalize an NPC instance's Mortal Wound track: keep only entries that carry
+ * a usable wound name, and repair the D20 to a whole face of the die (entries
+ * whose roll is off-table keep their name — the wound is what the panel shows —
+ * and fall back to the table lookup at render time).
+ *
+ * Screens written before instance mortal wounds existed simply have no
+ * `mortalWounds` field, which backfills to an empty track.
+ */
+function normalizeInstanceMortalWounds(raw: unknown): MortalWoundRoll[] {
+  if (!Array.isArray(raw)) return []
+  const wounds: MortalWoundRoll[] = []
+  for (const entry of raw) {
+    if (!entry || typeof entry !== 'object') continue
+    const e = entry as Record<string, unknown>
+    const name = typeof e.name === 'string' ? e.name : ''
+    if (!name) continue
+    const rawRoll = typeof e.roll === 'number' && Number.isFinite(e.roll) ? Math.round(e.roll) : 0
+    wounds.push({ roll: rawRoll >= 1 && rawRoll <= 20 ? rawRoll : 0, name })
+  }
+  return wounds
 }
 
 /**

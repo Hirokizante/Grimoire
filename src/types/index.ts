@@ -18,6 +18,7 @@ export type {
   SheetColors,
   ImportedFont,
   MortalWound,
+  MortalWoundRoll,
   DeathSaves,
   Semver,
   VersionSnapshot,

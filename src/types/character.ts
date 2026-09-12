@@ -161,6 +161,21 @@ export interface MortalWound {
   description: string
 }
 
+/**
+ * One Mortal Wound that has been rolled and applied.
+ *
+ * A player sheet's wound slots store only the wound's name (the player rolls it
+ * themselves from the sheet's Mortal Wound card). An **NPC instance** rolls
+ * automatically when damage drives it to 0 HP, so its track keeps the D20 too —
+ * that is what the GM panel shows on the instance ("Damaged Throat · d20 14").
+ */
+export interface MortalWoundRoll {
+  /** The D20 roll (1–20) that produced the wound. */
+  roll: number
+  /** Wound name from the Mortal Wounds table. */
+  name: string
+}
+
 export interface DeathSaves {
   /** Count of successful death saves (max 3). */
   successes: number

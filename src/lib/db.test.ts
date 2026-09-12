@@ -459,6 +459,7 @@ test('normalizeScreen: a well-formed screen is unchanged and idempotent', () => 
           condition: 'active',
           currentAP: 2,
           cooldowns: ['a1'],
+          mortalWounds: [{ roll: 14, name: 'Damaged Throat' }],
         },
       },
     ],
@@ -522,6 +523,7 @@ test('normalizeScreen: backfills complete instance state', () => {
     // Live-play fields backfill to a full, fresh turn.
     currentAP: MAX_AP,
     cooldowns: [],
+    mortalWounds: [],
   })
   expect(panel.label).toBe('')
 })
@@ -550,6 +552,7 @@ test('normalizeScreen: keeps a valid instance state and clamps negatives', () =>
     condition: 'downed',
     currentAP: MAX_AP,
     cooldowns: [],
+    mortalWounds: [],
   })
 })
 
@@ -584,6 +587,47 @@ test('normalizeScreen: repairs the instance turn state (AP + cooldowns)', () => 
   // Cooldown ids are strings, de-duplicated, and blanks dropped — the list is
   // written straight from ability ids, so anything else is corrupt data.
   expect(second.state.cooldowns).toEqual(['a1', 'a2'])
+})
+
+test('normalizeScreen: repairs the instance Mortal Wound track', () => {
+  const out = normalizeScreen(
+    asScreen({
+      id: 's1',
+      name: 'Spawns',
+      panels: [
+        {
+          kind: 'npc-instance',
+          id: 'p1',
+          baseNpcId: 'n1',
+          // A legacy instance has no track at all; these entries cover the
+          // shapes that could have been written since.
+          state: {
+            currentHP: 5,
+            mortalWounds: [
+              { roll: 14, name: 'Fracture' },
+              { roll: 0, name: 'Damaged Throat' },
+              { roll: 3 },
+              'Exhaustion',
+              null,
+            ],
+          },
+        },
+        // A legacy instance: no `mortalWounds` field at all.
+        { kind: 'npc-instance', id: 'p2', baseNpcId: 'n1' },
+      ],
+    }),
+  )
+  const [first, second] = out.panels as Extract<
+    ScreenPanel,
+    { kind: 'npc-instance' }
+  >[]
+  // Entries without a wound name are dropped; a name without a usable D20 is
+  // kept (the wound is what the GM tracks) with an unknown roll.
+  expect(first.state.mortalWounds).toEqual([
+    { roll: 14, name: 'Fracture' },
+    { roll: 0, name: 'Damaged Throat' },
+  ])
+  expect(second.state.mortalWounds).toEqual([])
 })
 
 test('normalizeScreen: drops panels that reference nothing', () => {

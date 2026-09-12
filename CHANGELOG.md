@@ -6,6 +6,52 @@ characters regularly.
 
 ## Unreleased
 
+### GM Screen — NPC Mortal Wounds
+
+- **An NPC instance takes Mortal Wounds like a player character does** — with
+  the roll made for the GM. Damage that drives an instance to 0 HP now rolls a
+  D20 on the Mortal Wounds table automatically, resets its HP to maximum with
+  the excess spilling over, and marks the wound on the panel. There is no
+  "Pending Roll" step: a GM running four bandits gets four wound results
+  without clicking a second card per knockout.
+- **How many wounds it can take is the NPC's own Mortal Wounds stat.** The
+  editable value on the NPC sheet (`Combat Stats → Mortal Wounds`) is the
+  instance's allowance, read at damage time like max HP or Armor — so raising a
+  boss to 2 or 3 applies to every instance of it already on the screen, and the
+  stat's tooltip now says what it means. Healing never clears a wound.
+- **`mortalWounds: 0` changes nothing.** The mook case rolls no dice, shows no
+  new row, and still simply goes **Downed** at 0 HP — every existing panel is
+  exactly the height and shape it was. Once the allowance is used up (or the
+  base allows none), reaching 0 HP downs the instance instead of rolling, and
+  the panel warns `⚠ Next 0 HP: Downed` while the track is full.
+- **The track is marked in the panel chrome**, right under the HP bar:
+  `[skull Wounds n/max | d20-and-name chips | warning]`. Each chip carries the
+  D20 result and the wound's name with its full rules text on hover, and clears
+  that one wound with its own ✕; the panel menu's **Clear mortal wounds** empties
+  the track (the Rest equivalent). Like the status strip it is ONE line that
+  scrolls sideways instead of wrapping, so a wounded boss never makes its panel
+  taller than the mook beside it. The store keeps it per instance: three
+  spawned Bandits bleed their own wounds and the base record is never written
+  to.
+- **One huge hit can cost several wounds** — each refill spills the remaining
+  damage, so a 100-damage hit on a three-wound boss can burn the whole track and
+  still down it.
+- **The roll is announced where it would otherwise be invisible.** A wound
+  refills the HP bar to max, which looks like nothing happened, so the Damage…
+  dialog names the wound it rolled ("1 Mortal Wound rolled automatically:
+  Fracture (d20 14). HP reset to 15.") and the panel's own `−` stepper — which
+  runs the same pipeline — raises the same toast.
+- **One implementation of the table.** `lib/mortalWounds.ts` owns the D20 roll
+  and the table lookup for both surfaces; the player sheet's `MortalWoundRoller`
+  and the instance's automatic roll resolve through the same function, and
+  `normalizeScreen` backfills an empty wound track for screens written before
+  it existed.
+- **Testing.** Store tests pin the automatic roll, the spill-over arithmetic,
+  multi-wound hits, going down when the allowance runs out, per-instance
+  isolation and clearing; `normalizeScreen` tests pin the track repair; and
+  component tests cover the mook case (no row, no roll), the marked chip, the
+  full-track warning and the dialog's report.
+
 ### NPC abilities — one section, two surfaces, drag to reorder
 
 - **An NPC's abilities can be dragged into order.** In edit mode every NPC

@@ -103,6 +103,17 @@ async function applyLethalDamage(page: Page, panelIndex: number) {
 }
 
 /**
+ * Apply a specific amount of damage to one panel with armor off, leaving the
+ * dialog open so the caller can read its result grid before dismissing it.
+ */
+async function damageFor(page: Page, panel: Locator, amount: number) {
+  await panel.getByRole('button', { name: 'Damage…' }).click()
+  await page.getByRole('spinbutton').fill(String(amount))
+  await page.getByLabel(/Apply Armor/).uncheck()
+  await page.getByRole('button', { name: 'Apply Damage' }).click()
+}
+
+/**
  * Track a compendium status on a panel through the Add Status picker: open the
  * panel's ＋ button, pick the duration chip on that status's row, then dismiss
  * the dialog (it stays open by design so several conditions can be applied).
@@ -706,6 +717,127 @@ test.describe('GM Screen', () => {
         .nth(1)
         .getByRole('img', { name: `${siblingHPNumber} of 20 hit points` }),
     ).toBeVisible()
+  })
+
+  test('an NPC instance rolls Mortal Wounds and goes down when they run out', async ({
+    page,
+  }) => {
+    // A deterministic Mortal Wounds die: every D20 in this test rolls 19
+    // ("Damaged Lung" on the table), so the panel's chips can be asserted by
+    // name and number. Armor is switched off on every hit below, so this is the
+    // only roll the pinned die feeds.
+    await page.addInitScript(() => {
+      Math.random = () => 0.9
+    })
+
+    await gotoHome(page)
+    await createNpc(page, 'Revenant')
+
+    // ---- The allowance is the base's own Mortal Wounds stat ----------------
+    await page.locator('.card-main').filter({ hasText: 'Revenant' }).first().click()
+    await page
+      .locator('.mode-toggle--floating')
+      .getByRole('tab', { name: 'Edit' })
+      .click()
+    const mortalStat = page
+      .locator('.stat-token')
+      .filter({ hasText: 'Mortal Wounds' })
+    await mortalStat.locator('input').fill('2')
+    await expect(mortalStat.locator('input')).toHaveValue('2')
+
+    // ---- Spawn an instance of it on a fresh screen -------------------------
+    await gotoGmScreen(page)
+    await page.getByRole('button', { name: 'New Screen' }).first().click()
+    await page.getByLabel('Screen name').fill('Wounds')
+    await page.getByRole('button', { name: 'Create' }).click()
+    await page.getByRole('button', { name: 'Add NPC' }).first().click()
+    await page
+      .locator('.gm-picker__list .gm-picker__item')
+      .filter({ hasText: 'Revenant' })
+      .click()
+    await page.getByRole('button', { name: 'Done' }).click()
+
+    const panel = page.locator('.gm-panel--npc').first()
+    // The track exists (the base allows two) and starts empty.
+    await expect(panel.locator('.gm-mw')).toContainText('Wounds')
+    await expect(panel.locator('.gm-mw')).toContainText('0/2')
+    await expect(panel.locator('.gm-mw__chip')).toHaveCount(0)
+
+    // ---- 25 damage on 20 HP: one wound, HP refilled, 5 spilled over --------
+    await damageFor(page, panel, 25)
+    await expect(page.locator('.damage-result__alert')).toContainText(
+      'Damaged Lung (d20 19)',
+    )
+    await page.getByRole('button', { name: '✕' }).click()
+
+    await expect(panel.locator('.gm-mw__chip')).toHaveText(/19\s*Damaged Lung/)
+    await expect(
+      panel.getByRole('img', { name: '15 of 20 hit points' }),
+    ).toBeVisible()
+    await expect(panel.getByText('Active')).toBeVisible()
+    await expect(panel.locator('.gm-mw__warn')).toHaveCount(0)
+
+    // ---- The second wound fills the track, so the panel warns --------------
+    await damageFor(page, panel, 25)
+    await page.getByRole('button', { name: '✕' }).click()
+    await expect(panel.locator('.gm-mw__chip')).toHaveCount(2)
+    await expect(panel.locator('.gm-mw__warn')).toContainText('Next 0 HP: Downed')
+    await expect(
+      panel.getByRole('img', { name: '10 of 20 hit points' }),
+    ).toBeVisible()
+
+    // ---- Phone width: the row is ONE line and never overflows --------------
+    // This is the widest state the row can be in — two chips plus the warning
+    // pill — so it is the one worth measuring at 360px. The row scrolls
+    // sideways (like the status strip) instead of wrapping or widening the
+    // panel, and every element in it shares one centre line.
+    const desktopViewport = page.viewportSize()!
+    await page.setViewportSize({ width: 360, height: 800 })
+    const narrow = await panel.evaluate((el) => {
+      const row = el.querySelector('.gm-mw') as HTMLElement
+      const strip = el.querySelector('.gm-mw__strip') as HTMLElement
+      const rowBox = row.getBoundingClientRect()
+      return {
+        overflow: document.documentElement.scrollWidth - window.innerWidth,
+        rowCentre: +(rowBox.top + rowBox.height / 2).toFixed(1),
+        rowHeight: +rowBox.height.toFixed(1),
+        centres: Array.from(el.querySelectorAll('.gm-mw__chip')).map((chip) => {
+          const box = chip.getBoundingClientRect()
+          return +(box.top + box.height / 2).toFixed(1)
+        }),
+        stripScrolls: strip.scrollWidth > strip.clientWidth,
+      }
+    })
+    expect(narrow.overflow).toBeLessThanOrEqual(0)
+    expect(narrow.rowHeight).toBeLessThan(30)
+    expect(narrow.centres).toHaveLength(2)
+    for (const centre of narrow.centres) {
+      expect(Math.abs(centre - narrow.rowCentre)).toBeLessThanOrEqual(2)
+    }
+    expect(narrow.stripScrolls).toBe(true)
+    await page.setViewportSize(desktopViewport)
+
+    // ---- With no wound left to take, 0 HP downs the instance ---------------
+    await damageFor(page, panel, 25)
+    await page.getByRole('button', { name: '✕' }).click()
+    // The condition badge specifically — the wound row's warning pill also
+    // carries the word "Downed".
+    await expect(panel.locator('.gm-panel__badge--downed')).toHaveText('Downed')
+    await expect(panel.getByRole('img', { name: '0 of 20 hit points' })).toBeVisible()
+    // No third wound: the track stays at two while it goes down.
+    await expect(panel.locator('.gm-mw__chip')).toHaveCount(2)
+
+    // Clearing a wound is per chip, and it survives a reload (the track lives
+    // on the panel record).
+    await panel.getByRole('button', { name: /^Clear Damaged Lung/ }).first().click()
+    await expect(panel.locator('.gm-mw__chip')).toHaveCount(1)
+    await page.waitForTimeout(700)
+    await page.reload()
+    await expect(page.getByRole('heading', { name: 'GRIMOIRE' })).toBeVisible()
+    await gotoGmScreen(page)
+    const reloaded = page.locator('.gm-panel--npc').first()
+    await expect(reloaded.locator('.gm-mw__chip')).toHaveCount(1)
+    await expect(reloaded.locator('.gm-mw')).toContainText('1/2')
   })
 
   test('a player panel and the character sheet share one source of truth', async ({

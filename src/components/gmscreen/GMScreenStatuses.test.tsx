@@ -127,6 +127,7 @@ function seed(kind: 'character' | 'npc') {
                   condition: 'active',
                   currentAP: MAX_AP,
                   cooldowns: [],
+                  mortalWounds: [],
                 },
               },
         ],

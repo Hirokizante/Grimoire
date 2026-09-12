@@ -92,6 +92,7 @@ function seedScreenFor(base: Character, state?: Partial<{ currentHP: number; tem
               condition: 'active',
               currentAP: MAX_AP,
               cooldowns: [],
+              mortalWounds: [],
             },
           },
         ],
@@ -183,8 +184,53 @@ test('DamageDialog: damage to 0 downs the instance instead of a mortal wound', (
 
   expect(panelState().currentHP).toBe(0)
   expect(panelState().condition).toBe('downed')
-  // The result grid reports no mortal wounds — NPCs have no death saves.
+  // A base that allows no Mortal Wounds never rolls for one.
+  expect(panelState().mortalWounds).toEqual([])
   expect(screen.queryByText(/Mortal Wound\(s\) incurred/)).not.toBeInTheDocument()
+})
+
+test('DamageDialog: an NPC that allows wounds rolls one automatically and reports it', () => {
+  const base = makeWoundNpc(2)
+  seedScreenFor(base)
+  const { container } = renderDialog(base)
+  mockMortalWoundRoll(14)
+
+  fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '25' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Apply Damage' }))
+
+  // The roll happened in the store — no "Pending Roll" step for the GM.
+  expect(panelState().mortalWounds).toEqual([{ roll: 14, name: 'Fracture' }])
+  expect(panelState().currentHP).toBe(15)
+  expect(panelState().condition).toBe('active')
+  // …and the dialog names the wound it rolled (its own text is split across
+  // nodes by the JSX expression, so assert on the line as a whole).
+  const alert = container.querySelector('.damage-result__alert')
+  expect(alert?.textContent).toContain('rolled automatically')
+  expect(alert?.textContent).toContain('Fracture (d20 14)')
+  expect(alert?.textContent).toContain('HP reset to 15')
+  // The toast says the same thing for a GM who is not looking at the dialog.
+  expect(screen.getByRole('alert').textContent).toContain(
+    'Bandit takes a Mortal Wound: Fracture (d20 14) — HP reset to 15.',
+  )
+})
+
+test('DamageDialog: a knockout on an NPC that allows wounds reports both', () => {
+  const base = makeWoundNpc(1)
+  seedScreenFor(base)
+  renderDialog(base)
+  mockMortalWoundRoll(9)
+
+  fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '25' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Apply Damage' }))
+  // One wound allowed: 20 − 25 → wound, HP reset to 20 with 5 spilling over.
+  expect(panelState().currentHP).toBe(15)
+
+  fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '25' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Apply Damage' }))
+
+  expect(panelState().currentHP).toBe(0)
+  expect(panelState().condition).toBe('downed')
+  expect(panelState().mortalWounds).toEqual([{ roll: 9, name: 'Exhaustion' }])
 })
 
 test('DamageDialog: instance temp HP absorbs damage before HP', () => {
@@ -294,6 +340,105 @@ test('NpcInstancePanel: a downed instance is labelled and struck through', () =>
   expect(screen.getByText('Downed')).toBeInTheDocument()
   expect(container.querySelector('.gm-panel__name--dimmed')).not.toBeNull()
   expect(container.querySelector('.gm-panel--downed')).not.toBeNull()
+})
+
+// ---- Instance Mortal Wounds ------------------------------------------------
+
+/** A bandit that can sustain `allowance` Mortal Wounds before it goes down. */
+function makeWoundNpc(allowance: number): Character {
+  return makeBase({
+    npcStats: { evasion: 10, armor: 0, movement: 5, saveDC: 10, hp: 20, mortalWounds: allowance },
+  })
+}
+
+/** Pin the Mortal Wounds D20 to a known face (14 → Fracture). */
+function mockMortalWoundRoll(face: number) {
+  vi.restoreAllMocks()
+  vi.spyOn(Math, 'random').mockReturnValue((face - 0.5) / 20)
+}
+
+afterEach(() => {
+  vi.restoreAllMocks()
+})
+
+test('NpcInstancePanel: an NPC whose base allows no wounds renders no wound track', () => {
+  // The mook case: `npcStats.mortalWounds: 0` must leave the panel exactly as
+  // it was — no row, no extra height.
+  const { container } = renderNpcPanel(makeBase(), 'compact')
+
+  expect(container.querySelector('.gm-mw')).toBeNull()
+})
+
+test('NpcInstancePanel: the base allowance shows as an empty wound track', () => {
+  const { container } = renderNpcPanel(makeWoundNpc(2), 'compact')
+
+  const row = container.querySelector('.gm-mw')
+  expect(row).not.toBeNull()
+  expect(row?.textContent).toContain('Wounds')
+  expect(row?.textContent).toContain('0/2')
+  // Nothing rolled yet, and there is still a wound to take.
+  expect(container.querySelector('.gm-mw__chip')).toBeNull()
+  expect(container.querySelector('.gm-mw__warn')).toBeNull()
+})
+
+test('NpcInstancePanel: an auto-rolled wound is marked on the panel with its d20', () => {
+  const base = makeWoundNpc(2)
+  renderNpcPanel(base, 'compact')
+  mockMortalWoundRoll(14)
+
+  // 20 HP − 25 damage: the wound is rolled for the GM and 5 spills over.
+  act(() => {
+    useGMScreenStore.getState().damageInstance(SCREEN_ID, PANEL_ID, 25)
+  })
+
+  const row = document.querySelector('.gm-mw')
+  expect(screen.getByText('Fracture')).toBeInTheDocument()
+  expect(screen.getByText('14')).toBeInTheDocument()
+  expect(row?.textContent).toContain('1/2')
+  expect(panelState().currentHP).toBe(15)
+  // The track is not full, so the instance is still standing.
+  expect(panelState().condition).toBe('active')
+
+  // Clearing the wound is explicit and per wound.
+  fireEvent.click(screen.getByRole('button', { name: 'Clear Fracture from Bandit' }))
+  expect(panelState().mortalWounds).toEqual([])
+})
+
+test('NpcInstancePanel: a full wound track warns that 0 HP now downs the instance', () => {
+  renderNpcPanel(makeWoundNpc(1), 'compact')
+  mockMortalWoundRoll(8)
+
+  act(() => {
+    useGMScreenStore.getState().damageInstance(SCREEN_ID, PANEL_ID, 25)
+  })
+
+  expect(screen.getByText('Damaged Throat')).toBeInTheDocument()
+  expect(document.querySelector('.gm-mw')?.textContent).toContain('1/1')
+  expect(screen.getByText('Next 0 HP: Downed')).toBeInTheDocument()
+})
+
+test('NpcInstancePanel: the panel menu clears the whole wound track', () => {
+  renderNpcPanel(makeWoundNpc(2), 'compact')
+  mockMortalWoundRoll(12)
+  act(() => {
+    useGMScreenStore.getState().damageInstance(SCREEN_ID, PANEL_ID, 25)
+  })
+  expect(panelState().mortalWounds).toHaveLength(1)
+
+  fireEvent.click(screen.getByRole('button', { name: 'Bandit options' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Clear mortal wounds' }))
+
+  expect(panelState().mortalWounds).toEqual([])
+})
+
+test('NpcInstancePanel: the menu offers no wound clearing when there are none', () => {
+  renderPanel('compact')
+
+  fireEvent.click(screen.getByRole('button', { name: 'Bandit options' }))
+
+  expect(
+    screen.queryByRole('menuitem', { name: 'Clear mortal wounds' }),
+  ).not.toBeInTheDocument()
 })
 
 test('NpcInstancePanel: expanded renders the condensed shared body, not the full NPC sheet', () => {
@@ -907,6 +1052,7 @@ function expandedHeadings(kind: 'character' | 'npc') {
                   condition: 'active',
                   currentAP: MAX_AP,
                   cooldowns: [],
+                  mortalWounds: [],
                 },
               },
         ],

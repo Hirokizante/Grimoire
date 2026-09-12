@@ -3,14 +3,17 @@
  *
  * The instance is a **delta, not a clone**: stats, abilities, portrait, and
  * description all come from the base record at render time, and only live
- * state (HP, temp HP, condition, **Action Points, Recharge cooldowns**) plus
- * the display label belong to the panel. Spawning "Bandit" three times
- * therefore gives three independent HP pools *and* three independent turns
- * over one shared statblock, and editing the base updates every instance.
+ * state (HP, temp HP, condition, **Mortal Wounds**, **Action Points, Recharge
+ * cooldowns**) plus the display label belong to the panel. Spawning "Bandit"
+ * three times therefore gives three independent HP pools *and* three
+ * independent turns over one shared statblock, and editing the base updates
+ * every instance.
  *
  * - **Compact** (default): portrait, instance label (+ base name when it
  *   differs), HP bar with −/+/damage affordances, temp HP, the GM's tracked
- *   status pills inline with the HP number, the instance's **Action Point
+ *   status pills inline with the HP number, the instance's **Mortal Wound
+ *   track** (only for an NPC whose base allows wounds — at 0 HP the store rolls
+ *   one automatically, see PanelMortalWounds), the instance's **Action Point
  *   meter** (3 per turn, the same meter player sheets use), key tokens from the
  *   base, and a condition badge. Downed/dead instances dim and strike through
  *   the label.
@@ -30,11 +33,14 @@ import DamageDialog from '@/components/sheet/DamageDialog'
 import PanelApBar from '@/components/gmscreen/PanelApBar'
 import PanelExpand from '@/components/gmscreen/PanelExpand'
 import PanelHpBar from '@/components/gmscreen/PanelHpBar'
+import PanelMortalWounds from '@/components/gmscreen/PanelMortalWounds'
 import PanelSheet from '@/components/gmscreen/PanelSheet'
 import PanelHeader, { type PanelMenuItem } from '@/components/gmscreen/PanelHeader'
 import PanelStatuses from '@/components/gmscreen/PanelStatuses'
+import { useNotification } from '@/context/NotificationContext'
 import { useNpcInstanceActivation } from '@/hooks/useNpcInstanceActivation'
-import { useGMScreenStore } from '@/store/gmScreenStore'
+import { useGMScreenStore, npcMortalWoundAllowance } from '@/store/gmScreenStore'
+import type { DamageResult } from '@/store/characterStore'
 import { appThemeStatColors, gmPanelSheetPresentation } from '@/lib/themeUtils'
 import { useAppThemeStore } from '@/store/appThemeStore'
 import type { Character, NpcInstanceState, ScreenPanel } from '@/types'
@@ -69,8 +75,10 @@ export default function NpcInstancePanel({
   const renameInstance = useGMScreenStore((s) => s.renameInstance)
   const setInstanceCondition = useGMScreenStore((s) => s.setInstanceCondition)
   const adjustInstanceHP = useGMScreenStore((s) => s.adjustInstanceHP)
+  const clearInstanceMortalWounds = useGMScreenStore((s) => s.clearInstanceMortalWounds)
   const spendInstanceAP = useGMScreenStore((s) => s.spendInstanceAP)
   const restoreInstanceAP = useGMScreenStore((s) => s.restoreInstanceAP)
+  const { notify } = useNotification()
   const appTheme = useAppThemeStore((s) => s.theme)
   // Panel-chrome colors — the app theme's palette, matching CharacterPanel and
   // deliberately independent of any sheet's customization. Its four stat
@@ -100,6 +108,10 @@ export default function NpcInstancePanel({
   const evasion = base.npcStats?.evasion ?? 0
   const movement = base.npcStats?.movement ?? 0
   const saveDC = base.npcStats?.saveDC ?? 0
+  // How many Mortal Wounds this NPC may sustain before 0 HP downs it — the
+  // base record's own stat, read here and in the damage pipeline (never copied
+  // onto the instance, so editing the base updates every instance of it).
+  const mortalWoundAllowance = npcMortalWoundAllowance(base)
   const hp = Math.max(0, panel.state.currentHP)
   const ap = panel.state.currentAP
   const { condition } = panel.state
@@ -107,6 +119,29 @@ export default function NpcInstancePanel({
   // Out of AP = out of actions for this turn: the panel dims (except its AP
   // block, which holds the `+` stepper and the turn button). See gmscreen.css.
   const spent = ap <= 0
+  const name = panel.label || base.name
+
+  /**
+   * Announce what the panel's own `−` stepper just did. Stepping HP runs the
+   * full damage pipeline, so it can auto-roll a Mortal Wound and reset the HP
+   * to max — an outcome that would otherwise look like nothing happened. The
+   * Damage… dialog reports its own results.
+   */
+  const reportSteppedDamage = (result: DamageResult | null) => {
+    if (!result) return
+    if (result.downed) {
+      notify(`${name} is DOWNED!`, 'error')
+      return
+    }
+    const wound = result.mortalWoundRolls?.[0]
+    if (wound) {
+      notify(
+        `${name} takes a Mortal Wound: ${wound.name} (d20 ${wound.roll}) — HP reset to ${result.finalHP}.`,
+        'error',
+        5000,
+      )
+    }
+  }
 
   const menuItems: PanelMenuItem[] = [
     { label: 'Rename instance…', onSelect: () => setRenaming(true) },
@@ -115,6 +150,16 @@ export default function NpcInstancePanel({
     // The turn button appears by itself once AP runs out; the menu entry keeps
     // an early turn (or a GM hand-wave) possible without spending down first.
     { label: 'Start new turn', onSelect: startTurn },
+    // Wounds persist until something clears them (an ability in play, or a
+    // Rest) — this is the panel's Rest for the track the base allows.
+    ...(panel.state.mortalWounds.length > 0
+      ? [
+          {
+            label: 'Clear mortal wounds',
+            onSelect: () => clearInstanceMortalWounds(screenId, panel.id),
+          },
+        ]
+      : []),
     ...(condition === 'dead'
       ? [{ label: 'Mark alive', onSelect: () => setInstanceCondition(screenId, panel.id, 'active') }]
       : [{ label: 'Mark dead', onSelect: () => setInstanceCondition(screenId, panel.id, 'dead') }]),
@@ -137,7 +182,7 @@ export default function NpcInstancePanel({
     >
       <PanelHeader
         portrait={base.portrait}
-        name={panel.label || base.name}
+        name={name}
         subtitle={subtitle}
         density={panel.density}
         onDensityChange={(d) => setPanelDensity(screenId, panel.id, d)}
@@ -174,20 +219,30 @@ export default function NpcInstancePanel({
       )}
 
       <PanelHpBar
-        name={panel.label || base.name}
+        name={name}
         hp={hp}
         maxHP={maxHP}
         tempHP={panel.state.tempHP}
-        onDamage={() => adjustInstanceHP(screenId, panel.id, -1)}
+        onDamage={() => reportSteppedDamage(adjustInstanceHP(screenId, panel.id, -1))}
         onHeal={() => adjustInstanceHP(screenId, panel.id, 1)}
         onOpenDamageDialog={() => setShowDamage(true)}
         statuses={
           <PanelStatuses
             screenId={screenId}
             panel={panel}
-            entityName={panel.label || base.name}
+            entityName={name}
           />
         }
+      />
+
+      {/* The instance's Mortal Wound track — its own, never the base's. Renders
+        * nothing for an NPC whose base allows no wounds (`mortalWounds: 0`). */}
+      <PanelMortalWounds
+        screenId={screenId}
+        panelId={panel.id}
+        wounds={panel.state.mortalWounds}
+        allowance={mortalWoundAllowance}
+        entityName={name}
       />
 
       <PanelApBar
@@ -236,7 +291,7 @@ export default function NpcInstancePanel({
           type="button"
           className="btn btn--icon gm-token gm-token--edit"
           onClick={onOpenBase}
-          aria-label={`Open ${panel.label || base.name}'s base sheet`}
+          aria-label={`Open ${name}'s base sheet`}
           title="Open base sheet"
         >
           <Pencil size={13} />
@@ -261,7 +316,7 @@ export default function NpcInstancePanel({
           npcInstance={{
             screenId,
             panelId: panel.id,
-            label: panel.label || base.name,
+            label: name,
             base,
             currentHP: panel.state.currentHP,
             tempHP: panel.state.tempHP,

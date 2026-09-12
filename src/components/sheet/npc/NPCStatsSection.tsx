@@ -4,7 +4,10 @@
  * Unlike the CharacterSheet's StatsSection, NPC stats are manually entered
  * (not derived from attributes) and there are no resource bars, no HP
  * tracking, no death saves, and no recover action. Mortal Wounds is a plain
- * stat here — a static reference value, not the player sheet's wound track.
+ * stat here — the NPC's **allowance**, i.e. how many Mortal Wounds it can take
+ * before 0 HP downs it — and an instance spawned on a GM screen reads it from
+ * here (see `gmScreenStore`). The wounds an instance has actually taken are
+ * tracked on its panel, never on this record.
  *
  * Uses the same `stat-token` card style as the player sheet's StatsSection
  * for visual consistency, and the same accent palette (STAT_TOKEN_COLORS): the
@@ -128,18 +131,26 @@ export default function NPCStatsSection({
           const delta = stats[token.key] - baseStats[token.key]
           const modified = !isEdit && delta !== 0
           // Short mode prints the shorthand; the full name rides along as the
-          // tooltip so "Wounds" is never a guess (see statTokenLabel).
+          // tooltip so "Wounds" is never a guess (see statTokenLabel). Mortal
+          // Wounds is the one stat with a rule attached — it is the allowance a
+          // GM-screen instance rolls against — so the EDIT input spells that
+          // out. View mode keeps the plain full-name tooltip the other tokens
+          // carry, which is what the label vocabulary tests pin.
           const { text: label, title } = statTokenLabel(
             token.label,
             tokenLabels,
             modified,
           )
+          const tooltip =
+            isEdit && token.key === 'mortalWounds'
+              ? 'Mortal Wounds this NPC can take before it goes down at 0 HP'
+              : title
           return (
             <div
               key={token.label}
               className={'stat-token' + (modified ? ' stat-token--modified' : '')}
               style={{ '--token-color': token.color } as React.CSSProperties}
-              title={title}
+              title={tooltip}
             >
               <div className="stat-token__left">
                 <Icon className="stat-token__icon" size={18} strokeWidth={2.2} />

@@ -12,9 +12,10 @@
  *
  * The dialog is **target-agnostic**: `characterId` drives a live character
  * sheet (mortal wounds, death saves, healing rules) while `npcInstance`
- * drives a GM-screen NPC instance (armor/max HP come from the base record,
- * damage to 0 HP downs the instance — NPCs have no death saves). Same dialog,
- * two target descriptors — deliberately not forked.
+ * drives a GM-screen NPC instance (armor/max HP come from the base record;
+ * a Mortal Wound is rolled automatically at 0 HP while the base allows one,
+ * and an instance with none left is driven `downed` — NPCs have no death
+ * saves). Same dialog, two target descriptors — deliberately not forked.
  */
 
 import { useState } from 'react'
@@ -55,6 +56,29 @@ export interface DamageDialogProps {
   characterId?: string
   /** NPC-instance target. Mutually exclusive with `characterId`. */
   npcInstance?: NpcInstanceTarget
+}
+
+/**
+ * One-line outcome for damage applied to an NPC instance.
+ *
+ * An instance resolves its own Mortal Wounds at 0 HP (see
+ * `gmScreenStore.damageInstance`), so the three outcomes read differently: a
+ * knockout is final for the fight, a wound leaves the instance standing at max
+ * HP minus the spill-over, and a plain hit just reports what the pool lost.
+ */
+function npcInstanceOutcome(label: string, res: DamageResult): string {
+  const rolled = (res.mortalWoundRolls ?? [])
+    .map((wound) => `${wound.name} (d20 ${wound.roll})`)
+    .join(', ')
+  if (res.downed) {
+    return rolled
+      ? `${label} is DOWNED! ${rolled} — no Mortal Wounds left.`
+      : `${label} is DOWNED!`
+  }
+  if (rolled) {
+    return `${label} takes a Mortal Wound: ${rolled} — HP reset to ${res.finalHP}.`
+  }
+  return `Applied ${res.hpLost} damage to ${label}.`
 }
 
 export default function DamageDialog({
@@ -109,10 +133,8 @@ export default function DamageDialog({
       if (!res) return
       setResult(res)
       notify(
-        res.downed
-          ? `${npcInstance.label} is DOWNED!`
-          : `Applied ${res.hpLost} damage to ${npcInstance.label}.`,
-        res.downed ? 'error' : 'warning',
+        npcInstanceOutcome(npcInstance.label, res),
+        res.downed || res.causedMortalWound ? 'error' : 'warning',
       )
       return
     }
@@ -226,13 +248,23 @@ export default function DamageDialog({
                 <div><span className="damage-result__label">HP Lost</span> {result.hpLost}</div>
                 <div><span className="damage-result__label">Final HP</span> {result.finalHP}</div>
               </div>
-              {result.causedMortalWound && (
-                <p className="damage-result__alert">
-                  ⚠ {result.mortalWoundsIncurred} Mortal Wound(s) incurred!
-                  {result.knockedOut && ' Character is KNOCKED OUT!'}
-                  {' '}Roll on the Mortal Wounds table.
-                </p>
-              )}
+              {result.causedMortalWound &&
+                (npcInstance ? (
+                  <p className="damage-result__alert">
+                    ⚠ {result.mortalWoundsIncurred} Mortal Wound(s) rolled
+                    automatically:{' '}
+                    {(result.mortalWoundRolls ?? [])
+                      .map((wound) => `${wound.name} (d20 ${wound.roll})`)
+                      .join(', ')}
+                    . HP reset to {result.finalHP}.
+                  </p>
+                ) : (
+                  <p className="damage-result__alert">
+                    ⚠ {result.mortalWoundsIncurred} Mortal Wound(s) incurred!
+                    {result.knockedOut && ' Character is KNOCKED OUT!'}
+                    {' '}Roll on the Mortal Wounds table.
+                  </p>
+                ))}
             </div>
           )}
         </div>
