@@ -2208,47 +2208,105 @@ body:has(.modal-overlay) .app-header__nav {
   gap: 0.6rem;
 }
 
-.status-icon-picker__emoji-grid {
-  display: grid;
-  grid-template-columns: repeat(10, 1fr);
-  gap: 0.3rem;
-}
-
-.status-icon-picker__emoji {
-  font-size: 1.15rem;
-  line-height: 1;
-  padding: 0.3rem;
-  border: 1px solid transparent;
-  border-radius: 7px;
-  background: transparent;
-  cursor: pointer;
-  transition: background-color 0.12s ease, border-color 0.12s ease;
-}
-
-.status-icon-picker__emoji:hover {
-  background: var(--bg-surface-hover);
-  border-color: var(--border);
-}
-
-.status-icon-picker__panel--pack {
-  max-height: 220px;
+/* Both searchable panels scroll their own content, so the icon grids can be
+   as long as they like without growing the modal. */
+.status-icon-picker__panel--scroll {
+  max-height: 248px;
   overflow-y: auto;
   overscroll-behavior: none;
+  padding-right: 0.2rem;
 }
 
-.status-icon-picker__pack-grid {
+/* The search row sticks to the top of the scrolling grid. The field itself is
+   the app's own text input (`.sheet-input`) at the panel's full width, with the
+   magnifier inside it — so it lines up with the Name/Description fields around
+   the picker rather than sitting inset behind an icon. */
+.status-icon-picker__search {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding-bottom: 0.4rem;
+  background: var(--bg-base);
+}
+
+.status-icon-picker__search-field {
+  position: relative;
+}
+
+.status-icon-picker__search-icon {
+  position: absolute;
+  left: 0.55rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+/* Room for the magnifier on the left and the clear button on the right.
+   (Scoped to `.sheet-input` so it wins over that rule's own padding.) */
+.status-icon-picker__search-field .sheet-input {
+  padding-left: 1.85rem;
+  padding-right: 1.85rem;
+}
+
+.status-icon-picker__search-clear {
+  position: absolute;
+  right: 0.3rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+.status-icon-picker__search-clear:hover {
+  background: var(--bg-surface-hover);
+  color: var(--text-primary);
+}
+
+.status-icon-picker__section {
+  margin: 0;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.status-icon-picker__subgroup {
+  margin: 0.35rem 0 0.1rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.status-icon-picker__grid {
   display: grid;
-  grid-template-columns: repeat(8, 1fr);
-  gap: 0.3rem;
+  grid-template-columns: repeat(auto-fill, minmax(2.1rem, 1fr));
+  gap: 0.25rem;
 }
 
-.status-icon-picker__pack-btn {
+.status-icon-picker__grid--pack {
+  grid-template-columns: repeat(auto-fill, minmax(2.3rem, 1fr));
+}
+
+.status-icon-picker__cell {
   display: flex;
   align-items: center;
   justify-content: center;
   width: 100%;
   aspect-ratio: 1;
-  border: 1px solid var(--border-soft);
+  padding: 0;
+  border: 1px solid transparent;
   border-radius: 7px;
   background: transparent;
   color: var(--text-secondary);
@@ -2257,15 +2315,48 @@ body:has(.modal-overlay) .app-header__nav {
     color 0.12s ease;
 }
 
-.status-icon-picker__pack-btn:hover {
+.status-icon-picker__cell:hover {
   background: var(--bg-surface-hover);
+  border-color: var(--border);
   color: var(--text-primary);
 }
 
-.status-icon-picker__pack-btn--active {
+.status-icon-picker__cell--active {
   background: color-mix(in srgb, var(--accent-violet) 18%, transparent);
   border-color: var(--accent-violet);
   color: var(--accent-violet-soft);
+}
+
+.status-icon-picker__glyph {
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.status-icon-picker__pack-glyph {
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
+/* "Paste an emoji" still works — it just arrives through the search box. */
+.status-icon-picker__pasted {
+  align-self: flex-start;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  padding: 0.35rem 0.6rem;
+  cursor: pointer;
+}
+
+.status-icon-picker__pasted:hover {
+  background: var(--bg-surface-hover);
+  border-color: var(--accent-violet);
+}
+
+.status-icon-picker__note {
+  margin: 0;
+  font-size: 0.8rem;
 }
 
 .status-icon-picker__upload {
@@ -2295,13 +2386,12 @@ body:has(.modal-overlay) .app-header__nav {
   gap: 0.6rem;
 }
 
-/* On narrow screens the fixed 10/8-column grids can't fit their
-   min-content, which overflows the modal to the right. Auto-fill columns
-   shrink the count to whatever actually fits (same cell size, no overflow). */
+/* Both grids size their columns with auto-fill, so a narrow modal shrinks the
+   column count instead of overflowing to the right. */
 @media (max-width: 640px) {
-  .status-icon-picker__emoji-grid,
-  .status-icon-picker__pack-grid {
-    grid-template-columns: repeat(auto-fill, minmax(2.2rem, 1fr));
+  .status-icon-picker__grid,
+  .status-icon-picker__grid--pack {
+    grid-template-columns: repeat(auto-fill, minmax(2rem, 1fr));
   }
 }
 

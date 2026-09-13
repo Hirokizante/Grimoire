@@ -3,10 +3,12 @@
   "private": true,
   "version": "0.8.0-alpha",
   "type": "module",
+  "packageManager": "pnpm@11.22.0",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
+    "icons:rpg-awesome": "node scripts/generate-rpg-awesome-icons.mjs",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
@@ -26,6 +28,8 @@
     "react-markdown": "^10.1.0",
     "rehype-raw": "^7.0.0",
     "remark-gfm": "^4.0.1",
+    "rpg-awesome": "^0.2.0",
+    "unicode-emoji-json": "^0.9.0",
     "zustand": "^5.0.8"
   },
   "devDependencies": {

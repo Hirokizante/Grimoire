@@ -41,6 +41,12 @@ importers:
       remark-gfm:
         specifier: ^4.0.1
         version: 4.0.1
+      rpg-awesome:
+        specifier: ^0.2.0
+        version: 0.2.0
+      unicode-emoji-json:
+        specifier: ^0.9.0
+        version: 0.9.0
       zustand:
         specifier: ^5.0.8
         version: 5.0.15(@types/react@19.2.18)(react@19.2.8)
@@ -1104,6 +1110,9 @@ packages:
     engines: {node: ^20.19.0 || >=22.12.0}
     hasBin: true
 
+  rpg-awesome@0.2.0:
+    resolution: {integrity: sha512-+jTuYWHOs8iZV5+XKvI/7Ojr0k4pLX/dRpa2LHXReGMQI6h0cGvNxIh/AQY1zhAC7LPcNXnPTliD1/ugB/DbRA==}
+
   saxes@6.0.0:
     resolution: {integrity: sha512-xAg7SOnEhrm5zI3puOOKyy1OMcMlIJZYNJY7xLBwSze0UjhPLnWfj2GF2EpT0jmzaJKIWKHLsaSSajf35bcYnA==}
     engines: {node: '>=v12.22.7'}
@@ -1193,6 +1202,9 @@ packages:
   undici@7.29.1:
     resolution: {integrity: sha512-RYONW2MeafgYlkVOKYKkA/Ag7BmXqgIWCa8t1m0JcxrQg9pI9lEqRhAOruOBCbAohOa/gkCF+iPi9hrgvTzu6Q==}
     engines: {node: '>=20.18.1'}
+
+  unicode-emoji-json@0.9.0:
+    resolution: {integrity: sha512-HdrQW/7SdbXUsTd8uTATv7LvQJkCSgbAgRCDCtOhQ6xn3EAx+xZHQtRniOXWJK3ywIqPegkNhP4U4EbuFsiQng==}
 
   unified@11.0.5:
     resolution: {integrity: sha512-xKvGhPWw3k84Qjh8bI3ZeJjqnyadK+GEFtazSfZv/rKeTkTjOJho6mFqh2SM96iIcZokxiOpg78GazTSg8+KHA==}
@@ -2505,6 +2517,8 @@ snapshots:
       '@rolldown/binding-win32-arm64-msvc': 1.2.8
       '@rolldown/binding-win32-x64-msvc': 1.2.8
 
+  rpg-awesome@0.2.0: {}
+
   saxes@6.0.0:
     dependencies:
       xmlchars: 2.2.0
@@ -2576,6 +2590,8 @@ snapshots:
   undici-types@7.18.2: {}
 
   undici@7.29.1: {}
+
+  unicode-emoji-json@0.9.0: {}
 
   unified@11.0.5:
     dependencies:

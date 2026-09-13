@@ -3,7 +3,9 @@
  *
  * Supports all three icon kinds via `iconType`:
  *   - 'emoji' — the raw emoji character(s) in `icon`
- *   - 'pack'  — a lucide key in `icon` (resolved via the catalog)
+ *   - 'pack'  — an RPG-Awesome class key in `icon`, drawn with the bundled
+ *               `rpg-awesome` icon font (keys saved with the old Lucide pack
+ *               still render through `legacyStatusIconByName`)
  *   - 'image' — an SVG/PNG data URL in `icon`, rendered as an <img>
  *
  * Empty/missing icons fall back to a placeholder glyph so layout never breaks.
@@ -11,7 +13,10 @@
 
 import type { CSSProperties } from 'react'
 
-import { statusIconByName } from '@/constants/statusIcons'
+import {
+  isRpgAwesomeIconKey,
+  legacyStatusIconByName,
+} from '@/constants/statusIcons'
 import type { StatusIconType } from '@/types'
 
 export interface StatusIconProps {
@@ -51,9 +56,28 @@ export default function StatusIcon({
   }
 
   if (iconType === 'pack') {
-    const Icon = statusIconByName(icon)
-    if (Icon) {
-      return <Icon size={size} className={className} aria-hidden />
+    // RPG-Awesome icons are font glyphs: `ra` picks the font up, the key is
+    // the class that carries the codepoint in its ::before.
+    if (isRpgAwesomeIconKey(icon)) {
+      return (
+        <i
+          className={className ? `ra ${icon} ${className}` : `ra ${icon}`}
+          aria-hidden
+          style={{
+            ...boxStyle,
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: size,
+            lineHeight: 1,
+          }}
+        />
+      )
+    }
+
+    const LegacyIcon = legacyStatusIconByName(icon)
+    if (LegacyIcon) {
+      return <LegacyIcon size={size} className={className} aria-hidden />
     }
   }
 

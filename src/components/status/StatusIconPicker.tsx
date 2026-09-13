@@ -2,27 +2,34 @@
  * StatusIconPicker — three-way icon chooser for status conditions.
  *
  * Lets the user pick an icon from three sources:
- *   1. Emoji       — free-text emoji + a quick-pick palette
- *   2. Icon pack   — a grid of curated Lucide icons (see statusIcons.tsx)
+ *   1. Emoji       — all 1,900+ Unicode emoji, searchable by name (plus a
+ *                    quick-pick row and a search-term table for game words the
+ *                    Unicode names don't use, e.g. "poisoned")
+ *   2. Icon pack   — the bundled RPG-Awesome fantasy pack (496 icons), searchable
  *   3. Upload      — an SVG or PNG file (SVG kept as-is; PNG compressed)
  *
  * Reports each selection back via `onChange({ icon, iconType })`.
  */
 
-import { useRef, useState } from 'react'
-import { Upload } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Search, Upload, X } from 'lucide-react'
 
 import { processImage } from '@/lib/imageProcessing'
-import { STATUS_ICON_CHOICES } from '@/constants/statusIcons'
+import {
+  EMOJI_QUICK_PICKS,
+  EMOJI_SEARCH_LIMIT,
+  loadEmojiCatalog,
+  pastedEmojiCandidate,
+  searchEmojis,
+} from '@/lib/emojiCatalog'
+import {
+  RPG_AWESOME_ICON_KEYS,
+  isRpgAwesomeIconKey,
+  rpgAwesomeIconLabel,
+} from '@/constants/statusIcons'
+import type { EmojiEntry, EmojiGroup } from '@/lib/emojiCatalog'
 import StatusIcon from '@/components/status/StatusIcon'
 import type { StatusIconType } from '@/types'
-
-/** A small curated emoji palette for quick selection. */
-const EMOJI_QUICK_PICKS = [
-  '💀', '☠️', '🔥', '❄️', '⚡', '💧', '🌪️', '🌙', '☀️', '✨',
-  '💫', '😵', '🧎', '🙈', '👻', '🌫️', '🔮', '♻️', '⛓️', '🩸',
-  '💚', '🧠', '🗡️', '🛡️', '💥', '🐍', '🕸️', '🩹', '⏳', '🔒',
-]
 
 export interface StatusIconPickerProps {
   /** Current icon payload. */
@@ -31,6 +38,265 @@ export interface StatusIconPickerProps {
   iconType: StatusIconType
   /** Called with the newly-chosen icon payload. */
   onChange: (next: { icon: string; iconType: StatusIconType }) => void
+}
+
+/** Shared shape for the two searchable panels. */
+interface PanelProps {
+  icon: string
+  iconType: StatusIconType
+  onChange: StatusIconPickerProps['onChange']
+}
+
+/**
+ * The search field both panels share: the app's standard text input
+ * (`.sheet-input`, full panel width) with a magnifier sitting inside it, so it
+ * lines up with every other field in the modal instead of reading as a
+ * smaller control.
+ */
+function SearchBox({
+  value,
+  onChange,
+  placeholder,
+  label,
+}: {
+  value: string
+  onChange: (next: string) => void
+  placeholder: string
+  label: string
+}) {
+  return (
+    <div className="status-icon-picker__search">
+      <div className="status-icon-picker__search-field">
+        <Search
+          size={14}
+          aria-hidden
+          className="status-icon-picker__search-icon"
+        />
+        <input
+          type="text"
+          className="sheet-input status-icon-picker__search-input"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          aria-label={label}
+          spellCheck={false}
+          autoComplete="off"
+        />
+        {value !== '' && (
+          <button
+            type="button"
+            className="status-icon-picker__search-clear"
+            onClick={() => onChange('')}
+            aria-label="Clear search"
+          >
+            <X size={13} aria-hidden />
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/** One icon cell in either grid. */
+function IconCell({
+  selected,
+  label,
+  onClick,
+  children,
+}: {
+  selected: boolean
+  label: string
+  onClick: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      className={
+        'status-icon-picker__cell' +
+        (selected ? ' status-icon-picker__cell--active' : '')
+      }
+      onClick={onClick}
+      title={label}
+      aria-label={label}
+      aria-pressed={selected}
+    >
+      {children}
+    </button>
+  )
+}
+
+/** The emoji tab: search the Unicode catalog, or take the quick picks. */
+function EmojiPanel({ icon, iconType, onChange }: PanelProps) {
+  const [query, setQuery] = useState('')
+  const [groups, setGroups] = useState<EmojiGroup[] | null>(null)
+  const [failed, setFailed] = useState(false)
+  const selected = iconType === 'emoji' ? icon : ''
+
+  useEffect(() => {
+    let alive = true
+    loadEmojiCatalog()
+      .then((loaded) => {
+        if (alive) setGroups(loaded)
+      })
+      .catch(() => {
+        if (alive) setFailed(true)
+      })
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  const trimmed = query.trim()
+  const results = useMemo(
+    () => (groups ? searchEmojis(groups, query) : []),
+    [groups, query],
+  )
+  /** Quick picks with their real names, once the catalog is in. */
+  const quickPicks = useMemo(() => {
+    const byEmoji = new Map<string, EmojiEntry>()
+    for (const group of groups ?? []) {
+      for (const entry of group.emojis) byEmoji.set(entry.emoji, entry)
+    }
+    return EMOJI_QUICK_PICKS.map((emoji) => ({
+      emoji,
+      name: byEmoji.get(emoji)?.name ?? emoji,
+    }))
+  }, [groups])
+  const pasted = pastedEmojiCandidate(query)
+  const matchCount = results.length
+  const capped = matchCount >= EMOJI_SEARCH_LIMIT
+
+  const renderCell = (emoji: string, label: string) => (
+    <IconCell
+      key={emoji}
+      selected={selected === emoji}
+      label={label}
+      onClick={() => onChange({ icon: emoji, iconType: 'emoji' })}
+    >
+      <span className="status-icon-picker__glyph">{emoji}</span>
+    </IconCell>
+  )
+
+  return (
+    <div className="status-icon-picker__panel status-icon-picker__panel--scroll">
+      <SearchBox
+        value={query}
+        onChange={setQuery}
+        placeholder="Search emoji…"
+        label="Search emoji"
+      />
+
+      {trimmed === '' ? (
+        <>
+          <p className="status-icon-picker__section">Common</p>
+          <div className="status-icon-picker__grid">
+            {quickPicks.map(({ emoji, name }) => renderCell(emoji, name))}
+          </div>
+          {groups ? (
+            <>
+              <p className="status-icon-picker__section">All emoji</p>
+              {groups.map((group) => (
+                <div key={group.name}>
+                  <p className="status-icon-picker__subgroup">{group.name}</p>
+                  <div className="status-icon-picker__grid">
+                    {group.emojis.map((entry) =>
+                      renderCell(entry.emoji, entry.name),
+                    )}
+                  </div>
+                </div>
+              ))}
+            </>
+          ) : (
+            <p className="muted status-icon-picker__note">
+              {failed ? 'Could not load the emoji list.' : 'Loading emoji…'}
+            </p>
+          )}
+        </>
+      ) : (
+        <>
+          {pasted && (
+            <button
+              type="button"
+              className="status-icon-picker__pasted"
+              onClick={() => onChange({ icon: pasted, iconType: 'emoji' })}
+            >
+              Use “{pasted}” as the icon
+            </button>
+          )}
+
+          {matchCount > 0 ? (
+            <>
+              <p className="status-icon-picker__section">
+                {matchCount} {matchCount === 1 ? 'match' : 'matches'}
+                {capped ? ` (first ${EMOJI_SEARCH_LIMIT})` : ''}
+              </p>
+              <div className="status-icon-picker__grid">
+                {results.map((entry: EmojiEntry) =>
+                  renderCell(entry.emoji, entry.name),
+                )}
+              </div>
+            </>
+          ) : (
+            !pasted && (
+              <p className="muted status-icon-picker__note">
+                {groups
+                  ? `No emoji match “${trimmed}”.`
+                  : failed
+                    ? 'Could not load the emoji list.'
+                    : 'Loading emoji…'}
+              </p>
+            )
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
+/** The icon-pack tab: search the bundled RPG-Awesome fantasy icons. */
+function IconPackPanel({ icon, iconType, onChange }: PanelProps) {
+  const [query, setQuery] = useState('')
+  const selected = iconType === 'pack' ? icon : ''
+
+  const matches = useMemo(() => {
+    const tokens = query.trim().toLowerCase().split(/\s+/).filter(Boolean)
+    if (tokens.length === 0) return RPG_AWESOME_ICON_KEYS
+    return RPG_AWESOME_ICON_KEYS.filter((key) => {
+      const words = rpgAwesomeIconLabel(key).toLowerCase()
+      return tokens.every((token) => words.includes(token))
+    })
+  }, [query])
+
+  return (
+    <div className="status-icon-picker__panel status-icon-picker__panel--scroll">
+      <SearchBox
+        value={query}
+        onChange={setQuery}
+        placeholder="Search icons…"
+        label="Search icon pack"
+      />
+
+      {matches.length > 0 ? (
+        <div className="status-icon-picker__grid status-icon-picker__grid--pack">
+          {matches.map((key) => (
+            <IconCell
+              key={key}
+              selected={selected === key}
+              label={rpgAwesomeIconLabel(key)}
+              onClick={() => onChange({ icon: key, iconType: 'pack' })}
+            >
+              <i className={`ra ${key} status-icon-picker__pack-glyph`} aria-hidden />
+            </IconCell>
+          ))}
+        </div>
+      ) : (
+        <p className="muted status-icon-picker__note">
+          No icons match “{query.trim()}”.
+        </p>
+      )}
+    </div>
+  )
 }
 
 export default function StatusIconPicker({
@@ -76,24 +342,28 @@ export default function StatusIconPicker({
 
   const tabs: { key: StatusIconType; label: string }[] = [
     { key: 'emoji', label: 'Emoji' },
-    { key: 'pack', label: 'Icon' },
+    { key: 'pack', label: 'Icon Pack' },
     { key: 'image', label: 'Upload' },
   ]
+
+  /** What the current selection is, spelled out under the preview. */
+  const previewLabel = () => {
+    if (iconType === 'image') return icon ? 'Uploaded image' : 'No icon selected'
+    if (iconType === 'pack') {
+      if (!icon) return 'No icon selected'
+      return isRpgAwesomeIconKey(icon)
+        ? `Icon pack · ${rpgAwesomeIconLabel(icon)}`
+        : 'Icon pack'
+    }
+    return icon ? 'Emoji' : 'No icon selected'
+  }
 
   return (
     <div className="status-icon-picker">
       {/* Live preview of the current selection. */}
       <div className="status-icon-picker__preview">
         <StatusIcon icon={icon} iconType={iconType} size={28} />
-        <span className="status-icon-picker__preview-label">
-          {iconType === 'image' && icon
-            ? 'Uploaded image'
-            : iconType === 'pack' && icon
-              ? 'Icon-pack icon'
-              : icon
-                ? 'Emoji'
-                : 'No icon selected'}
-        </span>
+        <span className="status-icon-picker__preview-label">{previewLabel()}</span>
       </div>
 
       <div className="status-icon-picker__tabs" role="tablist">
@@ -115,53 +385,11 @@ export default function StatusIconPicker({
       </div>
 
       {tab === 'emoji' && (
-        <div className="status-icon-picker__panel">
-          <input
-            type="text"
-            className="sheet-input"
-            value={iconType === 'emoji' ? icon : ''}
-            onChange={(e) => onChange({ icon: e.target.value, iconType: 'emoji' })}
-            placeholder="Paste an emoji…"
-            maxLength={8}
-          />
-          <div className="status-icon-picker__emoji-grid">
-            {EMOJI_QUICK_PICKS.map((e) => (
-              <button
-                key={e}
-                type="button"
-                className="status-icon-picker__emoji"
-                onClick={() => onChange({ icon: e, iconType: 'emoji' })}
-                aria-label={`Use ${e}`}
-              >
-                {e}
-              </button>
-            ))}
-          </div>
-        </div>
+        <EmojiPanel icon={icon} iconType={iconType} onChange={onChange} />
       )}
 
       {tab === 'pack' && (
-        <div className="status-icon-picker__panel status-icon-picker__panel--pack">
-          <div className="status-icon-picker__pack-grid">
-            {STATUS_ICON_CHOICES.map(({ key, label, Icon }) => (
-              <button
-                key={key}
-                type="button"
-                className={
-                  'status-icon-picker__pack-btn' +
-                  (iconType === 'pack' && icon === key
-                    ? ' status-icon-picker__pack-btn--active'
-                    : '')
-                }
-                onClick={() => onChange({ icon: key, iconType: 'pack' })}
-                title={label}
-                aria-label={label}
-              >
-                <Icon size={18} aria-hidden />
-              </button>
-            ))}
-          </div>
-        </div>
+        <IconPackPanel icon={icon} iconType={iconType} onChange={onChange} />
       )}
 
       {tab === 'image' && (

@@ -81,6 +81,7 @@ Divergence is a DIY tabletop RPG system — there is no compendium of spells or 
 - **Status conditions** — reference records for game effects like "Poisoned" or "Hidden", each with an icon, rules text, and categorization tags. The compendium ships seeded with the built-in Divergence conditions and supports player-created custom ones.
 - **Inline references** — write `[StatusName]` in any sheet markdown (ability descriptions, overcharge, flavor text, innate description, custom text sections); it renders as a highlighted, clickable reference with a tooltip showing the condition's details. Matching is case-insensitive.
 - **Compendium page** — browse, sort, create, edit, and delete conditions; pick an icon from emoji, the bundled icon pack, or an uploaded image.
+- **Searchable icon picker** — all three icon sources are searched, not scrolled: any of the 1,900+ Unicode emoji by name (with a quick-pick row, and tabletop aliases so "poisoned" reaches ☠️ and "grappled" reaches ⛓️), any of RPG-Awesome's 496 fantasy icons, or an uploaded SVG/PNG. Pasting an emoji into the search box still works, and statuses saved with the older Lucide pack keep rendering their icon.
 - **Referencing sheets** — the compendium shows which characters reference each condition, and character exports bundle every status the sheet references.
 - **GM Screen tracking** — the same records back the GM Screen's per-panel status pills (see [GM Screen](#gm-screen)); that tracking state lives on the panel, not on any character sheet.
 
@@ -237,7 +238,9 @@ Every live-play character mutation was refactored to be **id-targeted** (`takeDa
 - **Vite 8** — build tool and dev server with HMR
 - **Zustand** — lightweight state management (character store, dice roll store, roll log store, status store, app theme store)
 - **@dnd-kit** — drag-and-drop for abilities (sortable lists, cross-list moves)
-- **Lucide Icons** — icon library
+- **Lucide Icons** — the app's own icon library (chrome, panels, sheet actions)
+- **RPG-Awesome** — the 496-icon fantasy pack the status icon picker offers
+- **unicode-emoji-json** — the Unicode emoji names/groups behind the picker's emoji search
 - **react-colorful** — color picker for the customization panel
 - **react-markdown** + **remark-gfm** + **rehype-raw** — Markdown rendering in ability descriptions and bio fields
 - **Vitest** + **Testing Library** — unit and component tests
@@ -272,11 +275,15 @@ git clone https://github.com/Hirokizante/Grimoire.git
 cd grimoire
 
 # 2. Install dependencies
-npm install
+pnpm install
 
 # 3. Start the dev server
-npm run dev
+pnpm run dev
 ```
+
+pnpm is the package manager this repo locks with (`pnpm-lock.yaml`), and the
+Pages workflow installs from that same lockfile. `npm install` and `npm run …`
+still work — pnpm is just what keeps the deploy build identical to a local one.
 
 Vite will print a local URL (usually `http://localhost:5173`). Open it in your browser.
 
@@ -292,6 +299,7 @@ The first time you open the app you'll land on the Home screen. Click **Characte
 | `npm run build` | Type-check + production build to `dist/` |
 | `npm run preview` | Preview the production build locally |
 | `npm run lint` | Lint with oxlint |
+| `npm run icons:rpg-awesome` | Regenerate the status icon pack's key list from the installed `rpg-awesome` |
 | `npm run typecheck` | Type-check only (no emit) |
 | `npm run test` | Run unit tests once via vitest |
 | `npm run test:watch` | Run unit tests in watch mode |
@@ -321,6 +329,7 @@ npm run preview
 The repo ships a GitHub Actions workflow (`.github/workflows/deploy.yml`) that publishes the app to GitHub Pages:
 
 - Every push to `main` (and manual runs via the Actions tab) builds the app and deploys `dist/` automatically.
+- The build installs with **pnpm** (`pnpm install --frozen-lockfile`) from the tracked `pnpm-lock.yaml`, so the deployed bundle is built from the same dependency tree as a local one. Bumping a dependency means committing the updated lockfile with it — the workflow fails rather than re-resolving.
 - Vite's `base` is set to `/Grimoire/` so the app works under the project-page subpath.
 - The live app is hosted at **https://hirokizante.github.io/Grimoire/** — the repo's Pages source must be set to "GitHub Actions" (repo Settings → Pages) for the workflow to be able to deploy.
 
@@ -412,7 +421,7 @@ Grimoire/
 │   │   ├── status/        # Status conditions compendium
 │   │   │   ├── StatusModal.tsx          # View/edit status modal
 │   │   │   ├── CreateStatusModal.tsx    # New-status form
-│   │   │   ├── StatusIconPicker.tsx     # Emoji / icon pack / image picker
+│   │   │   ├── StatusIconPicker.tsx     # Searchable emoji / RPG-Awesome / upload picker
 │   │   │   ├── StatusIcon.tsx           # Status icon renderer
 │   │   │   ├── StatusHighlighter.tsx    # Inline [Name] reference highlighting
 │   │   │   ├── StatusReference.tsx      # Clickable reference + hover card
@@ -423,7 +432,8 @@ Grimoire/
 │   ├── constants/
 │   │   ├── gameData.ts    # Attribute/skill metadata, mortal wounds table, defaults
 │   │   ├── statuses.ts    # Built-in status conditions + defaults
-│   │   └── statusIcons.tsx # Built-in status icon pack
+│   │   ├── rpgAwesomeIcons.ts # Generated: the pack's 496 icon keys
+│   │   └── statusIcons.ts # Icon-pack keys/labels + legacy Lucide fallback
 │   ├── context/
 │   │   └── NotificationContext.tsx # Toast notification system
 │   ├── hooks/
@@ -442,6 +452,7 @@ Grimoire/
 │   │   ├── dice.ts          # Single die roll utility
 │   │   ├── diceParser.ts    # Tokenizer + parser for dice notation
 │   │   ├── diceRoller.ts    # Evaluates parsed expressions with stats
+│   │   ├── emojiCatalog.ts  # Lazy Unicode emoji catalog + name/alias search
 │   │   ├── exportImport.ts  # JSON export/import, versioning, snapshots
 │   │   ├── imageProcessing.ts # Canvas-based image resize + compression
 │   │   ├── mortalWounds.ts  # Table lookup, roll, and the wound-slot rules
@@ -477,7 +488,10 @@ Grimoire/
 │   └── test/
 │       └── setup.ts        # Vitest setup (jest-dom matchers)
 ├── e2e/
-│   └── gm-screen.spec.ts   # Playwright: assemble, damage, persist, placeholders
+│   ├── gm-screen.spec.ts   # Playwright: assemble, damage, persist, placeholders
+│   └── status-icons.spec.ts # Playwright: search both icon sources, save, reload
+├── scripts/
+│   └── generate-rpg-awesome-icons.mjs # Regenerates the icon pack's key list
 └── playwright.config.ts    # E2E config (runs against `vite preview`)
 ```
 
@@ -550,7 +564,7 @@ The central domain object is a **`Character`**, which holds everything about a s
 | Field | Purpose |
 | --- | --- |
 | `id`, `name` | Identity; `[name]` references match case-insensitively |
-| `icon`, `iconType` | Icon payload (`'emoji'`, `'pack'` lucide key, or `'image'` data URL) |
+| `icon`, `iconType` | Icon payload (`'emoji'`, `'pack'` RPG-Awesome class key such as `'ra-crossed-swords'`, or `'image'` data URL). Lucide keys saved by older releases still render |
 | `description` | Full rules text for the condition |
 | `tags` | Categorization tags; built-ins carry `'Default'` |
 | `createdAt`, `updatedAt` | Timestamps |
@@ -658,9 +672,9 @@ npm run test:e2e
 npm run test:e2e:ui
 ```
 
-Unit tests cover the pure logic modules (`calculations`, `diceParser`, `diceRoller`, `slotLogic`, `exportImport`, `db`, `backup`, `mortalWounds` — the table resolved face by face, the slot rules, the `{ slot, roll, name }` projection, and `isKnockedOut`: a full track standing is *not* out, 0 HP with a slot in hand is not either, 0 HP with none is), the character store's id-targeted mutations and autosave (including `addMortalWound`: filling the oldest slot that can take a name, resolving a `Pending Roll` slot, refusing off-table names and a full track, and a hand-added wound really reaching healing), the GM Screen store (CRUD, panel ops, duplicate guard, auto-labelling, instance damage/heal/downed flow, the instance Mortal Wound track — automatic rolls, spill-over, going down when the allowance runs out, per-instance isolation and clearing, and `addInstanceMortalWound` — the entry's D20 stored beside the name, refusal at the allowance and for off-table names, the live read of a raised allowance, and per-panel isolation — panel status tracking, per-instance ability uses — spending, clamping, per-panel isolation and the untouched base record — per-instance modifier switches — flipping, per-panel isolation, the HP clamp, effective Armor in the damage pipeline — per-screen autosave), the player sheet's wound block (the `n / max` counter with no empty slot boxes, the read-only track edit mode renders, one action row whose roll/add/rest buttons share the `sheet-action-btn` class and each carry an icon, the Death Save roll sharing that same class, which toast each wound raises — the Critical Condition when the roll fills the last slot, the knock-out only at 0 HP with no slot left, and nothing for an ordinary wound — the picker's search and "on track" marking, the dialog locking itself on a full track, and a pending slot named by hand instead of rolled), and the GM Screen components (panels, pickers, placeholder, status pills + Add Status picker — including a pill's click-through to the status description and its hover card — limited-use cards on a panel — activation spending the instance's own use, working ± steppers, refusal at 0 — modifier switches moving an instance's tokens/body without touching its sibling or the base — manual Mortal Wound adds on both panel kinds, and `DamageDialog` against an NPC instance, both the mook case and an auto-rolled wound).
+Unit tests cover the pure logic modules (`calculations`, `diceParser`, `diceRoller`, `slotLogic`, `exportImport`, `db`, `backup`, `mortalWounds` — the table resolved face by face, the slot rules, the `{ slot, roll, name }` projection, and `isKnockedOut`: a full track standing is *not* out, 0 HP with a slot in hand is not either, 0 HP with none is), the character store's id-targeted mutations and autosave (including `addMortalWound`: filling the oldest slot that can take a name, resolving a `Pending Roll` slot, refusing off-table names and a full track, and a hand-added wound really reaching healing), the GM Screen store (CRUD, panel ops, duplicate guard, auto-labelling, instance damage/heal/downed flow, the instance Mortal Wound track — automatic rolls, spill-over, going down when the allowance runs out, per-instance isolation and clearing, and `addInstanceMortalWound` — the entry's D20 stored beside the name, refusal at the allowance and for off-table names, the live read of a raised allowance, and per-panel isolation — panel status tracking, per-instance ability uses — spending, clamping, per-panel isolation and the untouched base record — per-instance modifier switches — flipping, per-panel isolation, the HP clamp, effective Armor in the damage pipeline — per-screen autosave), the player sheet's wound block (the `n / max` counter with no empty slot boxes, the read-only track edit mode renders, one action row whose roll/add/rest buttons share the `sheet-action-btn` class and each carry an icon, the Death Save roll sharing that same class, which toast each wound raises — the Critical Condition when the roll fills the last slot, the knock-out only at 0 HP with no slot left, and nothing for an ordinary wound — the picker's search and "on track" marking, the dialog locking itself on a full track, and a pending slot named by hand instead of rolled), and the GM Screen components (panels, pickers, placeholder, status pills + Add Status picker — including a pill's click-through to the status description and its hover card — limited-use cards on a panel — activation spending the instance's own use, working ± steppers, refusal at 0 — modifier switches moving an instance's tokens/body without touching its sibling or the base — manual Mortal Wound adds on both panel kinds, and `DamageDialog` against an NPC instance, both the mook case and an auto-rolled wound), and the status icon picker (emoji search run against the real shipped catalog — name ranking, a game term like "poisoned" reaching ☠️, every alias verified to point at an emoji that catalog contains, the pasted-emoji path and the result cap — the RPG-Awesome pack's 496 keys matching every word of a query, the selection mark on both grids, and `StatusIcon` drawing a saved RPG-Awesome key as a font glyph while still drawing the Lucide keys older records carry).
 
-End-to-end tests live in `e2e/` and run against the **production build** served by `vite preview` (not a dev server). `e2e/npc-abilities.spec.ts` drags a real ability card with a real pointer on both NPC surfaces — the NPC's own sheet page and an NPC bundled into a character's custom tab — asserting the drop reorders the record, survives a reload, and that the two surfaces lay the list out identically (unit tests pin the drop handler itself, since jsdom has no layout for dnd-kit to measure). `e2e/gm-screen.spec.ts` covers screen creation, mixing a character with two NPC instances, damaging one instance to 0 HP while its sibling is unaffected, an instance's Mortal Wound track walked end to end (auto-rolled wound with its d20, spill-over refill, the full-track warning, going down on the next 0 HP, a cleared wound surviving a reload, and the row staying one line without overflow at 360px), a specific wound recorded by hand on the sheet and on both panel kinds (searching the picker, the card/chip landing with the entry's D20, the menu entry disappearing once the track is full, and both tracks surviving a reload), a character walked 20 → 15 → 10 → 1 → 0 HP on their own sheet to pin when the knock-out is announced (the second wound and the full track raise the Critical Condition instead, the hit that finally has no wound to pay for it is the knock-out), persistence across a reload, player/panel state parity, delete-reference placeholders, status tracking (per-panel pills, durations, stacks, hovering a pill for its card — asserted to render un-clipped outside the pill — clicking through to its description, and a panel that stays exactly as tall with five statuses as with one — on desktop and at 360px), and a 360px-wide layout with no horizontal overflow. `e2e/storage-failure.spec.ts` pins the recovery contract for all three failure modes: a blocked upgrade must not hang (it must explain itself, and Retry must succeed once the blocking connection goes away), a half-applied upgrade must repair itself **without losing data**, and a sequence of mixed reads and writes must keep working on the shared connection (every helper used to close it on exit, silently breaking everything after the first call). Run `npx playwright install chromium` once before the first `npm run test:e2e`.
+End-to-end tests live in `e2e/` and run against the **production build** served by `vite preview` (not a dev server). `e2e/status-icons.spec.ts` walks the icon picker in a real browser — search the emoji tab, pick, search the RPG-Awesome pack, pick, save, reload — and asserts the pack's `@font-face` actually resolved (`document.fonts.check('16px RPGAwesome')`), which is the one thing jsdom can never cover. `e2e/npc-abilities.spec.ts` drags a real ability card with a real pointer on both NPC surfaces — the NPC's own sheet page and an NPC bundled into a character's custom tab — asserting the drop reorders the record, survives a reload, and that the two surfaces lay the list out identically (unit tests pin the drop handler itself, since jsdom has no layout for dnd-kit to measure). `e2e/gm-screen.spec.ts` covers screen creation, mixing a character with two NPC instances, damaging one instance to 0 HP while its sibling is unaffected, an instance's Mortal Wound track walked end to end (auto-rolled wound with its d20, spill-over refill, the full-track warning, going down on the next 0 HP, a cleared wound surviving a reload, and the row staying one line without overflow at 360px), a specific wound recorded by hand on the sheet and on both panel kinds (searching the picker, the card/chip landing with the entry's D20, the menu entry disappearing once the track is full, and both tracks surviving a reload), a character walked 20 → 15 → 10 → 1 → 0 HP on their own sheet to pin when the knock-out is announced (the second wound and the full track raise the Critical Condition instead, the hit that finally has no wound to pay for it is the knock-out), persistence across a reload, player/panel state parity, delete-reference placeholders, status tracking (per-panel pills, durations, stacks, hovering a pill for its card — asserted to render un-clipped outside the pill — clicking through to its description, and a panel that stays exactly as tall with five statuses as with one — on desktop and at 360px), and a 360px-wide layout with no horizontal overflow. `e2e/storage-failure.spec.ts` pins the recovery contract for all three failure modes: a blocked upgrade must not hang (it must explain itself, and Retry must succeed once the blocking connection goes away), a half-applied upgrade must repair itself **without losing data**, and a sequence of mixed reads and writes must keep working on the shared connection (every helper used to close it on exit, silently breaking everything after the first call). Run `npx playwright install chromium` once before the first `npm run test:e2e`.
 
 ---
 
@@ -676,3 +690,10 @@ End-to-end tests live in `e2e/` and run against the **production build** served 
 ## License
 
 This project is licensed under the MIT license.
+
+Bundled third-party work keeps its own license: the status icon pack is
+[RPG-Awesome](https://github.com/nagoshiashumari/Rpg-Awesome) (font under SIL OFL 1.1,
+CSS under MIT), drawn from [Game Icons](https://game-icons.net/), and the emoji names and
+groups behind the picker's emoji search come from
+[unicode-emoji-json](https://github.com/muan/unicode-emoji-json) (MIT), which repackages
+Unicode's emoji data.
