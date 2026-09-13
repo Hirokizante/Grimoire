@@ -33,7 +33,7 @@ import {
 } from '@/lib/abilityUses'
 import { withInstanceState } from '@/lib/gmScreenUtils'
 import { rollDie } from '@/lib/dice'
-import { rollOnMortalWoundTable } from '@/lib/mortalWounds'
+import { rollOnMortalWoundTable, mortalWoundByName } from '@/lib/mortalWounds'
 import { resolveRecharge, rollRechargeDie, type RechargeOutcome } from '@/lib/abilityRecharge'
 import { useCharacterStore } from '@/store/characterStore'
 import type { DamageResult } from '@/store/characterStore'
@@ -260,6 +260,25 @@ export interface GMScreenActions {
   ) => void
   /** Clear an instance's whole Mortal Wound track (the panel's Rest equivalent). */
   clearInstanceMortalWounds: (screenId: string, panelId: string) => void
+  /**
+   * Apply a **specific** wound from the table to an instance's own track, with
+   * no D20 — the manual counterpart of the automatic roll
+   * {@link GMScreenActions.damageInstance} makes at 0 HP, for a wound something
+   * named outright (an ability in play, the NPC's authored effect, a GM ruling).
+   *
+   * `name` must be a Mortal Wounds table entry: the entry's own D20 is stored
+   * beside it, so a hand-added wound renders on the panel exactly like a rolled
+   * one (`Damaged Throat · d20 8`) and its rules text resolves. Respects the
+   * instance's allowance — the base's `npcStats.mortalWounds`, read live as the
+   * damage pipeline reads it — so a full track (and the `mortalWounds: 0` mook
+   * case) gains nothing. Returns whether the wound was added; nothing is
+   * written when it was not.
+   */
+  addInstanceMortalWound: (
+    screenId: string,
+    panelId: string,
+    name: string,
+  ) => boolean
   /**
    * Spend AP from an NPC instance's own turn budget. Returns false when the
    * instance cannot afford it (the caller decides what to tell the GM).
@@ -935,6 +954,31 @@ export const useGMScreenStore = create<GMScreenStore>()((set, get) => {
         ...state,
         mortalWounds: [],
       }))
+    },
+
+    addInstanceMortalWound: (screenId, panelId, name) => {
+      const found = findInstance(screenId, panelId)
+      // A hand-added wound is a table entry like a rolled one — see the action
+      // doc: the panel resolves its rules text by name and prints the entry's
+      // D20, so an invented name would render a wound with no rules at all.
+      const entry = mortalWoundByName(name)
+      if (!found || !entry) return false
+      const base = useCharacterStore
+        .getState()
+        .characters.find((c) => c.id === found.panel.baseNpcId)
+      // Room is the base's allowance, read live — exactly what the damage
+      // pipeline compares the track against before it rolls.
+      if (found.panel.state.mortalWounds.length >= npcMortalWoundAllowance(base)) {
+        return false
+      }
+      get().updateInstanceState(screenId, panelId, (state) => ({
+        ...state,
+        mortalWounds: [
+          ...state.mortalWounds,
+          { roll: entry.id, name: entry.name },
+        ],
+      }))
+      return true
     },
 
     // ---- Live play: NPC Action Points & Recharge -------------------------------

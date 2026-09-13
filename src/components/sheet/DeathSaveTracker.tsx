@@ -8,11 +8,15 @@
  * - 3 successes → character revives at 1 HP.
  * - 3 failures → character dies.
  *
- * The tracker shows success/failure pips and a "Roll Death Save" button.
- * The player can also manually adjust successes/failures if needed.
+ * The tracker shows success/failure pips and a "Roll Death Save" button. The
+ * button is the sheet's shared compact action button (`sheet-action-btn`) — the
+ * same one the Mortal Wound row's Roll uses, since the two live in the same
+ * place on the sheet and do the same kind of thing. The player can also
+ * manually adjust successes/failures if needed.
  */
 
 import { useState } from 'react'
+import { Dices } from 'lucide-react'
 
 import { useNotification } from '@/context/NotificationContext'
 import { useCharacterStore, type DeathSaveResult } from '@/store/characterStore'
@@ -129,9 +133,10 @@ export default function DeathSaveTracker({ character }: DeathSaveTrackerProps) {
       {!isDead && !isRevived && (
         <button
           type="button"
-          className="btn btn--primary death-save-tracker__roll"
+          className="btn btn--primary sheet-action-btn death-save-tracker__roll"
           onClick={handleRoll}
         >
+          <Dices size={13} aria-hidden="true" />
           Roll Death Save (d20)
         </button>
       )}

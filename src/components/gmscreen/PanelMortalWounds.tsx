@@ -26,7 +26,9 @@
  * made-up result, and the panel's ⋯ menu carries the roll for it: the row is
  * deliberately the same shape on both kinds, so no panel grows a control the
  * other one lacks (the row has no width to spare at phone sizes — see
- * gmscreen.css).
+ * gmscreen.css). The menu carries the manual counterpart too — **Add mortal
+ * wound…**, a specific table entry applied with no D20 — for both panel kinds
+ * and for the same reason: one line, one shape, both panels.
  *
  * The row is deliberately **props-driven**: it owns no target of its own, so
  * the same markup renders an instance's track (a `{ roll, name }[]` in panel
@@ -38,13 +40,10 @@ import { Skull, TriangleAlert, X } from 'lucide-react'
 import type { CSSProperties } from 'react'
 
 import { useHorizontalWheelScroll } from '@/hooks/useHorizontalWheelScroll'
-import { mortalWoundByName } from '@/lib/mortalWounds'
+import { PENDING_MORTAL_WOUND, mortalWoundByName } from '@/lib/mortalWounds'
 import { appThemeStatColors } from '@/lib/themeUtils'
 import { useAppThemeStore } from '@/store/appThemeStore'
 import type { MortalWoundRoll } from '@/types'
-
-/** The name `characterStore.takeDamage` parks in a slot awaiting its D20. */
-export const PENDING_MORTAL_WOUND = 'Pending Roll'
 
 export interface PanelMortalWoundsProps {
   /** Wounds sustained, in the order they were rolled (or `roll: 0` if pending). */

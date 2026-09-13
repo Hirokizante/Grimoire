@@ -320,6 +320,37 @@ test('takeDamage: damage causing 2 mortal wounds → knocked out', () => {
   expect(result.knockedOut).toBe(true)
 })
 
+test('takeDamage: a hit that fills the second wound is not a knock-out', () => {
+  // 10 HP, one wound, 15 damage: the wound lands, HP resets to 30 with the 5
+  // spill-over. The track is full and the character is standing — the next 0 HP
+  // is the knock-out, this hit is not it (SRD "Hit Points and Mortal Wounds").
+  const char = setupChar({ currentHP: 10, mortalWounds: ['Sprain', null] })
+  const result = useCharacterStore.getState().takeDamage(char.id, 15)
+
+  expect(result.mortalWoundsIncurred).toBe(1)
+  expect(result.finalHP).toBe(25)
+  expect(result.knockedOut).toBe(false)
+  expect(useCharacterStore.getState().currentCharacter!.mortalWounds).toEqual([
+    'Sprain',
+    'Pending Roll',
+  ])
+})
+
+test('takeDamage: the next 0 HP on a full track is the knock-out', () => {
+  // Same character one hit later: 25 HP, both slots taken, 30 damage. No third
+  // wound exists to pay for the 0 HP, so this is the knock-out — and no wound
+  // is incurred by it (the cards on the track are the two already there).
+  const char = setupChar({
+    currentHP: 25,
+    mortalWounds: ['Sprain', 'Exhaustion'],
+  })
+  const result = useCharacterStore.getState().takeDamage(char.id, 30)
+
+  expect(result.mortalWoundsIncurred).toBe(0)
+  expect(result.causedMortalWound).toBe(false)
+  expect(result.knockedOut).toBe(true)
+})
+
 test('takeDamage: with resistance, halves damage', () => {
   const char = setupChar({ currentHP: 30 })
   const result = useCharacterStore.getState().takeDamage(char.id, 10, { resistant: true })
@@ -456,13 +487,121 @@ test('rollMortalWound: fills first empty slot', () => {
   vi.restoreAllMocks()
 })
 
-test('rollMortalWound: fills second slot and detects knockout', () => {
+test('rollMortalWound: filling the second slot is not a knock-out', () => {
+  // The character is standing at 30 HP: the track is full, which is the
+  // Critical Condition (the next 0 HP is the knock-out), not a knock-out now.
   const char = setupChar({ mortalWounds: ['Sprain', null] })
   vi.spyOn(Math, 'random').mockReturnValue(0) // roll 1 → Grave Danger
   const result = useCharacterStore.getState().rollMortalWound(char.id)
   expect(result.slotIndex).toBe(1)
+  expect(result.trackFull).toBe(true)
+  expect(result.knockedOut).toBe(false)
+  vi.restoreAllMocks()
+})
+
+test('rollMortalWound: resolving a wound at 0 HP with a full track is a knock-out', () => {
+  // Overkill can burn through both slots in one hit and leave the character at
+  // 0 HP; naming the last wound is the moment that state is reached.
+  const char = setupChar({
+    currentHP: 0,
+    mortalWounds: ['Sprain', 'Pending Roll'],
+  })
+  vi.spyOn(Math, 'random').mockReturnValue(0)
+  const result = useCharacterStore.getState().rollMortalWound(char.id)
+  expect(result.trackFull).toBe(true)
   expect(result.knockedOut).toBe(true)
   vi.restoreAllMocks()
+})
+
+// ---- Mortal Wounds applied by hand (no D20) --------------------------------
+
+test('addMortalWound: applies the named table entry to the first empty slot', () => {
+  const char = setupChar({ mortalWounds: [null, null] })
+  const result = useCharacterStore.getState().addMortalWound(char.id, 'Damaged Throat')
+
+  // The entry's own D20 rides along, so the sheet/panel prints it like a roll.
+  expect(result.roll).toBe(8)
+  expect(result.woundName).toBe('Damaged Throat')
+  expect(result.woundDescription).toContain('Unable to regain END')
+  expect(result.slotIndex).toBe(0)
+  expect(result.knockedOut).toBe(false)
+  expect(useCharacterStore.getState().currentCharacter!.mortalWounds).toEqual([
+    'Damaged Throat',
+    null,
+  ])
+})
+
+test('addMortalWound: names the oldest pending slot instead of opening a second one', () => {
+  // `takeDamage` parked slot 0 on "Pending Roll": the wound happened, it just
+  // has no name yet. Naming it by hand is what the player would otherwise roll.
+  const char = setupChar({ mortalWounds: ['Pending Roll', null] })
+  const result = useCharacterStore.getState().addMortalWound(char.id, 'Hemorrhage')
+
+  expect(result.slotIndex).toBe(0)
+  expect(useCharacterStore.getState().currentCharacter!.mortalWounds).toEqual([
+    'Hemorrhage',
+    null,
+  ])
+})
+
+test('addMortalWound: filling the second slot reports the critical condition', () => {
+  const char = setupChar({ mortalWounds: ['Sprain', null] })
+  const result = useCharacterStore.getState().addMortalWound(char.id, 'Exhaustion')
+
+  expect(result.slotIndex).toBe(1)
+  // Full, but standing: a knock-out needs 0 HP as well.
+  expect(result.trackFull).toBe(true)
+  expect(result.knockedOut).toBe(false)
+  expect(useCharacterStore.getState().currentCharacter!.mortalWounds).toEqual([
+    'Sprain',
+    'Exhaustion',
+  ])
+})
+
+test('addMortalWound: filling the last slot at 0 HP knocks the character out', () => {
+  const char = setupChar({ currentHP: 0, mortalWounds: ['Sprain', 'Pending Roll'] })
+  const result = useCharacterStore.getState().addMortalWound(char.id, 'Exhaustion')
+
+  expect(result.trackFull).toBe(true)
+  expect(result.knockedOut).toBe(true)
+})
+
+test('addMortalWound: a full track gains nothing', () => {
+  const char = setupChar({ mortalWounds: ['Sprain', 'Exhaustion'] })
+  const result = useCharacterStore.getState().addMortalWound(char.id, 'Hemorrhage')
+
+  expect(result.slotIndex).toBe(-1)
+  expect(useCharacterStore.getState().currentCharacter!.mortalWounds).toEqual([
+    'Sprain',
+    'Exhaustion',
+  ])
+})
+
+test('addMortalWound: a name off the table is refused', () => {
+  // A wound's effects are looked up by name (healing, END recovery, …), so an
+  // invented one would occupy a slot and change nothing.
+  const char = setupChar()
+  const result = useCharacterStore.getState().addMortalWound(char.id, 'Broken Toe')
+
+  expect(result.slotIndex).toBe(-1)
+  expect(result.woundName).toBe('')
+  expect(useCharacterStore.getState().currentCharacter!.mortalWounds).toEqual([null, null])
+})
+
+test('addMortalWound: an unknown character changes nothing', () => {
+  const result = useCharacterStore.getState().addMortalWound('nope', 'Hemorrhage')
+  expect(result.slotIndex).toBe(-1)
+})
+
+test('addMortalWound: the wound it applies is a real one to the rest of the sheet', () => {
+  // Circulatory Dysfunction halves healing — proof that the manual path writes
+  // a wound the rules actually see, not a decorative label in a slot.
+  const char = setupChar({ currentHP: 10, mortalWounds: [null, null] })
+  useCharacterStore.getState().addMortalWound(char.id, 'Circulatory Dysfunction')
+
+  useCharacterStore.getState().heal(char.id, 10)
+
+  expect(useCharacterStore.getState().currentCharacter!.currentHP).toBe(15)
 })
 
 test('clearMortalWound: sets slot to null', () => {

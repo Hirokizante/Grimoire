@@ -32,6 +32,7 @@ import { useCharacterStore, type DamageResult } from '@/store/characterStore'
 import { useGMScreenStore } from '@/store/gmScreenStore'
 import { effectiveCombatStats, effectiveNPCStats } from '@/lib/abilityModifiers'
 import { panelDamageOutcome } from '@/lib/gmScreenUtils'
+import { KNOCKED_OUT_MESSAGE } from '@/lib/mortalWounds'
 import type { Character } from '@/types'
 
 /**
@@ -161,6 +162,18 @@ export default function DamageDialog({
       } else {
         notify(`Applied ${res.hpLost} damage.`, 'warning')
       }
+    } else if (res.knockedOut) {
+      // The SRD's knock-out: reduced to 0 HP with no Mortal Wound left to take
+      // — never merely a full track (that is the Critical Condition, and the
+      // sheet's banner says so). Wounds this hit did cause are on the track as
+      // pending rolls, so the message names them.
+      notify(
+        res.causedMortalWound
+          ? `${res.mortalWoundsIncurred} Mortal Wound${res.mortalWoundsIncurred === 1 ? '' : 's'} incurred — ${KNOCKED_OUT_MESSAGE}`
+          : KNOCKED_OUT_MESSAGE,
+        'error',
+        5000,
+      )
     } else if (res.causedMortalWound) {
       // The sheet's own wording: it has to send the player to the Mortal Wound
       // card, because that is where their roll still is.

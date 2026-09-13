@@ -1270,11 +1270,6 @@ button.gm-status-pill__main:hover {
   line-height: 1.5;
 }
 
-/* The mortal-wound cards are wide, page-scale affordances; let them wrap. */
-.gm-panel__sheet .mw-card-grid {
-  grid-template-columns: 1fr;
-}
-
 /* ---- Pickers ------------------------------------------------------------- */
 
 /* A picker dialog is a three-part shell: pinned header, scrolling list, pinned

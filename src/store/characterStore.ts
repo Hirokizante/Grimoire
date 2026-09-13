@@ -33,7 +33,14 @@ import {
   spendAbilityUse as applySpendAbilityUse,
 } from '@/lib/abilityUses'
 import { rollDie } from '@/lib/dice'
-import { rollOnMortalWoundTable } from '@/lib/mortalWounds'
+import {
+  PENDING_MORTAL_WOUND,
+  isKnockedOut,
+  mortalWoundByName,
+  mortalWoundsTaken,
+  nextMortalWoundSlot,
+  rollOnMortalWoundTable,
+} from '@/lib/mortalWounds'
 import {
   bumpSemver,
   deleteVersion,
@@ -158,7 +165,17 @@ export interface MortalWoundResult {
   woundDescription: string
   /** Which mortal wound slot was filled (0 or 1). */
   slotIndex: number
-  /** Whether the character is now knocked out (both slots filled). */
+  /**
+   * Whether the track is now **full** — the sheet's Critical Condition: no slot
+   * left to take, so the next time this character is reduced to 0 HP they are
+   * Knocked Out. Not itself a knock-out (see `knockedOut`).
+   */
+  trackFull: boolean
+  /**
+   * Whether the character is knocked out **now** — `isKnockedOut` (see
+   * `lib/mortalWounds.ts`): at 0 HP with no slot left to take. Filling the
+   * second slot while the character still stands is `trackFull`, *not* this.
+   */
   knockedOut: boolean
 }
 
@@ -324,6 +341,21 @@ export interface CharacterStoreActions {
   rollDeathSave: (id: string) => DeathSaveResult
   /** Roll on the Mortal Wounds table (d20). Returns the wound and applies it. */
   rollMortalWound: (id: string) => MortalWoundResult
+  /**
+   * Apply a **specific** wound from the table, with no D20 — the manual
+   * counterpart of {@link rollMortalWound}, for a wound something named
+   * outright (an ability in play, an NPC's authored effect, a GM ruling).
+   *
+   * Fills the oldest slot that can take a name, exactly as the roll does: an
+   * empty slot, or one `takeDamage` parked on `'Pending Roll'` — naming a
+   * pending slot resolves the wound the player has not rolled yet rather than
+   * opening a second one. Returns the `MortalWoundResult` for the wound, with
+   * `slotIndex: -1` and **nothing written** when the track is already full or
+   * `name` is not on the table: a manual add never grows the track past
+   * `MAX_MORTAL_WOUNDS`, and never invents a wound whose effects (halved
+   * healing, no END recovery, …) the rest of the sheet could not look up.
+   */
+  addMortalWound: (id: string, name: string) => MortalWoundResult
   /** Clear a Mortal Wound at the given index. */
   clearMortalWound: (id: string, index: number) => void
   /**
@@ -494,6 +526,22 @@ export function installCharacterAutosaveFlush() {
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') flushPendingCharacterSaves()
   })
+}
+
+/**
+ * A Mortal Wound result that changed nothing: an unknown target, a name the
+ * table does not define, or a track with no slot left to fill. Callers treat a
+ * `slotIndex` of -1 as "not applied".
+ */
+function noMortalWound(): MortalWoundResult {
+  return {
+    roll: 0,
+    woundName: '',
+    woundDescription: '',
+    slotIndex: -1,
+    trackFull: false,
+    knockedOut: false,
+  }
 }
 
 export const useCharacterStore = create<CharacterStore>()((set, get) => ({
@@ -845,22 +893,20 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
     // Step 4: Apply remaining to HP, handle mortal wound overflow.
     let newHP = current.currentHP - remainingDamage
     let mortalWoundsIncurred = 0
-    let knockedOut = false
 
+    // Each wound this hit can still be paid for resets HP to its maximum, with
+    // the damage that took the character to 0 spilling over into the HP they
+    // regain (SRD "Hit Points and Mortal Wounds"). The loop stops when the HP
+    // regained is still 0 or less, or when the track can take no more.
     while (newHP <= 0 && mortalWoundsIncurred < MAX_MORTAL_WOUNDS) {
-      const filledSlots = current.mortalWounds.filter((w) => w != null).length + mortalWoundsIncurred
-      if (filledSlots >= MAX_MORTAL_WOUNDS) {
-        knockedOut = true
-        break
-      }
+      const filledSlots = mortalWoundsTaken(current.mortalWounds) + mortalWoundsIncurred
+      if (filledSlots >= MAX_MORTAL_WOUNDS) break
       mortalWoundsIncurred++
-      // HP resets to max after a mortal wound, excess spills over.
       const overflow = Math.abs(newHP)
       newHP = maxHP - overflow
     }
 
     if (newHP <= 0 && mortalWoundsIncurred >= MAX_MORTAL_WOUNDS) {
-      knockedOut = true
       newHP = 0
     }
 
@@ -870,9 +916,15 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
     for (let i = 0; i < mortalWoundsIncurred; i++) {
       while (slotIdx < newMortalWounds.length && newMortalWounds[slotIdx] != null) slotIdx++
       if (slotIdx < newMortalWounds.length) {
-        newMortalWounds[slotIdx] = 'Pending Roll'
+        newMortalWounds[slotIdx] = PENDING_MORTAL_WOUND
       }
     }
+
+    // Knocked Out is the *state* the character is left in — 0 HP with no wound
+    // left to take — never merely "the track is full": a hit that fills the
+    // last slot while HP stands leaves them at the Critical Condition, one 0 HP
+    // away from it (see `isKnockedOut`).
+    const knockedOut = isKnockedOut(newMortalWounds, newHP)
 
     get().updateCharacter(id, (char) => ({
       ...char,
@@ -1113,32 +1165,27 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
 
   rollMortalWound: (id) => {
     const current = get().characters.find((c) => c.id === id)
-    if (!current) {
-      return { roll: 0, woundName: '', woundDescription: '', slotIndex: -1, knockedOut: false }
-    }
+    if (!current) return noMortalWound()
 
     // Table resolution is shared with the GM Screen's instance rolls — see
     // lib/mortalWounds.ts.
     const wound = rollOnMortalWoundTable()
 
-    // Find first empty slot.
+    // Fill the oldest slot that can take a name: an empty one, or a wound of
+    // unknown result the sheet parked on "Pending Roll" — resolving that is the
+    // point of the roll (see nextMortalWoundSlot).
     const newMortalWounds = [...current.mortalWounds]
-    let slotIndex = -1
-    for (let i = 0; i < newMortalWounds.length; i++) {
-      if (newMortalWounds[i] === 'Pending Roll' || newMortalWounds[i] == null) {
-        slotIndex = i
-        newMortalWounds[i] = wound.name
-        break
-      }
-    }
-
+    let slotIndex = nextMortalWoundSlot(newMortalWounds)
     if (slotIndex === -1) {
       // No empty slot — shouldn't normally happen, but handle gracefully.
       newMortalWounds.push(wound.name)
       slotIndex = newMortalWounds.length - 1
+    } else {
+      newMortalWounds[slotIndex] = wound.name
     }
 
-    const knockedOut = newMortalWounds.filter((w) => w != null).length >= MAX_MORTAL_WOUNDS
+    const knockedOut = isKnockedOut(newMortalWounds, current.currentHP)
+    const trackFull = mortalWoundsTaken(newMortalWounds) >= MAX_MORTAL_WOUNDS
 
     get().updateCharacter(id, (char) => ({
       ...char,
@@ -1150,6 +1197,52 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
       woundName: wound.name,
       woundDescription: wound.description,
       slotIndex,
+      trackFull,
+      knockedOut,
+    } satisfies MortalWoundResult
+  },
+
+  addMortalWound: (id, name) => {
+    const current = get().characters.find((c) => c.id === id)
+    // The wound has to be a table entry: the sheet looks a wound's effects up
+    // by name (healing, END recovery, …), so an invented one would take a slot
+    // and change nothing. The picker only offers table entries; this guard is
+    // what keeps a hand-edited export from smuggling one in through the UI.
+    const entry = mortalWoundByName(name)
+    if (!current || !entry) return noMortalWound()
+
+    const newMortalWounds = [...current.mortalWounds]
+    const slotIndex = nextMortalWoundSlot(newMortalWounds)
+    // A full track writes nothing: naming a wound the character cannot take
+    // would grow the track past MAX_MORTAL_WOUNDS (and past "Knocked Out").
+    if (slotIndex === -1) {
+      return {
+        roll: entry.id,
+        woundName: entry.name,
+        woundDescription: entry.description,
+        slotIndex: -1,
+        trackFull: mortalWoundsTaken(newMortalWounds) >= MAX_MORTAL_WOUNDS,
+        knockedOut: isKnockedOut(newMortalWounds, current.currentHP),
+      } satisfies MortalWoundResult
+    }
+
+    newMortalWounds[slotIndex] = entry.name
+    // Full is not knocked out: naming the last wound leaves the character at
+    // the Critical Condition unless they are already at 0 HP (see `isKnockedOut`).
+    const knockedOut = isKnockedOut(newMortalWounds, current.currentHP)
+    const trackFull = mortalWoundsTaken(newMortalWounds) >= MAX_MORTAL_WOUNDS
+
+    get().updateCharacter(id, (char) => ({
+      ...char,
+      mortalWounds: newMortalWounds,
+    }))
+
+    return {
+      roll: entry.id,
+      woundName: entry.name,
+      woundDescription: entry.description,
+      slotIndex,
+      trackFull,
       knockedOut,
     } satisfies MortalWoundResult
   },

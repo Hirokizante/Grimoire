@@ -806,7 +806,8 @@
   gap: 0.25rem;
 }
 
-/* Keep old stat-item classes for mortal wounds label etc. */
+/* The Death Saves block's label — the same sub-label the Mortal Wounds
+   header prints (see `.mw-head`). */
 .stat-item__label {
   font-family: var(--sheet-label-font, inherit);
   font-size: 0.72rem;
@@ -956,8 +957,32 @@
   margin-top: 0.75rem;
 }
 
+/* ---- Compact sheet action buttons ---------------------------------------- */
+
+/* ONE shape for a live-play action that either stands alone or shares a row
+   with peers: natural width (never a `width: 100%` bar across the section),
+   one size, icon room in front of the label. The Mortal Wound row (Roll / Add /
+   Rest) and the Death Save roll are all this one button, so the sheet's two
+   end-of-the-line trackers offer the same control to the same hand. The
+   row-filling pairs (Recover / End Turn) are deliberately not in this group:
+   those two split their row by design. */
+.sheet-action-btn {
+  flex: 0 1 auto;
+  width: auto;
+  font-size: 0.8rem;
+  padding: 0.4rem 0.75rem;
+  line-height: 1.2;
+}
+
+/* ---- Mortal Wounds block (sheet) ----------------------------------------- */
+
+/* The wound track is a live-play tracker, so it opens with the same hairline
+   rule its sibling Death Save block uses (`stat-section__death-saves`) instead
+   of floating loose under the Rest/Recover row. */
 .stat-mortals {
   margin-top: 0.85rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid var(--border-soft);
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
@@ -972,9 +997,63 @@
 }
 
 .mortal-wound-roller {
+  /* ONE accent for the whole block: the character's own Mortal Wounds token
+     color (Customization → Mortal Wounds) — the entry that until now was
+     exposed but consumed nowhere on a player sheet. It is the sheet's
+     counterpart of the GM panel's `--mw-tone`, which reads the same stat's
+     accent out of the app theme (see gmscreen.css), so "the wound color" means
+     one thing on both surfaces. The fallback covers a record written before
+     the token existed. */
+  --mw-tone: var(--color-token-mortal-wounds, var(--danger));
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
+}
+
+/* The track's read-out: [skull] MORTAL WOUNDS 1 / 2 — label and count read as
+   one phrase, the way the GM panel's row reads (`Wounds 1/2`). */
+.mw-head {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.mw-head__icon {
+  flex: 0 0 auto;
+  color: var(--mw-tone);
+}
+
+/* The counter is a small outlined pill so the "full" state can light it up
+   without moving anything: the geometry (padding + border) is reserved from
+   the first wound to the second, and only the fill changes. */
+.mw-head__count {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.15rem;
+  padding: 0.05rem 0.45rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--mw-tone) 35%, transparent);
+  font-family: var(--sheet-heading-font, inherit);
+  font-size: 0.78rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--mw-tone);
+  white-space: nowrap;
+}
+
+.mw-head__max {
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+/* A full track is a state, not a number: the pill fills in with the alarm the
+   section's overflow counter uses (`sheet-section__counter--over`), which is
+   visible even in a theme where the wound tone and the danger red are the same
+   color (the shipped default). */
+.mw-head__count--full {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 55%, transparent);
+  background: color-mix(in srgb, var(--danger) 16%, transparent);
 }
 
 .mw-card {
@@ -983,8 +1062,8 @@
   align-items: flex-start;
   padding: 0.7rem 0.85rem;
   border-radius: 10px;
-  background: color-mix(in srgb, var(--danger) 9%, transparent);
-  border: 1px solid color-mix(in srgb, var(--danger) 30%, transparent);
+  background: color-mix(in srgb, var(--mw-tone) 9%, transparent);
+  border: 1px solid color-mix(in srgb, var(--mw-tone) 30%, transparent);
   transition: background-color 0.2s ease;
 }
 
@@ -993,27 +1072,20 @@
   border-color: color-mix(in srgb, var(--accent-violet) 30%, transparent);
 }
 
-.mw-card--ko {
-  flex-direction: column;
-  text-align: center;
-  background: color-mix(in srgb, var(--danger) 22%, transparent);
-  border-color: var(--danger);
-}
-
 .mw-card__roll {
   flex: 0 0 auto;
   min-width: 2.6rem;
   height: 2.6rem;
   border-radius: 8px;
-  background: color-mix(in srgb, var(--danger) 22%, transparent);
-  border: 1px solid color-mix(in srgb, var(--danger) 35%, transparent);
+  background: color-mix(in srgb, var(--mw-tone) 22%, transparent);
+  border: 1px solid color-mix(in srgb, var(--mw-tone) 35%, transparent);
   display: flex;
   align-items: center;
   justify-content: center;
   font-family: var(--sheet-heading-font, inherit);
   font-size: 1.15rem;
   font-weight: 700;
-  color: var(--danger-hover);
+  color: var(--mw-tone);
   line-height: 1;
 }
 
@@ -1022,10 +1094,6 @@
   border-color: color-mix(in srgb, var(--accent-violet) 35%, transparent);
   color: var(--accent-violet);
   font-size: 1.4rem;
-}
-
-.mw-card--ko .mw-card__roll {
-  display: none;
 }
 
 .mw-card__body {
@@ -1047,7 +1115,7 @@
   font-family: var(--sheet-heading-font, inherit);
   font-weight: 700;
   font-size: 0.92rem;
-  color: var(--danger-hover);
+  color: var(--mw-tone);
 }
 
 .mw-card--pending .mw-card__name {
@@ -1064,16 +1132,15 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: color-mix(in srgb, var(--danger) 15%, transparent);
-  color: var(--danger-hover);
-  font-size: 1.1rem;
+  background: color-mix(in srgb, var(--mw-tone) 15%, transparent);
+  color: var(--mw-tone);
   line-height: 1;
   cursor: pointer;
   transition: background-color 0.15s ease;
 }
 
 .mw-card__clear:hover {
-  background: color-mix(in srgb, var(--danger) 30%, transparent);
+  background: color-mix(in srgb, var(--mw-tone) 30%, transparent);
 }
 
 .mw-card__desc {
@@ -1083,51 +1150,195 @@
   color: var(--text-secondary);
 }
 
-.mw-card__ko-text {
-  margin: 0;
-  color: var(--danger);
-  font-weight: 700;
-  font-size: 0.88rem;
-}
+/* ---- Mortal Wound actions ------------------------------------------------ */
 
-.mw-roll-btn {
-  width: 100%;
-  font-size: 0.85rem;
-  padding: 0.5rem 0.8rem;
-}
-
-.mw-rest-btn {
-  width: 100%;
-  font-size: 0.78rem;
-  padding: 0.35rem 0.6rem;
-}
-
-/* ---- Mortal wound slot indicators (edit mode) ---------------------------- */
-
-.mortal-wounds {
+/* ONE row of peer-sized buttons (`sheet-action-btn`). Each of these used to be
+   a `width: 100%` bar stacked down the section, which read as a form field
+   rather than an action and left the wound controls full-width under a
+   half-width bar row. Wrapping only when a phone width leaves no choice —
+   never overflowing: the automatic minimum size keeps the label inside. */
+.mw-actions {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 0.5rem;
 }
 
-.mortal-wound-slot {
-  width: 2rem;
-  height: 2rem;
+/* A full track: the next 0 HP is a knock-out instead of another roll. The GM
+   panel compresses the same warning into its ⚠ pill; the sheet has the room to
+   spell it out, but says it the same way — icon first, danger-tinted, one
+   line. */
+.mw-warn {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0.45rem 0.6rem;
   border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--bg-surface-raised);
+  border: 1px solid color-mix(in srgb, var(--danger) 40%, transparent);
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  color: var(--text-primary);
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.mw-warn__icon {
+  flex: 0 0 auto;
+  /* Optical alignment with the first line of text, not the box's top edge. */
+  margin-top: 0.12rem;
+  color: var(--danger);
+}
+
+/* ---- Mortal Wound picker (apply a specific wound, no D20) ---------------- */
+
+.modal-content.mw-picker {
+  max-width: 520px;
+  display: flex;
+  flex-direction: column;
+  /* The BODY is the scroller (see .hermes.md): the dialog only clips its own
+     rounded corners, so the header ✕ and the footer Done stay pinned at any
+     scroll offset. */
+  overflow: hidden;
+}
+
+.mw-picker__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 0.85rem 1rem;
+  flex: 1 1 auto;
+  /* Required: without it a flex item refuses to shrink below its content, so
+     nothing overflows and the body never scrolls. */
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: none;
+}
+
+.modal-content.mw-picker > .modal-header,
+.modal-content.mw-picker > .modal-footer {
+  flex: 0 0 auto;
+}
+
+.mw-picker__search {
   display: flex;
   align-items: center;
-  justify-content: center;
-  font-size: 1rem;
+  gap: 0.4rem;
   color: var(--text-muted);
 }
 
-.mortal-wound-slot--filled {
-  border-color: var(--danger);
-  background: color-mix(in srgb, var(--danger) 16%, transparent);
+.mw-picker__search .sheet-input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.mw-picker__hint {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+
+.mw-picker__empty {
+  margin: 0.5rem 0;
+  text-align: center;
+}
+
+.mw-picker__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+/* One table row: the D20 it sits on, the wound, its rules text. */
+.mw-picker__row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.45rem 0.55rem;
+  border-radius: 8px;
+  border: 1px solid var(--border-soft);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+  min-width: 0;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.mw-picker__row:hover:not(:disabled) {
+  background: var(--bg-surface-hover);
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--border));
+}
+
+.mw-picker__row:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.mw-picker__roll {
+  flex: 0 0 auto;
+  min-width: 1.8rem;
+  height: 1.8rem;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--danger) 15%, transparent);
+  border: 1px solid color-mix(in srgb, var(--danger) 30%, transparent);
   color: var(--danger-hover);
   font-weight: 700;
+  font-size: 0.85rem;
+  line-height: 1;
 }
+
+.mw-picker__text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.mw-picker__name {
+  display: flex;
+  align-items: center;
+  /* At 360px a long wound name plus the badge wraps rather than clipping. */
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  font-family: var(--sheet-heading-font, inherit);
+  font-weight: 600;
+  font-size: 0.88rem;
+  color: var(--text-primary);
+}
+
+.mw-picker__badge {
+  flex: 0 0 auto;
+  padding: 0.05rem 0.35rem;
+  border-radius: 999px;
+  font-family: var(--sheet-body-font, inherit);
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--danger-hover);
+  background: color-mix(in srgb, var(--danger) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--danger) 32%, transparent);
+}
+
+.mw-picker__desc {
+  font-size: 0.76rem;
+  line-height: 1.35;
+  color: var(--text-secondary);
+}
+
+/* (The edit-mode Mortal Wound slot squircles lived here. They are gone: an
+   untouched track printed two empty boxes either side of the header's own
+   "0 / 2", and a filled one printed a third face for a wound the cards already
+   render — see MortalWoundRoller.) */
 
 .seg-bar {
   display: flex;
@@ -2826,10 +3037,13 @@
   min-width: 1.5rem;
 }
 
+/* The roll is the tracker's one action, so it is the shared compact action
+   button (`sheet-action-btn`) rather than another full-width bar: the wound
+   block's roll directly above it is the same control, doing the same kind of
+   thing. `align-self` because this block is a column flex container, which
+   would otherwise stretch it back across the section. */
 .death-save-tracker__roll {
-  font-size: 0.82rem;
-  padding: 0.4rem 0.8rem;
-  width: 100%;
+  align-self: flex-start;
   margin-top: 0.2rem;
 }
 

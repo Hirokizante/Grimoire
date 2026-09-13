@@ -8,7 +8,7 @@
  */
 
 import { test, expect, beforeEach, vi } from 'vitest'
-import { act, cleanup, render, screen, fireEvent } from '@testing-library/react'
+import { act, cleanup, render, screen, fireEvent, within } from '@testing-library/react'
 
 import DamageDialog from '@/components/sheet/DamageDialog'
 import CharacterPanel from '@/components/gmscreen/CharacterPanel'
@@ -450,6 +450,86 @@ test('NpcInstancePanel: the menu offers no wound clearing when there are none', 
   expect(
     screen.queryByRole('menuitem', { name: 'Clear mortal wounds' }),
   ).not.toBeInTheDocument()
+})
+
+test('NpcInstancePanel: the menu applies a specific wound without rolling', () => {
+  const { container } = renderNpcPanel(makeWoundNpc(2), 'compact')
+
+  fireEvent.click(screen.getByRole('button', { name: 'Bandit options' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Add mortal wound…' }))
+
+  // The same table picker the sheet opens, targeted at this instance.
+  expect(
+    screen.getByRole('dialog', { name: 'Add Mortal Wound to Bandit' }),
+  ).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Add Damaged Throat' }))
+
+  // The instance's own track, in the rolled shape — the entry's D20 included,
+  // so the chip reads exactly like an auto-rolled one.
+  expect(panelState().mortalWounds).toEqual([
+    { roll: 8, name: 'Damaged Throat' },
+  ])
+  const chip = container.querySelector('.gm-mw__chip')
+  expect(chip?.textContent).toContain('Damaged Throat')
+  expect(chip?.textContent).toContain('8')
+  // Hand-adding a wound is bookkeeping, not damage: HP is untouched.
+  expect(panelState().currentHP).toBe(20)
+})
+
+test('NpcInstancePanel: the manual add locks itself at the base’s allowance', () => {
+  const base = makeWoundNpc(1)
+  renderNpcPanel(base, 'compact')
+
+  fireEvent.click(screen.getByRole('button', { name: 'Bandit options' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Add mortal wound…' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Add Fracture' }))
+  expect(panelState().mortalWounds).toEqual([{ roll: 14, name: 'Fracture' }])
+
+  // The track is full, so the still-open dialog says why nothing can be picked
+  // (the row is really disabled — no dead click).
+  const dialog = screen.getByRole('dialog', { name: 'Add Mortal Wound to Bandit' })
+  expect(
+    within(dialog).getByText(/No Mortal Wound slots left on Bandit/),
+  ).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Add Hemorrhage' })).toBeDisabled()
+
+  fireEvent.click(screen.getByRole('button', { name: 'Done' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Bandit options' }))
+  expect(
+    screen.queryByRole('menuitem', { name: 'Add mortal wound…' }),
+  ).not.toBeInTheDocument()
+})
+
+test('NpcInstancePanel: a mook that allows no wounds is offered no manual add', () => {
+  // `mortalWounds: 0` renders no track at all, so it must offer no add either:
+  // a wound on a panel that has no wound row could never be read back.
+  renderPanel('compact')
+
+  fireEvent.click(screen.getByRole('button', { name: 'Bandit options' }))
+
+  expect(
+    screen.queryByRole('menuitem', { name: 'Add mortal wound…' }),
+  ).not.toBeInTheDocument()
+})
+
+test('the manual-add picker portals out of the dead panel that opened it', () => {
+  // A panel's dead state is `opacity` on the panel itself, which would both
+  // fade an in-place dialog and make the panel the containing block for its
+  // `position: fixed` overlay (see AddStatusModal). The picker mounts on
+  // `document.body`, so no panel state can reach it.
+  renderNpcPanel(makeWoundNpc(2), 'compact')
+  act(() => {
+    useGMScreenStore.getState().setInstanceCondition(SCREEN_ID, PANEL_ID, 'dead')
+  })
+
+  fireEvent.click(screen.getByRole('button', { name: 'Bandit options' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Add mortal wound…' }))
+
+  const dialog = screen.getByRole('dialog', { name: 'Add Mortal Wound to Bandit' })
+  const overlay = dialog.parentElement
+  expect(overlay?.classList.contains('modal-overlay')).toBe(true)
+  expect(overlay?.parentElement).toBe(document.body)
+  expect(document.querySelector('.gm-panel--dead')?.contains(dialog)).toBe(false)
 })
 
 test('NpcInstancePanel: expanded renders the condensed shared body, not the full NPC sheet', () => {
@@ -1637,6 +1717,50 @@ test('player panel: the menu offers no roll when nothing is pending', () => {
 
   expect(
     screen.queryByRole('menuitem', { name: 'Roll Mortal Wound (d20)' }),
+  ).toBeNull()
+})
+
+test('player panel: the menu applies a specific wound to the character’s own slots', () => {
+  const pc = makePlayer({ name: 'Vex', mortalWounds: [null, null] })
+  const { container } = renderPlayerPanel(pc)
+
+  fireEvent.click(screen.getByRole('button', { name: 'Vex options' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Add mortal wound…' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Add Damaged Throat' }))
+
+  // The panel writes the character's real record, so the player's own sheet
+  // shows the wound at once — and the chip carries the table's D20.
+  expect(storedPlayer(pc.id).mortalWounds).toEqual(['Damaged Throat', null])
+  const chip = container.querySelector('.gm-mw__chip')
+  expect(chip?.textContent).toContain('Damaged Throat')
+  expect(chip?.textContent).toContain('8')
+})
+
+test('player panel: a pending slot can be named by hand instead of rolled', () => {
+  const pc = makePlayer({ name: 'Vex', mortalWounds: ['Pending Roll', null] })
+  const { container } = renderPlayerPanel(pc)
+
+  fireEvent.click(screen.getByRole('button', { name: 'Vex options' }))
+  expect(
+    screen.getByRole('menuitem', { name: 'Roll Mortal Wound (d20)' }),
+  ).toBeInTheDocument()
+
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Add mortal wound…' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Add Hemorrhage' }))
+
+  // Naming it resolves the slot the player had not rolled: no second wound, no
+  // dashed pending chip left behind.
+  expect(storedPlayer(pc.id).mortalWounds).toEqual(['Hemorrhage', null])
+  expect(container.querySelector('.gm-mw__chip--pending')).toBeNull()
+})
+
+test('player panel: a full track offers no manual add', () => {
+  renderPlayerPanel(makePlayer({ mortalWounds: ['Sprain', 'Exhaustion'] }))
+
+  fireEvent.click(screen.getByRole('button', { name: 'Vex options' }))
+
+  expect(
+    screen.queryByRole('menuitem', { name: 'Add mortal wound…' }),
   ).toBeNull()
 })
 

@@ -989,6 +989,224 @@ test.describe('GM Screen', () => {
     await expect(reloaded.locator('.gm-mw')).toContainText('1/2')
   })
 
+  test('a specific Mortal Wound can be recorded by hand, with no D20', async ({
+    page,
+  }) => {
+    await gotoHome(page)
+    await createPlayerCharacter(page, 'Vex')
+    await createNpc(page, 'Revenant')
+
+    // The NPC needs an allowance before a panel can carry a wound at all — the
+    // base's own Mortal Wounds stat, exactly as the automatic roll reads it.
+    await page.locator('.card-main').filter({ hasText: 'Revenant' }).first().click()
+    await page.locator('.mode-toggle--floating').getByRole('tab', { name: 'Edit' }).click()
+    const mortalStat = page.locator('.stat-token').filter({ hasText: 'Mortal Wounds' })
+    await mortalStat.locator('input').fill('2')
+
+    // ---- On the sheet: the track is there before the first wound -----------
+    await gotoCharacters(page)
+    await page.locator('.card-main').filter({ hasText: 'Vex' }).first().click()
+    await expect(page.locator('.stat-mortals')).toBeVisible()
+    // An untouched track reads as a counter beside the header — not as two
+    // empty slot boxes.
+    await expect(page.locator('.mw-head__count')).toHaveText('0 / 2')
+    await expect(page.locator('.mortal-wound-slot')).toHaveCount(0)
+    await page.getByRole('button', { name: /Add Mortal Wound/ }).click()
+
+    const sheetPicker = page.getByRole('dialog', { name: 'Add Mortal Wound to Vex' })
+    await expect(sheetPicker).toBeVisible()
+
+    // ---- Phone width: the dialog fits the viewport -------------------------
+    const desktopViewport = page.viewportSize()!
+    await page.setViewportSize({ width: 360, height: 800 })
+    const narrow = await page.evaluate(() => {
+      const box = (document.querySelector('.mw-picker') as HTMLElement).getBoundingClientRect()
+      return {
+        overflow: document.documentElement.scrollWidth - window.innerWidth,
+        insideViewport: box.left >= 0 && box.right <= window.innerWidth + 1,
+      }
+    })
+    expect(narrow.overflow).toBeLessThanOrEqual(0)
+    expect(narrow.insideViewport).toBe(true)
+    await page.setViewportSize(desktopViewport)
+
+    // The list is the table: search narrows it, picking applies the entry.
+    await sheetPicker
+      .getByRole('searchbox', { name: 'Search Mortal Wounds' })
+      .fill('throat')
+    await sheetPicker.getByRole('button', { name: 'Add Damaged Throat' }).click()
+
+    // A picked wound is an ordinary wound card: entry's D20, name, rules text.
+    await expect(page.locator('.mw-card__name')).toHaveText('Damaged Throat')
+    await expect(page.locator('.mw-card__roll')).toHaveText('8')
+    await expect(page.locator('.mw-card__desc')).toContainText('Unable to regain END')
+    await expect(page.locator('.mw-head__count')).toHaveText('1 / 2')
+    await expect(
+      page
+        .locator('.notification--error')
+        .filter({ hasText: 'Mortal Wound added: Damaged Throat (d20 8).' }),
+    ).toBeVisible()
+
+    // ---- Both manual actions sit on one row, sized like buttons ------------
+    // They used to be `width: 100%` bars stacked down the Combat Stats block,
+    // which read as form fields rather than actions.
+    const woundActions = await page.evaluate(() => {
+      const section = document.querySelector('.stat-block--flat') as HTMLElement
+      const boxes = Array.from(
+        document.querySelectorAll('.mw-actions .sheet-action-btn'),
+      ).map((button) => {
+        const rect = button.getBoundingClientRect()
+        return {
+          text: (button.textContent ?? '').trim(),
+          top: Math.round(rect.top),
+          height: Math.round(rect.height),
+          width: Math.round(rect.width),
+          icons: button.querySelectorAll('svg').length,
+        }
+      })
+      return { sectionWidth: section.getBoundingClientRect().width, boxes }
+    })
+    expect(woundActions.boxes.map((b) => b.text)).toEqual([
+      'Add Mortal Wound…',
+      'Rest (Full Restore)',
+    ])
+    // One row, one size, an icon each.
+    expect(new Set(woundActions.boxes.map((b) => b.top)).size).toBe(1)
+    expect(new Set(woundActions.boxes.map((b) => b.height)).size).toBe(1)
+    expect(woundActions.boxes.map((b) => b.icons)).toEqual([1, 1])
+    // …and neither one spans the section.
+    for (const box of woundActions.boxes) {
+      expect(box.width).toBeLessThan(woundActions.sectionWidth * 0.6)
+    }
+
+    // The picker stays open for a second wound; the rail is behind a modal, so
+    // dismiss it before navigating away.
+    await page.getByRole('button', { name: 'Done' }).click()
+
+    // ---- A player panel writes the character's real slots ------------------
+    await gotoGmScreen(page)
+    await page.getByRole('button', { name: 'New Screen' }).first().click()
+    await page.getByLabel('Screen name').fill('Hand-picked')
+    await page.getByRole('button', { name: 'Create' }).click()
+    await page.getByRole('button', { name: 'Add Character' }).first().click()
+    await page.getByRole('button', { name: /Vex/ }).click()
+    await page.getByRole('button', { name: 'Add NPC' }).first().click()
+    await page
+      .locator('.gm-picker__list .gm-picker__item')
+      .filter({ hasText: 'Revenant' })
+      .click()
+    await page.getByRole('button', { name: 'Done' }).click()
+
+    const pcPanel = page.locator('.gm-panel--character').first()
+    await expect(pcPanel.locator('.gm-mw__chip')).toHaveText(/8\s*Damaged Throat/)
+
+    // The second slot, filled from the panel's own menu — still no roll.
+    await pcPanel.getByRole('button', { name: /Vex options/ }).click()
+    await page.getByRole('menuitem', { name: 'Add mortal wound…' }).click()
+    await page.getByRole('button', { name: 'Add Exhaustion' }).click()
+    await expect(pcPanel.locator('.gm-mw__chip')).toHaveCount(2)
+    await expect(pcPanel.locator('.gm-mw__warn')).toContainText(
+      'Next 0 HP: Knocked Out',
+    )
+    await page.getByRole('button', { name: 'Done' }).click()
+
+    // A full track has nothing left to add: the menu entry is gone, so there is
+    // no click that could only fail.
+    await pcPanel.getByRole('button', { name: /Vex options/ }).click()
+    await expect(
+      page.getByRole('menuitem', { name: 'Add mortal wound…' }),
+    ).toHaveCount(0)
+    await page.keyboard.press('Escape')
+
+    // ---- An NPC instance keeps its own track, and its own allowance --------
+    const npcPanel = page.locator('.gm-panel--npc').first()
+    await npcPanel.getByRole('button', { name: /Revenant options/ }).click()
+    await page.getByRole('menuitem', { name: 'Add mortal wound…' }).click()
+    await page.getByRole('button', { name: 'Add Fracture' }).click()
+    await expect(npcPanel.locator('.gm-mw__chip')).toHaveText(/14\s*Fracture/)
+    await page.getByRole('button', { name: 'Done' }).click()
+
+    // ---- Both tracks survive a reload --------------------------------------
+    await page.waitForTimeout(700)
+    await page.reload()
+    await expect(page.getByRole('heading', { name: 'GRIMOIRE' })).toBeVisible()
+    await gotoGmScreen(page)
+    await expect(
+      page.locator('.gm-panel--character').first().locator('.gm-mw__chip'),
+    ).toHaveCount(2)
+    await expect(
+      page.locator('.gm-panel--npc').first().locator('.gm-mw__chip'),
+    ).toHaveText(/14\s*Fracture/)
+  })
+
+  test('the sheet announces a knock-out only when the character is knocked out', async ({
+    page,
+  }) => {
+    await gotoHome(page)
+    await createPlayerCharacter(page, 'Vex')
+    // `createPlayerCharacter` returns to the list; this walk is on the sheet.
+    await page.locator('.card-main').filter({ hasText: 'Vex' }).first().click()
+    await expect(page.locator('.stat-block--flat')).toBeVisible()
+
+    // The sheet's own damage dialog, applied and dismissed (VIT 0 → 20 max HP).
+    const sheetDamage = async (amount: number) => {
+      await page.locator('.resource-bar__head--clickable').first().click()
+      await page.locator('.damage-dialog input[type=number]').fill(String(amount))
+      await page.getByRole('button', { name: 'Apply Damage' }).click()
+      await page.locator('.damage-dialog .modal-close').click()
+    }
+    // Toasts linger for seconds: a negative assertion has to name the sentence
+    // it is looking for, not just the toast class ("Critical Condition!" also
+    // mentions being Knocked Out, in other words).
+    const knockOutToast = page
+      .locator('.notification')
+      .filter({ hasText: 'Character knocked out!' })
+
+    // ---- 20 HP → 15: the first wound, no knock-out ------------------------
+    await sheetDamage(25)
+    await expect(page.locator('.mw-head__count')).toHaveText('1 / 2')
+    await page.getByRole('button', { name: 'Roll Mortal Wound (d20)' }).click()
+    await expect(page.locator('.mw-card__name')).toHaveCount(1)
+    await expect(knockOutToast).toHaveCount(0)
+
+    // ---- 15 HP → 10: the *second* wound. The track is full, the character
+    // is standing: this is the Critical Condition, one 0 HP away from the
+    // knock-out — and it used to announce the knock-out itself.
+    await sheetDamage(25)
+    await expect(page.locator('.mw-head__count')).toHaveText('2 / 2')
+    await expect(page.locator('.mw-warn')).toBeVisible()
+    await expect(knockOutToast).toHaveCount(0)
+
+    await page.getByRole('button', { name: 'Roll Mortal Wound (d20)' }).click()
+    await expect(page.locator('.mw-card__name')).toHaveCount(2)
+    await expect(
+      page
+        .locator('.notification')
+        .filter({ hasText: 'Critical Condition!' })
+        .last(),
+    ).toBeVisible()
+    await expect(knockOutToast).toHaveCount(0)
+
+    // ---- 10 HP → 1: a plain hit, no wound and no knock-out ----------------
+    await sheetDamage(9)
+    await expect(page.locator('.mw-head__count')).toHaveText('2 / 2')
+    await expect(knockOutToast).toHaveCount(0)
+
+    // ---- 1 HP → 0 with no wound left: *now* it is a knock-out -------------
+    // The sheet's own `−` stepper runs the same damage pipeline. No third wound
+    // exists to pay for the 0 HP, so the character is Knocked Out, Death Saves
+    // begin, and the track is untouched by it (still the two cards it had).
+    await page.locator('.notification').first().waitFor({ state: 'detached' })
+    await page.getByRole('button', { name: 'Spend HP' }).click()
+    await expect(knockOutToast.last()).toBeVisible()
+    // The Death Saves block is on screen (the toast says the same words, so
+    // count the tracker itself, not the phrase).
+    await expect(
+      page.getByRole('button', { name: 'Roll Death Save (d20)' }),
+    ).toBeVisible()
+    await expect(page.locator('.mw-card__name')).toHaveCount(2)
+  })
+
   test('a player panel and the character sheet share one source of truth', async ({
     page,
   }) => {

@@ -43,13 +43,12 @@ import { useState } from 'react'
 import { Heart, Pencil, Shield, Sparkles, Swords, Wind } from 'lucide-react'
 
 import DamageDialog from '@/components/sheet/DamageDialog'
+import MortalWoundPicker from '@/components/sheet/MortalWoundPicker'
 import PanelHeader, { type PanelMenuItem } from '@/components/gmscreen/PanelHeader'
 import PanelApBar from '@/components/gmscreen/PanelApBar'
 import PanelExpand from '@/components/gmscreen/PanelExpand'
 import PanelHpBar from '@/components/gmscreen/PanelHpBar'
-import PanelMortalWounds, {
-  PENDING_MORTAL_WOUND,
-} from '@/components/gmscreen/PanelMortalWounds'
+import PanelMortalWounds from '@/components/gmscreen/PanelMortalWounds'
 import PanelSheet from '@/components/gmscreen/PanelSheet'
 import PanelStatuses from '@/components/gmscreen/PanelStatuses'
 import { MAX_MORTAL_WOUNDS } from '@/constants/gameData'
@@ -58,12 +57,16 @@ import { useNotification } from '@/context/NotificationContext'
 import { useGMScreenStore } from '@/store/gmScreenStore'
 import { effectiveCombatStats } from '@/lib/abilityModifiers'
 import { panelDamageOutcome } from '@/lib/gmScreenUtils'
-import { mortalWoundByName } from '@/lib/mortalWounds'
+import {
+  PENDING_MORTAL_WOUND,
+  characterMortalWounds,
+  nextMortalWoundSlot,
+} from '@/lib/mortalWounds'
 import { appThemeColorVars, appThemeStatColors, gmPanelSheetPresentation } from '@/lib/themeUtils'
 import { useAppThemeStore } from '@/store/appThemeStore'
 import { useGmPanelThemeStore } from '@/store/gmPanelThemeStore'
 import type { DamageResult } from '@/store/characterStore'
-import type { Character, MortalWoundRoll, ScreenPanel } from '@/types'
+import type { Character, MortalWound, ScreenPanel } from '@/types'
 
 export interface CharacterPanelProps {
   panel: Extract<ScreenPanel, { kind: 'character' }>
@@ -88,6 +91,7 @@ export default function CharacterPanel({
   // for a hit they took there.
   const takePanelDamage = useCharacterStore((s) => s.takePanelDamage)
   const rollMortalWound = useCharacterStore((s) => s.rollMortalWound)
+  const addMortalWound = useCharacterStore((s) => s.addMortalWound)
   const clearMortalWound = useCharacterStore((s) => s.clearMortalWound)
   const clearMortalWounds = useCharacterStore((s) => s.clearMortalWounds)
   const spendAP = useCharacterStore((s) => s.spendAP)
@@ -104,6 +108,7 @@ export default function CharacterPanel({
   const matchAppTheme = useGmPanelThemeStore((s) => s.matchAppTheme)
   const { notify } = useNotification()
   const [showDamage, setShowDamage] = useState(false)
+  const [showWoundPicker, setShowWoundPicker] = useState(false)
 
   // Panel-chrome colors — the app theme's palette, deliberately NOT the
   // character's own `config.colors` (see the component doc). Only the resource
@@ -126,23 +131,18 @@ export default function CharacterPanel({
   const spent = ap <= 0
 
   // The character's Mortal Wound slots in the panel row's `{ roll, name }`
-  // shape. `character.mortalWounds` is a fixed two-slot array of names (a slot
-  // the player still has to roll reads "Pending Roll"), so an empty slot leaves
-  // no entry and — because slots can be cleared out of order — an entry's
-  // position in this list is NOT its slot index. `woundSlots` keeps the mapping
-  // so a chip's ✕ clears the slot it actually belongs to.
-  const woundSlots = character.mortalWounds.flatMap((name, slot) =>
-    name == null ? [] : [{ slot, name }],
-  )
-  const wounds: MortalWoundRoll[] = woundSlots.map(({ name }) => ({
-    // A named wound carries the D20 that produced it (the table's id is the
-    // roll); "Pending Roll" has no roll yet, which the row marks with `?`.
-    roll: mortalWoundByName(name)?.id ?? 0,
-    name,
-  }))
+  // shape, each carrying the slot it belongs to. `character.mortalWounds` is a
+  // fixed two-slot array of names (a slot the player still has to roll reads
+  // "Pending Roll"), so an empty slot leaves no entry and — because slots can
+  // be cleared out of order — an entry's position in this list is NOT its slot
+  // index, which is why the shared helper keeps both.
+  const wounds = characterMortalWounds(character.mortalWounds)
   // A slot the player's own sheet left unresolved (never one this panel dealt —
   // its damage rolls as it lands). The panel menu carries the roll for it.
-  const pendingWound = woundSlots.some(({ name }) => name === PENDING_MORTAL_WOUND)
+  const pendingWound = wounds.some(({ name }) => name === PENDING_MORTAL_WOUND)
+  // A slot that can still take a name: empty, or one of those pending wounds —
+  // naming it by hand is the manual add's job (see the ⋯ menu).
+  const canAddWound = nextMortalWoundSlot(character.mortalWounds) !== -1
 
   /**
    * Announce what the panel's own `−` stepper just did. Stepping HP runs the
@@ -163,6 +163,29 @@ export default function CharacterPanel({
         ? `${character.name}'s turn — AP restored · +${gained} END`
         : `${character.name}'s turn — AP replenished`,
       gained > 0 ? 'success' : 'info',
+    )
+  }
+
+  /**
+   * Apply the wound the GM picked by name, skipping the D20 — the manual
+   * counterpart of the menu's roll, writing the character's real slots so the
+   * player's own sheet shows it immediately. The picker stays open, so a track
+   * that fills up mid-dialog re-renders it locked (see `canAddWound`).
+   */
+  const addWoundByName = (wound: MortalWound) => {
+    const result = addMortalWound(character.id, wound.name)
+    if (result.slotIndex < 0) {
+      notify(
+        `${character.name} has no Mortal Wound slot left — clear one first.`,
+        'error',
+        4000,
+      )
+      return
+    }
+    notify(
+      `${character.name} takes a Mortal Wound: ${result.woundName} (d20 ${result.roll}).`,
+      'error',
+      5000,
     )
   }
 
@@ -192,6 +215,13 @@ export default function CharacterPanel({
             },
           },
         ]
+      : []),
+    // The manual path: a wound something named outright (an ability in play, a
+    // GM ruling). Same place, same reason as the roll above — and the same
+    // picker the player's sheet opens, so a wound chosen at the table and one
+    // chosen on the sheet cannot disagree.
+    ...(canAddWound
+      ? [{ label: 'Add mortal wound…', onSelect: () => setShowWoundPicker(true) }]
       : []),
     // Wounds persist until something clears them (an ability in play, or the
     // sheet's Rest) — this is the panel's Rest for the wound track, exactly as
@@ -260,7 +290,7 @@ export default function CharacterPanel({
         allowance={MAX_MORTAL_WOUNDS}
         entityName={character.name}
         onClear={(index) => {
-          const entry = woundSlots[index]
+          const entry = wounds[index]
           if (entry) clearMortalWound(character.id, entry.slot)
         }}
         outOfWoundsLabel="Knocked Out"
@@ -345,6 +375,22 @@ export default function CharacterPanel({
           // its Mortal Wounds for the GM instead of leaving the player's card
           // waiting (see the component doc).
           autoRollMortalWounds
+        />
+      )}
+
+      {/* The manual add, opened from the ⋯ menu. It writes the character's real
+        * slots (so the player's own sheet shows the wound at once) and, like
+        * the Add Status picker, stays open across picks — a dialog that closed
+        * on each pick would send the GM back through the ⋯ menu for a second
+        * wound. It portals itself to `document.body`, so no panel state
+        * (a downed dim, the no-AP fade) can reach it. */}
+      {showWoundPicker && (
+        <MortalWoundPicker
+          entityName={character.name}
+          activeNames={wounds.map((w) => w.name)}
+          canAdd={canAddWound}
+          onPick={addWoundByName}
+          onClose={() => setShowWoundPicker(false)}
         />
       )}
     </section>

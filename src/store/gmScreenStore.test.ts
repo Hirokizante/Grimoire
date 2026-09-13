@@ -655,6 +655,113 @@ test('clearInstanceMortalWounds: empties the whole track', async () => {
   expect(instanceState().mortalWounds).toEqual([])
 })
 
+test('addInstanceMortalWound: applies the named table entry with its own D20', async () => {
+  const screen = await useGMScreenStore.getState().createScreen('S')
+  seedCharacters(makeToughNpc(2))
+  useGMScreenStore.getState().addNpcInstancePanel(screen.id, 'n1')
+  const panel = useGMScreenStore.getState().screens[0].panels[0]
+
+  const added = useGMScreenStore
+    .getState()
+    .addInstanceMortalWound(screen.id, panel.id, 'Damaged Throat')
+
+  expect(added).toBe(true)
+  // Stored in the rolled shape: the entry's D20 is the "roll", so the panel
+  // chip renders a hand-added wound exactly like an auto-rolled one.
+  expect(instanceState().mortalWounds).toEqual([
+    { roll: 8, name: 'Damaged Throat' },
+  ])
+  // Nothing else about the instance moves — this is not a damage pipeline.
+  expect(instanceState().currentHP).toBe(20)
+  expect(instanceState().condition).toBe('active')
+})
+
+test('addInstanceMortalWound: a full track refuses, and the allowance is the base’s', async () => {
+  const screen = await useGMScreenStore.getState().createScreen('S')
+  seedCharacters(makeToughNpc(2))
+  useGMScreenStore.getState().addNpcInstancePanel(screen.id, 'n1')
+  const panel = useGMScreenStore.getState().screens[0].panels[0]
+  const store = useGMScreenStore.getState()
+
+  expect(store.addInstanceMortalWound(screen.id, panel.id, 'Hemorrhage')).toBe(true)
+  expect(store.addInstanceMortalWound(screen.id, panel.id, 'Exhaustion')).toBe(true)
+  // Two is the base's allowance: the third writes nothing.
+  expect(
+    useGMScreenStore
+      .getState()
+      .addInstanceMortalWound(screen.id, panel.id, 'Sprain'),
+  ).toBe(false)
+  expect(instanceState().mortalWounds).toHaveLength(2)
+})
+
+test('addInstanceMortalWound: the mortalWounds 0 mook case allows none', async () => {
+  const screen = await useGMScreenStore.getState().createScreen('S')
+  seedCharacters(makeNpc({ id: 'n1' }))
+  useGMScreenStore.getState().addNpcInstancePanel(screen.id, 'n1')
+  const panel = useGMScreenStore.getState().screens[0].panels[0]
+
+  const added = useGMScreenStore
+    .getState()
+    .addInstanceMortalWound(screen.id, panel.id, 'Hemorrhage')
+
+  expect(added).toBe(false)
+  expect(instanceState().mortalWounds).toEqual([])
+})
+
+test('addInstanceMortalWound: a name off the table is refused', async () => {
+  const screen = await useGMScreenStore.getState().createScreen('S')
+  seedCharacters(makeToughNpc(2))
+  useGMScreenStore.getState().addNpcInstancePanel(screen.id, 'n1')
+  const panel = useGMScreenStore.getState().screens[0].panels[0]
+
+  const added = useGMScreenStore
+    .getState()
+    .addInstanceMortalWound(screen.id, panel.id, 'Broken Toe')
+
+  expect(added).toBe(false)
+  expect(instanceState().mortalWounds).toEqual([])
+})
+
+test('addInstanceMortalWound: raising the base’s allowance lets an existing instance add one', async () => {
+  const screen = await useGMScreenStore.getState().createScreen('S')
+  seedCharacters(makeToughNpc(1))
+  useGMScreenStore.getState().addNpcInstancePanel(screen.id, 'n1')
+  const panel = useGMScreenStore.getState().screens[0].panels[0]
+  const store = useGMScreenStore.getState()
+  expect(store.addInstanceMortalWound(screen.id, panel.id, 'Hemorrhage')).toBe(true)
+  expect(store.addInstanceMortalWound(screen.id, panel.id, 'Exhaustion')).toBe(false)
+
+  // The allowance is read live from the base — never copied onto the instance.
+  seedCharacters(makeToughNpc(2))
+  expect(
+    useGMScreenStore
+      .getState()
+      .addInstanceMortalWound(screen.id, panel.id, 'Exhaustion'),
+  ).toBe(true)
+  expect(instanceState().mortalWounds).toEqual([
+    { roll: 7, name: 'Hemorrhage' },
+    { roll: 9, name: 'Exhaustion' },
+  ])
+})
+
+test('addInstanceMortalWound: one panel’s manual wound never reaches its sibling or the base', async () => {
+  const screen = await useGMScreenStore.getState().createScreen('S')
+  seedCharacters(makeToughNpc(2))
+  const store = useGMScreenStore.getState()
+  store.addNpcInstancePanel(screen.id, 'n1')
+  store.addNpcInstancePanel(screen.id, 'n1')
+  const [first] = useGMScreenStore.getState().screens[0].panels
+
+  useGMScreenStore.getState().addInstanceMortalWound(screen.id, first.id, 'Fracture')
+
+  expect(instanceState(0).mortalWounds).toEqual([{ roll: 14, name: 'Fracture' }])
+  expect(instanceState(1).mortalWounds).toEqual([])
+  // The base record's own slots are template data no instance writes to.
+  expect(
+    useCharacterStore.getState().characters.find((c) => c.id === 'n1')?.mortalWounds,
+  ).toEqual([null, null])
+})
+
 test('duplicatePanel: a duplicate never inherits the original’s wounds', async () => {
   const screen = await useGMScreenStore.getState().createScreen('S')
   seedCharacters(makeToughNpc(2))

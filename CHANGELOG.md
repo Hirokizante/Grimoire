@@ -6,6 +6,159 @@ characters regularly.
 
 ## Unreleased
 
+### Mortal Wounds — a knock-out is announced when it happens, not when the track fills
+
+- **Taking the second wound is not a knock-out.** The sheet's wound roll
+  announced *"Character knocked out! Death Saves begin next turn."* the moment
+  the second wound landed — but the SRD's condition is narrower: a character is
+  Knocked Out when they are **reduced to 0 HP with no Mortal Wound left to
+  take**. Filling the last slot while they still stand is the Critical
+  Condition (the block's ⚠ banner), and the knock-out is the *next* time they
+  are reduced to 0 HP. The roll's `knockedOut` flag had been answering "is the
+  track full?".
+- **One definition, read by everything.** `isKnockedOut(slots, currentHP)` in
+  `lib/mortalWounds.ts` is now that rules sentence and nothing else; the damage
+  pipeline (`takeDamage`), both wound writers (`rollMortalWound`,
+  `addMortalWound`) and the sheet's own read-out all resolve the state through
+  it, so no surface can disagree about whether a character is out. `takeDamage`
+  reached the same verdict before — it was the wound results that were wrong.
+- **What each moment says.** A wound roll (or hand-picked wound) that fills the
+  track raises the Critical Condition line — the very sentence the ⚠ banner
+  prints, now shared as `CRITICAL_CONDITION_MESSAGE` — and stays quiet about a
+  knock-out that has not happened. A wound resolved while the character is
+  already at 0 HP (overkill can burn through both slots in one hit) *is* a
+  knock-out, and says so. `MortalWoundResult` reports both facts separately now
+  (`trackFull` and `knockedOut`) instead of conflating them.
+- **The knock-out moment is announced on the sheet.** The Damage dialog's sheet
+  branch words a real knock-out as one (it used to fold it into "Mortal Wound
+  incurred" — or say nothing at all when the track was already full and the hit
+  caused no wound), naming any wounds the same hit caused; and the HP `−`
+  stepper, which runs the whole damage pipeline and can take the last point of
+  HP, announces it too, instead of letting the HP bar and the Death Saves block
+  rearrange themselves in silence.
+- **Testing.** `isKnockedOut` / `mortalWoundsTaken` are pinned face by face
+  (`lib/mortalWounds.test.ts` — full track standing is *not* out, 0 HP with a
+  slot in hand is not either); the store's contracts are pinned at all three
+  moments (the roll and the manual add that fill the last slot at positive HP,
+  the same two at 0 HP, and the damage pair: a hit that fills the second wound
+  is not a knock-out, the next 0 HP is); the sheet's block asserts which toast
+  each moment raises and which it must not; and a Playwright walk takes a
+  character 20 → 15 → 10 → 1 → 0 through the real sheet, asserting the
+  knock-out toast appears exactly once — on the last step.
+
+### The sheet's Mortal Wound block — a counter, one action row, one face
+
+- **The empty slot boxes are gone.** An untouched track used to print two
+  squircles that said "nothing here" a second time, right beside the block's own
+  label. The block now opens with a header read-out —
+  `[skull] MORTAL WOUNDS (0 / 2)` — the same shape the GM panel's wound row uses
+  (`Wounds 1/2`), spelled the sheet's way (`1 / 2`, as every resource bar above
+  it reads). The counter's pill fills in with the danger red once the track is
+  full, so "no wound left to take" is visible before the next hit rather than
+  after it (the fill, not the hue, is what carries it — the shipped theme's
+  wound tone and danger red are the same color).
+- **The wound actions are buttons, not bars.** **Add Mortal Wound…** and
+  **Rest (Full Restore)** were `width: 100%` bars stacked down the whole Combat
+  Stats block, which read as form fields and pushed the section's live-play
+  controls apart. Both are now peer-sized buttons on **one row**, with an icon
+  each (a `+` and a bed), and the roll — when a slot is waiting for its D20 —
+  joins them as the row's primary button instead of a third full-width bar. The
+  row wraps rather than overflowing on a phone.
+- **The Death Save roll is the same button.** `Roll Death Save (d20)` was the
+  last `width: 100%` bar in the block; it now wears the shared
+  `sheet-action-btn` shape (natural width, one size, the same `Dices` icon as
+  the wound roll), so the two D20s a knocked-out character rolls — the wound and
+  the save — are visibly the same control. The pips, their ± steppers and the
+  roll's result line are unchanged.
+- **The knock-out warning reads like the panel's.** A full track still warns
+  that the next 0 HP is a Knocked Out, but as a danger-tinted banner with a
+  warning icon rather than a centered card that looked like a third wound.
+- **One face per wound.** Edit mode used to draw its own squircle track, so the
+  same wound looked different depending on which mode the sheet was in. It now
+  renders `MortalWoundRoller` read-only — the same counter, the same cards, no
+  roll/add/rest/clear — so the sheet has one wound vocabulary.
+- **The wound accent is the sheet's own.** The block reads
+  `--color-token-mortal-wounds` (Customization → Mortal Wounds), the one palette
+  entry that until now was exposed but consumed nowhere on a player sheet; it is
+  the player-sheet counterpart of the GM panel's `--mw-tone`. The clear ✕ is the
+  lucide `X` the panel chip uses, not a `×` glyph.
+- **Testing.** Unit tests pin the read-out (the counter and no slot boxes on an
+  empty track, `1 / 2` once a wound lands, the pill's `--full` state, the
+  knock-out banner), the action row (one row, both buttons the same class, an
+  icon each, the Rest button alone on a full track), the Death Save roll wearing
+  that same class, and edit mode's read-only track; a Playwright walk measures
+  the two buttons on the sheet for real — one row, one height, an icon each,
+  neither spanning the Combat Stats block.
+
+### Mortal Wounds — apply a specific wound by hand, with no D20
+
+- **A wound is not always rolled.** The D20 is the normal way onto the Mortal
+  Wounds table, and every surface keeps it. But nothing about the *rules* needs
+  the die: an ability in play, an NPC's authored effect or a GM ruling can name
+  the wound outright, and rolling to discover what the table already agreed on
+  is theatre. A specific entry can now be recorded directly, on a player's sheet
+  and from either GM panel's ⋯ menu.
+- **On the sheet, the wound block is always there in view mode.** `StatsSection`
+  used to render the Mortal Wounds block only once a wound existed — which hid
+  it exactly when the first wound had to be written down. View mode now always
+  shows the track (its counter and its **Add Mortal Wound…** button, matching the
+  GM panel's always-on read-out). Edit mode shows the same block read-only, and
+  a clean track stays hidden while the sheet is being built.
+- **The picker is the table, read as a list.** `MortalWoundPicker` (one
+  component for the sheet and both panel kinds) lists all twenty entries in
+  table order with their D20, name and rules text, searchable by name,
+  description or number, and marks what is already on the target's track.
+  Picking applies that entry — duplicates stay allowed, since two wounds can
+  share a name. It stays open across picks (an NPC whose base allows several
+  wounds takes them in one visit), portal-mounts to `document.body` so a
+  downed/dead panel's dim cannot reach it, and re-reads the track as it writes:
+  once there is no slot left it disables the list and says why, instead of
+  leaving a dead click behind.
+- **One table, one write per surface.** A player panel and the sheet write the
+  character's real slots (`characterStore.addMortalWound`), so a wound added at
+  the table shows up on the player's own sheet at once — and a wound written on
+  the sheet shows up on the panel. An NPC instance appends to its own track
+  (`gmScreenStore.addInstanceMortalWound`), storing the entry's D20 beside the
+  name, so a hand-added chip reads exactly like an auto-rolled one ("Damaged
+  Throat · 8") and its rules text resolves from the same table lookup.
+- **A hand-added wound fills the oldest slot that can take a name** — an empty
+  one, or one `takeDamage` parked on `Pending Roll`. Naming a pending slot is
+  the manual alternative to the player's own roll (it resolves the wound that
+  already happened rather than opening a second slot), and `rollMortalWound` now
+  fills its slot through the same `nextMortalWoundSlot` helper, so the two paths
+  can never disagree about which slot is next. Room follows the rule each
+  surface already used: `MAX_MORTAL_WOUNDS` for a character, the base's live
+  `npcStats.mortalWounds` for an instance — so a full track offers nothing to
+  click, and the `mortalWounds: 0` mook case, which renders no track at all, is
+  offered no add either.
+- **Only table entries can be applied.** A wound's effects are looked up by name
+  elsewhere on the sheet (halved healing, no passive END recovery, +1 END
+  costs), so `addMortalWound` refuses a name the table does not define rather
+  than letting an invented one take a slot and change nothing. The same guard
+  covers the instance track.
+- **The wound row did not grow a control.** Both entry points live in the ⋯
+  menu, exactly where a player panel's pending-wound roll already lives, for the
+  documented reason: `PanelMortalWounds` must stay one line at 360px on both
+  panel kinds.
+- **One place for the shared pieces.** `PENDING_MORTAL_WOUND` moved to
+  `lib/mortalWounds.ts` (it was exported from `PanelMortalWounds`, which had the
+  store and the sheet spelling `'Pending Roll'` by hand), and
+  `characterMortalWounds(slots)` now owns the character-track projection both
+  `CharacterPanel` and the picker read — so the chip's slot mapping and the
+  "on track" marks cannot drift apart.
+- **Testing.** Unit tests pin the table face by face and the slot rules
+  (`lib/mortalWounds.test.ts`), the character store's manual add (filling the
+  first empty slot, resolving a pending one, refusing off-table names and a full
+  track, and a hand-added Circulatory Dysfunction really halving healing), the
+  instance store's (the entry's D20 stored beside the name, refusal at the
+  allowance and for off-table names, a raised base allowance read live, and
+  per-panel isolation), the sheet's block (visible before the first wound, the
+  picker's search and "on track" badges, the dialog locking on a full track, and
+  a pending slot named instead of rolled), and both panel kinds' menus (the add
+  appearing exactly when there is room, writing the right record). A Playwright
+  walk records a wound by hand on the sheet, then one on each panel kind, and
+  asserts both tracks survive a reload.
+
 ### GM Screen — a dead panel no longer dims the dialogs it opens
 
 - **The Add Status picker is a viewport overlay again.** Opening it from a panel

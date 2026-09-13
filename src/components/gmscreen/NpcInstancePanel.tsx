@@ -34,6 +34,7 @@ import { useMemo, useState } from 'react'
 import { Hourglass, Pencil, Shield, Skull, Swords, Target, Wind } from 'lucide-react'
 
 import DamageDialog from '@/components/sheet/DamageDialog'
+import MortalWoundPicker from '@/components/sheet/MortalWoundPicker'
 import PanelApBar from '@/components/gmscreen/PanelApBar'
 import PanelExpand from '@/components/gmscreen/PanelExpand'
 import PanelHpBar from '@/components/gmscreen/PanelHpBar'
@@ -49,7 +50,7 @@ import { useGMScreenStore, npcMortalWoundAllowance } from '@/store/gmScreenStore
 import type { DamageResult } from '@/store/characterStore'
 import { appThemeStatColors, gmPanelSheetPresentation } from '@/lib/themeUtils'
 import { useAppThemeStore } from '@/store/appThemeStore'
-import type { Character, NpcInstanceState, ScreenPanel } from '@/types'
+import type { Character, MortalWound, NpcInstanceState, ScreenPanel } from '@/types'
 
 export interface NpcInstancePanelProps {
   panel: Extract<ScreenPanel, { kind: 'npc-instance' }>
@@ -83,6 +84,7 @@ export default function NpcInstancePanel({
   const adjustInstanceHP = useGMScreenStore((s) => s.adjustInstanceHP)
   const clearInstanceMortalWound = useGMScreenStore((s) => s.clearInstanceMortalWound)
   const clearInstanceMortalWounds = useGMScreenStore((s) => s.clearInstanceMortalWounds)
+  const addInstanceMortalWound = useGMScreenStore((s) => s.addInstanceMortalWound)
   const spendInstanceAP = useGMScreenStore((s) => s.spendInstanceAP)
   const restoreInstanceAP = useGMScreenStore((s) => s.restoreInstanceAP)
   const { notify } = useNotification()
@@ -133,6 +135,7 @@ export default function NpcInstancePanel({
   const stats = useMemo(() => effectiveNPCStats(entity), [entity])
 
   const [showDamage, setShowDamage] = useState(false)
+  const [showWoundPicker, setShowWoundPicker] = useState(false)
   const [renaming, setRenaming] = useState(false)
 
   const maxHP = stats.hp
@@ -144,6 +147,11 @@ export default function NpcInstancePanel({
   // base record's own stat, read here and in the damage pipeline (never copied
   // onto the instance, so editing the base updates every instance of it).
   const mortalWoundAllowance = npcMortalWoundAllowance(base)
+  // Room on the track for one more wound — the manual add's gate, read exactly
+  // as the damage pipeline reads it: the base's allowance minus what this
+  // instance already carries. A `mortalWounds: 0` mook has no track at all
+  // (PanelMortalWounds renders nothing for it), so it offers no add either.
+  const canAddWound = panel.state.mortalWounds.length < mortalWoundAllowance
   const hp = Math.max(0, panel.state.currentHP)
   const ap = panel.state.currentAP
   const { condition } = panel.state
@@ -165,6 +173,29 @@ export default function NpcInstancePanel({
     notify(panelDamageOutcome(name, result, 'DOWNED'), 'error', 5000)
   }
 
+  /**
+   * Apply the wound the GM picked by name, skipping the D20 — the manual
+   * counterpart of the roll `damageInstance` makes at 0 HP. The store re-checks
+   * the allowance as it writes, so a track that filled up while the picker was
+   * open refuses here rather than overflowing; the picker re-renders locked in
+   * the same tick (see `canAddWound`).
+   */
+  const addWoundByName = (wound: MortalWound) => {
+    if (!addInstanceMortalWound(screenId, panel.id, wound.name)) {
+      notify(
+        `${name} has no Mortal Wound slot left — clear one first.`,
+        'error',
+        4000,
+      )
+      return
+    }
+    notify(
+      `${name} takes a Mortal Wound: ${wound.name} (d20 ${wound.id}).`,
+      'error',
+      5000,
+    )
+  }
+
   const menuItems: PanelMenuItem[] = [
     { label: 'Rename instance…', onSelect: () => setRenaming(true) },
     { label: 'Duplicate instance', onSelect: () => duplicatePanel(screenId, panel.id) },
@@ -172,6 +203,12 @@ export default function NpcInstancePanel({
     // The turn button appears by itself once AP runs out; the menu entry keeps
     // an early turn (or a GM hand-wave) possible without spending down first.
     { label: 'Start new turn', onSelect: startTurn },
+    // The manual path: a wound something named outright (an ability in play,
+    // the NPC's authored effect, a GM ruling). Same picker as the player
+    // sheet's and a player panel's, so one wound is one table entry everywhere.
+    ...(canAddWound
+      ? [{ label: 'Add mortal wound…', onSelect: () => setShowWoundPicker(true) }]
+      : []),
     // Wounds persist until something clears them (an ability in play, or a
     // Rest) — this is the panel's Rest for the track the base allows.
     ...(panel.state.mortalWounds.length > 0
@@ -355,6 +392,21 @@ export default function NpcInstancePanel({
             tempHP: panel.state.tempHP,
           }}
           onClose={() => setShowDamage(false)}
+        />
+      )}
+
+      {/* The manual add, opened from the ⋯ menu: the same picker a player panel
+        * and the player's own sheet open, writing this instance's own track
+        * (never the base's). It stays open across picks — an NPC whose base
+        * allows several wounds can take them in one visit — and portals itself
+        * to `document.body`, so a downed/dead panel's dim cannot reach it. */}
+      {showWoundPicker && (
+        <MortalWoundPicker
+          entityName={name}
+          activeNames={panel.state.mortalWounds.map((w) => w.name)}
+          canAdd={canAddWound}
+          onPick={addWoundByName}
+          onClose={() => setShowWoundPicker(false)}
         />
       )}
     </section>

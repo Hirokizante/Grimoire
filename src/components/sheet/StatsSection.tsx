@@ -5,11 +5,12 @@
  *   - HP bar with inline +/− controls (click label → DamageDialog)
  *   - FP/AP/END bars with inline +/− controls
  *   - RecoverAction button (recover all END)
- *   - MortalWoundRoller for wound slots + rolling
+ *   - MortalWoundRoller for the wound track (counter + cards + actions)
  *   - DeathSaveTracker (shown when knocked out: 0 HP + 2 Mortal Wounds)
  *
- * In **edit mode**, all trackers are hidden — only the calculated stats and
- * bars are shown (edit mode is for building the sheet, not playing).
+ * In **edit mode**, the trackers are read-only — only the calculated stats and
+ * bars are shown, with any wound on the track rendered as the read-out it is
+ * (edit mode is for building the sheet, not playing it).
  *
  * The six derived stats (Milestones, Evasion, Armor, Movement, Save DC, END
  * Recovery) are displayed as stylized "stat tokens" with icons and accent
@@ -46,7 +47,9 @@ import {
   calcSaveDC,
 } from '@/lib/calculations'
 import { effectiveCombatStats, formatModifierValue } from '@/lib/abilityModifiers'
-import { MAX_AP, MAX_END, MAX_MORTAL_WOUNDS } from '@/constants/gameData'
+import { MAX_AP, MAX_END } from '@/constants/gameData'
+import { useNotification } from '@/context/NotificationContext'
+import { KNOCKED_OUT_MESSAGE, isKnockedOut as isKnockedOutNow } from '@/lib/mortalWounds'
 import { useCharacterStore } from '@/store/characterStore'
 import {
   statTokenLabel,
@@ -180,11 +183,12 @@ export default function StatsSection({
   const [showAddBar, setShowAddBar] = useState(false)
   const [barToEdit, setBarToEdit] = useState<CustomResourceBar | null>(null)
   const [barToRemove, setBarToRemove] = useState<{ id: string; name: string } | null>(null)
+  const { notify } = useNotification()
   const isView = mode === 'view'
   const isEdit = mode === 'edit'
-  const isKnockedOut =
-    character.currentHP <= 0 &&
-    character.mortalWounds.filter((w) => w != null).length >= MAX_MORTAL_WOUNDS
+  // 0 HP with no Mortal Wound left to take — the one condition for it, shared
+  // with the store's damage pipeline (see `lib/mortalWounds.ts`).
+  const isKnockedOut = isKnockedOutNow(character.mortalWounds, character.currentHP)
 
   const sectionClass =
     variant === 'flat'
@@ -266,8 +270,16 @@ export default function StatsSection({
             continuous={maxHP > 30}
             interactive={isView}
             onSpend={() => {
-              // Spending HP = taking 1 raw damage
-              useCharacterStore.getState().takeDamage(character.id, 1)
+              // Spending HP = taking 1 raw damage. The step runs the whole
+              // damage pipeline, so it can be the hit that knocks the character
+              // out (0 HP with no Mortal Wound left to take) — a state change
+              // that would otherwise land without a word while the HP bar and
+              // the Death Saves block silently rearrange themselves. A step that
+              // only takes a wound is left alone: the wound card appears with it.
+              const result = useCharacterStore.getState().takeDamage(character.id, 1)
+              if (result.knockedOut) {
+                notify(KNOCKED_OUT_MESSAGE, 'error', 5000)
+              }
             }}
             onRestore={() => heal(character.id, 1)}
             onLabelClick={isView ? () => setShowDamageDialog(true) : undefined}
@@ -371,31 +383,15 @@ export default function StatsSection({
 
       {isView && <RecoverAction characterId={character.id} />}
 
-      {!hideMortalWounds && character.mortalWounds.some((w) => w != null) && (
+      {/* View mode always shows the block — the counter and the manual add
+        * included — because it is also where a specific wound is recorded by
+        * hand (`MortalWoundRoller`'s "Add Mortal Wound…"), and that affordance
+        * has to exist before the first wound lands. Edit mode keeps the same
+        * block read-only, and only once something is on it: building a sheet is
+        * not playing it. */}
+      {!hideMortalWounds && (isView || character.mortalWounds.some((w) => w != null)) && (
         <div className="stat-mortals">
-          <span className="stat-item__label">Mortal Wounds</span>
-          {isView ? (
-            <MortalWoundRoller character={character} />
-          ) : (
-            <div className="mortal-wounds">
-              {Array.from({ length: MAX_MORTAL_WOUNDS }, (_, i) => {
-                const wound = character.mortalWounds[i]
-                const filled = wound != null
-                return (
-                  <div
-                    key={i}
-                    className={
-                      'mortal-wound-slot' +
-                      (filled ? ' mortal-wound-slot--filled' : '')
-                    }
-                    title={filled ? wound ?? '' : 'Empty'}
-                  >
-                    {filled ? '✕' : ''}
-                  </div>
-                )
-              })}
-            </div>
-          )}
+          <MortalWoundRoller character={character} readOnly={!isView} />
         </div>
       )}
 
