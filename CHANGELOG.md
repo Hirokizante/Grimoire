@@ -4,7 +4,96 @@ All notable changes to Grimoire are documented here. This project is in alpha:
 storage format may change between pre-1.0 releases, so export (or back up) your
 characters regularly.
 
-## Unreleased
+## v0.9.0-alpha — 2026-09-13
+
+The table release. Ten commits since `v0.8.0-alpha`, and they all point the same
+way: the GM Screen stops being a display and starts running the fight. An NPC
+panel takes its own turn — Action Points, Recharge, limited-ability uses and
+modifier switches owned by the *instance*, not the statblock — Mortal Wounds
+arrive on both panel kinds and get a rebuilt block on the sheet, and the status
+icon picker trades a 62-glyph UI palette for a search over all 1,914 Unicode
+emoji and RPG-Awesome's 496 fantasy icons. **No migration to run:** the
+IndexedDB schema stays at version 5 and every new live-play field on a panel is
+additive, backfilled by `normalizeScreen` when a screen written by
+`v0.8.0-alpha` loads — an instance with no `currentAP`/`cooldowns` reads as a
+fresh turn, and one with no `mortalWounds`/`abilityUses` as an untouched track
+and full uses.
+
+### Status icons — search any emoji, and a fantasy icon pack worth searching
+
+- **The emoji tab is a search box, not a paste box.** The old field took any
+  text at all and stored it, so a typo became an invisible "icon" and finding a
+  glyph meant scrolling a 30-item palette. It is now a search over the **full
+  Unicode emoji set** — all 1,914 of them, names and groups from
+  `unicode-emoji-json`, loaded lazily the first time the tab opens (a ~277 KB
+  chunk, 30 KB gzipped, that a session which never opens the tab never
+  downloads). Type "sword", "poisoned" or "sleep" and the matches appear best
+  first; the old palette survives as the **Common** row, and the groups below it
+  still make the whole set browsable.
+- **Game words reach the right glyph.** Unicode names a skull-and-crossbones
+  exactly that — never "poison" — so `lib/emojiCatalog.ts` carries a small table
+  of tabletop terms (Poisoned → ☠️, Grappled/Immobilized → ⛓️, Blinded → 🙈,
+  Regeneration → ♻️, Prone → 🧎, and so on) and ranks those hits ahead of name
+  matches. Prefixes count, so typing the SRD condition's own name ("poisoned",
+  "blinded", "cursed") lands on its glyph.
+- **Pasting still works.** A query that is *itself* an emoji is not treated as a
+  search word: it is offered as `Use “🦴” as the icon`, so nothing the old text
+  field could do is gone.
+- **The icon pack is RPG-Awesome now.** The pack tab used to offer 62 curated
+  Lucide **UI** glyphs — the wrong vocabulary for conditions ("poison cloud" and
+  "bleeding eye" do not exist in a UI set). It now offers all **496 RPG-Awesome
+  fantasy icons**, drawn with the pack's own icon font (`rpg-awesome`, SIL
+  OFL 1.1 font / MIT CSS) and searchable by name: "sword" finds broadsword, bat
+  sword, crossed swords, dervish swords and lightning sword; "potion" finds the
+  bubbling potion. Every word of the query has to match, and an empty query shows
+  the whole pack.
+- **Keys are the pack's own class names.** A selection stores
+  `ra-crossed-swords` in `StatusCondition.icon` and renders as
+  `<i className="ra ra-crossed-swords">`, so the stored value is exactly the
+  class that carries the glyph. The 496 keys live in the generated
+  `constants/rpgAwesomeIcons.ts` (`npm run icons:rpg-awesome` rebuilds it from
+  the installed package, so bumping the pack cannot leave the list stale).
+- **Statuses saved with the old pack keep their icon.** `StatusIcon` draws an
+  RPG-Awesome key with the icon font, resolves anything else through the old
+  Lucide map, and only falls back to the placeholder glyph for a key that
+  resolves to nothing — the pack switch is not a data loss for existing records.
+- **Both grids show their work.** The preview line names the current pack icon
+  ("Icon pack · Crossed swords"), each grid marks the current selection rather
+  than only previewing it, and an empty result says `No emoji match “xyz”.` /
+  `No icons match “xyz”.` instead of rendering nothing.
+- **The search bar is an ordinary app text field.** It is the same `.sheet-input`
+  every other form uses — same height, border, radius and font — spanning the
+  panel's full width with the magnifier *inside* it (an icon sitting outside had
+  left the field 50px narrower than the fields above it, which read as a
+  shrunken, out-of-place control), plus a ✕ that clears the query and returns to
+  the browse view. The row stays pinned to the top of the scrolling grid.
+- **Testing.** `lib/emojiCatalog.test.ts` runs the search against the real
+  shipped catalog: name ranking, "poisoned" reaching ☠️, multi-word queries
+  requiring every word, **every alias and quick pick verified to exist in the
+  dataset**, the over-broad query cap, and the pasted-emoji candidate.
+  `StatusIconPicker.test.tsx` searches and selects on both grids, marks the
+  stored emoji/key as current, keeps the two panels' queries independent, clears
+  a query back to the browse view, reports an empty result, and pins
+  `StatusIcon`: `ra-crossed-swords` draws as
+  `<i class="ra ra-crossed-swords">` at the requested size, an old `skull` key
+  still draws the Lucide SVG, an unknown key still reaches the placeholder, and
+  emoji/uploaded images render as before. `e2e/status-icons.spec.ts` walks the
+  same path in a real browser against the production build — search both tabs,
+  pick, save, reload — because jsdom loads no stylesheet: it is the test that
+  would catch the pack's CSS import being dropped (asserting the cell's
+  `font-family` and that `document.fonts.check('16px RPGAwesome')` resolves).
+- **The deploy build installs the same tree as a local one.** The Pages workflow
+  ran `npm ci` against an npm lockfile that predated the icon pack, so it
+  resolved a tree without `rpg-awesome` or `unicode-emoji-json` and could not
+  have built this release. The workflow now installs with pnpm from the
+  `pnpm-lock.yaml` this repo actually locks with (`pnpm install
+  --frozen-lockfile`, cached on the pnpm store), that stale `package-lock.json`
+  is gone rather than left to drift again, and `package.json` pins the
+  toolchain with `packageManager`.
+- **The boot sequence prints the real version again.** Its `APP_VERSION` was
+  hard-coded at `0.3.0` when the terminal animation landed and had been sitting
+  there through five releases, so the home screen announced `grimoire v0.3.0`
+  while the app shipped `v0.8.0-alpha`. It now reads `v0.9.0-alpha`.
 
 ### Mortal Wounds — a knock-out is announced when it happens, not when the track fills
 

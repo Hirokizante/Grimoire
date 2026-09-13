@@ -21,7 +21,10 @@ interface BootLine {
   pauseAfterMs: number
 }
 
-const APP_VERSION = '0.3.0'
+/* The version the boot sequence prints. Keep in step with `package.json` —
+   it had sat at 0.3.0 while the app shipped 0.8.0, so it is worth checking on
+   every release bump. */
+const APP_VERSION = '0.9.0-alpha'
 
 /* The app's glyph rendered as terminal art (Braille-pattern blocks).
  * Lines use ⠀ (U+2800 Braille blank) for padding — keep them intact. */

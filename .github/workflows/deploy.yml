@@ -24,14 +24,18 @@ jobs:
 
       # pnpm is the package manager this project locks with (pnpm-lock.yaml);
       # the npm lock was stale, so `npm ci` resolved a tree without the icon
-      # pack. Install pnpm before setup-node so its cache can key on the store.
+      # pack. No `version:` here on purpose — pnpm/action-setup reads the
+      # pinned version from package.json's `packageManager` field, and passing
+      # both is an error. Install it before setup-node so the cache can key on
+      # the pnpm store.
       - uses: pnpm/action-setup@v4
-        with:
-          version: 11
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # Matches the version this project is developed on. Node 20 still
+          # satisfies Vite's `^20.19.0 || >=22.12.0`, but it is deprecated on
+          # the runners, so the build targets 22 (current LTS).
+          node-version: 22
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
