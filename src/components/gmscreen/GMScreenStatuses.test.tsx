@@ -272,6 +272,42 @@ test('the picker filters by name and reports an empty search', () => {
   expect(screen.getByText('No statuses match that search.')).toBeInTheDocument()
 })
 
+// ---- The picker is a viewport overlay ---------------------------------------
+
+test('a dead panel cannot dim the picker it opens', () => {
+  renderPanel('npc')
+
+  // Mark the instance dead through the panel's own menu — the state the bug
+  // needed, because `.gm-panel--dead` dims the panel to 0.75.
+  fireEvent.click(screen.getByRole('button', { name: 'Bandit options' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Mark dead' }))
+  const panel = document.querySelector('.gm-panel--dead')
+  expect(panel).not.toBeNull()
+
+  fireEvent.click(screen.getByRole('button', { name: 'Add status to Bandit' }))
+  const dialog = screen.getByRole('dialog', { name: 'Add status to Bandit' })
+
+  // jsdom applies no stylesheets, so the dim itself cannot be measured here;
+  // what this pins is the structure that produced it. `opacity` passes down to
+  // every descendant AND makes the panel the containing block for
+  // `position: fixed`, so a dialog rendered inside the panel painted at 75%
+  // over a backdrop the size of the panel instead of the viewport. The picker
+  // must therefore be portalled out of the panel entirely (the browser suite
+  // measures the painted result — see `e2e/gm-screen.spec.ts`).
+  const overlay = dialog.closest('.modal-overlay')
+  expect(overlay).not.toBeNull()
+  expect(panel!.contains(overlay)).toBe(false)
+  expect(overlay!.parentElement).toBe(document.body)
+
+  // …and the picker still works from there: the portal keeps it wired to the
+  // panel it was opened from.
+  const chips = screen.getByRole('group', { name: 'Duration for Poisoned' })
+  fireEvent.click(within(chips).getByRole('button', { name: 'Quick' }))
+  expect(tracked()).toEqual([
+    { statusId: POISONED.id, duration: 'quick', stacks: 1 },
+  ])
+})
+
 // ---- Applying, stacking, and removing ---------------------------------------
 
 test('picking a duration tracks the status and renders its pill inline', () => {

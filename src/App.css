@@ -40,12 +40,20 @@
  * forced a compositing-layer swap that made the bar briefly paint beneath
  * the sheet whenever a modal opened. Instead the bar keeps its normal
  * opaque surface, a ::after scrim matches the modal backdrop's dark tint,
- * and the 4px blur is applied only to the inner content (title + nav). */
-.app:has(.modal-overlay) .app-header {
+ * and the 4px blur is applied only to the inner content (title + nav).
+ *
+ * Scoped to `body:has(...)`, NOT `.app:has(...)`: a modal is a viewport
+ * overlay, and an overlay that is portalled straight to `document.body` (the
+ * GM Screen's Add Status picker is, so a panel's dead/dim opacity cannot
+ * reach it) sits OUTSIDE the `.app` subtree — an `.app:has()` guard never
+ * matched it and the bar stayed sharp behind that dialog. `body` sees every
+ * overlay wherever it is mounted, which is what "while any modal is open"
+ * means. Nothing needs the old, narrower scope: `.app` is inside `body`. */
+body:has(.modal-overlay) .app-header {
   pointer-events: none;
 }
 
-.app:has(.modal-overlay) .app-header::after {
+body:has(.modal-overlay) .app-header::after {
   content: '';
   position: absolute;
   /* Bottom extends -1px past the padding box so the scrim also covers the
@@ -57,8 +65,8 @@
   background: rgba(10, 8, 16, 0.85);
 }
 
-.app:has(.modal-overlay) .app-title,
-.app:has(.modal-overlay) .app-header__nav {
+body:has(.modal-overlay) .app-title,
+body:has(.modal-overlay) .app-header__nav {
   filter: blur(4px);
 }
 

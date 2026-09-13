@@ -11,9 +11,23 @@
  * The modal stays open after each pick — a GM usually applies two or three
  * conditions at once ("prone and poisoned") — and closes from the header ✕,
  * the footer Done, Escape, or the backdrop.
+ *
+ * It renders through a **portal to `document.body`**, like the panel pill's
+ * hover card (`StatusTooltip`), and for the same reason the panel must not own
+ * its overlays: the picker is opened from a panel, and a panel can carry a
+ * dim — `.gm-panel--dead` dims to 0.75 — which `opacity` passes down to every
+ * descendant AND turns the panel into the containing block for any
+ * `position: fixed` inside it. An in-place picker therefore painted at 75%
+ * over a backdrop sized to the panel's own box instead of the viewport: the
+ * whole dialog read as translucent and its overlay never dimmed the page
+ * behind it. Portalled, the dialog is a viewport overlay again, on the
+ * documented layer for modals (z-index 2000, below the 3000 title bar), and no
+ * panel state can reach it. `useModalDialog` is portal-safe: the focus trap
+ * scopes itself to `.modal-overlay`, which travels with the dialog.
  */
 
 import { useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Search } from 'lucide-react'
 
 import StatusIcon from '@/components/status/StatusIcon'
@@ -72,7 +86,7 @@ export default function AddStatusModal({
     return [...list].sort((a, b) => a.name.localeCompare(b.name))
   }, [statuses, query])
 
-  return (
+  return createPortal(
     <div className="modal-overlay" onClick={onClose}>
       <div
         className="modal-content gm-picker gm-status-picker"
@@ -203,6 +217,7 @@ export default function AddStatusModal({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

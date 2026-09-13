@@ -6,6 +6,48 @@ characters regularly.
 
 ## Unreleased
 
+### GM Screen — a dead panel no longer dims the dialogs it opens
+
+- **The Add Status picker is a viewport overlay again.** Opening it from a panel
+  whose instance is marked **dead** painted the whole dialog at 75%: a panel's
+  dead state is `opacity: 0.75` on the panel itself, and `opacity` on an
+  ancestor does two things to everything inside it — it multiplies into every
+  descendant's paint, and it becomes the containing block for any
+  `position: fixed` box. The picker was rendered inside the panel, so the dialog
+  went translucent *and* its backdrop was sized to the panel's box instead of
+  the viewport, which left the page behind it undimmed.
+- **The picker now portals to `document.body`**, exactly as the panel pill's
+  hover card already does (`StatusTooltip`), so no panel state can reach it: the
+  dialog keeps its own full opacity, its backdrop covers the whole viewport,
+  and it sits on the documented modal layer (z-index 2000, below the 3000 title
+  bar). `useModalDialog`'s focus trap scopes itself to `.modal-overlay`, which
+  travels with the portalled dialog, so Escape, the Tab cycle and focus restore
+  are unchanged — as is the picker's wiring to the panel it was opened from
+  (a status picked from a dead instance still lands on that panel).
+- **The title bar recedes behind the portalled picker too.** Moving the dialog
+  to `document.body` put it *outside* the `.app` subtree, and the "a modal is
+  open" chrome state was hung off `.app:has(.modal-overlay)` rules — so with the
+  picker up, the title bar stayed fully sharp (no blur, no scrim, nav still
+  clickable) while every other modal dimmed it. Those rules are now scoped to
+  `body:has(.modal-overlay)` in App.css, dice.css and sheet.css: a modal is a
+  viewport overlay, `body` sees one wherever it is mounted, and `.app` is inside
+  `body`, so every in-page modal keeps the behaviour it had. Only the guard
+  moved — the bar still carries the `::after` scrim that matches the modal
+  backdrop's tint rather than `opacity`/`filter` on the sticky element itself,
+  and the 4px blur still lands on the title and nav only.
+- **Testing.** A component test opens the picker from a dead instance and pins
+  the structure that makes the dim visible (the overlay is a child of
+  `document.body`, never inside `.gm-panel--dead`) plus the still-working pick;
+  a new Playwright walk marks an instance dead, opens the picker in a real
+  browser and measures the painted result — the dialog's effective opacity is 1
+  (every ancestor's opacity multiplied down the tree) and its backdrop covers
+  the full viewport. Both fail against the previous in-panel rendering. A second
+  browser walk pins the chrome state for both mount points: the bar is blurred
+  (`filter: blur(4px)` on the title and nav), dimmed (the `::after` scrim at the
+  backdrop's tint), and `pointer-events: none` behind the in-page Add NPC picker
+  *and* behind the portalled status picker, then returns to normal when the
+  dialog closes.
+
 ### GM Screen — an NPC instance owns its ability modifier switches
 
 - **An NPC base sheet's modifier switch is visible but inert.** The switch on an

@@ -213,17 +213,19 @@
  * App.css; selector toggle: sheet.css). Without this the opaque roll-log-tab
  * doesn't inherit the overlay's blur and looks fully sharp while the mode
  * toggle shows the 4px backdrop-filter beneath it. All chrome is also
- * pointer-events: none so nothing outside the dialog is interactable. */
-.app:has(.modal-overlay) .roll-log-tab,
-.app:has(.modal-overlay) .mode-toggle--floating {
+ * pointer-events: none so nothing outside the dialog is interactable.
+ * Scoped to `body:has(...)` so it also covers an overlay portalled to
+ * `document.body` — see the note in App.css. */
+body:has(.modal-overlay) .roll-log-tab,
+body:has(.modal-overlay) .mode-toggle--floating {
   filter: blur(4px);
   opacity: 0.4;
   pointer-events: none;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
 }
-.app:has(.modal-overlay) .roll-log-tab:hover,
-.app:has(.modal-overlay) .mode-toggle--floating .mode-toggle__btn--active {
+body:has(.modal-overlay) .roll-log-tab:hover,
+body:has(.modal-overlay) .mode-toggle--floating .mode-toggle__btn--active {
   transform: none;
 }
 

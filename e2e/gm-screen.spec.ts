@@ -1798,4 +1798,138 @@ test.describe('GM Screen', () => {
       'ellipsis',
     )
   })
+
+  test('a dead panel never dims the picker it opens', async ({ page }) => {
+    await gotoHome(page)
+    await createNpc(page, 'Bandit')
+
+    await gotoGmScreen(page)
+    await page.getByRole('button', { name: 'New Screen' }).first().click()
+    await page.getByRole('button', { name: 'Create' }).click()
+    await page.getByRole('button', { name: 'Add NPC' }).first().click()
+    await page.locator('.gm-picker__list .gm-picker__item').filter({ hasText: 'Bandit' }).click()
+    await page.getByRole('button', { name: 'Done' }).click()
+
+    // ---- Mark the instance dead ------------------------------------------
+    // `.gm-panel--dead` carries the panel's dim, and `opacity` on an ancestor
+    // both multiplies into every descendant and becomes the containing block
+    // for `position: fixed` — the two halves of the bug.
+    const panel = page.locator('.gm-panel--npc')
+    await panel.getByRole('button', { name: 'Bandit options' }).click()
+    await page.getByRole('menuitem', { name: 'Mark dead' }).click()
+    await expect(panel).toHaveClass(/gm-panel--dead/)
+    expect(
+      await panel.evaluate((el) => parseFloat(getComputedStyle(el).opacity)),
+    ).toBeLessThan(1)
+
+    // ---- Open the picker from that panel ---------------------------------
+    await panel.getByRole('button', { name: 'Add status to Bandit' }).click()
+    const overlay = page.locator('.modal-overlay')
+    const dialog = overlay.locator('.modal-content.gm-status-picker')
+    await expect(dialog).toBeVisible()
+    // Both fade/pop in over 0.2s — read them settled.
+    await expect(overlay).toHaveCSS('opacity', '1')
+    await expect(dialog).toHaveCSS('opacity', '1')
+
+    const placement = await page.evaluate(() => {
+      const overlay = document.querySelector('.modal-overlay')!
+      const dialog = overlay.querySelector('.modal-content')!
+      // What the eye actually sees: every ancestor's opacity multiplies down
+      // the tree, so the panel's dim used to make the whole dialog 75%
+      // transparent even though its own opacity was 1.
+      let node: Element | null = dialog
+      let effectiveOpacity = 1
+      while (node) {
+        effectiveOpacity *= parseFloat(getComputedStyle(node).opacity)
+        node = node.parentElement
+      }
+      const rect = overlay.getBoundingClientRect()
+      return {
+        onBody: overlay.parentElement === document.body,
+        insidePanel: overlay.closest('.gm-panel') !== null,
+        effectiveOpacity,
+        rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+      }
+    })
+
+    // The dialog is a viewport overlay again, not a child of the panel…
+    expect(placement.onBody).toBe(true)
+    expect(placement.insidePanel).toBe(false)
+    expect(placement.effectiveOpacity).toBe(1)
+    // …so its backdrop dims the whole viewport instead of the panel's box.
+    const viewport = page.viewportSize()!
+    expect(placement.rect).toEqual({
+      x: 0,
+      y: 0,
+      width: viewport.width,
+      height: viewport.height,
+    })
+
+    // ---- …and it still tracks statuses on the dead panel ------------------
+    await page
+      .getByRole('group', { name: 'Duration for Poisoned' })
+      .getByRole('button', { name: 'Quick', exact: true })
+      .click()
+    await page.getByRole('button', { name: 'Done' }).click()
+    await expect(panel.locator('.gm-status-pill')).toHaveCount(1)
+    await expect(panel.locator('.gm-status-pill__name')).toHaveText('Poisoned')
+  })
+
+  test('the title bar recedes behind a GM Screen status picker', async ({ page }) => {
+    const header = page.locator('.app-header')
+    const title = page.locator('.app-title')
+
+    await gotoHome(page)
+    await createNpc(page, 'Bandit')
+
+    await gotoGmScreen(page)
+    await page.getByRole('button', { name: 'New Screen' }).first().click()
+    await page.getByRole('button', { name: 'Create' }).click()
+
+    // Baseline: an idle bar is neither blurred nor click-through.
+    await expect(title).not.toHaveCSS('filter', 'blur(4px)')
+    await expect(header).toHaveCSS('pointer-events', 'auto')
+
+    // A modal mounted inside the page (this picker lives in the screen's own
+    // tree) recedes the bar as it always has…
+    await page.getByRole('button', { name: 'Add NPC' }).first().click()
+    await expect(title).toHaveCSS('filter', 'blur(4px)')
+    await page.locator('.gm-picker__list .gm-picker__item').filter({ hasText: 'Bandit' }).click()
+    await page.getByRole('button', { name: 'Done' }).click()
+    await expect(title).not.toHaveCSS('filter', 'blur(4px)')
+
+    // ---- The status picker, which portals to `document.body` -------------
+    // …and so must that one. Every modal recedes the app chrome behind it
+    // (blurred content, a scrim over the bar, no nav clicks), but the portalled
+    // picker sat OUTSIDE the `.app:has(...)` guard this state used to hang off
+    // — the bar stayed sharp behind exactly this dialog. `body:has(...)` sees
+    // an overlay wherever it is mounted.
+    await page
+      .locator('.gm-panel--npc')
+      .getByRole('button', { name: 'Add status to Bandit' })
+      .click()
+    await expect(page.locator('.modal-content.gm-status-picker')).toBeVisible()
+
+    await expect(title).toHaveCSS('filter', 'blur(4px)')
+    await expect(page.locator('.app-header__nav')).toHaveCSS('filter', 'blur(4px)')
+    // The rest of the chrome recedes with it (App.css owns the bar, dice.css
+    // the floating roll-log tab), so nothing behind the dialog stays sharp.
+    await expect(page.locator('.roll-log-tab')).toHaveCSS('filter', 'blur(4px)')
+    // The bar is not interactable while a dialog is pending…
+    await expect(header).toHaveCSS('pointer-events', 'none')
+    // …and it is dimmed by its scrim, which the bar itself must not carry (it
+    // stays opaque — see App.css) but which matches the modal backdrop's tint.
+    const scrim = await header.evaluate((el) => {
+      const style = getComputedStyle(el, '::after')
+      return { content: style.content, background: style.backgroundColor }
+    })
+    expect(scrim.content).not.toBe('none')
+    expect(scrim.background).toBe('rgba(10, 8, 16, 0.85)')
+
+    // Closing the dialog hands the chrome straight back.
+    await page.getByRole('button', { name: 'Done' }).click()
+    await expect(page.locator('.modal-overlay')).toHaveCount(0)
+    await expect(title).not.toHaveCSS('filter', 'blur(4px)')
+    await expect(header).toHaveCSS('pointer-events', 'auto')
+  })
 })

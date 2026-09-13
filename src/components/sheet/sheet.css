@@ -4646,8 +4646,10 @@
 
 /* When any modal is open, the selector toggle recedes behind it like every
  * other chrome layer (title bar: App.css; floating dice controls: dice.css):
- * blurred, dimmed, and non-interactive so only the dialog is reachable. */
-.app:has(.modal-overlay) .char-selector__toggle {
+ * blurred, dimmed, and non-interactive so only the dialog is reachable.
+ * Scoped to `body:has(...)` so it also covers an overlay portalled to
+ * `document.body` — see the note in App.css. */
+body:has(.modal-overlay) .char-selector__toggle {
   filter: blur(4px);
   opacity: 0.4;
   pointer-events: none;
@@ -4656,7 +4658,7 @@
 /* The customization drawer is not itself a modal, so when a real modal opens
  * above it (e.g. a confirmation), the drawer recedes with the rest of the
  * chrome instead of staying sharp behind the overlay. */
-.app:has(.modal-overlay) .customize-drawer {
+body:has(.modal-overlay) .customize-drawer {
   filter: blur(4px);
   opacity: 0.4;
   pointer-events: none;
