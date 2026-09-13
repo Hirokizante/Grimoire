@@ -1,29 +1,36 @@
 /**
- * PanelMortalWounds — the Mortal Wound track of one NPC instance panel.
+ * PanelMortalWounds — the Mortal Wound track of one GM Screen panel.
  *
- * An NPC instance follows the same rule as a player sheet (Divergence SRD "Hit
- * Points and Mortal Wounds"): at 0 HP it rolls a D20 on the Mortal Wounds
- * table, HP resets to its maximum and the excess damage spills over. Two
- * differences belong to the panel:
- *
- *  - the roll happens **automatically**, inside
- *    `gmScreenStore.damageInstance` — a GM running four bandits should not have
- *    to click a second card per knockout; and
- *  - how many wounds the NPC may take is the base record's
- *    `npcStats.mortalWounds` stat, so a mook with `0` simply goes down at 0 HP
- *    while a boss can soak two or three.
+ * BOTH panel kinds carry the same track, because the rule behind it is the
+ * same for both (Divergence SRD "Hit Points and Mortal Wounds"): at 0 HP the
+ * target rolls a D20 on the Mortal Wounds table, HP resets to its maximum and
+ * the excess damage spills over. The panel resolves that roll **for the GM** on
+ * either kind — `gmScreenStore.damageInstance` for an NPC instance, which reads
+ * its allowance from the base's `npcStats.mortalWounds` (`0` = the mook case,
+ * downed at 0 HP with no roll), and `characterStore.takePanelDamage` for a
+ * player character, whose two slots are then named rather than left on
+ * "Pending Roll" (the player's own sheet keeps its Mortal Wound card and its
+ * manual roll; see `takeDamage`).
  *
  * This row is the visible mark of that track, in the panel chrome right under
- * the HP bar: `[skull Wounds n/max | chips… | ⚠ next 0 HP: Downed]`. It follows
+ * the HP bar: `[skull Wounds n/max | chips… | ⚠ next 0 HP: …]`. It follows
  * the panel status strip's discipline — ONE line that scrolls sideways rather
  * than wraps, so a stack of wounds never makes one panel taller than its
- * neighbour — and it renders **nothing at all** for an NPC that can take no
- * wounds and has none (`mortalWounds: 0`), which is why adding it changes no
- * existing panel's height.
+ * neighbour.
  *
  * Wounds persist until cleared (the chip's ✕, the panel menu's "Clear mortal
  * wounds", or an ability that removes one in play) — healing does not erase
- * them, exactly as on a sheet.
+ * them, exactly as on a sheet. A slot still awaiting its D20 — which only a
+ * player's own sheet can produce — is shown as a dashed `?` chip rather than a
+ * made-up result, and the panel's ⋯ menu carries the roll for it: the row is
+ * deliberately the same shape on both kinds, so no panel grows a control the
+ * other one lacks (the row has no width to spare at phone sizes — see
+ * gmscreen.css).
+ *
+ * The row is deliberately **props-driven**: it owns no target of its own, so
+ * the same markup renders an instance's track (a `{ roll, name }[]` in panel
+ * state) and a character's sheet slots (names, two of them) without either kind
+ * growing its own copy of the row — the two could not then drift apart.
  */
 
 import { Skull, TriangleAlert, X } from 'lucide-react'
@@ -32,38 +39,48 @@ import type { CSSProperties } from 'react'
 import { mortalWoundByName } from '@/lib/mortalWounds'
 import { appThemeStatColors } from '@/lib/themeUtils'
 import { useAppThemeStore } from '@/store/appThemeStore'
-import { useGMScreenStore } from '@/store/gmScreenStore'
 import type { MortalWoundRoll } from '@/types'
 
+/** The name `characterStore.takeDamage` parks in a slot awaiting its D20. */
+export const PENDING_MORTAL_WOUND = 'Pending Roll'
+
 export interface PanelMortalWoundsProps {
-  screenId: string
-  panelId: string
-  /** Wounds this instance has sustained, in the order they were rolled. */
+  /** Wounds sustained, in the order they were rolled (or `roll: 0` if pending). */
   wounds: MortalWoundRoll[]
-  /** How many the base allows before 0 HP downs the instance. */
+  /** How many the target allows before 0 HP takes it out of the fight. */
   allowance: number
   /** Display name used in control labels ("Clear Damaged Throat from Bandit"). */
   entityName: string
+  /** Clear the wound at this index **of `wounds`**, not of any slot list. */
+  onClear: (index: number) => void
+  /**
+   * What a full track means on the next 0 HP. An NPC instance goes `downed`; a
+   * character is knocked out and starts Death Saves — the sheet's own word for
+   * it. Defaults to "Downed".
+   */
+  outOfWoundsLabel?: string
+  /** Tooltip for the full-track warning, spelling out what happens next. */
+  outOfWoundsTitle?: string
 }
 
 export default function PanelMortalWounds({
-  screenId,
-  panelId,
   wounds,
   allowance,
   entityName,
+  onClear,
+  outOfWoundsLabel = 'Downed',
+  outOfWoundsTitle = 'No Mortal Wounds left — reaching 0 HP takes this target out of the fight.',
 }: PanelMortalWoundsProps) {
-  const clearWound = useGMScreenStore((s) => s.clearInstanceMortalWound)
   const appTheme = useAppThemeStore((s) => s.theme)
   // Panel chrome: the app theme's Mortal Wounds accent, the same one the
   // expanded body's stat row uses — never a per-sheet color.
   const tone = appThemeStatColors(appTheme).mortalWounds
 
-  // An NPC with no wound allowance and none taken shows nothing: the mook case
-  // (`npcStats.mortalWounds: 0`) renders exactly the panel it always did.
+  // A target with no wound allowance and none taken shows nothing: the mook
+  // case (`npcStats.mortalWounds: 0`) renders exactly the panel it always did.
   if (allowance <= 0 && wounds.length === 0) return null
 
-  // No wound left to take: the next time this instance reaches 0 HP it goes
+  // No wound left to take: the next time this target reaches 0 HP it goes
   // down instead of rolling (the sheet's "Critical Condition" warning, in one
   // glance-readable line).
   const outOfWounds = wounds.length >= allowance
@@ -86,21 +103,34 @@ export default function PanelMortalWounds({
           aria-label={`Mortal Wounds on ${entityName}`}
         >
           {wounds.map((wound, index) => {
+            const isPending = wound.name === PENDING_MORTAL_WOUND
             const entry = mortalWoundByName(wound.name)
-            const roll = wound.roll > 0 ? `d20 ${wound.roll}` : 'no roll recorded'
+            const roll = isPending
+              ? 'not rolled yet'
+              : wound.roll > 0
+                ? `d20 ${wound.roll}`
+                : 'no roll recorded'
             return (
               <span
                 key={`${wound.name}-${index}`}
-                className="gm-mw__chip"
+                className={`gm-mw__chip${isPending ? ' gm-mw__chip--pending' : ''}`}
                 role="listitem"
-                title={`${wound.name} (${roll})${entry ? ` — ${entry.description}` : ''}`}
+                title={
+                  isPending
+                    ? 'Pending Roll — this wound has no D20 result yet; roll it from the panel menu.'
+                    : `${wound.name} (${roll})${entry ? ` — ${entry.description}` : ''}`
+                }
               >
-                {wound.roll > 0 && <span className="gm-mw__roll">{wound.roll}</span>}
+                {isPending ? (
+                  <span className="gm-mw__roll gm-mw__roll--pending">?</span>
+                ) : (
+                  wound.roll > 0 && <span className="gm-mw__roll">{wound.roll}</span>
+                )}
                 <span className="gm-mw__name">{wound.name}</span>
                 <button
                   type="button"
                   className="btn btn--icon gm-mw__clear"
-                  onClick={() => clearWound(screenId, panelId, index)}
+                  onClick={() => onClear(index)}
                   aria-label={`Clear ${wound.name} from ${entityName}`}
                   title={`Clear ${wound.name}`}
                 >
@@ -113,12 +143,9 @@ export default function PanelMortalWounds({
       )}
 
       {outOfWounds && (
-        <span
-          className="gm-mw__warn"
-          title="This NPC has no Mortal Wounds left — reaching 0 HP now downs it."
-        >
+        <span className="gm-mw__warn" title={outOfWoundsTitle}>
           <TriangleAlert size={11} aria-hidden="true" />
-          Next 0 HP: Downed
+          Next 0 HP: {outOfWoundsLabel}
         </span>
       )}
     </div>

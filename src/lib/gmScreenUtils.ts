@@ -6,6 +6,38 @@
  */
 
 import type { Character, ScreenPanel } from '@/types'
+import type { DamageResult } from '@/store/characterStore'
+
+/**
+ * One-line outcome of damage applied to a GM panel target, for its toast and
+ * its Damage dialog.
+ *
+ * Both panel kinds run the same damage pipeline and both resolve their Mortal
+ * Wounds inside it, so the sentence is written once here: a target taken out of
+ * the fight, a target that took a wound (HP reset to max), or a plain hit.
+ * Only the word for "out of the fight" differs — an NPC instance is **downed**,
+ * a player character is **knocked out** and starts Death Saves — so the caller
+ * passes it (`takenOutLabel`) rather than each panel growing its own wording.
+ */
+export function panelDamageOutcome(
+  label: string,
+  result: DamageResult,
+  /** Word for a target this damage took out of the fight ("DOWNED", "KNOCKED OUT"). */
+  takenOutLabel: string,
+): string {
+  const rolled = (result.mortalWoundRolls ?? [])
+    .map((wound) => `${wound.name} (d20 ${wound.roll})`)
+    .join(', ')
+  if (result.downed || result.knockedOut) {
+    return rolled
+      ? `${label} is ${takenOutLabel}! ${rolled} — no Mortal Wounds left.`
+      : `${label} is ${takenOutLabel}!`
+  }
+  if (rolled) {
+    return `${label} takes a Mortal Wound: ${rolled} — HP reset to ${result.finalHP}.`
+  }
+  return `Applied ${result.hpLost} damage to ${label}.`
+}
 
 /**
  * One-line warning for a delete confirmation: which GM screens reference the

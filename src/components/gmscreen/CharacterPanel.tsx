@@ -6,12 +6,26 @@
  * the exact state that player sees on their own sheet, and vice versa.
  *
  * - **Compact** (default): portrait, name, HP bar with −/+/damage affordances,
- *   the GM's tracked status pills inline with the HP number, and the key stat
- *   tokens — one glance-height card.
+ *   the GM's tracked status pills inline with the HP number, the character's
+ *   **Mortal Wound track**, and the key stat tokens — one glance-height card.
  * - **Expanded**: the live-play sheet sections rendered inline inside a
  *   `colorVars()` container, so by default the character's own customization
  *   applies. Expanded panels are deliberately read-only live-play views; full
  *   editing happens on the sheet page ("Open sheet" in the panel menu).
+ *
+ * Mortal Wounds read and behave exactly as they do on an NPC instance panel
+ * (same `PanelMortalWounds` row under the HP bar, same per-wound ✕ and menu
+ * clear, same `⚠ Next 0 HP` warning), with one deliberate difference in the
+ * roll: damage dealt **from this panel** resolves the D20 immediately
+ * (`takePanelDamage`), because a GM mid-turn has no Mortal Wound card to press,
+ * while damage the player takes on their own sheet still parks the slot on
+ * "Pending Roll" for them to roll. A wound left pending that way shows as a
+ * dashed `?` chip, and the ⋯ menu carries **Roll Mortal Wound (d20)** for it, so
+ * the track is always resolvable from the screen — through the menu rather than
+ * a button in the row, which stays the same shape on both panel kinds (and the
+ * same one line at phone widths). The expanded body suppresses its own copy
+ * (`hideMortalWounds`) — the chrome row is the panel's one reading of it, the
+ * same rule HP and AP follow.
  *
  * The panel's own chrome — including its stat tokens — follows the **app
  * theme**, never the sheet's palette. The GM Screen shows several sheets side
@@ -33,16 +47,23 @@ import PanelHeader, { type PanelMenuItem } from '@/components/gmscreen/PanelHead
 import PanelApBar from '@/components/gmscreen/PanelApBar'
 import PanelExpand from '@/components/gmscreen/PanelExpand'
 import PanelHpBar from '@/components/gmscreen/PanelHpBar'
+import PanelMortalWounds, {
+  PENDING_MORTAL_WOUND,
+} from '@/components/gmscreen/PanelMortalWounds'
 import PanelSheet from '@/components/gmscreen/PanelSheet'
 import PanelStatuses from '@/components/gmscreen/PanelStatuses'
+import { MAX_MORTAL_WOUNDS } from '@/constants/gameData'
 import { useCharacterStore } from '@/store/characterStore'
 import { useNotification } from '@/context/NotificationContext'
 import { useGMScreenStore } from '@/store/gmScreenStore'
 import { effectiveCombatStats } from '@/lib/abilityModifiers'
+import { panelDamageOutcome } from '@/lib/gmScreenUtils'
+import { mortalWoundByName } from '@/lib/mortalWounds'
 import { appThemeColorVars, appThemeStatColors, gmPanelSheetPresentation } from '@/lib/themeUtils'
 import { useAppThemeStore } from '@/store/appThemeStore'
 import { useGmPanelThemeStore } from '@/store/gmPanelThemeStore'
-import type { Character, ScreenPanel } from '@/types'
+import type { DamageResult } from '@/store/characterStore'
+import type { Character, MortalWoundRoll, ScreenPanel } from '@/types'
 
 export interface CharacterPanelProps {
   panel: Extract<ScreenPanel, { kind: 'character' }>
@@ -61,7 +82,14 @@ export default function CharacterPanel({
 }: CharacterPanelProps) {
   const setPanelDensity = useGMScreenStore((s) => s.setPanelDensity)
   const heal = useCharacterStore((s) => s.heal)
-  const takeDamage = useCharacterStore((s) => s.takeDamage)
+  // The panel's damage pipeline: `takeDamage` plus the D20 the GM would
+  // otherwise have no card to roll (see the component doc). The player's own
+  // sheet keeps plain `takeDamage`, so their Mortal Wound card still appears
+  // for a hit they took there.
+  const takePanelDamage = useCharacterStore((s) => s.takePanelDamage)
+  const rollMortalWound = useCharacterStore((s) => s.rollMortalWound)
+  const clearMortalWound = useCharacterStore((s) => s.clearMortalWound)
+  const clearMortalWounds = useCharacterStore((s) => s.clearMortalWounds)
   const spendAP = useCharacterStore((s) => s.spendAP)
   const restoreAP = useCharacterStore((s) => s.restoreAP)
   // Ending a turn is the same store action the sheet's own End Turn button
@@ -97,6 +125,37 @@ export default function CharacterPanel({
   // block, which holds the `+` stepper and the turn button). See gmscreen.css.
   const spent = ap <= 0
 
+  // The character's Mortal Wound slots in the panel row's `{ roll, name }`
+  // shape. `character.mortalWounds` is a fixed two-slot array of names (a slot
+  // the player still has to roll reads "Pending Roll"), so an empty slot leaves
+  // no entry and — because slots can be cleared out of order — an entry's
+  // position in this list is NOT its slot index. `woundSlots` keeps the mapping
+  // so a chip's ✕ clears the slot it actually belongs to.
+  const woundSlots = character.mortalWounds.flatMap((name, slot) =>
+    name == null ? [] : [{ slot, name }],
+  )
+  const wounds: MortalWoundRoll[] = woundSlots.map(({ name }) => ({
+    // A named wound carries the D20 that produced it (the table's id is the
+    // roll); "Pending Roll" has no roll yet, which the row marks with `?`.
+    roll: mortalWoundByName(name)?.id ?? 0,
+    name,
+  }))
+  // A slot the player's own sheet left unresolved (never one this panel dealt —
+  // its damage rolls as it lands). The panel menu carries the roll for it.
+  const pendingWound = woundSlots.some(({ name }) => name === PENDING_MORTAL_WOUND)
+
+  /**
+   * Announce what the panel's own `−` stepper just did. Stepping HP runs the
+   * full damage pipeline, so it can auto-roll a Mortal Wound and reset the HP
+   * to max — an outcome that would otherwise look like nothing happened. The
+   * Damage… dialog reports its own results (and says the same thing).
+   */
+  const reportSteppedDamage = (result: DamageResult | null) => {
+    if (!result) return
+    if (!result.knockedOut && !result.causedMortalWound) return
+    notify(panelDamageOutcome(character.name, result, 'KNOCKED OUT'), 'error', 5000)
+  }
+
   const startTurn = () => {
     const gained = endTurn(character.id)
     notify(
@@ -113,6 +172,39 @@ export default function CharacterPanel({
     // an early turn possible without spending down first (same pairing as an
     // NPC instance panel).
     { label: 'Start new turn', onSelect: startTurn },
+    // A slot the player's own sheet left unresolved. The roll lives here rather
+    // than in the wound row so that row stays the same shape on both panel
+    // kinds — and the same one line at phone widths, where a button beside the
+    // chips would push the row past the panel's edge.
+    ...(pendingWound
+      ? [
+          {
+            label: 'Roll Mortal Wound (d20)',
+            onSelect: () => {
+              const wound = rollMortalWound(character.id)
+              if (wound.slotIndex >= 0) {
+                notify(
+                  `${character.name} takes a Mortal Wound: ${wound.woundName} (d20 ${wound.roll}).`,
+                  'error',
+                  5000,
+                )
+              }
+            },
+          },
+        ]
+      : []),
+    // Wounds persist until something clears them (an ability in play, or the
+    // sheet's Rest) — this is the panel's Rest for the wound track, exactly as
+    // on an NPC panel. It touches nothing else: HP, END, AP and ability uses
+    // are left alone.
+    ...(wounds.length > 0
+      ? [
+          {
+            label: 'Clear mortal wounds',
+            onSelect: () => clearMortalWounds(character.id),
+          },
+        ]
+      : []),
     { label: 'Remove panel', onSelect: onRemove, danger: true },
   ]
 
@@ -145,7 +237,7 @@ export default function CharacterPanel({
         hp={hp}
         maxHP={maxHP}
         tempHP={character.tempHP}
-        onDamage={() => takeDamage(character.id, 1)}
+        onDamage={() => reportSteppedDamage(takePanelDamage(character.id, 1))}
         onHeal={() => heal(character.id, 1)}
         onOpenDamageDialog={() => setShowDamage(true)}
         statuses={
@@ -155,6 +247,24 @@ export default function CharacterPanel({
             entityName={character.name}
           />
         }
+      />
+
+      {/* The character's Mortal Wound track, in the same row an NPC instance
+        * panel uses. A character always allows two, so the row is always
+        * present (an NPC whose base allows wounds shows its empty track too) and
+        * doubles as the at-a-glance allowance read-out. Wounds live on the
+        * character record, so clearing one here is visible on their own
+        * sheet — and vice versa. */}
+      <PanelMortalWounds
+        wounds={wounds}
+        allowance={MAX_MORTAL_WOUNDS}
+        entityName={character.name}
+        onClear={(index) => {
+          const entry = woundSlots[index]
+          if (entry) clearMortalWound(character.id, entry.slot)
+        }}
+        outOfWoundsLabel="Knocked Out"
+        outOfWoundsTitle="Both Mortal Wounds are filled — reaching 0 HP now knocks this character out (Death Saves)."
       />
 
       {/* The character's own turn budget, in the panel chrome and directly
@@ -223,7 +333,7 @@ export default function CharacterPanel({
           className={sheetPresentation.className}
           style={sheetPresentation.style}
         >
-          <PanelSheet entity={character} mode="view" hideAP />
+          <PanelSheet entity={character} mode="view" hideAP hideMortalWounds />
         </div>
       </PanelExpand>
 
@@ -231,6 +341,10 @@ export default function CharacterPanel({
         <DamageDialog
           characterId={character.id}
           onClose={() => setShowDamage(false)}
+          // Same rule as the `−` stepper: damage dealt from a panel resolves
+          // its Mortal Wounds for the GM instead of leaving the player's card
+          // waiting (see the component doc).
+          autoRollMortalWounds
         />
       )}
     </section>

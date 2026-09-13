@@ -14,6 +14,7 @@ import DamageDialog from '@/components/sheet/DamageDialog'
 import CharacterPanel from '@/components/gmscreen/CharacterPanel'
 import NpcInstancePanel from '@/components/gmscreen/NpcInstancePanel'
 import CharacterSheet from '@/components/sheet/CharacterSheet'
+import StatsSection from '@/components/sheet/StatsSection'
 import { NotificationProvider } from '@/context/NotificationContext'
 import { useCharacterStore } from '@/store/characterStore'
 import { useGMScreenStore } from '@/store/gmScreenStore'
@@ -1464,6 +1465,183 @@ test('player panel: the menu can end the turn early, like an NPC panel', () => {
   // Unspent AP converts to END 1:1 (9 + 2), plus 1 END Recovery, capped at 10.
   expect(storedPlayer(pc.id).currentAP).toBe(3)
   expect(storedPlayer(pc.id).currentEND).toBe(10)
+})
+
+// ---- Player-panel Mortal Wounds (the player sheet's track, in the chrome) ---
+
+test('player panel: the Mortal Wound track sits under the HP bar, like an NPC panel', () => {
+  const pc = makePlayer()
+  const { container } = renderPlayerPanel(pc)
+
+  const row = container.querySelector('.gm-mw')
+  expect(row).not.toBeNull()
+  expect(row?.textContent).toContain('Wounds')
+  expect(row?.textContent).toContain('0/2')
+  // Nothing rolled yet, and there is still a wound to take.
+  expect(container.querySelector('.gm-mw__chip')).toBeNull()
+  expect(container.querySelector('.gm-mw__warn')).toBeNull()
+
+  // Directly below the HP bar, in the panel chrome — not in the sheet body.
+  const hp = container.querySelector('.gm-hp')!
+  expect(hp.compareDocumentPosition(row!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  expect(container.querySelector('.gm-panel__sheet .gm-mw')).toBeNull()
+
+  // Byte-for-byte the same row an NPC panel renders for a target that allows
+  // wounds: same segments, in the same order.
+  const segments = (el: Element | null) =>
+    Array.from(el!.children).map((child) => child.className)
+  let npc: ReturnType<typeof renderNpcPanel> | null = null
+  act(() => {
+    npc = renderNpcPanel(makeWoundNpc(2), 'compact')
+  })
+  expect(segments(row)).toEqual(
+    segments(npc!.container.querySelector('.gm-mw')),
+  )
+})
+
+test('player panel: damage from the panel rolls the wound and marks the track', () => {
+  const pc = makePlayer({ currentHP: 1 })
+  const { container } = renderPlayerPanel(pc)
+  mockMortalWoundRoll(7) // → Hemorrhage
+
+  // The panel's `−` stepper runs the whole pipeline, Mortal Wound included.
+  fireEvent.click(screen.getByRole('button', { name: 'Deal 1 damage to Vex' }))
+
+  expect(storedPlayer(pc.id).mortalWounds).toEqual(['Hemorrhage', null])
+  // HP was reset to max (20) with no excess left to spill over.
+  expect(storedPlayer(pc.id).currentHP).toBe(20)
+  expect(container.querySelector('.gm-mw')?.textContent).toContain('1/2')
+  expect(screen.getByText('Hemorrhage')).toBeInTheDocument()
+  expect(screen.getByText('7')).toBeInTheDocument()
+  // No "Pending Roll" step for the GM, and the outcome is announced (a wound
+  // refills the bar, which would otherwise look like nothing happened).
+  expect(screen.queryByText('Pending Roll')).toBeNull()
+  expect(screen.getByRole('alert').textContent).toContain(
+    'Vex takes a Mortal Wound: Hemorrhage (d20 7) — HP reset to 20.',
+  )
+
+  // Clearing is explicit and per wound.
+  fireEvent.click(screen.getByRole('button', { name: 'Clear Hemorrhage from Vex' }))
+  expect(storedPlayer(pc.id).mortalWounds).toEqual([null, null])
+})
+
+test('player panel: a chip clears the slot it belongs to, not its position', () => {
+  // Slot 0 is empty and slot 1 is filled: a chip that cleared by list position
+  // would clear the empty slot and leave the wound in place.
+  const pc = makePlayer({ mortalWounds: [null, 'Exhaustion'] })
+  renderPlayerPanel(pc)
+
+  fireEvent.click(screen.getByRole('button', { name: 'Clear Exhaustion from Vex' }))
+  expect(storedPlayer(pc.id).mortalWounds).toEqual([null, null])
+})
+
+test('player panel: a full track warns that 0 HP now knocks the character out', () => {
+  const pc = makePlayer({ mortalWounds: ['Sprain', 'Exhaustion'] })
+  const { container } = renderPlayerPanel(pc)
+
+  expect(container.querySelector('.gm-mw')?.textContent).toContain('2/2')
+  // The character's own word for it (the sheet's "Critical Condition"), not an
+  // NPC's "Downed": the next 0 HP starts Death Saves.
+  expect(screen.getByText('Next 0 HP: Knocked Out')).toBeInTheDocument()
+})
+
+test('player panel: the panel menu clears the whole wound track', () => {
+  const pc = makePlayer({ mortalWounds: ['Sprain', 'Exhaustion'] })
+  renderPlayerPanel(pc)
+
+  fireEvent.click(screen.getByRole('button', { name: 'Vex options' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Clear mortal wounds' }))
+
+  expect(storedPlayer(pc.id).mortalWounds).toEqual([null, null])
+})
+
+test('player panel: the menu offers no wound clearing when there are none', () => {
+  renderPlayerPanel(makePlayer())
+
+  fireEvent.click(screen.getByRole('button', { name: 'Vex options' }))
+
+  expect(
+    screen.queryByRole('menuitem', { name: 'Clear mortal wounds' }),
+  ).toBeNull()
+})
+
+test('player panel: a wound the sheet left pending shows as pending and can be rolled from the menu', () => {
+  // Only the player's own sheet can leave a slot pending — the panel's damage
+  // always rolls. The row must say so rather than inventing a D20, and the roll
+  // lives in the ⋯ menu so the row keeps the NPC row's shape (and its one line
+  // at phone widths).
+  const pc = makePlayer({ mortalWounds: ['Pending Roll', null] })
+  renderPlayerPanel(pc)
+
+  expect(screen.getByText('Pending Roll')).toBeInTheDocument()
+  const chip = document.querySelector('.gm-mw__chip')
+  expect(chip).toHaveClass('gm-mw__chip--pending')
+  expect(chip?.querySelector('.gm-mw__roll')?.textContent).toBe('?')
+  // Nothing in the row itself: it is the same row an NPC panel renders.
+  expect(document.querySelector('.gm-mw button:not(.gm-mw__clear)')).toBeNull()
+
+  mockMortalWoundRoll(7) // → Hemorrhage
+  fireEvent.click(screen.getByRole('button', { name: 'Vex options' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Roll Mortal Wound (d20)' }))
+
+  expect(storedPlayer(pc.id).mortalWounds).toEqual(['Hemorrhage', null])
+  expect(document.querySelector('.gm-mw__chip--pending')).toBeNull()
+  expect(screen.getByRole('alert').textContent).toContain(
+    'Vex takes a Mortal Wound: Hemorrhage (d20 7).',
+  )
+})
+
+test('player panel: the menu offers no roll when nothing is pending', () => {
+  renderPlayerPanel(makePlayer({ mortalWounds: ['Sprain', null] }))
+
+  fireEvent.click(screen.getByRole('button', { name: 'Vex options' }))
+
+  expect(
+    screen.queryByRole('menuitem', { name: 'Roll Mortal Wound (d20)' }),
+  ).toBeNull()
+})
+
+test('player panel: the Damage dialog resolves the wound instead of pending it', () => {
+  const pc = makePlayer({ currentHP: 5, name: 'Vex' })
+  const { container } = renderPlayerPanel(pc)
+  mockMortalWoundRoll(7) // → Hemorrhage
+
+  fireEvent.click(screen.getByRole('button', { name: 'Damage…' }))
+  fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '15' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Apply Damage' }))
+
+  // 20 max HP, 5 current, 15 damage: the wound takes the hit, 10 spills over.
+  expect(storedPlayer(pc.id).currentHP).toBe(10)
+  expect(storedPlayer(pc.id).mortalWounds).toEqual(['Hemorrhage', null])
+  const alert = container.querySelector('.damage-result__alert')
+  expect(alert?.textContent).toContain('rolled automatically')
+  expect(alert?.textContent).toContain('Hemorrhage (d20 7)')
+  expect(alert?.textContent).toContain('HP reset to 10')
+})
+
+test('player panel: the expanded body prints the track once, not twice', () => {
+  const pc = makePlayer({ mortalWounds: ['Sprain', null] })
+  const { container } = renderPlayerPanel(pc, 'expanded')
+
+  expect(container.querySelectorAll('.gm-mw')).toHaveLength(1)
+  // The sheet body's own wound block (cards + roll + Rest) is suppressed in a
+  // panel, exactly as its HP and AP blocks are.
+  expect(container.querySelector('.gm-panel__sheet .stat-mortals')).toBeNull()
+})
+
+test('a player sheet outside the GM Screen keeps its own wound card and roll', () => {
+  // The suppression is panel-scoped: the sheet page still renders the wound
+  // block, its "Pending Roll" card and its roll button, because a player rolling
+  // their own wound is the sheet's flow (only a panel rolls it for the GM).
+  const pc = makePlayer({ mortalWounds: ['Pending Roll', 'Exhaustion'] })
+  const { container } = render(
+    <NotificationProvider>
+      <StatsSection character={pc} mode="view" />
+    </NotificationProvider>,
+  )
+
+  expect(container.querySelector('.stat-mortals')).not.toBeNull()
+  expect(screen.getByRole('button', { name: 'Roll Mortal Wound (d20)' })).toBeInTheDocument()
 })
 
 test('NPC panel: each instance carries a 3 AP turn meter with steppers', () => {

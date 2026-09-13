@@ -6,6 +6,62 @@ characters regularly.
 
 ## Unreleased
 
+### GM Screen — Mortal Wounds on player panels
+
+- **A player panel now carries the same Mortal Wound track an NPC panel does** —
+  the identical row under the HP bar
+  (`[skull Wounds n/2 │ d20-and-name chips │ ⚠ next 0 HP: Knocked Out]`), the
+  same per-chip ✕, the same panel-menu **Clear mortal wounds**, and the same
+  one-line-that-scrolls-sideways discipline, so a wounded character never makes
+  its panel taller than the one beside it. A character always allows two wounds,
+  so the row is always present — the empty state doubles as the allowance
+  read-out, exactly as it does on an NPC whose base allows wounds.
+- **Damage dealt from a player panel rolls the D20 for the GM.**
+  `characterStore.takePanelDamage` runs the character's own damage pipeline
+  (armor → resistance → temp HP → HP, HP reset to max, spill-over) and then
+  resolves the wound it caused, so the panel never parks a slot on
+  "Pending Roll" for the GM to wait on. The player's **own sheet is untouched**:
+  a hit they take there still leaves the slot pending for their Mortal Wound
+  card, because that roll is theirs. The Damage… dialog and the panel's `−`
+  stepper both use the panel pipeline and announce the outcome in the same
+  sentence an NPC panel uses ("Vex takes a Mortal Wound: Fracture (d20 14) — HP
+  reset to 15."), including `KNOCKED OUT` when the last slot fills.
+- **A wound the player left pending is still resolvable from the screen.** A
+  slot the player's own sheet put on "Pending Roll" renders as a dashed `?` chip
+  — the row never invents a result — and the ⋯ menu offers **Roll Mortal Wound
+  (d20)**, the same wording the sheet's own button uses, rolling through the
+  same `characterStore.rollMortalWound`. It lives in the menu rather than in the
+  row because the row is the same shape on both panel kinds and has no width to
+  spare at 360px (a button beside the chips pushed the row 27px past the
+  panel's edge, which the new e2e test now measures). A panel-applied hit
+  resolves the oldest pending slot first, so its own damage can never *add* an
+  unresolved one.
+- **One row, one wording, one implementation.** `PanelMortalWounds` is now
+  props-driven (wounds, allowance, the clear callback, the out-of-fight wording)
+  instead of reading the GM store itself, so both panel kinds render the same
+  markup — a component test pins the two rows segment for segment.
+  `panelDamageOutcome` (`lib/gmScreenUtils.ts`) writes the damage sentence once
+  for the dialog, both steppers and both panel kinds; the one word that genuinely
+  differs is passed in, because an NPC instance is **Downed** while a character
+  is **Knocked Out** and starts Death Saves — which is also what the character's
+  full-track warning says, in place of the sheet's "Critical Condition" card.
+- **The expanded body prints the track once.** `StatsSection` gained
+  `hideMortalWounds`, passed by `PanelSheet` exactly as `hideHP`/`hideAP` are,
+  so an expanded player panel does not show the chrome row and the sheet's wound
+  cards at the same time. The sheet page keeps its own wound cards, its
+  "Pending Roll" step and its roll button unchanged.
+- **Testing.** Store tests pin the auto-roll, the spill-over arithmetic, the
+  multi-wound knockout and the pending-slot rule; component tests cover the row
+  on a player panel (parity with an NPC row, clearing the slot a chip actually
+  belongs to, the menu's clear and roll entries, the full-track warning, the
+  pending chip, the dialog's report, and the single row in an expanded panel),
+  plus that a sheet outside the GM Screen still renders its own wound block; and
+  a Playwright walk drives it end to end in a browser — damage → named chip →
+  the character's own sheet showing the same wound with no roll left to make →
+  the sheet's own damage leaving a pending slot → the panel's menu rolling it →
+  the two-wound warning measured at 360px (one line, no overflow, nothing past
+  the row's edge) → knockout → per-chip clear → reload.
+
 ### GM Screen — NPC Mortal Wounds
 
 - **An NPC instance takes Mortal Wounds like a player character does** — with

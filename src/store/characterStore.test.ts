@@ -472,6 +472,76 @@ test('clearMortalWound: sets slot to null', () => {
   expect(useCharacterStore.getState().currentCharacter!.mortalWounds[1]).toBe('Exhaustion')
 })
 
+test('clearMortalWounds: empties the whole track, keeping the slot count', () => {
+  const char = setupChar({ mortalWounds: ['Sprain', 'Exhaustion'] })
+  useCharacterStore.getState().clearMortalWounds(char.id)
+  expect(useCharacterStore.getState().currentCharacter!.mortalWounds).toEqual([null, null])
+
+  // Clearing a clean track is harmless, and still leaves two empty slots.
+  useCharacterStore.getState().clearMortalWounds(char.id)
+  expect(useCharacterStore.getState().currentCharacter!.mortalWounds).toEqual([null, null])
+})
+
+// ---- Mortal Wounds from a GM panel (auto-rolled for the GM) ----------------
+
+test('takePanelDamage: rolls the Mortal Wound it causes instead of pending it', () => {
+  const char = setupChar({ currentHP: 5 })
+  vi.spyOn(Math, 'random').mockReturnValue(6 / 20) // roll 7 → Hemorrhage
+  const result = useCharacterStore.getState().takePanelDamage(char.id, 15)
+
+  expect(result.causedMortalWound).toBe(true)
+  expect(result.mortalWoundsIncurred).toBe(1)
+  expect(result.mortalWoundRolls).toEqual([{ roll: 7, name: 'Hemorrhage' }])
+  // HP resets to max with the 10 excess spilling over, exactly as on a sheet.
+  expect(result.finalHP).toBe(20)
+  expect(useCharacterStore.getState().currentCharacter!.mortalWounds).toEqual([
+    'Hemorrhage',
+    null,
+  ])
+  vi.restoreAllMocks()
+})
+
+test('takePanelDamage: a big hit can burn both slots and knock the character out', () => {
+  // 30 max HP from 5 current: 65 damage → wound (HP 30 − 30), wound (HP 30 − 5),
+  // and no third slot, so the character is knocked out.
+  const char = setupChar({ currentHP: 5 })
+  vi.spyOn(Math, 'random').mockReturnValue(6 / 20) // roll 7 → Hemorrhage
+  const result = useCharacterStore.getState().takePanelDamage(char.id, 65)
+
+  expect(result.mortalWoundsIncurred).toBe(2)
+  expect(result.mortalWoundRolls).toHaveLength(2)
+  expect(result.knockedOut).toBe(true)
+  expect(useCharacterStore.getState().currentCharacter!.mortalWounds).toEqual([
+    'Hemorrhage',
+    'Hemorrhage',
+  ])
+  vi.restoreAllMocks()
+})
+
+test('takePanelDamage: a plain hit leaves the track and the rolls untouched', () => {
+  const char = setupChar({ currentHP: 30 })
+  const result = useCharacterStore.getState().takePanelDamage(char.id, 4)
+  expect(result.finalHP).toBe(26)
+  expect(result.mortalWoundRolls).toBeUndefined()
+  expect(useCharacterStore.getState().currentCharacter!.mortalWounds).toEqual([null, null])
+})
+
+test('takePanelDamage: a wound the player left pending still resolves from the panel', () => {
+  // The player's own sheet put slot 0 on "Pending Roll"; panel damage that
+  // causes a second wound rolls a D20 for it — `rollMortalWound` fills the
+  // oldest pending slot first — so the hit never adds an unresolved slot.
+  const char = setupChar({ currentHP: 5, mortalWounds: ['Pending Roll', null] })
+  vi.spyOn(Math, 'random').mockReturnValue(6 / 20) // roll 7 → Hemorrhage
+  const result = useCharacterStore.getState().takePanelDamage(char.id, 15)
+  expect(result.mortalWoundRolls).toEqual([{ roll: 7, name: 'Hemorrhage' }])
+  expect(
+    useCharacterStore.getState().currentCharacter!.mortalWounds.filter(
+      (w) => w === 'Pending Roll',
+    ),
+  ).toHaveLength(1)
+  vi.restoreAllMocks()
+})
+
 // ---- Full Restore ---------------------------------------------------------
 
 test('fullRestore: resets everything', () => {

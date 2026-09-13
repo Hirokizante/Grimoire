@@ -121,9 +121,11 @@ export interface DamageResult {
   mortalWoundsIncurred: number
   /**
    * The wounds rolled by this application, when the target resolves them
-   * itself — an NPC instance rolls automatically at 0 HP, so its panel can name
-   * what was rolled. Absent for player sheets, whose slots go to `Pending Roll`
-   * until the player rolls from the Mortal Wound card.
+   * itself — an NPC instance (`gmScreenStore.damageInstance`) and a player
+   * character damaged from a GM panel (`takePanelDamage`) both roll at 0 HP, so
+   * their panels can name what was rolled. Absent from the sheet's own
+   * `takeDamage`, whose slots go to `Pending Roll` until the player rolls from
+   * the Mortal Wound card.
    */
   mortalWoundRolls?: MortalWoundRoll[]
   /** Whether the character is now knocked out. */
@@ -266,6 +268,27 @@ export interface CharacterStoreActions {
     /** Whether to bypass temp HP. */
     ignoreTempHP?: boolean
   }) => DamageResult
+  /**
+   * Apply damage to the character with `id` **and roll any Mortal Wound it
+   * causes** — the GM Screen's player-panel pipeline.
+   *
+   * A player rolling from their own sheet uses {@link takeDamage}, which
+   * deliberately leaves the slot on `'Pending Roll'` until they press the
+   * Mortal Wound card's button. A GM panel has no such card, and a GM running a
+   * fight should not have to ask the table to resolve a wound mid-turn, so this
+   * entry point resolves the D20 immediately through the same
+   * {@link rollMortalWound} the sheet uses and reports the names in
+   * `mortalWoundRolls` — exactly what `gmScreenStore.damageInstance` does for
+   * an NPC instance, so both panel kinds read the same.
+   */
+  takePanelDamage: (id: string, amount: number, opts?: {
+    /** Whether to apply armor reduction (1d6 per armor point). */
+    applyArmor?: boolean
+    /** Whether the character has Resistance (halves damage after armor). */
+    resistant?: boolean
+    /** Whether to bypass temp HP. */
+    ignoreTempHP?: boolean
+  }) => DamageResult
   /** Heal the character with `id` (respecting Circulatory Dysfunction if present). */
   heal: (id: string, amount: number) => void
   /** Add or replace Temporary HP on the character with `id` (higher value wins). */
@@ -303,6 +326,12 @@ export interface CharacterStoreActions {
   rollMortalWound: (id: string) => MortalWoundResult
   /** Clear a Mortal Wound at the given index. */
   clearMortalWound: (id: string, index: number) => void
+  /**
+   * Clear every Mortal Wound on the character with `id` — the GM panel menu's
+   * "Clear mortal wounds", the track-only counterpart of `fullRestore` (which
+   * is the sheet's Rest and resets every resource as well).
+   */
+  clearMortalWounds: (id: string) => void
   /** Reset to full HP, clear mortal wounds, clear death saves (end of encounter / Rest). */
   fullRestore: (id: string) => void
   /** Reset only HP to max (end of encounter). */
@@ -865,6 +894,24 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
     } satisfies DamageResult
   },
 
+  takePanelDamage: (id, amount, opts = {}) => {
+    const result = get().takeDamage(id, amount, opts)
+    if (result.mortalWoundsIncurred <= 0) return result
+
+    // `takeDamage` parked each incurred wound on 'Pending Roll'; roll exactly
+    // that many so the track never gains an unresolved slot from this call.
+    // `rollMortalWound` fills the oldest pending (or empty) slot first, so a
+    // slot the player left pending on their own sheet may be the one named
+    // here — which is harmless: slots carry no identity, only a wound name.
+    const rolls: MortalWoundRoll[] = []
+    for (let i = 0; i < result.mortalWoundsIncurred; i++) {
+      const wound = get().rollMortalWound(id)
+      if (wound.slotIndex < 0) break
+      rolls.push({ roll: wound.roll, name: wound.woundName })
+    }
+    return rolls.length > 0 ? { ...result, mortalWoundRolls: rolls } : result
+  },
+
   heal: (id, amount) => {
     const current = get().characters.find((c) => c.id === id)
     if (!current) return
@@ -1115,6 +1162,15 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
       }
       return { ...char, mortalWounds: wounds }
     })
+  },
+
+  clearMortalWounds: (id) => {
+    get().updateCharacter(id, (char) => ({
+      ...char,
+      // Mapped rather than replaced with a literal two-slot array: the slot
+      // count is the sheet's business, and clearing must not change it.
+      mortalWounds: char.mortalWounds.map(() => null),
+    }))
   },
 
   // ---- Live play: full restore & reset ---------------------------------------

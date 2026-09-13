@@ -39,6 +39,7 @@ import PanelHeader, { type PanelMenuItem } from '@/components/gmscreen/PanelHead
 import PanelStatuses from '@/components/gmscreen/PanelStatuses'
 import { useNotification } from '@/context/NotificationContext'
 import { useNpcInstanceActivation } from '@/hooks/useNpcInstanceActivation'
+import { panelDamageOutcome } from '@/lib/gmScreenUtils'
 import { useGMScreenStore, npcMortalWoundAllowance } from '@/store/gmScreenStore'
 import type { DamageResult } from '@/store/characterStore'
 import { appThemeStatColors, gmPanelSheetPresentation } from '@/lib/themeUtils'
@@ -75,6 +76,7 @@ export default function NpcInstancePanel({
   const renameInstance = useGMScreenStore((s) => s.renameInstance)
   const setInstanceCondition = useGMScreenStore((s) => s.setInstanceCondition)
   const adjustInstanceHP = useGMScreenStore((s) => s.adjustInstanceHP)
+  const clearInstanceMortalWound = useGMScreenStore((s) => s.clearInstanceMortalWound)
   const clearInstanceMortalWounds = useGMScreenStore((s) => s.clearInstanceMortalWounds)
   const spendInstanceAP = useGMScreenStore((s) => s.spendInstanceAP)
   const restoreInstanceAP = useGMScreenStore((s) => s.restoreInstanceAP)
@@ -125,22 +127,12 @@ export default function NpcInstancePanel({
    * Announce what the panel's own `−` stepper just did. Stepping HP runs the
    * full damage pipeline, so it can auto-roll a Mortal Wound and reset the HP
    * to max — an outcome that would otherwise look like nothing happened. The
-   * Damage… dialog reports its own results.
+   * Damage… dialog reports its own results (and says the same thing).
    */
   const reportSteppedDamage = (result: DamageResult | null) => {
     if (!result) return
-    if (result.downed) {
-      notify(`${name} is DOWNED!`, 'error')
-      return
-    }
-    const wound = result.mortalWoundRolls?.[0]
-    if (wound) {
-      notify(
-        `${name} takes a Mortal Wound: ${wound.name} (d20 ${wound.roll}) — HP reset to ${result.finalHP}.`,
-        'error',
-        5000,
-      )
-    }
+    if (!result.downed && !result.causedMortalWound) return
+    notify(panelDamageOutcome(name, result, 'DOWNED'), 'error', 5000)
   }
 
   const menuItems: PanelMenuItem[] = [
@@ -238,11 +230,11 @@ export default function NpcInstancePanel({
       {/* The instance's Mortal Wound track — its own, never the base's. Renders
         * nothing for an NPC whose base allows no wounds (`mortalWounds: 0`). */}
       <PanelMortalWounds
-        screenId={screenId}
-        panelId={panel.id}
         wounds={panel.state.mortalWounds}
         allowance={mortalWoundAllowance}
         entityName={name}
+        onClear={(index) => clearInstanceMortalWound(screenId, panel.id, index)}
+        outOfWoundsTitle="This NPC has no Mortal Wounds left — reaching 0 HP now downs it."
       />
 
       <PanelApBar

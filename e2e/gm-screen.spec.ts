@@ -840,6 +840,155 @@ test.describe('GM Screen', () => {
     await expect(reloaded.locator('.gm-mw')).toContainText('1/2')
   })
 
+  test('a player panel carries the same Mortal Wound track as an NPC panel', async ({
+    page,
+  }) => {
+    // The same deterministic die the NPC test uses: every D20 rolls 19
+    // ("Damaged Lung"), and armor is switched off on every hit below, so the
+    // pinned die only ever feeds the Mortal Wound roll.
+    await page.addInitScript(() => {
+      Math.random = () => 0.9
+    })
+
+    await gotoHome(page)
+    await createPlayerCharacter(page, 'Vex')
+
+    await gotoGmScreen(page)
+    await page.getByRole('button', { name: 'New Screen' }).first().click()
+    await page.getByLabel('Screen name').fill('Wounds')
+    await page.getByRole('button', { name: 'Create' }).click()
+    await page.getByRole('button', { name: 'Add Character' }).first().click()
+    await page.getByRole('button', { name: /Vex/ }).click()
+
+    // A character always allows two Mortal Wounds, so the track is there from
+    // the start — the same row an NPC whose base allows wounds renders.
+    const panel = page.locator('.gm-panel--character').first()
+    await expect(panel.locator('.gm-mw')).toContainText('Wounds')
+    await expect(panel.locator('.gm-mw')).toContainText('0/2')
+    await expect(panel.locator('.gm-mw__chip')).toHaveCount(0)
+
+    // ---- 25 damage on 20 HP: the GM gets the roll, not a "Pending Roll" ----
+    await damageFor(page, panel, 25)
+    await expect(page.locator('.damage-result__alert')).toContainText(
+      'Damaged Lung (d20 19)',
+    )
+    await page.getByRole('button', { name: '✕' }).click()
+
+    await expect(panel.locator('.gm-mw__chip')).toHaveText(/19\s*Damaged Lung/)
+    await expect(
+      panel.getByRole('img', { name: '15 of 20 hit points' }),
+    ).toBeVisible()
+    await expect(panel.locator('.gm-mw__warn')).toHaveCount(0)
+
+    // The wound is the character's own record, not a panel copy: their sheet
+    // shows the very same wound, with no roll left to make.
+    await panel.getByRole('button', { name: /Vex options/ }).click()
+    await page.getByRole('menuitem', { name: 'Open sheet' }).click()
+    await expect(page.locator('.mw-card__name')).toHaveText('Damaged Lung')
+    await expect(
+      page.getByRole('button', { name: 'Roll Mortal Wound (d20)' }),
+    ).toHaveCount(0)
+
+    // ---- A wound the SHEET deals stays pending: that roll is the player's ---
+    // The sheet's own HP block opens the same Damage dialog without the panel's
+    // auto-roll, so the slot lands on "Pending Roll" with the card's button.
+    await page.locator('.resource-bar__head--clickable').click()
+    await page.getByRole('spinbutton').fill('15')
+    await page.getByLabel(/Apply Armor/).uncheck()
+    await page.getByRole('button', { name: 'Apply Damage' }).click()
+    await page.getByRole('button', { name: '✕' }).click()
+    await expect(page.locator('.mw-card--pending')).toBeVisible()
+    await expect(
+      page.getByRole('button', { name: 'Roll Mortal Wound (d20)' }),
+    ).toBeVisible()
+    await gotoGmScreen(page)
+
+    // The panel shows that unresolved slot as pending — the ⋯ menu carries the
+    // roll for it, so the row itself keeps the NPC row's shape — and the track
+    // is now full, so it carries the character's own warning.
+    await expect(panel.locator('.gm-mw__chip--pending')).toHaveCount(1)
+    await expect(panel.locator('.gm-mw__chip')).toHaveCount(2)
+    await expect(panel.locator('.gm-mw__warn')).toContainText(
+      'Next 0 HP: Knocked Out',
+    )
+
+    // ---- Phone width: the row is ONE line and never overflows --------------
+    // Measured with a full track and a pending chip — the row's widest state on
+    // a player panel — so the character's longer outcome word cannot quietly
+    // push it past the panel's edge.
+    const desktopViewport = page.viewportSize()!
+    await page.setViewportSize({ width: 360, height: 800 })
+    const narrow = await panel.evaluate((el) => {
+      const row = el.querySelector('.gm-mw') as HTMLElement
+      const strip = el.querySelector('.gm-mw__strip') as HTMLElement
+      const rowBox = row.getBoundingClientRect()
+      // The row's one-line rule, measured where it can actually break: every
+      // chip and the ⚠ pill must share the row's centre line…
+      const items = Array.from(el.querySelectorAll('.gm-mw__chip, .gm-mw__warn'))
+      // …and the row's own box must hold its non-scrolling children (the chips
+      // live in the strip, which is a scroll container by design).
+      const fixed = Array.from(row.children).filter((child) => child !== strip)
+      return {
+        overflow: document.documentElement.scrollWidth - window.innerWidth,
+        rowCentre: +(rowBox.top + rowBox.height / 2).toFixed(1),
+        rowHeight: +rowBox.height.toFixed(1),
+        centres: items.map((item) => {
+          const box = item.getBoundingClientRect()
+          return +(box.top + box.height / 2).toFixed(1)
+        }),
+        spill: [...fixed, strip].filter(
+          (item) => item.getBoundingClientRect().right > rowBox.right + 1,
+        ).length,
+        stripScrolls: strip.scrollWidth > strip.clientWidth,
+      }
+    })
+    expect(narrow.overflow).toBeLessThanOrEqual(0)
+    expect(narrow.rowHeight).toBeLessThan(30)
+    expect(narrow.centres).toHaveLength(3)
+    for (const centre of narrow.centres) {
+      expect(Math.abs(centre - narrow.rowCentre)).toBeLessThanOrEqual(2)
+    }
+    expect(narrow.spill).toBe(0)
+    expect(narrow.stripScrolls).toBe(true)
+    await page.setViewportSize(desktopViewport)
+
+    // ---- The GM resolves the pending wound from the panel ------------------
+    await panel.getByRole('button', { name: /Vex options/ }).click()
+    await page.getByRole('menuitem', { name: 'Roll Mortal Wound (d20)' }).click()
+    await expect(panel.locator('.gm-mw__chip--pending')).toHaveCount(0)
+    await expect(panel.locator('.gm-mw__chip')).toHaveCount(2)
+    // The roll is announced like any other wound (the earlier chip's toast may
+    // still be on screen, so assert the newest one).
+    await expect(
+      page
+        .locator('.notification--error')
+        .filter({ hasText: 'Vex takes a Mortal Wound: Damaged Lung (d20 19).' })
+        .last(),
+    ).toBeVisible()
+
+    // ---- With no wound left, 0 HP knocks the character out -----------------
+    await damageFor(page, panel, 25)
+    await page.getByRole('button', { name: '✕' }).click()
+    await expect(panel.getByRole('img', { name: '0 of 20 hit points' })).toBeVisible()
+    await expect(
+      page.locator('.notification--error').filter({ hasText: 'KNOCKED OUT' }),
+    ).toBeVisible()
+    // No third wound: the track stays at two while the character goes down.
+    await expect(panel.locator('.gm-mw__chip')).toHaveCount(2)
+
+    // Clearing a wound is per chip and lands on the character record, so it
+    // outlives a reload (and the sheet) exactly as an instance's track does.
+    await panel.getByRole('button', { name: /^Clear Damaged Lung/ }).first().click()
+    await expect(panel.locator('.gm-mw__chip')).toHaveCount(1)
+    await page.waitForTimeout(700)
+    await page.reload()
+    await expect(page.getByRole('heading', { name: 'GRIMOIRE' })).toBeVisible()
+    await gotoGmScreen(page)
+    const reloaded = page.locator('.gm-panel--character').first()
+    await expect(reloaded.locator('.gm-mw__chip')).toHaveCount(1)
+    await expect(reloaded.locator('.gm-mw')).toContainText('1/2')
+  })
+
   test('a player panel and the character sheet share one source of truth', async ({
     page,
   }) => {

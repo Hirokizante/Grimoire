@@ -78,6 +78,14 @@ export interface StatsSectionProps {
    */
   hideAP?: boolean
   /**
+   * Hide the Mortal Wounds block (the wound cards, their roll button, and the
+   * Rest button). Used by GM Screen character panels, which carry the same
+   * wound track in their chrome as an NPC panel does (see PanelMortalWounds) —
+   * the track is the panel's one reading of it, and the chrome row stays one
+   * line tall where these cards are not.
+   */
+  hideMortalWounds?: boolean
+  /**
    * Override the Combat Stats token accents, per {@link StatColorKey}.
    *
    * GM panels pass the active app theme's shared stat palette
@@ -134,6 +142,7 @@ export default function StatsSection({
   variant = 'section',
   hideHP = false,
   hideAP = false,
+  hideMortalWounds = false,
   tokenColors,
   tokenLabels = 'full',
 }: StatsSectionProps) {
@@ -362,7 +371,7 @@ export default function StatsSection({
 
       {isView && <RecoverAction characterId={character.id} />}
 
-      {character.mortalWounds.some((w) => w != null) && (
+      {!hideMortalWounds && character.mortalWounds.some((w) => w != null) && (
         <div className="stat-mortals">
           <span className="stat-item__label">Mortal Wounds</span>
           {isView ? (

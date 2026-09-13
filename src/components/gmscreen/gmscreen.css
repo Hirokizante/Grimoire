@@ -897,14 +897,16 @@ button.gm-status-pill__main:hover {
   font-weight: 600;
 }
 
-/* ---- NPC Mortal Wounds (GM Screen only) ---------------------------------- */
+/* ---- Mortal Wounds (both panel kinds) ------------------------------------- */
 
-/* The instance's wound track, directly under the HP bar: `[skull Wounds n/max
-   | chips… | ⚠ next 0 HP: Downed]`. Like the status strip this is ONE line that
-   scrolls sideways rather than wrapping, so a boss carrying three wounds never
-   makes its panel taller than the mook beside it — and the whole row is absent
-   for an NPC whose base allows no wounds (`npcStats.mortalWounds: 0`), so those
-   panels keep exactly the height they had before this track existed.
+/* The target's wound track, directly under the HP bar: `[skull Wounds n/max
+   | chips… | ⚠ next 0 HP: Downed / Knocked Out]`. Both panel kinds render it
+   through PanelMortalWounds, so a player panel and an NPC panel carry the same
+   row. Like the status strip this is ONE line that scrolls sideways rather than
+   wrapping, so a boss carrying three wounds never makes its panel taller than
+   the mook beside it — and the whole row is absent for an NPC whose base allows
+   no wounds (`npcStats.mortalWounds: 0`), so those panels keep exactly the
+   height they had before this track existed.
 
    It is panel chrome and follows the app theme like the rest of the panel (see
    `.hermes.md` "GM Screen is app chrome"): `--mw-tone` is the theme's Mortal
@@ -1011,6 +1013,23 @@ button.gm-status-pill__main:hover {
   font-size: 0.68rem;
   font-weight: 600;
   white-space: nowrap;
+}
+
+/* A slot the sheet left unresolved ("Pending Roll"): the track never invents a
+   D20 for it, so the chip prints `?` where a result would go and takes a dashed
+   edge. A panel cannot leave a slot in this state itself — its own damage rolls
+   the wounds it applies — so a pending chip means the target took the hit on
+   their sheet, and the panel menu carries the roll that resolves it. The row
+   deliberately grows no button for it: at 360px the warning pill already takes
+   most of the line, and a control beside the chips pushed the row past the
+   panel's edge (measured — see e2e/gm-screen.spec.ts). */
+.gm-mw__chip--pending {
+  border-style: dashed;
+}
+
+.gm-mw__roll--pending {
+  background: transparent;
+  color: var(--text-secondary);
 }
 
 /* ---- Expand / collapse animation ----------------------------------------- */

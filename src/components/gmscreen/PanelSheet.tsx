@@ -58,6 +58,13 @@ export interface PanelSheetProps {
    * copy of the same number (see PanelApBar).
    */
   hideAP?: boolean
+  /**
+   * Suppress the sheet body's own Mortal Wounds block. A player panel shows the
+   * wound track in its chrome, directly under the HP bar and in the same row an
+   * NPC panel uses (see PanelMortalWounds), so the body must not print a second
+   * copy of the same track.
+   */
+  hideMortalWounds?: boolean
 }
 
 export default function PanelSheet({
@@ -65,6 +72,7 @@ export default function PanelSheet({
   mode = 'view',
   npcActivation,
   hideAP = false,
+  hideMortalWounds = false,
 }: PanelSheetProps) {
   const isNpc = entity.kind === 'npc'
   // A panel is app chrome, so its Combat Stats accents come from the app
@@ -97,6 +105,7 @@ export default function PanelSheet({
           variant="flat"
           hideHP
           hideAP={hideAP}
+          hideMortalWounds={hideMortalWounds}
           tokenColors={statColors}
           tokenLabels="short"
         />

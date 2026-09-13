@@ -16,6 +16,12 @@
  * a Mortal Wound is rolled automatically at 0 HP while the base allows one,
  * and an instance with none left is driven `downed` — NPCs have no death
  * saves). Same dialog, two target descriptors — deliberately not forked.
+ *
+ * `autoRollMortalWounds` is the GM Screen's rule layered on the character
+ * target, not a third target: a panel has no Mortal Wound card to press, so
+ * its damage resolves the D20 as it lands (`takePanelDamage`) exactly as an
+ * instance's does. The player's own sheet leaves it unset and keeps the
+ * "Pending Roll" step they roll themselves.
  */
 
 import { useState } from 'react'
@@ -25,6 +31,7 @@ import { useNotification } from '@/context/NotificationContext'
 import { useCharacterStore, type DamageResult } from '@/store/characterStore'
 import { useGMScreenStore } from '@/store/gmScreenStore'
 import { effectiveCombatStats } from '@/lib/abilityModifiers'
+import { panelDamageOutcome } from '@/lib/gmScreenUtils'
 import type { Character } from '@/types'
 
 /**
@@ -56,37 +63,22 @@ export interface DamageDialogProps {
   characterId?: string
   /** NPC-instance target. Mutually exclusive with `characterId`. */
   npcInstance?: NpcInstanceTarget
-}
-
-/**
- * One-line outcome for damage applied to an NPC instance.
- *
- * An instance resolves its own Mortal Wounds at 0 HP (see
- * `gmScreenStore.damageInstance`), so the three outcomes read differently: a
- * knockout is final for the fight, a wound leaves the instance standing at max
- * HP minus the spill-over, and a plain hit just reports what the pool lost.
- */
-function npcInstanceOutcome(label: string, res: DamageResult): string {
-  const rolled = (res.mortalWoundRolls ?? [])
-    .map((wound) => `${wound.name} (d20 ${wound.roll})`)
-    .join(', ')
-  if (res.downed) {
-    return rolled
-      ? `${label} is DOWNED! ${rolled} — no Mortal Wounds left.`
-      : `${label} is DOWNED!`
-  }
-  if (rolled) {
-    return `${label} takes a Mortal Wound: ${rolled} — HP reset to ${res.finalHP}.`
-  }
-  return `Applied ${res.hpLost} damage to ${label}.`
+  /**
+   * Roll any Mortal Wound this damage causes straight away instead of leaving
+   * the slot on "Pending Roll" — the GM Screen player-panel rule. Ignored for
+   * an `npcInstance` target, which always rolls inside its own pipeline.
+   */
+  autoRollMortalWounds?: boolean
 }
 
 export default function DamageDialog({
   onClose,
   characterId,
   npcInstance,
+  autoRollMortalWounds = false,
 }: DamageDialogProps) {
   const takeDamage = useCharacterStore((s) => s.takeDamage)
+  const takePanelDamage = useCharacterStore((s) => s.takePanelDamage)
   const storeCharacter = useCharacterStore((s) => s.currentCharacter)
   const damageInstance = useGMScreenStore((s) => s.damageInstance)
   const healInstance = useGMScreenStore((s) => s.healInstance)
@@ -120,6 +112,12 @@ export default function DamageDialog({
     ? `Apply Damage — ${npcInstance.label}`
     : 'Apply Damage'
 
+  // What the target is called once it is out of the fight — the one word the
+  // two targets disagree on (NPC instances are DOWNED, characters are KNOCKED
+  // OUT and move to Death Saves). Everything else about a wound reads the same
+  // on both, including the D20 that is rolled for the GM.
+  const outOfFightLabel = npcInstance ? 'DOWNED' : 'KNOCKED OUT'
+
   const handleApply = () => {
     const n = parseInt(amount, 10)
     if (!Number.isFinite(n) || n <= 0) return
@@ -133,16 +131,28 @@ export default function DamageDialog({
       if (!res) return
       setResult(res)
       notify(
-        npcInstanceOutcome(npcInstance.label, res),
+        panelDamageOutcome(npcInstance.label, res, outOfFightLabel),
         res.downed || res.causedMortalWound ? 'error' : 'warning',
       )
       return
     }
 
     if (!target) return
-    const res = takeDamage(target.id, n, { applyArmor, resistant, ignoreTempHP })
+    // A GM panel resolves the wound as it deals it (see the dialog doc); the
+    // sheet leaves the slot pending for the player's own Mortal Wound card.
+    const res = autoRollMortalWounds
+      ? takePanelDamage(target.id, n, { applyArmor, resistant, ignoreTempHP })
+      : takeDamage(target.id, n, { applyArmor, resistant, ignoreTempHP })
     setResult(res)
-    if (res.causedMortalWound) {
+    if (autoRollMortalWounds) {
+      if (res.causedMortalWound || res.knockedOut) {
+        notify(panelDamageOutcome(target.name, res, outOfFightLabel), 'error', 5000)
+      } else {
+        notify(`Applied ${res.hpLost} damage.`, 'warning')
+      }
+    } else if (res.causedMortalWound) {
+      // The sheet's own wording: it has to send the player to the Mortal Wound
+      // card, because that is where their roll still is.
       notify(`${res.hpLost} damage taken! Mortal Wound incurred.`, 'error')
     } else {
       notify(`Applied ${res.hpLost} damage.`, 'warning')
@@ -249,14 +259,18 @@ export default function DamageDialog({
                 <div><span className="damage-result__label">Final HP</span> {result.finalHP}</div>
               </div>
               {result.causedMortalWound &&
-                (npcInstance ? (
+                ((result.mortalWoundRolls ?? []).length > 0 ? (
+                  // Resolved for the GM (an NPC instance, or a character
+                  // damaged from a panel): name every wound that was rolled.
                   <p className="damage-result__alert">
-                    ⚠ {result.mortalWoundsIncurred} Mortal Wound(s) rolled
-                    automatically:{' '}
+                    ⚠ {(result.mortalWoundRolls ?? []).length} Mortal Wound(s)
+                    rolled automatically:{' '}
                     {(result.mortalWoundRolls ?? [])
                       .map((wound) => `${wound.name} (d20 ${wound.roll})`)
                       .join(', ')}
                     . HP reset to {result.finalHP}.
+                    {result.knockedOut &&
+                      ` ${npcInstance ? 'Instance' : 'Character'} is ${outOfFightLabel}!`}
                   </p>
                 ) : (
                   <p className="damage-result__alert">
