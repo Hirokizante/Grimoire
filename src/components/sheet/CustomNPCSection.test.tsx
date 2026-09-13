@@ -17,6 +17,7 @@ import type {
 const {
   roll,
   removeCustomSection,
+  reorderCustomSection,
   updateCharacter,
   charactersRef,
   currentCharacterRef,
@@ -24,6 +25,7 @@ const {
 } = vi.hoisted(() => ({
     roll: vi.fn(),
     removeCustomSection: vi.fn(),
+    reorderCustomSection: vi.fn(),
     // The section's only store write: an id-targeted updater. Applied to the
     // shared list so a test can read the resulting record back.
     updateCharacter: vi.fn((id: string, updater: (c: Character) => Character) => {
@@ -55,6 +57,7 @@ vi.mock('@/store/characterStore', () => ({
       characters: charactersRef.current,
       currentCharacter: currentCharacterRef.current,
       removeCustomSection,
+      reorderCustomSection,
       updateCharacter,
     }),
 }))
@@ -109,6 +112,7 @@ beforeEach(() => {
   currentCharacterRef.current = null
   roll.mockReset()
   removeCustomSection.mockReset()
+  reorderCustomSection.mockReset()
   updateCharacter.mockClear()
   dragEndRef.current = null
 })
@@ -166,6 +170,62 @@ test('attributes and skills are not clickable in edit mode', () => {
   fireEvent.click(screen.getByText('Sneak'))
 
   expect(roll).not.toHaveBeenCalled()
+})
+
+// ---- Section reordering ----------------------------------------------------
+
+test('edit mode offers the reorder arrows, wired to this section’s position', () => {
+  charactersRef.current = [makeNPC()]
+
+  render(
+    <CustomNPCSection
+      tabId="tab-1"
+      section={section}
+      mode="edit"
+      index={1}
+      count={2}
+    />,
+  )
+
+  fireEvent.click(screen.getByRole('button', { name: 'Move Goblin up' }))
+  expect(reorderCustomSection).toHaveBeenCalledWith('tab-1', 1, 0)
+})
+
+test('view mode shows no reorder arrows', () => {
+  charactersRef.current = [makeNPC()]
+
+  render(
+    <CustomNPCSection
+      tabId="tab-1"
+      section={section}
+      mode="view"
+      index={1}
+      count={2}
+    />,
+  )
+
+  expect(
+    screen.queryByRole('button', { name: 'Move Goblin up' }),
+  ).not.toBeInTheDocument()
+})
+
+test('a section whose NPC record is gone can still be moved in edit mode', () => {
+  // The lookup fails (no characters), so the section renders its placeholder —
+  // which must keep the reorder pair, or a broken section could not be shifted
+  // out of the way of the ones that still work.
+  render(
+    <CustomNPCSection
+      tabId="tab-1"
+      section={section}
+      mode="edit"
+      index={0}
+      count={2}
+    />,
+  )
+
+  expect(screen.getByText(/could not be found/i)).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Move Goblin down' }))
+  expect(reorderCustomSection).toHaveBeenCalledWith('tab-1', 0, 1)
 })
 
 /** An NPC ability, costed and activatable, carrying one costed sub-ability. */

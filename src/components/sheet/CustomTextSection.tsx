@@ -15,6 +15,7 @@ import { Pencil, Check, Trash2 } from 'lucide-react'
 
 import ConfirmModal from '@/components/sheet/ConfirmModal'
 import MarkdownText from '@/components/ui/MarkdownText'
+import SectionReorderButtons from '@/components/sheet/SectionReorderButtons'
 import { useCharacterStore } from '@/store/characterStore'
 import type { CustomTextSection as CustomTextSectionType } from '@/types'
 import type { SheetMode } from '@/pages/CharacterSheetPage'
@@ -23,12 +24,18 @@ export interface CustomTextSectionProps {
   tabId: string
   section: CustomTextSectionType
   mode?: SheetMode
+  /** Zero-based position of this section within its tab (edit-mode reorder). */
+  index?: number
+  /** Total sections in the tab (edit-mode reorder boundary). */
+  count?: number
 }
 
 export default function CustomTextSection({
   tabId,
   section,
   mode = 'view',
+  index = 0,
+  count = 1,
 }: CustomTextSectionProps) {
   const isEdit = mode === 'edit'
   const renameCustomSection = useCharacterStore((s) => s.renameCustomSection)
@@ -96,6 +103,14 @@ export default function CustomTextSection({
           </span>
         )}
         <div className="sheet-section__heading-row-right">
+          {isEdit && (
+            <SectionReorderButtons
+              tabId={tabId}
+              index={index}
+              count={count}
+              name={section.name}
+            />
+          )}
           {isEdit && (
             <button
               type="button"

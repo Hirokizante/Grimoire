@@ -90,7 +90,7 @@ export default function CustomTabContent({
             </p>
           </div>
         ) : (
-          tab.sections.map((section) => {
+          tab.sections.map((section, index) => {
             switch (section.kind) {
               case 'npc':
                 return (
@@ -99,6 +99,8 @@ export default function CustomTabContent({
                     tabId={tab.id}
                     section={section}
                     mode={mode}
+                    index={index}
+                    count={tab.sections.length}
                     viewMode={tabViewModes[section.id] ?? 'grid'}
                     onViewModeChange={(m) => handleViewModeChange(section.id, m)}
                   />
@@ -110,6 +112,8 @@ export default function CustomTabContent({
                     tabId={tab.id}
                     section={section}
                     mode={mode}
+                    index={index}
+                    count={tab.sections.length}
                   />
                 )
               case 'ability':
@@ -119,6 +123,8 @@ export default function CustomTabContent({
                     tabId={tab.id}
                     section={section}
                     mode={mode}
+                    index={index}
+                    count={tab.sections.length}
                     viewMode={tabViewModes[section.id] ?? 'grid'}
                     onViewModeChange={(m) => handleViewModeChange(section.id, m)}
                   />

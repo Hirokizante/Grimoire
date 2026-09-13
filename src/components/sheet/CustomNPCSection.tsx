@@ -25,6 +25,7 @@ import { useDiceRollStore } from '@/store/diceRollStore'
 import { putCharacter } from '@/lib/db'
 import PortraitUploader from '@/components/sheet/PortraitUploader'
 import ConfirmModal from '@/components/sheet/ConfirmModal'
+import SectionReorderButtons from '@/components/sheet/SectionReorderButtons'
 import NPCAbilitiesSection from '@/components/sheet/npc/NPCAbilitiesSection'
 import MarkdownText from '@/components/ui/MarkdownText'
 import { ATTRIBUTE_LIST, SKILL_LIST } from '@/constants/gameData'
@@ -55,6 +56,10 @@ export interface CustomNPCSectionProps {
    */
   viewMode?: 'grid' | 'list'
   onViewModeChange?: (mode: 'grid' | 'list') => void
+  /** Zero-based position of this section within its tab (edit-mode reorder). */
+  index?: number
+  /** Total sections in the tab (edit-mode reorder boundary). */
+  count?: number
 }
 
 const STAT_COLORS = {
@@ -113,6 +118,8 @@ export default function CustomNPCSection({
   mode = 'view',
   viewMode = 'grid',
   onViewModeChange,
+  index = 0,
+  count = 1,
 }: CustomNPCSectionProps) {
   const isEdit = mode === 'edit'
   const characters = useCharacterStore((s) => s.characters)
@@ -128,6 +135,16 @@ export default function CustomNPCSection({
       <section className="sheet-section sheet-section--custom sheet-section--npc-missing">
         <div className="sheet-section__heading-row">
           <h3 className="sheet-section__heading">{section.name}</h3>
+          {isEdit && (
+            <div className="sheet-section__heading-row-right">
+              <SectionReorderButtons
+                tabId={tabId}
+                index={index}
+                count={count}
+                name={section.name}
+              />
+            </div>
+          )}
         </div>
         <p className="sheet-section__empty muted">
           The attached NPC record could not be found. It may have been deleted.
@@ -208,6 +225,17 @@ export default function CustomNPCSection({
           <h3 className="sheet-section__heading">{npc.name}</h3>
         </span>
         <div className="sheet-section__heading-row-right">
+          {isEdit && (
+            <SectionReorderButtons
+              tabId={tabId}
+              index={index}
+              count={count}
+              // The heading is the bundled NPC's name, not the section's
+              // (which is stamped at attach time), so the labels match what is
+              // on screen even after the NPC is renamed on its own page.
+              name={npc.name}
+            />
+          )}
           {isEdit && (
             <button
               type="button"

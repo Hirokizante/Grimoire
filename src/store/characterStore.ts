@@ -417,6 +417,12 @@ export interface CharacterStoreActions {
    * from the NPC list page.
    */
   removeCustomSection: (tabId: string, sectionId: string) => Promise<void>
+  /**
+   * Reorder a custom section within its tab to a new position. Out-of-range
+   * or no-op moves are ignored (never written), so a boundary arrow cannot
+   * stamp an updatedAt / autosave on a sheet nothing moved on.
+   */
+  reorderCustomSection: (tabId: string, fromIndex: number, toIndex: number) => void
   /** Add an ability block to a custom section (ability sections only). */
   addCustomAbility: (tabId: string, sectionId: string, ability: AbilityBlock) => void
   /** Update an ability block within a custom section (ability sections only). */
@@ -1597,6 +1603,24 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
         },
       }
     })
+  },
+
+  reorderCustomSection: (tabId, fromIndex, toIndex) => {
+    if (fromIndex === toIndex) return
+    const tab = get().currentCharacter?.customTabs.find((t) => t.id === tabId)
+    if (!tab) return
+    if (fromIndex < 0 || fromIndex >= tab.sections.length) return
+    if (toIndex < 0 || toIndex >= tab.sections.length) return
+    get().updateCurrentCharacter((char) => ({
+      ...char,
+      customTabs: char.customTabs.map((t) => {
+        if (t.id !== tabId) return t
+        const sections = [...t.sections]
+        const [moved] = sections.splice(fromIndex, 1)
+        sections.splice(toIndex, 0, moved)
+        return { ...t, sections }
+      }),
+    }))
   },
 
   addCustomAbility: (tabId, sectionId, ability) => {

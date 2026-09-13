@@ -20,6 +20,7 @@ import AbilityActivation from '@/components/sheet/AbilityActivation'
 import AbilityEditorModal from '@/components/sheet/AbilityEditorModal'
 import ConfirmModal from '@/components/sheet/ConfirmModal'
 import SectionViewToggle from '@/components/sheet/SectionViewToggle'
+import SectionReorderButtons from '@/components/sheet/SectionReorderButtons'
 import SortableAbilityCard from '@/components/sheet/SortableAbilityCard'
 import { useCharacterStore } from '@/store/characterStore'
 import { useSubAbilityEditor } from '@/hooks/useSubAbilityEditor'
@@ -32,6 +33,10 @@ export interface CustomAbilitySectionProps {
   mode?: SheetMode
   viewMode?: 'grid' | 'list'
   onViewModeChange?: (mode: 'grid' | 'list') => void
+  /** Zero-based position of this section within its tab (edit-mode reorder). */
+  index?: number
+  /** Total sections in the tab (edit-mode reorder boundary). */
+  count?: number
 }
 
 export default function CustomAbilitySection({
@@ -40,6 +45,8 @@ export default function CustomAbilitySection({
   mode = 'view',
   viewMode = 'grid',
   onViewModeChange,
+  index = 0,
+  count = 1,
 }: CustomAbilitySectionProps) {
   const isEdit = mode === 'edit'
   const addCustomAbility = useCharacterStore((s) => s.addCustomAbility)
@@ -145,6 +152,14 @@ export default function CustomAbilitySection({
           </span>
         )}
           <div className="sheet-section__heading-row-right">
+            {isEdit && (
+              <SectionReorderButtons
+                tabId={tabId}
+                index={index}
+                count={count}
+                name={section.name}
+              />
+            )}
             {onViewModeChange && (
               <SectionViewToggle
                 viewMode={viewMode}

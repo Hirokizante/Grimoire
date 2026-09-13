@@ -9,10 +9,12 @@ import type {
   CustomAbilitySection as CustomAbilitySectionType,
 } from '@/types'
 
-const { removeCustomSection, setAbilityUsesRemaining } = vi.hoisted(() => ({
-  removeCustomSection: vi.fn(),
-  setAbilityUsesRemaining: vi.fn(),
-}))
+const { removeCustomSection, setAbilityUsesRemaining, reorderCustomSection } =
+  vi.hoisted(() => ({
+    removeCustomSection: vi.fn(),
+    setAbilityUsesRemaining: vi.fn(),
+    reorderCustomSection: vi.fn(),
+  }))
 
 vi.mock('@/store/characterStore', () => ({
   useCharacterStore: (selector: (state: Record<string, unknown>) => unknown) =>
@@ -21,6 +23,7 @@ vi.mock('@/store/characterStore', () => ({
       updateCustomAbility: vi.fn(),
       renameCustomSection: vi.fn(),
       removeCustomSection,
+      reorderCustomSection,
       addCustomNPCSection: vi.fn(() => 'npc-section'),
       currentCharacter: { ...createDefaultCharacter(), id: 'char-1' },
       setAbilityUsesRemaining,
@@ -56,6 +59,7 @@ const section: CustomAbilitySectionType = {
 beforeEach(() => {
   removeCustomSection.mockReset()
   setAbilityUsesRemaining.mockReset()
+  reorderCustomSection.mockReset()
 })
 
 test('deletes a custom ability section after confirmation in edit mode', () => {
@@ -91,6 +95,42 @@ test('does not show section deletion in view mode', () => {
 
   expect(
     screen.queryByRole('button', { name: 'Delete Offense section' }),
+  ).not.toBeInTheDocument()
+})
+
+// ---- Section reordering ----------------------------------------------------
+
+test('edit mode offers the reorder arrows, wired to this section’s position', () => {
+  render(
+    <CustomAbilitySection
+      tabId="tab-1"
+      section={section}
+      mode="edit"
+      index={1}
+      count={3}
+    />,
+  )
+
+  fireEvent.click(screen.getByRole('button', { name: 'Move Offense down' }))
+  expect(reorderCustomSection).toHaveBeenCalledWith('tab-1', 1, 2)
+})
+
+test('view mode shows no reorder arrows', () => {
+  render(
+    <CustomAbilitySection
+      tabId="tab-1"
+      section={section}
+      mode="view"
+      index={1}
+      count={3}
+    />,
+  )
+
+  expect(
+    screen.queryByRole('button', { name: 'Move Offense up' }),
+  ).not.toBeInTheDocument()
+  expect(
+    screen.queryByRole('button', { name: 'Move Offense down' }),
   ).not.toBeInTheDocument()
 })
 

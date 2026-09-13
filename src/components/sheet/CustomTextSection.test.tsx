@@ -4,17 +4,20 @@ import { beforeEach, expect, test, vi } from 'vitest'
 import CustomTextSection from '@/components/sheet/CustomTextSection'
 import type { CustomTextSection as CustomTextSectionType } from '@/types'
 
-const { renameCustomSection, removeCustomSection, updateContent } = vi.hoisted(() => ({
-  renameCustomSection: vi.fn(),
-  removeCustomSection: vi.fn(),
-  updateContent: vi.fn(),
-}))
+const { renameCustomSection, removeCustomSection, updateContent, reorderCustomSection } =
+  vi.hoisted(() => ({
+    renameCustomSection: vi.fn(),
+    removeCustomSection: vi.fn(),
+    updateContent: vi.fn(),
+    reorderCustomSection: vi.fn(),
+  }))
 
 vi.mock('@/store/characterStore', () => ({
   useCharacterStore: (selector: (state: Record<string, unknown>) => unknown) =>
     selector({
       renameCustomSection,
       removeCustomSection,
+      reorderCustomSection,
       updateCustomTextSectionContent: updateContent,
     }),
 }))
@@ -41,6 +44,7 @@ beforeEach(() => {
   renameCustomSection.mockReset()
   removeCustomSection.mockReset()
   updateContent.mockReset()
+  reorderCustomSection.mockReset()
 })
 
 test('renders an editable textarea in edit mode', () => {
@@ -86,5 +90,42 @@ test('does not show section deletion in view mode', () => {
   render(<CustomTextSection tabId="tab-1" section={section} mode="view" />)
   expect(
     screen.queryByRole('button', { name: 'Delete Backstory section' }),
+  ).not.toBeInTheDocument()
+})
+
+// ---- Section reordering ----------------------------------------------------
+
+test('edit mode offers the reorder arrows, wired to this section’s position', () => {
+  render(
+    <CustomTextSection
+      tabId="tab-1"
+      section={section}
+      mode="edit"
+      index={0}
+      count={2}
+    />,
+  )
+
+  expect(screen.getByRole('button', { name: 'Move Backstory up' })).toBeDisabled()
+  fireEvent.click(screen.getByRole('button', { name: 'Move Backstory down' }))
+  expect(reorderCustomSection).toHaveBeenCalledWith('tab-1', 0, 1)
+})
+
+test('view mode shows no reorder arrows', () => {
+  render(
+    <CustomTextSection
+      tabId="tab-1"
+      section={section}
+      mode="view"
+      index={0}
+      count={2}
+    />,
+  )
+
+  expect(
+    screen.queryByRole('button', { name: 'Move Backstory up' }),
+  ).not.toBeInTheDocument()
+  expect(
+    screen.queryByRole('button', { name: 'Move Backstory down' }),
   ).not.toBeInTheDocument()
 })

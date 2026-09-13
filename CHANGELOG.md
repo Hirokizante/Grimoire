@@ -4,6 +4,43 @@ All notable changes to Grimoire are documented here. This project is in alpha:
 storage format may change between pre-1.0 releases, so export (or back up) your
 characters regularly.
 
+## Unreleased
+
+### Custom tab sections — shift them with ↑ / ↓
+
+- **A custom tab's sections can be reordered.** Until now a section sat wherever
+  it was added; there was no way to move one. Every section heading now carries
+  a compact **↑ / ↓ pair** at the right edge in edit mode — ahead of the
+  grid/list toggle and the delete button — and one click shifts that section a
+  single place up or down its tab.
+- **One component for all three kinds.** `SectionReorderButtons` is shared by
+  the ability, bundled-NPC and text heading rows, so the three cannot drift
+  apart; it reuses the sheet's frameless `.btn--icon` treatment so the pair
+  reads as chrome, not as two more actions competing with the delete button.
+- **The ends are disabled, not hidden.** The first section's ↑ and the last
+  section's ↓ render disabled, so the control keeps its place and the heading
+  row never reflows as a section walks the tab. A disabled arrow is also the
+  read-out of "nothing above/below to trade with": `reorderCustomSection`
+  rejects a no-op or out-of-range move **before** it touches the record, so a
+  dead arrow cannot stamp an `updatedAt` or schedule an autosave.
+- **Positional only.** Whole section records move: per-section view modes are
+  keyed by section id, so a moved section keeps its grid/list choice, and
+  nothing else about the tab — its name, its other sections, other tabs — is
+  touched.
+- **Testing.** The store test pins the move down and up, the no-write identity
+  of an out-of-range move (the store hands back the very same character
+  reference), and that a move in one tab leaves another tab's sections alone.
+  `SectionReorderButtons.test.tsx` pins which arrow is live at each position
+  and that a click asks for a one-place move; the three section tests pin the
+  wiring (edit mode only, this section's own index and count), including the
+  detached-NPC placeholder, which keeps its pair so a broken section can still
+  be shifted out of the way. `e2e/custom-sections.spec.ts` walks it in a real
+  browser against the production build: one tab holding one section of each
+  kind, the pair measured into the heading row's upper-right corner, boundary
+  arrows asserted disabled, the ability section moved down and the NPC section
+  moved up, and the resulting order — `text, npc, ability` — read back after a
+  reload with no arrows in view mode.
+
 ## v0.9.0-alpha — 2026-09-13
 
 The table release. Ten commits since `v0.8.0-alpha`, and they all point the same

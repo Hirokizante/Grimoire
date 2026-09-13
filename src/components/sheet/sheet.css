@@ -138,6 +138,40 @@
   background: color-mix(in srgb, var(--danger) 8%, transparent);
 }
 
+/* Section reorder arrows (custom tab sections, edit mode). The pair sits at
+   the head of the heading row's right cluster, before the view toggle and the
+   delete button. A boundary arrow renders disabled rather than hidden, so the
+   row never reflows as a section walks the tab. */
+.section-reorder {
+  display: inline-flex;
+  align-items: center;
+}
+
+.section-reorder__btn {
+  padding: 0.2rem;
+  color: var(--text-muted);
+}
+
+.section-reorder__btn:hover:not(:disabled),
+.section-reorder__btn:focus-visible:not(:disabled) {
+  color: var(--accent-violet-soft);
+  background: color-mix(in srgb, var(--accent-violet-soft) 8%, transparent);
+}
+
+.section-reorder__btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* A custom section's heading row carries the widest right cluster on the
+   sheet (↑ ↓ + view toggle + delete). Tighten it on a phone so the row stays
+   one line instead of dropping the delete button to its own row. */
+@media (max-width: 480px) {
+  .sheet-section--custom .sheet-section__heading-row-right {
+    gap: 0.4rem;
+  }
+}
+
 .sheet-section__counter {
   font-family: var(--sheet-label-font, inherit);
   font-size: 0.78rem;

@@ -859,6 +859,80 @@ test('updateCustomSectionViewMode: overrides a previously-set custom section mod
   expect(char.viewModes.customTabs[tabId][secId]).toBe('grid')
 })
 
+// ---- Custom section reordering -----------------------------------------------
+
+/** The named sections of one tab, in order. */
+function sectionNames(tabId: string): string[] {
+  return useCharacterStore
+    .getState()
+    .currentCharacter!.customTabs.find((t) => t.id === tabId)!
+    .sections.map((s) => s.name)
+}
+
+test('reorderCustomSection: moves a section down within its tab', () => {
+  setupChar()
+  const tabId = useCharacterStore.getState().addCustomTab('Powers')
+  useCharacterStore.getState().addCustomSection(tabId, 'One')
+  const twoId = useCharacterStore.getState().addCustomSection(tabId, 'Two')
+  useCharacterStore.getState().addCustomTextSection(tabId, 'Three')
+  useCharacterStore.getState().updateCustomSectionViewMode(tabId, twoId, 'list')
+
+  useCharacterStore.getState().reorderCustomSection(tabId, 0, 1)
+
+  expect(sectionNames(tabId)).toEqual(['Two', 'One', 'Three'])
+  // Reordering is positional only: per-section view modes are keyed by id and
+  // must survive the move.
+  const char = useCharacterStore.getState().currentCharacter!
+  expect(char.viewModes.customTabs[tabId][twoId]).toBe('list')
+})
+
+test('reorderCustomSection: moves a section up within its tab', () => {
+  setupChar()
+  const tabId = useCharacterStore.getState().addCustomTab('Powers')
+  useCharacterStore.getState().addCustomSection(tabId, 'One')
+  useCharacterStore.getState().addCustomSection(tabId, 'Two')
+  useCharacterStore.getState().addCustomTextSection(tabId, 'Three')
+
+  useCharacterStore.getState().reorderCustomSection(tabId, 2, 1)
+
+  expect(sectionNames(tabId)).toEqual(['One', 'Three', 'Two'])
+})
+
+test('reorderCustomSection: out-of-range moves are never written', () => {
+  setupChar()
+  const tabId = useCharacterStore.getState().addCustomTab('Powers')
+  useCharacterStore.getState().addCustomSection(tabId, 'One')
+  useCharacterStore.getState().addCustomSection(tabId, 'Two')
+
+  const before = useCharacterStore.getState().currentCharacter
+
+  useCharacterStore.getState().reorderCustomSection(tabId, 0, 0) // no-op
+  useCharacterStore.getState().reorderCustomSection(tabId, 0, -1) // first, up
+  useCharacterStore.getState().reorderCustomSection(tabId, 1, 2) // last, down
+  useCharacterStore.getState().reorderCustomSection(tabId, 2, 0) // from past end
+  useCharacterStore.getState().reorderCustomSection('missing-tab', 0, 1)
+
+  // `updateCharacter` always stamps a fresh object, so reference identity is
+  // the proof that a dead arrow started no write and no autosave.
+  expect(useCharacterStore.getState().currentCharacter).toBe(before)
+  expect(sectionNames(tabId)).toEqual(['One', 'Two'])
+})
+
+test('reorderCustomSection: leaves other tabs untouched', () => {
+  setupChar()
+  const powers = useCharacterStore.getState().addCustomTab('Powers')
+  useCharacterStore.getState().addCustomSection(powers, 'One')
+  useCharacterStore.getState().addCustomSection(powers, 'Two')
+  const lore = useCharacterStore.getState().addCustomTab('Lore')
+  useCharacterStore.getState().addCustomSection(lore, 'Keep')
+  useCharacterStore.getState().addCustomSection(lore, 'Me')
+
+  useCharacterStore.getState().reorderCustomSection(powers, 0, 1)
+
+  expect(sectionNames(powers)).toEqual(['Two', 'One'])
+  expect(sectionNames(lore)).toEqual(['Keep', 'Me'])
+})
+
 // ---- Custom NPC sections ------------------------------------------------------
 
 test('addCustomNPCSection: adds an npc-kind section referencing a new NPC record', async () => {
