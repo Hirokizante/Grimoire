@@ -1499,6 +1499,26 @@ test('player panel: the Mortal Wound track sits under the HP bar, like an NPC pa
   )
 })
 
+test('a mouse wheel scrolls the Mortal Wound strip, not just a trackpad swipe', () => {
+  const pc = makePlayer({ mortalWounds: ['Sprain', 'Exhaustion'] })
+  const { container } = renderPlayerPanel(pc)
+
+  const strip = container.querySelector('.gm-mw__strip') as HTMLElement
+  // jsdom does no layout, so the overflow the hook reacts to is declared here;
+  // the browser suite moves the same strip under a real wheel and measures it
+  // (see `e2e/gm-screen.spec.ts`). What this pins is the WIRING: both panel
+  // kinds render this one component, so one wiring test covers both.
+  Object.defineProperty(strip, 'scrollWidth', { configurable: true, value: 400 })
+  Object.defineProperty(strip, 'clientWidth', { configurable: true, value: 200 })
+
+  const event = new WheelEvent('wheel', { deltaY: 90, bubbles: true, cancelable: true })
+  strip.dispatchEvent(event)
+
+  expect(strip.scrollLeft).toBe(90)
+  // Consumed: the strip moved, so the page behind it must not scroll too.
+  expect(event.defaultPrevented).toBe(true)
+})
+
 test('player panel: damage from the panel rolls the wound and marks the track', () => {
   const pc = makePlayer({ currentHP: 1 })
   const { container } = renderPlayerPanel(pc)

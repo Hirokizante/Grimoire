@@ -300,6 +300,28 @@ test('picking a duration tracks the status and renders its pill inline', () => {
   expect(within(pill).queryByText('Countdown')).not.toBeInTheDocument()
 })
 
+// ---- Scrolling the strip ----------------------------------------------------
+
+test('the strip answers a mouse wheel, not just a trackpad swipe', () => {
+  renderPanel('npc')
+  addViaPicker('Poisoned', 'quick')
+
+  const strip = screen.getByRole('list', { name: 'Statuses on Bandit' })
+  // jsdom does no layout, so the overflow the hook reacts to is declared here;
+  // the browser suite moves the same strip under a real wheel and measures it
+  // (see `e2e/gm-screen.spec.ts`). What this pins is the WIRING: the strip is
+  // handed to `useHorizontalWheelScroll`, and a vertical wheel moves it.
+  Object.defineProperty(strip, 'scrollWidth', { configurable: true, value: 400 })
+  Object.defineProperty(strip, 'clientWidth', { configurable: true, value: 200 })
+
+  const event = new WheelEvent('wheel', { deltaY: 90, bubbles: true, cancelable: true })
+  strip.dispatchEvent(event)
+
+  expect(strip.scrollLeft).toBe(90)
+  // Consumed: the strip moved, so the page behind it must not scroll too.
+  expect(event.defaultPrevented).toBe(true)
+})
+
 test('the picker stays open so several statuses can be applied at once', () => {
   renderPanel('npc')
 

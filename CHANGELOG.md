@@ -6,6 +6,30 @@ characters regularly.
 
 ## Unreleased
 
+### GM Screen — a mouse wheel scrolls the panel strips
+
+- **A panel's status pills and Mortal Wound chips answer a mouse wheel.** Both
+  rows are ONE line that scrolls sideways with its scrollbar hidden, so a
+  trackpad's two-finger swipe (`deltaX`) moved them while a mouse wheel — which
+  only ever reports `deltaY`, which an `overflow-x` container never consumes —
+  chained straight past the strip to the page. The rows could not be scrolled
+  with a mouse at all. `useHorizontalWheelScroll` now translates a vertical
+  wheel into the strip's `scrollLeft`, so one notch moves the pills or chips by
+  the pixels the browser reported (line- and page-mode deltas included) and the
+  page behind stays put.
+- **The wheel is never trapped, and never taken when it isn't ours.** At either
+  end of the strip the page gets the gesture back — the hook hands the delta to
+  the nearest vertically scrollable ancestor itself, because Chromium stops
+  chaining a wheel that a non-passive listener has seen, which is how "just let
+  it bubble" silently killed page scrolling whenever the pointer rested on a
+  full row. A trackpad's sideways swipe (momentum and all), `ctrl`+wheel (zoom)
+  and `shift`+wheel stay with the browser untouched.
+- **Testing.** Unit tests pin the decision for every gesture (translate, hand
+  off to the page, leave the event alone, line/page deltas) plus listener
+  teardown; component tests pin the wiring on both strips; and a Playwright walk
+  wheels over a five-status strip and a full wound row in a real browser — the
+  strip moves, the page does not, and the page takes over at the strip's edge.
+
 ### GM Screen — Mortal Wounds on player panels
 
 - **A player panel now carries the same Mortal Wound track an NPC panel does** —

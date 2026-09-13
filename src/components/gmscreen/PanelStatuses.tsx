@@ -5,7 +5,9 @@
  * **inline with the HP number**, followed by the "Add Status" icon button. The
  * whole strip is one line that scrolls sideways instead of wrapping: a panel
  * must never grow taller because the GM stacked conditions on it (see
- * `.gm-statuses` in gmscreen.css).
+ * `.gm-statuses` in gmscreen.css). The strip hides its scrollbar, so BOTH kinds
+ * of wheel must move it — a trackpad swipe natively, a mouse wheel through
+ * `useHorizontalWheelScroll`.
  *
  * Each pill has exactly two segments:
  *   `[ icon Name | duration-icon − n + ]`
@@ -37,6 +39,7 @@ import AddStatusModal from '@/components/gmscreen/AddStatusModal'
 import StatusIcon from '@/components/status/StatusIcon'
 import { StatusTooltip } from '@/components/status/StatusTooltip'
 import { MAX_PANEL_STATUS_STACKS, statusDurationMeta } from '@/constants/statusDurations'
+import { useHorizontalWheelScroll } from '@/hooks/useHorizontalWheelScroll'
 import { statusDurationColor } from '@/lib/themeUtils'
 import { useAppThemeStore } from '@/store/appThemeStore'
 import { useGMScreenStore } from '@/store/gmScreenStore'
@@ -65,7 +68,10 @@ export default function PanelStatuses({
   const appTheme = useAppThemeStore((s) => s.theme)
 
   const [pickerOpen, setPickerOpen] = useState(false)
-  const stripRef = useRef<HTMLDivElement>(null)
+  const stripRef = useRef<HTMLDivElement | null>(null)
+  /** The strip hides its scrollbar, so a mouse wheel must move it by hand —
+   *  see `useHorizontalWheelScroll`. */
+  const setStripNode = useHorizontalWheelScroll<HTMLDivElement>(stripRef)
   /** Tracked count from the previous render, to detect an addition. */
   const prevCount = useRef(panel.statuses.length)
 
@@ -90,7 +96,7 @@ export default function PanelStatuses({
       {tracked.length > 0 && (
         <div
           className="gm-statuses__strip"
-          ref={stripRef}
+          ref={setStripNode}
           role="list"
           aria-label={`Statuses on ${entityName}`}
         >

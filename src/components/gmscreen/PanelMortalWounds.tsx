@@ -16,7 +16,8 @@
  * the HP bar: `[skull Wounds n/max | chips… | ⚠ next 0 HP: …]`. It follows
  * the panel status strip's discipline — ONE line that scrolls sideways rather
  * than wraps, so a stack of wounds never makes one panel taller than its
- * neighbour.
+ * neighbour — and, like that strip, it hides its scrollbar and answers a mouse
+ * wheel through `useHorizontalWheelScroll`.
  *
  * Wounds persist until cleared (the chip's ✕, the panel menu's "Clear mortal
  * wounds", or an ability that removes one in play) — healing does not erase
@@ -36,6 +37,7 @@
 import { Skull, TriangleAlert, X } from 'lucide-react'
 import type { CSSProperties } from 'react'
 
+import { useHorizontalWheelScroll } from '@/hooks/useHorizontalWheelScroll'
 import { mortalWoundByName } from '@/lib/mortalWounds'
 import { appThemeStatColors } from '@/lib/themeUtils'
 import { useAppThemeStore } from '@/store/appThemeStore'
@@ -75,6 +77,9 @@ export default function PanelMortalWounds({
   // Panel chrome: the app theme's Mortal Wounds accent, the same one the
   // expanded body's stat row uses — never a per-sheet color.
   const tone = appThemeStatColors(appTheme).mortalWounds
+  /** The strip hides its scrollbar, so a mouse wheel must move it by hand —
+   *  see `useHorizontalWheelScroll`. */
+  const setStripNode = useHorizontalWheelScroll<HTMLDivElement>()
 
   // A target with no wound allowance and none taken shows nothing: the mook
   // case (`npcStats.mortalWounds: 0`) renders exactly the panel it always did.
@@ -99,6 +104,7 @@ export default function PanelMortalWounds({
       {wounds.length > 0 && (
         <div
           className="gm-mw__strip"
+          ref={setStripNode}
           role="list"
           aria-label={`Mortal Wounds on ${entityName}`}
         >

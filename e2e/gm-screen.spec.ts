@@ -1289,6 +1289,129 @@ test.describe('GM Screen', () => {
     await expect(page.locator('.gm-statuses')).toHaveCount(0)
   })
 
+  test('a mouse wheel scrolls a panel strip sideways, not just a trackpad swipe', async ({
+    page,
+  }) => {
+    // Both strips hide their scrollbar and are ONE line that scrolls sideways,
+    // so a trackpad's two-finger swipe (deltaX) used to be the only way to move
+    // them: a mouse wheel reports deltaY, which an `overflow-x` container never
+    // consumes, so the wheel chained straight past the strip to the page. This
+    // drives a real wheel over both strips and measures them.
+    //
+    // A deterministic die, as in the Mortal Wound tests: every D20 rolls 19, so
+    // the wound chips are identical and the strip's width is predictable.
+    await page.addInitScript(() => {
+      Math.random = () => 0.9
+    })
+
+    await gotoHome(page)
+    await createPlayerCharacter(page, 'Vex')
+    await createNpc(page, 'Bandit')
+
+    await gotoGmScreen(page)
+    await page.getByRole('button', { name: 'New Screen' }).first().click()
+    await page.getByRole('button', { name: 'Create' }).click()
+    await page.getByRole('button', { name: 'Add Character' }).first().click()
+    await page.getByRole('button', { name: /Vex/ }).click()
+
+    const panel = page.locator('.gm-panel--character').first()
+
+    // Five tracked statuses overflow the status strip…
+    for (const [name, duration] of [
+      ['Poisoned', 'Countdown'],
+      ['Blinded', 'Quick'],
+      ['Prone', 'Permanent'],
+      ['Hidden', 'Persistent'],
+      ['Dazed', 'Conditional'],
+    ] as const) {
+      await addStatus(page, panel, name, duration)
+    }
+    // …and a full wound track (two d20-and-name chips, plus the ⚠ pill that
+    // takes the row's right edge) overflows the Mortal Wound strip.
+    await damageFor(page, panel, 25)
+    await page.getByRole('button', { name: '✕' }).click()
+    await damageFor(page, panel, 25)
+    await page.getByRole('button', { name: '✕' }).click()
+    await expect(panel.locator('.gm-status-pill')).toHaveCount(5)
+    await expect(panel.locator('.gm-mw__chip')).toHaveCount(2)
+    await expect(panel.locator('.gm-mw__warn')).toContainText('Knocked Out')
+    // Let the damage toasts clear: they stack up from the bottom-left (each
+    // auto-dismisses after 3s) and this test is about what the pointer hits.
+    await expect(page.locator('.notification')).toHaveCount(0, { timeout: 15_000 })
+
+    // A phone-width viewport is where both strips genuinely overflow, and a few
+    // more panels make the PAGE taller than the viewport — which is what lets
+    // "the strip let go at its edge" be observed instead of being a no-op.
+    await page.getByRole('button', { name: 'Add NPC' }).first().click()
+    const npcRow = page.locator('.gm-picker__list .gm-picker__item').filter({
+      hasText: 'Bandit',
+    })
+    for (let i = 0; i < 4; i += 1) await npcRow.click()
+    await page.getByRole('button', { name: 'Done' }).click()
+    await expect(page.locator('.gm-panel--npc')).toHaveCount(4)
+    await page.setViewportSize({ width: 360, height: 800 })
+    // The page itself has to be taller than the viewport, or "the wheel goes on
+    // to the page" cannot be told apart from "nothing happened".
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollHeight - window.innerHeight,
+      ),
+    ).toBeGreaterThan(0)
+
+    for (const selector of ['.gm-statuses__strip', '.gm-mw__strip']) {
+      const strip = panel.locator(selector)
+      await strip.scrollIntoViewIfNeeded()
+
+      // The premise: at this width the strip really does overflow, and it
+      // starts at the left edge. (Set explicitly rather than assumed — the
+      // status strip scrolls itself to the end when a pill is added, so the GM
+      // sees what they just tracked.)
+      await strip.evaluate((el) => {
+        el.scrollLeft = 0
+      })
+      const max = await strip.evaluate((el) => el.scrollWidth - el.clientWidth)
+      expect(max).toBeGreaterThan(0)
+
+      // Park the pointer on the strip. Positioned by coordinates and not with
+      // `hover()`, which scrolls the strip back for its actionability check and
+      // would undo the edge the test is about to measure.
+      const point = await strip.evaluate((el) => {
+        const box = el.getBoundingClientRect()
+        return { x: box.left + box.width / 2, y: box.top + box.height / 2 }
+      })
+      await page.mouse.move(point.x, point.y)
+
+      // A sideways gesture (a trackpad swipe) still scrolls the strip natively
+      // — the hook deliberately leaves deltaX alone — and back to the start.
+      await page.mouse.wheel(60, 0)
+      await expect.poll(() => strip.evaluate((el) => el.scrollLeft)).toBeGreaterThan(0)
+      await page.mouse.wheel(-600, 0)
+      await expect.poll(() => strip.evaluate((el) => el.scrollLeft)).toBe(0)
+
+      // The actual regression: a mouse-wheel notch moves the strip sideways —
+      // the gesture a trackpad's swipe is NOT, and the one that used to chain
+      // straight past the strip and leave it stuck at 0.
+      const pageY = await page.evaluate(() => window.scrollY)
+      await page.mouse.wheel(0, 120)
+      await expect.poll(() => strip.evaluate((el) => el.scrollLeft)).toBeGreaterThan(0)
+      // …and it is CONSUMED: the page behind the strip must not scroll as well.
+      expect(await page.evaluate(() => window.scrollY)).toBe(pageY)
+
+      // At its end the strip lets go rather than trapping the wheel: the next
+      // notch scrolls the page, exactly as it did before the strip existed.
+      // (Asserted last for each strip: scrolling the page moves the strip out
+      // from under the pointer, so nothing else may depend on the position.)
+      await page.mouse.wheel(0, 4000)
+      const atEnd = await strip.evaluate((el) => el.scrollLeft)
+      expect(atEnd).toBe(max)
+      await page.mouse.wheel(0, 120)
+      await expect
+        .poll(() => page.evaluate(() => window.scrollY))
+        .toBeGreaterThan(pageY)
+      expect(await strip.evaluate((el) => el.scrollLeft)).toBe(atEnd)
+    }
+  })
+
   test('the picker dialog scrolls its list from anywhere in the dialog', async ({
     page,
   }) => {

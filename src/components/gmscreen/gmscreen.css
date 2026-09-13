@@ -738,7 +738,10 @@
   overflow-x: auto;
   overflow-y: hidden;
   /* A painted scrollbar would add height to the row it must not change, and
-     the overflowing pill's cut edge is the scroll affordance. */
+     the overflowing pill's cut edge is the scroll affordance. Hiding it costs
+     nothing on a trackpad (a sideways swipe still scrolls natively) but leaves
+     a mouse wheel with nothing to grab at — `useHorizontalWheelScroll` on the
+     strip translates it, and hands it on to the page at either edge. */
   scrollbar-width: none;
   overscroll-behavior-x: contain;
 }
@@ -935,7 +938,8 @@ button.gm-status-pill__main:hover {
   overflow-y: hidden;
   /* No painted scrollbar: it would add height to a row that must stay one
      line, and the cut-off chip's edge is the scroll affordance — the same
-     trade the status strip makes. */
+     trade the status strip makes, wheel handling included (see
+     `useHorizontalWheelScroll`). */
   scrollbar-width: none;
   overscroll-behavior-x: contain;
 }
