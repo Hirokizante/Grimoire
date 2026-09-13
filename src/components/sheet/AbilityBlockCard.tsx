@@ -44,17 +44,20 @@ export interface AbilityBlockCardProps {
    */
   character?: Character
   /**
-   * Persist the stat/attribute modifier switch for an ability that does not
-   * live on the store's current character (attached NPC sections). When
-   * omitted, the switch updates the current character.
+   * Persist the stat/attribute modifier switch for an entity the store does not
+   * own — a GM screen NPC *instance*, whose switches live on the panel. When
+   * omitted, the switch updates the current character — but only if the card's
+   * character *is* that character and is a player sheet, so a static NPC base
+   * sheet renders a visible-but-inert switch.
    */
   onToggleModifiers?: (abilityId: string, active: boolean) => void
   /**
    * Persist a manual adjustment of a limited ability's remaining uses for an
-   * ability that does not live on the store's current character (attached NPC
-   * sections). When omitted, the adjustment updates the current character —
-   * but only if the card's character *is* that character, so a read-only card
-   * (a GM panel's entity, a drag overlay) renders no steppers at all.
+   * entity the store does not own — a GM screen NPC *instance*, whose budget
+   * lives on the panel. When omitted, the adjustment updates the current
+   * character — but only if the card's character *is* that character and is a
+   * player sheet, so a read-only card (an NPC base sheet, a GM panel's entity,
+   * a drag overlay) renders no steppers at all.
    */
   onSetUses?: (abilityId: string, remaining: number) => void
   /**
@@ -96,6 +99,7 @@ export default function AbilityBlockCard({
   // character prop wins for NPC sheets embedded in a character sheet tab).
   const storeCharacter = useCharacterStore((s) => s.currentCharacter)
   const storeSetUses = useCharacterStore((s) => s.setAbilityUsesRemaining)
+  const storeToggleModifiers = useCharacterStore((s) => s.setAbilityModifiersActive)
   const costCharacter = character ?? storeCharacter
   const customCosts = resolveCustomAbilityCosts(
     cost.custom,
@@ -120,21 +124,52 @@ export default function AbilityBlockCard({
    * the sheet mode either: a use count is a live-play number a player adjusts
    * while building a sheet just as often as during play.
    *
-   * An attached-NPC section supplies its own writer; otherwise the store action
-   * only helps when the card's character *is* the store's current character, so
-   * GM-panel entities stay read-only.
+   * A GM panel's NPC instance supplies the panel's own writer; otherwise the
+   * store action only helps a **player** character that is the store's current
+   * character. Two cases deliberately get no writer, and so render a read-only
+   * meter:
+   *
+   *   - an NPC base record (`kind: 'npc'`) on any surface — the standalone NPC
+   *     sheet and an NPC embedded in a custom tab are static references the GM
+   *     Screen spawns instances from, so their use counts are template data, not
+   *     live play (that gate is what keeps the steppers off the base sheet even
+   *     though the sheet *is* the store's current character there);
+   *   - any entity that is not the current character (a GM panel's entity when
+   *     no writer was threaded down).
    *
    * `adjustUses` stays undefined in those read-only cases, which is exactly what
    * suppresses the steppers (a control that cannot write must not look
    * clickable).
    */
   const storeAdjuster =
-    storeCharacter && costCharacter?.id === storeCharacter.id
+    storeCharacter &&
+    costCharacter?.id === storeCharacter.id &&
+    costCharacter.kind !== 'npc'
       ? (abilityId: string, next: number) =>
           storeSetUses(costCharacter.id, abilityId, next)
       : undefined
 
   const adjustUses = onSetUses ?? storeAdjuster
+
+  /**
+   * The modifier switch's writer, resolved by exactly the same contract as
+   * `adjustUses` above: the surface's own handler first (a GM Screen NPC
+   * instance passes the panel's), otherwise the store action — which switches
+   * the ability on the store's **current character**, so it is only valid when
+   * this card's character *is* that character and is a player sheet. Everything
+   * else renders the switch read-only: an NPC base record's flags are template
+   * data (the base sheet is a static reference), and a GM panel's entity is not
+   * the store's character.
+   */
+  const storeToggle =
+    storeCharacter &&
+    costCharacter?.id === storeCharacter.id &&
+    costCharacter.kind !== 'npc'
+      ? (abilityId: string, active: boolean) =>
+          storeToggleModifiers(abilityId, active)
+      : undefined
+
+  const toggleModifiers = onToggleModifiers ?? storeToggle
 
   /**
    * The resolved activation override for THIS ability (the GM panel's live-play
@@ -232,7 +267,8 @@ export default function AbilityBlockCard({
       <AbilityModifierToggle
         ability={ability}
         mode={mode}
-        onToggle={onToggleModifiers}
+        onToggle={toggleModifiers}
+        character={costCharacter}
       />
 
       {flavorText && (

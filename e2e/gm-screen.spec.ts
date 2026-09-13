@@ -1569,6 +1569,203 @@ test.describe('GM Screen', () => {
     await expect(entry.locator('.roll-log-item__total')).toHaveText('6')
   })
 
+  test('an NPC panel spends the instance’s own limited uses, not the base’s', async ({
+    page,
+  }) => {
+    await gotoHome(page)
+    await createNpc(page, 'Bandit')
+
+    // ---- Author a limited ability on the base through the real editor -----
+    await page.locator('.card-main').filter({ hasText: 'Bandit' }).first().click()
+    await page
+      .locator('.mode-toggle--floating')
+      .getByRole('tab', { name: 'Edit' })
+      .click()
+    await page.getByRole('button', { name: '+ Add Ability' }).click()
+    const editor = page.getByRole('dialog', { name: 'New Ability' })
+    await editor.getByLabel('Name').fill('Cleave')
+    await editor.getByLabel('AP Cost').fill('1')
+    await editor.getByRole('checkbox', { name: 'Limited uses' }).check()
+    await editor.getByLabel('Max uses').fill('3')
+    await editor.getByRole('button', { name: 'Save', exact: true }).click()
+    await expect(page.getByText('Cleave')).toBeVisible()
+
+    // ---- The base sheet reads the budget but offers no stepper ------------
+    // A base NPC record is the static reference instances are spawned from:
+    // its count is template data, so the meter renders and nothing moves it.
+    await page
+      .locator('.mode-toggle--floating')
+      .getByRole('tab', { name: 'View' })
+      .click()
+    const baseCard = page.locator('.npc-abilities-section .ability-card')
+    await expect(
+      baseCard.getByRole('img', { name: '3 of 3 uses remaining' }),
+    ).toBeVisible()
+    await expect(
+      baseCard.getByRole('button', { name: /one use of/i }),
+    ).toHaveCount(0)
+    // Let the sheet's debounced autosave land before leaving the page.
+    await page.waitForTimeout(700)
+
+    // ---- Spawn an instance and expand it ----------------------------------
+    await gotoGmScreen(page)
+    await page.getByRole('button', { name: 'New Screen' }).first().click()
+    await page.getByRole('button', { name: 'Create' }).click()
+    await page.getByRole('button', { name: 'Add NPC' }).first().click()
+    await page
+      .locator('.gm-picker__list .gm-picker__item')
+      .filter({ hasText: 'Bandit' })
+      .click()
+    await page.getByRole('button', { name: 'Done' }).click()
+
+    const first = page.locator('.gm-panel--npc').first()
+    await first.getByRole('button', { name: /Expand/ }).click()
+    const meter = first.getByRole('img', { name: /uses remaining/i })
+    await expect(meter).toHaveAccessibleName('3 of 3 uses remaining')
+
+    // ---- Activating spends one use of the instance's own budget ----------
+    const apMeter = first.locator('.gm-ap .gm-bar__value')
+    await first.getByRole('button', { name: 'Activate' }).click()
+    await expect(meter).toHaveAccessibleName('2 of 3 uses remaining')
+    await expect(apMeter).toContainText('2')
+    await expect(page.getByText(/Activated Cleave \(1 use spent\)/)).toBeVisible()
+
+    // ---- The ± steppers work here (and cost no AP) ------------------------
+    await first.getByRole('button', { name: 'Spend one use of Cleave' }).click()
+    await expect(meter).toHaveAccessibleName('1 of 3 uses remaining')
+    await first.getByRole('button', { name: 'Restore one use of Cleave' }).click()
+    await expect(meter).toHaveAccessibleName('2 of 3 uses remaining')
+    await expect(apMeter).toContainText('2')
+
+    // ---- A second instance of the same base starts full -------------------
+    await page.getByRole('button', { name: 'Add NPC' }).first().click()
+    await page
+      .locator('.gm-picker__list .gm-picker__item')
+      .filter({ hasText: 'Bandit' })
+      .click()
+    await page.getByRole('button', { name: 'Done' }).click()
+    const second = page.locator('.gm-panel--npc').nth(1)
+    await second.getByRole('button', { name: /Expand/ }).click()
+    await expect(
+      second.getByRole('img', { name: '3 of 3 uses remaining' }),
+    ).toBeVisible()
+
+    // ---- Reload: each instance kept its own count -------------------------
+    await page.waitForTimeout(700)
+    await page.reload()
+    await expect(page.getByRole('heading', { name: 'GRIMOIRE' })).toBeVisible()
+    await gotoGmScreen(page)
+    await expect(
+      page
+        .locator('.gm-panel--npc')
+        .nth(0)
+        .getByRole('img', { name: '2 of 3 uses remaining' }),
+    ).toBeVisible()
+    await expect(
+      page
+        .locator('.gm-panel--npc')
+        .nth(1)
+        .getByRole('img', { name: '3 of 3 uses remaining' }),
+    ).toBeVisible()
+
+    // ---- …and the base record never moved --------------------------------
+    await page.getByRole('button', { name: 'NPCs' }).first().click()
+    await page.locator('.card-main').filter({ hasText: 'Bandit' }).first().click()
+    const baseCardAfter = page.locator('.npc-abilities-section .ability-card')
+    await expect(
+      baseCardAfter.getByRole('img', { name: '3 of 3 uses remaining' }),
+    ).toBeVisible()
+    await expect(
+      baseCardAfter.getByRole('button', { name: /one use of/i }),
+    ).toHaveCount(0)
+  })
+
+  test('an NPC panel switches its own ability modifiers', async ({ page }) => {
+    await gotoHome(page)
+    await createNpc(page, 'Bandit')
+
+    // ---- Author an "Evasion +2" ability on the base -----------------------
+    await page.locator('.card-main').filter({ hasText: 'Bandit' }).first().click()
+    await page
+      .locator('.mode-toggle--floating')
+      .getByRole('tab', { name: 'Edit' })
+      .click()
+    await page.getByRole('button', { name: '+ Add Ability' }).click()
+    const editor = page.getByRole('dialog', { name: 'New Ability' })
+    await editor.getByLabel('Name').fill('Rage')
+    await editor
+      .getByRole('checkbox', { name: 'Modifies combat stats / attributes' })
+      .check()
+    await editor.getByLabel('Evasion amount').fill('2')
+    await editor.getByRole('button', { name: 'Save', exact: true }).click()
+    await expect(page.getByText('Rage')).toBeVisible()
+
+    // ---- The base sheet reads it but cannot switch it on ------------------
+    await page
+      .locator('.mode-toggle--floating')
+      .getByRole('tab', { name: 'View' })
+      .click()
+    const baseCard = page.locator('.npc-abilities-section .ability-card')
+    await expect(baseCard.getByText('+2 Evasion')).toBeVisible()
+    await expect(baseCard.getByRole('switch')).toBeDisabled()
+    // Let the sheet's debounced autosave land before leaving the page.
+    await page.waitForTimeout(700)
+
+    // ---- Spawn two instances and expand the first -------------------------
+    await gotoGmScreen(page)
+    await page.getByRole('button', { name: 'New Screen' }).first().click()
+    await page.getByRole('button', { name: 'Create' }).click()
+    for (let i = 0; i < 2; i += 1) {
+      await page.getByRole('button', { name: 'Add NPC' }).first().click()
+      await page
+        .locator('.gm-picker__list .gm-picker__item')
+        .filter({ hasText: 'Bandit' })
+        .click()
+      await page.getByRole('button', { name: 'Done' }).click()
+    }
+
+    const first = page.locator('.gm-panel--npc').nth(0)
+    const second = page.locator('.gm-panel--npc').nth(1)
+    const evasion = (panel: Locator) =>
+      panel.locator('.gm-token').filter({ hasText: 'Eva' }).locator('.gm-token__value')
+    await first.getByRole('button', { name: /Expand/ }).click()
+    await expect(evasion(first)).toHaveText('10')
+
+    // ---- Switching it on moves THIS instance's stats ----------------------
+    const toggle = first.getByRole('switch', { name: /Apply Rage modifiers/i })
+    await expect(toggle).toHaveAttribute('aria-checked', 'false')
+    await toggle.click()
+
+    await expect(toggle).toHaveAttribute('aria-checked', 'true')
+    await expect(evasion(first)).toHaveText('12')
+    // The expanded body's own Combat Stats row agrees with the chrome token.
+    await expect(
+      first.locator('.gm-panel__sheet .stat-token--modified .stat-token__delta'),
+    ).toHaveText('+2')
+    // …and the sibling instance is untouched.
+    await expect(evasion(second)).toHaveText('10')
+    await second.getByRole('button', { name: /Expand/ }).click()
+    await expect(
+      second.getByRole('switch', { name: /Apply Rage modifiers/i }),
+    ).toHaveAttribute('aria-checked', 'false')
+
+    // ---- Reload: each instance kept its own switches ----------------------
+    await page.waitForTimeout(700)
+    await page.reload()
+    await expect(page.getByRole('heading', { name: 'GRIMOIRE' })).toBeVisible()
+    await gotoGmScreen(page)
+    await expect(evasion(page.locator('.gm-panel--npc').nth(0))).toHaveText('12')
+    await expect(evasion(page.locator('.gm-panel--npc').nth(1))).toHaveText('10')
+
+    // ---- …and the base record never moved --------------------------------
+    await page.getByRole('button', { name: 'NPCs' }).first().click()
+    await page.locator('.card-main').filter({ hasText: 'Bandit' }).first().click()
+    const baseCardAfter = page.locator('.npc-abilities-section .ability-card')
+    const baseToggle = baseCardAfter.getByRole('switch')
+    await expect(baseToggle).toBeDisabled()
+    await expect(baseToggle).toHaveAttribute('aria-checked', 'false')
+  })
+
   test('a phone-width layout keeps panels on one column without overflow', async ({
     page,
   }) => {

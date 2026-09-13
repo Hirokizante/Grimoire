@@ -17,7 +17,7 @@ import { beforeEach, expect, test, vi } from 'vitest'
 import AbilityActivation from '@/components/sheet/AbilityActivation'
 import AbilityBlockCard from '@/components/sheet/AbilityBlockCard'
 import { NotificationProvider } from '@/context/NotificationContext'
-import { createDefaultCharacter } from '@/constants/gameData'
+import { createDefaultCharacter, createDefaultNPC } from '@/constants/gameData'
 import { useCharacterStore } from '@/store/characterStore'
 import { abilityUsesRemaining } from '@/lib/abilityUses'
 import type { AbilityBlock, Character } from '@/types'
@@ -467,6 +467,37 @@ test('a read-only entity keeps the readout but gets no steppers', () => {
 
   expect(usesReadout()).toHaveAccessibleName('3 of 3 uses remaining')
   expect(screen.queryByRole('button', { name: /spend one use of/i })).toBeNull()
+})
+
+test('an NPC base record gets no steppers even as the current character', () => {
+  // A base NPC record is a static reference the GM Screen spawns instances
+  // from: its abilities' use counts are template data, so the store fallback
+  // (which is what gives a player sheet its steppers) must not fire for it —
+  // on the parent ability or on a nested sub-ability.
+  const sub: AbilityBlock = { ...limitedAbility(2, 2), id: 'sub-1', name: 'Riposte' }
+  const npc: Character = {
+    ...createDefaultNPC(),
+    id: 'npc-1',
+    slottedAbilities: [
+      { ...limitedAbility(2, 3), subAbilitiesUnderDescription: [sub] },
+    ],
+  }
+  useCharacterStore.setState({ currentCharacter: npc, characters: [npc] })
+  renderActivation(npc.slottedAbilities[0])
+
+  expect(
+    screen.getByRole('img', { name: '2 of 3 uses remaining' }),
+  ).toBeInTheDocument()
+  expect(
+    screen.getByRole('img', { name: '2 of 2 uses remaining' }),
+  ).toBeInTheDocument()
+  expect(screen.queryAllByRole('button', { name: /one use of/i })).toHaveLength(0)
+  // The record keeps its authored counts.
+  expect(slottedUses(useCharacterStore.getState().currentCharacter)).toBe(2)
+  expect(
+    useCharacterStore.getState().currentCharacter?.slottedAbilities[0]
+      .subAbilitiesUnderDescription[0].uses?.current,
+  ).toBe(2)
 })
 
 test('a supplied writer handles an ability that is not on the current character', () => {

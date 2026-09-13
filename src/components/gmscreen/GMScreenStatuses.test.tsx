@@ -128,6 +128,8 @@ function seed(kind: 'character' | 'npc') {
                   currentAP: MAX_AP,
                   cooldowns: [],
                   mortalWounds: [],
+                  abilityUses: {},
+                  abilityModifiers: {},
                 },
               },
         ],

@@ -14,8 +14,11 @@ import type { AbilityBlock, AbilityCost, Character, CharacterViewModes, GMScreen
 import { createDefaultStatuses } from '@/constants/statuses'
 import { MAX_PANEL_STATUS_STACKS, isPanelStatusDuration } from '@/constants/statusDurations'
 import { DEFAULT_SHEET_COLORS, MAX_AP, generateId } from '@/constants/gameData'
-import { normalizeModifiers } from '@/lib/abilityModifiers'
-import { normalizeAbilityUses } from '@/lib/abilityUses'
+import {
+  normalizeInstanceAbilityModifiers,
+  normalizeModifiers,
+} from '@/lib/abilityModifiers'
+import { normalizeAbilityUses, normalizeInstanceAbilityUses } from '@/lib/abilityUses'
 
 const DB_NAME = 'grimoire'
 const DB_VERSION = 5
@@ -897,6 +900,17 @@ export function normalizeScreen(raw: GMScreen): GMScreen {
       // backfills to an empty track; the allowance itself is never stored here
       // (it is read from the base's `npcStats` at damage/render time).
       const mortalWounds = normalizeInstanceMortalWounds(rawState.mortalWounds)
+      // Per-instance ability uses, added with NPC-instance limited-use tracking.
+      // Screens written before it existed have no `abilityUses`, which backfills
+      // to an empty map — every limited ability then reads as its authored
+      // maximum, i.e. a fresh instance (see lib/abilityUses.ts).
+      const abilityUses = normalizeInstanceAbilityUses(rawState.abilityUses)
+      // Per-instance modifier switches, added with NPC-instance ability
+      // modifiers. Missing (or unusable) entries backfill to an empty map: the
+      // instance then matches its base record's own switch state.
+      const abilityModifiers = normalizeInstanceAbilityModifiers(
+        rawState.abilityModifiers,
+      )
       panels.push({
         kind: 'npc-instance',
         id,
@@ -911,6 +925,8 @@ export function normalizeScreen(raw: GMScreen): GMScreen {
           currentAP,
           cooldowns,
           mortalWounds,
+          abilityUses,
+          abilityModifiers,
         },
       })
       continue

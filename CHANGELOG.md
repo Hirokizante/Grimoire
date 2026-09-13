@@ -6,6 +6,88 @@ characters regularly.
 
 ## Unreleased
 
+### GM Screen — an NPC instance owns its ability modifier switches
+
+- **An NPC base sheet's modifier switch is visible but inert.** The switch on an
+  ability that declares stat/attribute modifiers used to render on the base
+  sheet (standalone and bundled into a player's custom tab) looking exactly like
+  a player sheet's — and did nothing when clicked, because the store action it
+  fell through to refuses to touch an `kind: 'npc'` record. A base record is the
+  static reference the GM Screen spawns instances from, so its switches are
+  template data: the switch and its modifier chips still read there, but the
+  control is now `disabled` with a tooltip saying where it *can* be flipped.
+  The switch also no longer falls through to the store from a card that is not
+  the current character: that action is current-character-only, so on any other
+  entity it could only ever have been a silent no-op against a record the card
+  was not even drawn for.
+- **Each spawned instance tracks its own switches.** `NpcInstanceState` gains a
+  sparse `abilityModifiers` map (`{ abilityId: active }`), with the same delta
+  rule as `abilityUses`: an absent entry means "untouched — still on the base
+  ability's own `modifiersActive` flag", so a fresh instance matches its base
+  sheet and only a switch the GM actually flipped is stored (flipping it back
+  clears the entry). `withInstanceAbilityModifiers` projects the map onto the
+  base record for rendering, and it is a projection, not a clone — an untouched
+  instance still renders the base reference itself.
+- **A flipped switch really applies to that instance.** The panel's chrome
+  tokens (Eva/Arm/Move/DC), its HP bar cap, the expanded body's Combat Stats and
+  Attributes rows, the dice resolved against them, and the damage pipeline all
+  read the instance's effective stats through one shared projection
+  (`gmScreenUtils.withInstanceState`, composing the uses and modifier maps), so
+  an active Armor modifier reduces the next hit and a Max HP one moves the cap
+  (clamping current HP when switched off) — and `DamageDialog`'s armor preview
+  comes from the same numbers the store rolls. Three spawned Bandits can rage
+  independently, and nothing reaches the base record.
+- **Testing.** Unit tests pin the new helpers (map normalization, the
+  base-flag fallback, projection identity, sub-abilities), the store action
+  (per-panel isolation, the no-modifier refusal, switching a base flag off, the
+  HP clamp, effective Armor in `damageInstance`, fresh duplicates),
+  `normalizeScreen`'s backfill/repair, and the surfaces: the panel switch moves
+  one instance's tokens/body and reaches the damage dialog while its sibling and
+  the base stay put, and the standalone/attached NPC sheets render the switch
+  disabled even when the NPC is the store's current character.
+
+### GM Screen — an NPC instance owns its limited-ability uses
+
+- **A base NPC sheet's use steppers are gone.** The ± control on a limited
+  ability read `current / max` and let you move it on the NPC's own sheet page
+  (and on an NPC bundled into a player's custom tab), but a base record is the
+  **static reference the GM Screen spawns instances from** — nothing about a
+  base sheet is live play, and its ability budgets are template data. The meter
+  still reads there; the writer is simply not offered, which is also what
+  removes the steppers (`AbilityUsesMeter` renders them only when it receives an
+  adjuster). The store fallback writer is now gated to a player sheet that is
+  the current character, so no NPC surface can grow the control back.
+- **Each spawned instance tracks its own uses.** That same base count used to be
+  rendered straight through to every instance, so three Bandits shared one
+  number and an adjustment anywhere changed all of them. `NpcInstanceState`
+  gains a sparse `abilityUses` map (`{ abilityId: remaining }`, spawned empty):
+  an ability with no entry reads as its authored `max`, so every instance starts
+  full and an ability added to the base later arrives full, while only a budget
+  the instance actually spent into is stored. `withInstanceAbilityUses` projects
+  the map onto the base record for rendering — a projection, not a clone, so an
+  untouched instance still renders the base reference itself and base edits keep
+  propagating. The base record's own `uses.current` is never read and never
+  written.
+- **Activating a limited ability on a panel spends one of that instance's
+  uses**, exactly as it does on a sheet: `gmScreenStore.spendInstanceAbilityUse`
+  mirrors `characterStore.spendAbilityUse` (unlimited, `expendOnActivate: false`
+  and 0-left all refuse and report `false`, so the toast never claims a use it
+  did not spend), the button is disabled with "No uses of X remaining" at 0, and
+  the panel reports "1 use spent" like the sheet does.
+- **The ± steppers work on the panel** — the instance's writer travels through
+  `PanelSheet` → `NPCAbilitiesSection` → the card, and every write is clamped
+  against the ability's authored maximum (a count handed back to full clears the
+  entry rather than pinning today's number). Stepping spends no AP and never
+  triggers the Activate path, and a duplicate instance spawns with full budgets,
+  like its HP, AP and cooldowns.
+- **Testing.** Unit tests pin the new helpers (the projection's identity
+  behaviour, clamping, `findAbility`, map normalization), the store actions
+  (per-panel isolation, clamping, refusal cases, the untouched base record, fresh
+  duplicates), `normalizeScreen`'s backfill/repair, and the surfaces: a panel
+  card spends and steps the instance's own count even when the base record is
+  the store's current character, while the standalone NPC sheet and an attached
+  NPC section render the readout with no steppers.
+
 ### GM Screen — a mouse wheel scrolls the panel strips
 
 - **A panel's status pills and Mortal Wound chips answer a mouse wheel.** Both

@@ -57,6 +57,35 @@ export interface NpcInstanceState {
    */
   cooldowns: string[]
   /**
+   * Remaining uses of the base record's **limited abilities**, keyed by ability
+   * id — the instance's own budget, never the base's.
+   *
+   * Spawned empty, and deliberately a **delta**: an ability with no entry reads
+   * as its authored `max` (`withInstanceAbilityUses` in lib/abilityUses.ts), so
+   * a fresh instance starts full, an ability added to the base later arrives
+   * full, and raising a base ability's maximum raises every instance that has
+   * not spent into it. Only a count the GM has actually moved on this panel is
+   * stored, and it is clamped to the base's current `max` at render time.
+   * Three spawned Bandits therefore each spend their own uses, and nothing the
+   * GM does at the table can reach the standalone NPC sheet.
+   */
+  abilityUses: Record<string, number>
+  /**
+   * Which of the base record's abilities currently have their **stat/attribute
+   * modifiers switched on** for this instance, keyed by ability id.
+   *
+   * The same delta rule as {@link abilityUses}: an ability with no entry reads
+   * as its own `modifiersActive` flag (`withInstanceAbilityModifiers` in
+   * lib/abilityModifiers.ts), which a base record only ever carries as template
+   * data — so a fresh instance starts matching its base sheet and records only
+   * the switches the GM has actually flipped here. Three spawned Bandits can
+   * therefore rage independently, the panel's effective stats (Evasion, Armor,
+   * Movement, Save DC, Max HP, Attributes, and the dice they feed) follow the
+   * instance's own switches, and nothing the GM does at the table reaches the
+   * standalone NPC sheet.
+   */
+  abilityModifiers: Record<string, boolean>
+  /**
    * Mortal Wounds this instance has sustained, in the order they were rolled.
    *
    * The instance's **allowance** is the base's `npcStats.mortalWounds` (read at

@@ -15,7 +15,11 @@ import {
   effectiveAttributes,
   effectiveCombatStats,
   effectiveNPCStats,
+  findAbility,
   formatModifierValue,
+  instanceAbilityModifiersActive,
+  normalizeInstanceAbilityModifiers,
+  withInstanceAbilityModifiers,
   hasAbilityModifiers,
   isModifierTarget,
   modifierTargetsFor,
@@ -384,5 +388,119 @@ describe('display helpers', () => {
     expect(describeModifier({ target: 'evasion', value: 2 })).toBe('+2 Evasion')
     expect(describeModifier({ target: 'AGI', value: -1 })).toBe('-1 AGI')
     expect(abilityModifiers(block())).toEqual([])
+  })
+})
+
+describe('findAbility', () => {
+  it('finds an ability wherever it lives on the sheet', () => {
+    const innate = block({ id: 'innate-1' })
+    const slotted = block({ id: 'slotted-1' })
+    const pooled = block({ id: 'pool-1' })
+    const tabbed = block({ id: 'tab-1' })
+    const nested = block({ id: 'nested-1' })
+    const customTab = {
+      id: 'tab',
+      name: 'Tab',
+      sections: [{ id: 'sec', name: 'Sec', kind: 'ability' as const, abilities: [tabbed] }],
+    }
+    const char = character({
+      innateAbilities: [innate],
+      slottedAbilities: [
+        { ...slotted, subAbilitiesUnderDescription: [nested] },
+      ],
+      abilityPool: [pooled],
+      customTabs: [customTab as Character['customTabs'][number]],
+    })
+
+    expect(findAbility(char, 'innate-1')).toBe(innate)
+    expect(findAbility(char, 'slotted-1')).toBe(char.slottedAbilities[0])
+    expect(findAbility(char, 'nested-1')).toBe(nested)
+    expect(findAbility(char, 'pool-1')).toBe(pooled)
+    expect(findAbility(char, 'tab-1')).toBe(tabbed)
+  })
+
+  it('returns null for an unknown or blank id', () => {
+    const char = character({ slottedAbilities: [block({ id: 'a' })] })
+    expect(findAbility(char, 'nope')).toBeNull()
+    expect(findAbility(char, '')).toBeNull()
+  })
+})
+
+describe('NPC instance modifier switches', () => {
+  const armed = (id: string, overrides: Partial<AbilityBlock> = {}) =>
+    block({
+      id,
+      modifiers: [{ target: 'evasion', value: 2 }],
+      ...overrides,
+    })
+
+  it('normalizes an untrusted switch map', () => {
+    expect(
+      normalizeInstanceAbilityModifiers({ a: true, b: false, c: 'true', d: 1 }),
+    ).toEqual({ a: true, b: false })
+    // A blank id is dropped; non-objects read as an untouched map.
+    expect(normalizeInstanceAbilityModifiers({ '': true })).toEqual({})
+    expect(normalizeInstanceAbilityModifiers(null)).toEqual({})
+    expect(normalizeInstanceAbilityModifiers(['a'])).toEqual({})
+  })
+
+  it('reads an untouched switch from the ability’s own flag', () => {
+    expect(instanceAbilityModifiersActive(armed('a'), undefined)).toBe(false)
+    expect(
+      instanceAbilityModifiersActive(armed('a', { modifiersActive: true }), undefined),
+    ).toBe(true)
+    // A recorded switch wins, in both directions.
+    expect(instanceAbilityModifiersActive(armed('a'), true)).toBe(true)
+    expect(
+      instanceAbilityModifiersActive(armed('a', { modifiersActive: true }), false),
+    ).toBe(false)
+    // An ability with no modifiers is never active: there is nothing to apply.
+    expect(instanceAbilityModifiersActive(block({ id: 'plain' }), true)).toBe(false)
+  })
+
+  it('projects an untouched instance back to the base reference', () => {
+    const char = character({ slottedAbilities: [armed('a')] })
+    expect(withInstanceAbilityModifiers(char, {})).toBe(char)
+    expect(withInstanceAbilityModifiers(char, undefined)).toBe(char)
+    // Recording the value the ability already has is also a no-op.
+    expect(withInstanceAbilityModifiers(char, { a: false })).toBe(char)
+  })
+
+  it('applies the instance’s switches without touching the base', () => {
+    const baseAbility = armed('a')
+    const plain = block({ id: 'plain' })
+    const char = character({ slottedAbilities: [baseAbility, plain] })
+
+    const projected = withInstanceAbilityModifiers(char, { a: true })
+
+    expect(projected.slottedAbilities[0].modifiersActive).toBe(true)
+    expect(effectiveCombatStats(projected).evasion).toBe(
+      effectiveCombatStats(char).evasion + 2,
+    )
+    // The untouched sibling keeps its reference, and the base record is
+    // unchanged — a switch flipped on one instance never leaks.
+    expect(projected.slottedAbilities[1]).toBe(plain)
+    expect(char.slottedAbilities[0].modifiersActive).toBeUndefined()
+  })
+
+  it('can switch a base ability off, and reaches sub-abilities', () => {
+    const sub = armed('sub', { modifiersActive: true })
+    const parent = block({
+      id: 'parent',
+      modifiers: [{ target: 'armor', value: 1 }],
+      modifiersActive: true,
+      subAbilitiesUnderDescription: [sub],
+    })
+    const char = character({ slottedAbilities: [parent] })
+
+    const projected = withInstanceAbilityModifiers(char, { parent: false, sub: false })
+
+    expect(projected.slottedAbilities[0].modifiersActive).toBe(false)
+    expect(
+      projected.slottedAbilities[0].subAbilitiesUnderDescription[0].modifiersActive,
+    ).toBe(false)
+    expect(effectiveCombatStats(projected).armor).toBe(
+      effectiveCombatStats(char).armor - 1,
+    )
   })
 })

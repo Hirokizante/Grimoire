@@ -109,12 +109,26 @@ export interface NPCAbilitiesSectionProps {
    */
   variant?: 'section' | 'embedded'
   /**
-   * Persist the modifier switch / manual use adjustment for an ability that
-   * does not live on the store's current character (an NPC attached to a
-   * character sheet tab). Omitted on the standalone sheet, where the store
-   * action already targets the right record.
+   * Persist the stat/attribute modifier switch.
+   *
+   * Only a GM Screen NPC panel passes this (the instance's own
+   * `state.abilityModifiers` writer), because only an instance *owns* live
+   * switch state: an NPC base record — the standalone sheet page and an NPC
+   * embedded in a player's custom tab alike — is a static reference the GM
+   * Screen spawns instances from, so its switch renders visible-but-inert (the
+   * store fallback is suppressed for `kind: 'npc'`).
    */
   onToggleModifiers?: (abilityId: string, active: boolean) => void
+  /**
+   * Persist a manual ± adjustment of a limited ability's remaining uses.
+   *
+   * Only a GM Screen NPC panel passes this (the instance's own
+   * `state.abilityUses` writer), because only an instance *owns* a live use
+   * count: an NPC base record — the standalone sheet page and an NPC embedded
+   * in a player's custom tab alike — is a static reference the GM Screen spawns
+   * instances from, so its cards render a read-only meter (the store fallback
+   * is suppressed for `kind: 'npc'`).
+   */
   onSetUses?: (abilityId: string, remaining: number) => void
 }
 
@@ -324,15 +338,17 @@ export default function NPCAbilitiesSection({
             // on Recharge cooldown) activates, the rest stay reference cards.
             const override = activateOverride(ability)
             if (override) {
-              // An override only ever comes from a GM panel, which is read-only
-              // for modifiers and uses, so this card needs no writers: the
-              // steppers are suppressed there by design.
+              // The same writer both branches get: a GM panel's limited
+              // abilities keep working ± steppers on an activatable card, and
+              // an NPC base sheet receives none (so its meter stays read-only).
               return (
                 <AbilityActivation
                   key={ability.id}
                   ability={ability}
                   character={owner}
                   activateOverride={activateOverride}
+                  onSetUses={onSetUses}
+                  onToggleModifiers={onToggleModifiers}
                 />
               )
             }

@@ -37,17 +37,19 @@ export interface SubAbilityBlockProps {
   /** Character for dice notation variable resolution (same as AbilityBlockCard). */
   character?: Character
   /**
-   * Persist the stat/attribute modifier switch for an ability that does not
-   * live on the store's current character (attached NPC sections). When
-   * omitted, the switch updates the current character.
+   * Persist the stat/attribute modifier switch for an entity the store does not
+   * own (a GM Screen NPC instance, whose switches live on the panel). When
+   * omitted, the switch updates the current player character — and is read-only
+   * everywhere else. Same contract as `AbilityBlockCard`'s prop of the same
+   * name.
    */
   onToggleModifiers?: (abilityId: string, active: boolean) => void
   /**
    * Persist a manual adjustment of a limited Sub-Ability's remaining uses for
-   * an ability that does not live on the store's current character. When
-   * omitted, the adjustment updates the current character — but only if the
-   * block's character *is* that character, so a read-only block renders no
-   * steppers. Same contract as `AbilityBlockCard`'s `onSetUses`.
+   * an entity the store does not own (a GM screen NPC instance's panel budget).
+   * When omitted, the adjustment updates the current player character — but only
+   * if the block's character *is* that character, so a read-only block renders
+   * no steppers. Same contract as `AbilityBlockCard`'s `onSetUses`.
    */
   onSetUses?: (abilityId: string, remaining: number) => void
   /**
@@ -103,6 +105,7 @@ export default function SubAbilityBlock({
 }: SubAbilityBlockProps) {
   const storeCharacter = useCharacterStore((s) => s.currentCharacter)
   const storeSetUses = useCharacterStore((s) => s.setAbilityUsesRemaining)
+  const storeToggleModifiers = useCharacterStore((s) => s.setAbilityModifiersActive)
 
   const { name, traits, cost, damage, description, overcharge, flavorText } =
     ability
@@ -125,17 +128,38 @@ export default function SubAbilityBlock({
    * A limited Sub-Ability gets its own uses stepper — even when it (or its
    * parent) has no Activate button, since the count is still a number the
    * player tracks while playing. Same writer contract as the parent card: the
-   * parent's handler wins, otherwise the store is used only when this block's
-   * character is the store's current character (a GM panel's entity stays
-   * read-only).
+   * parent's handler wins (a GM panel's instance writer, an
+   * {@link AbilityBlockCard}'s own prop), otherwise the store is used only when
+   * this block's character is the store's current **player** character — an NPC
+   * base record is a static reference and a GM panel's entity is not the store's
+   * character, so both keep a read-only meter and render no steppers.
    */
   const storeAdjuster =
-    storeCharacter && activeCharacter?.id === storeCharacter.id
+    storeCharacter &&
+    activeCharacter?.id === storeCharacter.id &&
+    activeCharacter.kind !== 'npc'
       ? (abilityId: string, next: number) =>
           storeSetUses(activeCharacter.id, abilityId, next)
       : undefined
 
   const adjustUses = onSetUses ?? storeAdjuster
+
+  /**
+   * The modifier switch's writer. Same contract as the parent card's: the
+   * surface's handler wins (a GM Screen instance's, threaded down through
+   * {@link AbilityBlockCard}), otherwise the store action only for a current
+   * **player** character — an NPC base record and a GM panel's entity render
+   * the switch read-only.
+   */
+  const storeToggle =
+    storeCharacter &&
+    activeCharacter?.id === storeCharacter.id &&
+    activeCharacter.kind !== 'npc'
+      ? (abilityId: string, active: boolean) =>
+          storeToggleModifiers(abilityId, active)
+      : undefined
+
+  const toggleModifiers = onToggleModifiers ?? storeToggle
 
   // Dice rolls from the damage field are "Damage: [name]"; rolls from
   // description/overcharge/flavor text are generic "Roll: [name]".
@@ -305,7 +329,8 @@ export default function SubAbilityBlock({
       <AbilityModifierToggle
         ability={ability}
         mode={mode}
-        onToggle={onToggleModifiers}
+        onToggle={toggleModifiers}
+        character={activeCharacter}
         className="ability-modifiers--sub"
       />
 

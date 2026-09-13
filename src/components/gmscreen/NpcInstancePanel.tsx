@@ -4,10 +4,12 @@
  * The instance is a **delta, not a clone**: stats, abilities, portrait, and
  * description all come from the base record at render time, and only live
  * state (HP, temp HP, condition, **Mortal Wounds**, **Action Points, Recharge
- * cooldowns**) plus the display label belong to the panel. Spawning "Bandit"
- * three times therefore gives three independent HP pools *and* three
- * independent turns over one shared statblock, and editing the base updates
- * every instance.
+ * cooldowns**, **remaining ability uses**, **modifier switches**) plus the
+ * display label belong to the panel. Spawning "Bandit" three times therefore
+ * gives three independent HP pools, three independent turns and three
+ * independent statblocks over one shared record — each instance's active
+ * ability modifiers move only its own Evasion/Armor/Movement/Save DC/Max HP and
+ * Attributes — and editing the base updates every instance.
  *
  * - **Compact** (default): portrait, instance label (+ base name when it
  *   differs), HP bar with −/+/damage affordances, temp HP, the GM's tracked
@@ -19,14 +21,16 @@
  *   the label.
  * - **Expanded**: the shared condensed `PanelSheet` for the base record, with
  *   the instance HP bar and AP meter kept above it. Its abilities are live:
- *   every ability with a cost activates against the instance's AP, Recharge
- *   abilities go on cooldown when used, and "Start new turn" (offered once AP
- *   hits 0) refills AP and rolls the Recharge Die. Edits inside the panel edit
- *   the **base**, which is shared by every instance — the intended semantic,
- *   flagged by an inline hint.
+ *   every ability with a cost activates against the instance's AP, a limited
+ *   ability spends one of the instance's own uses (with ± steppers to move the
+ *   count by hand), an ability's stat/attribute switch flips this instance's
+ *   effective stats, Recharge abilities go on cooldown when used, and "Start
+ *   new turn" (offered once AP hits 0) refills AP and rolls the Recharge Die.
+ *   Edits inside the panel edit the **base**, which is shared by every
+ *   instance — the intended semantic, flagged by an inline hint.
  */
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Hourglass, Pencil, Shield, Skull, Swords, Target, Wind } from 'lucide-react'
 
 import DamageDialog from '@/components/sheet/DamageDialog'
@@ -39,7 +43,8 @@ import PanelHeader, { type PanelMenuItem } from '@/components/gmscreen/PanelHead
 import PanelStatuses from '@/components/gmscreen/PanelStatuses'
 import { useNotification } from '@/context/NotificationContext'
 import { useNpcInstanceActivation } from '@/hooks/useNpcInstanceActivation'
-import { panelDamageOutcome } from '@/lib/gmScreenUtils'
+import { effectiveNPCStats } from '@/lib/abilityModifiers'
+import { panelDamageOutcome, withInstanceState } from '@/lib/gmScreenUtils'
 import { useGMScreenStore, npcMortalWoundAllowance } from '@/store/gmScreenStore'
 import type { DamageResult } from '@/store/characterStore'
 import { appThemeStatColors, gmPanelSheetPresentation } from '@/lib/themeUtils'
@@ -95,21 +100,46 @@ export default function NpcInstancePanel({
   const sheetPresentation = gmPanelSheetPresentation(base.config, appTheme, true)
 
   // Live-play wiring for this instance: its own AP, its own Recharge
-  // cooldowns, its own turn. Everything the base record owns stays untouched.
-  const { activation, startTurn, hasCooldowns } = useNpcInstanceActivation(
-    screenId,
-    panel,
-    base,
+  // cooldowns, its own turn, its own limited-ability budgets, and its own
+  // modifier switches. Everything the base record owns stays untouched.
+  const {
+    activation,
+    startTurn,
+    hasCooldowns,
+    setAbilityUses,
+    setAbilityModifiersActive,
+  } = useNpcInstanceActivation(screenId, panel, base)
+
+  /**
+   * The entity this panel renders and measures: the base record with this
+   * instance's own remaining uses and modifier switches applied to its
+   * abilities. A **projection, not a copy** — `withInstanceState` returns the
+   * base itself while the instance matches it, and rebuilds only what differs,
+   * so base edits still reach every instance and the base record is never
+   * written to. Without it every Bandit would share the base's counts and its
+   * switch states (and a switch could never be per instance).
+   */
+  const entity = useMemo(
+    () => withInstanceState(base, panel.state),
+    [base, panel.state],
   )
+
+  /**
+   * The instance's own stats: the base's manual statblock with this instance's
+   * active modifiers applied. Read through the same projection the body uses,
+   * so the chrome's Eva/Arm/Move/DC tokens and the HP bar's cap agree with the
+   * Combat Stats row and with the damage pipeline.
+   */
+  const stats = useMemo(() => effectiveNPCStats(entity), [entity])
 
   const [showDamage, setShowDamage] = useState(false)
   const [renaming, setRenaming] = useState(false)
 
-  const maxHP = base.npcStats?.hp ?? 0
-  const armor = base.npcStats?.armor ?? 0
-  const evasion = base.npcStats?.evasion ?? 0
-  const movement = base.npcStats?.movement ?? 0
-  const saveDC = base.npcStats?.saveDC ?? 0
+  const maxHP = stats.hp
+  const armor = stats.armor
+  const evasion = stats.evasion
+  const movement = stats.movement
+  const saveDC = stats.saveDC
   // How many Mortal Wounds this NPC may sustain before 0 HP downs it — the
   // base record's own stat, read here and in the damage pipeline (never copied
   // onto the instance, so editing the base updates every instance of it).
@@ -293,13 +323,21 @@ export default function NpcInstancePanel({
       {/* Same condensed body as an expanded player panel (see PanelSheet) —
         * an NPC panel used to render the entire NPCSheet, which was far too
         * tall to read alongside other panels. `npcActivation` is what makes
-        * the abilities live here without touching the base record's sheet. */}
+        * the abilities live here without touching the base record's sheet, and
+        * `npcOnSetUses` gives a limited ability's steppers the instance's own
+        * budget to move (the base sheet's copy of that control is read-only). */}
       <PanelExpand open={expanded}>
         <div
           className={sheetPresentation.className}
           style={sheetPresentation.style}
         >
-          <PanelSheet entity={base} mode="view" npcActivation={activation} />
+          <PanelSheet
+            entity={entity}
+            mode="view"
+            npcActivation={activation}
+            npcOnSetUses={setAbilityUses}
+            npcOnToggleModifiers={setAbilityModifiersActive}
+          />
         </div>
       </PanelExpand>
 
@@ -309,7 +347,10 @@ export default function NpcInstancePanel({
             screenId,
             panelId: panel.id,
             label: name,
-            base,
+            // The instance's entity, not the raw base: the dialog's armor /
+            // max-HP readouts then match what the panel shows and what the
+            // store's damage pipeline actually rolls against.
+            base: entity,
             currentHP: panel.state.currentHP,
             tempHP: panel.state.tempHP,
           }}

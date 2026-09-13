@@ -460,6 +460,8 @@ test('normalizeScreen: a well-formed screen is unchanged and idempotent', () => 
           currentAP: 2,
           cooldowns: ['a1'],
           mortalWounds: [{ roll: 14, name: 'Damaged Throat' }],
+          abilityUses: { a1: 1 },
+          abilityModifiers: { a1: true },
         },
       },
     ],
@@ -524,6 +526,10 @@ test('normalizeScreen: backfills complete instance state', () => {
     currentAP: MAX_AP,
     cooldowns: [],
     mortalWounds: [],
+    // A limited ability's budget backfills to "untouched" (reads as full) and
+    // every modifier switch backfills to the base record's own state.
+    abilityUses: {},
+    abilityModifiers: {},
   })
   expect(panel.label).toBe('')
 })
@@ -553,6 +559,8 @@ test('normalizeScreen: keeps a valid instance state and clamps negatives', () =>
     currentAP: MAX_AP,
     cooldowns: [],
     mortalWounds: [],
+    abilityUses: {},
+    abilityModifiers: {},
   })
 })
 
@@ -628,6 +636,68 @@ test('normalizeScreen: repairs the instance Mortal Wound track', () => {
     { roll: 0, name: 'Damaged Throat' },
   ])
   expect(second.state.mortalWounds).toEqual([])
+})
+
+test('normalizeScreen: repairs the instance ability-use map', () => {
+  const out = normalizeScreen(
+    asScreen({
+      id: 's1',
+      name: 'Spawns',
+      panels: [
+        {
+          kind: 'npc-instance',
+          id: 'p1',
+          baseNpcId: 'n1',
+          state: {
+            currentHP: 5,
+            // Counts are whole numbers floored into [0, MAX_ABILITY_USES];
+            // unusable entries are dropped. The per-ability maximum lives on
+            // the base record and is applied at render time, not here.
+            abilityUses: { a1: 2, a2: '1', a3: -4, a4: 2.9, a5: 'x', '': 3 },
+          },
+        },
+        // A legacy instance: no `abilityUses` field at all.
+        { kind: 'npc-instance', id: 'p2', baseNpcId: 'n1' },
+      ],
+    }),
+  )
+  const [first, second] = out.panels as Extract<
+    ScreenPanel,
+    { kind: 'npc-instance' }
+  >[]
+  expect(first.state.abilityUses).toEqual({ a1: 2, a2: 1, a3: 0, a4: 2 })
+  expect(second.state.abilityUses).toEqual({})
+})
+
+test('normalizeScreen: repairs the instance modifier-switch map', () => {
+  const out = normalizeScreen(
+    asScreen({
+      id: 's1',
+      name: 'Spawns',
+      panels: [
+        {
+          kind: 'npc-instance',
+          id: 'p1',
+          baseNpcId: 'n1',
+          state: {
+            currentHP: 5,
+            // Only booleans are usable: anything else (a truthy string, a
+            // number) is dropped rather than guessed at, and a blank id goes
+            // with it. What an absent entry means lives on the base record.
+            abilityModifiers: { a1: true, a2: false, a3: 'true', a4: 1, '': true },
+          },
+        },
+        // A legacy instance: no `abilityModifiers` field at all.
+        { kind: 'npc-instance', id: 'p2', baseNpcId: 'n1' },
+      ],
+    }),
+  )
+  const [first, second] = out.panels as Extract<
+    ScreenPanel,
+    { kind: 'npc-instance' }
+  >[]
+  expect(first.state.abilityModifiers).toEqual({ a1: true, a2: false })
+  expect(second.state.abilityModifiers).toEqual({})
 })
 
 test('normalizeScreen: drops panels that reference nothing', () => {

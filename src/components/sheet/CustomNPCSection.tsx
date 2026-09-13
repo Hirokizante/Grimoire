@@ -32,10 +32,8 @@ import {
   DEFAULT_NPC_STATS,
   effectiveAttributes,
   effectiveNPCStats,
-  setAbilityModifiersActive,
   formatModifierValue,
 } from '@/lib/abilityModifiers'
-import { setAbilityUsesRemaining } from '@/lib/abilityUses'
 import type {
   AttributeKey,
   Character,
@@ -184,28 +182,6 @@ export default function CustomNPCSection({
       character: npc,
       source: { type: 'attribute-check', attributeKey: key, attributeName: name },
     })
-  }
-
-  /**
-   * Switch an attached NPC ability's modifiers on/off. The ability lives on
-   * the NPC's own record — not on the parent character in `currentCharacter` —
-   * so the update goes through {@link updateAttachedNPC}.
-   */
-  const toggleAbilityModifiers = (abilityId: string, active: boolean) => {
-    updateAttachedNPC(npc.id, (cur) =>
-      setAbilityModifiersActive(cur, abilityId, active),
-    )
-  }
-
-  /**
-   * Move an attached NPC ability's remaining uses by hand. Like the modifier
-   * switch, the block lives on the NPC's own record, so the write goes through
-   * {@link updateAttachedNPC} rather than the store's current-character action.
-   */
-  const setAbilityUses = (abilityId: string, remaining: number) => {
-    updateAttachedNPC(npc.id, (cur) =>
-      setAbilityUsesRemaining(cur, abilityId, remaining),
-    )
   }
 
   const onClickSkill = (skill: SkillName) => {
@@ -381,7 +357,12 @@ export default function CustomNPCSection({
             grid/list toggle, "+ Add Ability" below it, the same card grid, and
             the same drag-to-reorder handles in edit mode. An attached NPC is a
             static reference like the standalone sheet, so "nothing activates"
-            (the section's own default resolver) travels with every card. */}
+            (the section's own default resolver) travels with every card — and
+            no state writer is threaded down either (no use stepper, no modifier
+            switch), so a limited ability's meter stays read-only and its
+            modifier switch stays visible-but-inert. Uses and modifier switches
+            are live play, and live play belongs to a GM Screen instance, which
+            tracks its own. */}
         <NPCAbilitiesSection
           variant="embedded"
           abilities={npc.slottedAbilities}
@@ -390,8 +371,6 @@ export default function CustomNPCSection({
           mode={mode}
           viewMode={viewMode}
           onViewModeChange={onViewModeChange}
-          onToggleModifiers={toggleAbilityModifiers}
-          onSetUses={setAbilityUses}
         />
 
         {/* Skills — compact horizontal list */}

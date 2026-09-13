@@ -72,7 +72,15 @@ const SCREEN_ID = 'screen-1'
 const PANEL_ID = 'panel-1'
 
 /** Seed a screen with one NPC-instance panel and return the panel. */
-function seedScreenFor(base: Character, state?: Partial<{ currentHP: number; tempHP: number }>) {
+function seedScreenFor(
+  base: Character,
+  state?: Partial<{
+    currentHP: number
+    tempHP: number
+    abilityUses: Record<string, number>
+    abilityModifiers: Record<string, boolean>
+  }>,
+) {
   useCharacterStore.setState({ characters: [base], currentCharacter: null })
   useGMScreenStore.setState({
     screens: [
@@ -94,6 +102,8 @@ function seedScreenFor(base: Character, state?: Partial<{ currentHP: number; tem
               currentAP: MAX_AP,
               cooldowns: [],
               mortalWounds: [],
+              abilityUses: state?.abilityUses ?? {},
+              abilityModifiers: state?.abilityModifiers ?? {},
             },
           },
         ],
@@ -1054,6 +1064,8 @@ function expandedHeadings(kind: 'character' | 'npc') {
                   currentAP: MAX_AP,
                   cooldowns: [],
                   mortalWounds: [],
+                  abilityUses: {},
+                  abilityModifiers: {},
                 },
               },
         ],
@@ -1205,11 +1217,18 @@ function makeBaseWith(abilities: AbilityBlock[], overrides: Partial<Character> =
 
 /**
  * Render the seeded panel the way GMScreenPage does — subscribed to the screen,
- * so a store write re-renders it with the fresh panel object.
+ * so a store write re-renders it with the fresh panel object. `panelIndex`
+ * picks which panel of the screen to render (0 unless a test spawns siblings).
  */
-function NpcPanelHarness({ base }: { base: Character }) {
+function NpcPanelHarness({
+  base,
+  panelIndex = 0,
+}: {
+  base: Character
+  panelIndex?: number
+}) {
   const panel = useGMScreenStore((s) =>
-    s.screens.find((screen) => screen.id === SCREEN_ID)?.panels[0],
+    s.screens.find((screen) => screen.id === SCREEN_ID)?.panels[panelIndex],
   )
   if (!panel || panel.kind !== 'npc-instance') return null
   return (
@@ -1853,21 +1872,303 @@ test('NPC panel: a Recharge sub-ability badges its own trait chip', () => {
   expect(chip?.querySelector('.gm-recharge')).not.toBeNull()
 })
 
-test('NPC panel: a limited ability is refused once its uses run out', () => {
+// ---- NPC live play: limited-use abilities -----------------------------------
+
+/** A limited 3-use ability for a panel test. */
+function limitedAbility(overrides: Partial<AbilityBlock> = {}): AbilityBlock {
+  return makeAbility({
+    id: 'a1',
+    name: 'Cleave',
+    cost: { ap: 1 },
+    uses: { max: 3, current: 3, expendOnActivate: true },
+    ...overrides,
+  })
+}
+
+/** The uses readout on the panel's ability card. */
+function usesReadout(name: string | RegExp = /uses remaining/i): HTMLElement {
+  return screen.getByRole('img', { name })
+}
+
+/** The base record as the store holds it (a panel must never write to it). */
+function storedBaseAbility(id = 'a1'): AbilityBlock {
+  const base = useCharacterStore
+    .getState()
+    .characters.find((c) => c.id === 'npc-1')
+  const ability = base?.slottedAbilities.find((a) => a.id === id)
+  if (!ability) throw new Error(`no base ability ${id}`)
+  return ability
+}
+
+test('NPC panel: a limited ability starts at the ability’s full budget', () => {
+  // The base is a template whose own count is spent down (legacy data, or a
+  // base that was stepped by hand before this rule). An instance never inherits
+  // it: it starts full and tracks its own uses from there.
   const base = makeBaseWith([
-    makeAbility({
-      id: 'a1',
-      name: 'Cleave',
-      cost: { ap: 1 },
-      uses: { max: 1, current: 0, expendOnActivate: true },
-    }),
+    limitedAbility({ uses: { max: 3, current: 1, expendOnActivate: true } }),
   ])
   renderNpcPanel(base)
+
+  expect(usesReadout('3 of 3 uses remaining')).toBeInTheDocument()
+  expect(activateButtons()[0]).toBeEnabled()
+  expect(panelState().abilityUses).toEqual({})
+})
+
+test('NPC panel: activating a limited ability spends one of the instance’s uses', () => {
+  const base = makeBaseWith([limitedAbility()])
+  renderNpcPanel(base)
+
+  fireEvent.click(activateButtons()[0])
+
+  expect(panelState().currentAP).toBe(2)
+  expect(panelState().abilityUses).toEqual({ a1: 2 })
+  expect(usesReadout('2 of 3 uses remaining')).toBeInTheDocument()
+  expect(screen.getByText(/Activated Cleave \(1 use spent\)/)).toBeInTheDocument()
+  // The shared base record keeps its full budget — the instance spent its own.
+  expect(storedBaseAbility().uses).toEqual({
+    max: 3,
+    current: 3,
+    expendOnActivate: true,
+  })
+})
+
+test('NPC panel: a limited ability is refused once the instance’s uses run out', () => {
+  const base = makeBaseWith([limitedAbility()])
+  seedScreenFor(base, { abilityUses: { a1: 0 } })
+  useGMScreenStore.getState().setPanelDensity(SCREEN_ID, PANEL_ID, 'expanded')
+  render(
+    <NotificationProvider>
+      <NpcPanelHarness base={base} />
+    </NotificationProvider>,
+  )
 
   const button = activateButtons()[0]
   expect(button).toBeDisabled()
   expect(button).toHaveAttribute('title', expect.stringContaining('No uses'))
   expect(panelState().currentAP).toBe(3)
+
+  // A disabled button swallows the click; the plan guards too.
+  fireEvent.click(button)
+  expect(panelState().currentAP).toBe(3)
+  expect(panelState().abilityUses).toEqual({ a1: 0 })
+})
+
+test('NPC panel: the ± steppers move the instance’s count without spending AP', () => {
+  const base = makeBaseWith([limitedAbility()])
+  renderNpcPanel(base)
+
+  fireEvent.click(screen.getByRole('button', { name: /spend one use of Cleave/i }))
+  expect(panelState().abilityUses).toEqual({ a1: 2 })
+  expect(panelState().currentAP).toBe(3)
+  expect(usesReadout('2 of 3 uses remaining')).toBeInTheDocument()
+
+  fireEvent.click(screen.getByRole('button', { name: /restore one use of Cleave/i }))
+  // Back to full: the entry goes away rather than pinning today's maximum.
+  expect(panelState().abilityUses).toEqual({})
+  expect(panelState().currentAP).toBe(3)
+  expect(storedBaseAbility().uses?.current).toBe(3)
+})
+
+test('NPC panel: the steppers write the panel even when the base is the current character', () => {
+  // The GM usually reaches the screen straight from the NPC's sheet page, which
+  // leaves the base record as `currentCharacter` — the instance's cards must
+  // still write the panel, never the (shared) base.
+  const base = makeBaseWith([limitedAbility()])
+  renderNpcPanel(base)
+  act(() => {
+    useCharacterStore.setState({ currentCharacter: base })
+  })
+
+  fireEvent.click(screen.getByRole('button', { name: /spend one use of Cleave/i }))
+
+  expect(panelState().abilityUses).toEqual({ a1: 2 })
+  expect(storedBaseAbility().uses?.current).toBe(3)
+})
+
+test('NPC panel: each instance spends its own uses', () => {
+  const base = makeBaseWith([limitedAbility()])
+  seedScreenFor(base)
+  useGMScreenStore.getState().setPanelDensity(SCREEN_ID, PANEL_ID, 'expanded')
+  useGMScreenStore.getState().duplicatePanel(SCREEN_ID, PANEL_ID)
+
+  const { container } = render(
+    <NotificationProvider>
+      <NpcPanelHarness base={base} />
+      <NpcPanelHarness base={base} panelIndex={1} />
+    </NotificationProvider>,
+  )
+  // Both panels render the same card; the first one activates.
+  const buttons = activateButtons()
+  expect(buttons).toHaveLength(2)
+  fireEvent.click(buttons[0])
+
+  const panels = useGMScreenStore.getState().screens[0].panels
+  expect(panels[0].kind === 'npc-instance' && panels[0].state.abilityUses).toEqual({ a1: 2 })
+  expect(panels[1].kind === 'npc-instance' && panels[1].state.abilityUses).toEqual({})
+
+  const readouts = Array.from(
+    container.querySelectorAll('.ability-uses__value'),
+  ).map((el) => el.getAttribute('aria-label'))
+  expect(readouts).toEqual(['2 of 3 uses remaining', '3 of 3 uses remaining'])
+})
+
+test('NPC panel: expendOnActivate off keeps the budget (and the steppers)', () => {
+  const base = makeBaseWith([
+    limitedAbility({ uses: { max: 2, current: 2, expendOnActivate: false } }),
+  ])
+  renderNpcPanel(base)
+
+  fireEvent.click(activateButtons()[0])
+
+  expect(panelState().currentAP).toBe(2)
+  expect(panelState().abilityUses).toEqual({})
+  // The counter is still adjustable by hand.
+  fireEvent.click(screen.getByRole('button', { name: /spend one use of Cleave/i }))
+  expect(panelState().abilityUses).toEqual({ a1: 1 })
+})
+
+test('NPC panel: a limited sub-ability spends the instance’s own use', () => {
+  const base = makeBaseWith([
+    makeAbility({
+      id: 'a1',
+      name: 'Storm Call',
+      cost: {},
+      subAbilitiesUnderDescription: [
+        limitedAbility({ id: 'sub', name: 'Lightning Lash', cost: { ap: 1 } }),
+      ],
+    }),
+  ])
+  renderNpcPanel(base)
+
+  fireEvent.click(activateButtons()[0])
+
+  expect(panelState().abilityUses).toEqual({ sub: 2 })
+  expect(usesReadout('2 of 3 uses remaining')).toBeInTheDocument()
+})
+
+// ---- NPC live play: ability modifier switches -------------------------------
+
+/** A base ability carrying one stat/attribute modifier. */
+function modifierAbility(overrides: Partial<AbilityBlock> = {}): AbilityBlock {
+  return makeAbility({
+    id: 'a1',
+    name: 'Rage',
+    modifiers: [{ target: 'evasion', value: 2 }],
+    ...overrides,
+  })
+}
+
+/** The value one of the panel chrome's stat tokens prints. */
+function tokenValue(container: HTMLElement, label: string): string {
+  const token = Array.from(container.querySelectorAll('.gm-token')).find(
+    (el) => el.querySelector('.gm-token__label')?.textContent === label,
+  )
+  if (!token) throw new Error(`no token labelled ${label}`)
+  return token.querySelector('.gm-token__value')?.textContent ?? ''
+}
+
+test('NPC panel: the modifier switch moves the instance’s effective stats', () => {
+  const base = makeBaseWith([modifierAbility()])
+  const { container } = renderNpcPanel(base)
+
+  const toggle = screen.getByRole('switch', { name: /Apply Rage modifiers/i })
+  expect(toggle).toBeEnabled()
+  expect(toggle).toHaveAttribute('aria-checked', 'false')
+  expect(tokenValue(container, 'Eva')).toBe('10')
+
+  fireEvent.click(toggle)
+
+  // The instance carries the switch, the chrome token and the body's Combat
+  // Stats row both read the projected entity, and the base record is untouched.
+  expect(panelState().abilityModifiers).toEqual({ a1: true })
+  expect(toggle).toHaveAttribute('aria-checked', 'true')
+  expect(tokenValue(container, 'Eva')).toBe('12')
+  expect(
+    container.querySelector('.gm-panel__sheet .stat-token--modified .stat-token__delta')
+      ?.textContent,
+  ).toBe('+2')
+  expect(storedBaseAbility().modifiersActive).toBeUndefined()
+
+  fireEvent.click(toggle)
+  expect(panelState().abilityModifiers).toEqual({})
+  expect(tokenValue(container, 'Eva')).toBe('10')
+})
+
+test('NPC panel: an active Max HP modifier raises the HP bar’s cap', () => {
+  const base = makeBaseWith([
+    modifierAbility({
+      id: 'a1',
+      name: 'Colossus',
+      modifiers: [{ target: 'maxHP', value: 10 }],
+    }),
+  ])
+  const { container } = renderNpcPanel(base)
+
+  fireEvent.click(screen.getByRole('switch', { name: /Apply Colossus modifiers/i }))
+
+  expect(container.querySelector('.gm-hp .gm-bar__max')?.textContent).toContain('30')
+})
+
+test('NPC panel: each instance switches its own modifiers', () => {
+  const base = makeBaseWith([modifierAbility()])
+  seedScreenFor(base)
+  useGMScreenStore.getState().setPanelDensity(SCREEN_ID, PANEL_ID, 'expanded')
+  useGMScreenStore.getState().duplicatePanel(SCREEN_ID, PANEL_ID)
+
+  const { container } = render(
+    <NotificationProvider>
+      <NpcPanelHarness base={base} />
+      <NpcPanelHarness base={base} panelIndex={1} />
+    </NotificationProvider>,
+  )
+  const switches = screen.getAllByRole('switch')
+  expect(switches).toHaveLength(2)
+  fireEvent.click(switches[0])
+
+  const panels = useGMScreenStore.getState().screens[0].panels
+  expect(
+    panels[0].kind === 'npc-instance' && panels[0].state.abilityModifiers,
+  ).toEqual({ a1: true })
+  expect(
+    panels[1].kind === 'npc-instance' && panels[1].state.abilityModifiers,
+  ).toEqual({})
+  expect(tokenValue(container, 'Eva')).toBe('12')
+  // The sibling panel still reads its own (unmodified) stats.
+  const evas = Array.from(container.querySelectorAll('.gm-token'))
+    .filter((el) => el.querySelector('.gm-token__label')?.textContent === 'Eva')
+    .map((el) => el.querySelector('.gm-token__value')?.textContent)
+  expect(evas).toEqual(['12', '10'])
+})
+
+test('NPC panel: the switch writes the panel even when the base is the current character', () => {
+  const base = makeBaseWith([modifierAbility()])
+  renderNpcPanel(base)
+  act(() => {
+    useCharacterStore.setState({ currentCharacter: base })
+  })
+
+  fireEvent.click(screen.getByRole('switch', { name: /Apply Rage modifiers/i }))
+
+  expect(panelState().abilityModifiers).toEqual({ a1: true })
+  expect(storedBaseAbility().modifiersActive).toBeUndefined()
+})
+
+test('NPC panel: an active Armor modifier reaches the Damage dialog', () => {
+  const base = makeBaseWith([
+    modifierAbility({
+      id: 'a1',
+      name: 'Bulwark',
+      modifiers: [{ target: 'armor', value: 3 }],
+    }),
+  ])
+  renderNpcPanel(base)
+
+  fireEvent.click(screen.getByRole('switch', { name: /Apply Bulwark modifiers/i }))
+  fireEvent.click(screen.getByRole('button', { name: 'Damage…' }))
+
+  // The dialog's armor preview has to be the instance's, or the reduction the
+  // GM is told about would not be the one the store rolls.
+  expect(screen.getByText('Apply Armor (3d6 reduction)')).toBeInTheDocument()
 })
 
 test('NPC panel: a Recharge ability cools down when used and is disabled', () => {

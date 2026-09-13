@@ -147,6 +147,97 @@ test('standalone NPC abilities never render an Activate button', () => {
   expect(screen.getByText('Fire Breath')).toBeInTheDocument()
 })
 
+test('standalone NPC limited uses render read-only — no ± steppers', () => {
+  // A base NPC record is a static reference the GM Screen spawns instances
+  // from, so its use counts are template data: the budget still *reads* on the
+  // card, but nothing here may move it — not even though this NPC is the
+  // store's current character, which is exactly what gives a player sheet its
+  // steppers.
+  const limited: AbilityBlock = {
+    ...plainAbility('limited-1', 'Cleave'),
+    cost: { ap: 1 },
+    showActivate: true,
+    uses: { max: 3, current: 2, expendOnActivate: true },
+    subAbilitiesUnderDescription: [
+      {
+        ...plainAbility('sub-1', 'Riposte'),
+        uses: { max: 2, current: 2, expendOnActivate: true },
+      },
+    ],
+  }
+  const npc: Character = {
+    ...createDefaultNPC(),
+    id: 'npc-1',
+    name: 'Bandit',
+    slottedAbilities: [limited],
+  }
+  dbMap.set(npc.id, npc)
+  useCharacterStore.setState({ currentCharacter: npc, characters: [npc] })
+
+  render(
+    <NPCAbilitiesSection
+      abilities={npc.slottedAbilities}
+      ownerId={npc.id}
+      owner={npc}
+    />,
+  )
+
+  // The counts are visible (the parent's and its sub-ability's)…
+  expect(
+    screen.getByRole('img', { name: '2 of 3 uses remaining' }),
+  ).toBeInTheDocument()
+  expect(
+    screen.getByRole('img', { name: '2 of 2 uses remaining' }),
+  ).toBeInTheDocument()
+  // …but there is no control to move either of them.
+  expect(screen.queryAllByRole('button', { name: /one use of/i })).toHaveLength(0)
+  // The record keeps its authored count, untouched.
+  expect(
+    useCharacterStore.getState().characters[0].slottedAbilities[0].uses?.current,
+  ).toBe(2)
+})
+
+test('standalone NPC modifier switches are visible but inert', () => {
+  // The modifier list and the switch state read on the base sheet, but a base
+  // NPC record is a static reference the GM Screen spawns instances from — the
+  // switch exists for parity with a player sheet and is deliberately disabled.
+  // The store's own fallback is what a player sheet uses here, so this pins the
+  // rule even though the NPC *is* the store's current character.
+  const rage: AbilityBlock = {
+    ...plainAbility('mod-1', 'Rage'),
+    modifiers: [{ target: 'evasion', value: 2 }],
+  }
+  const npc: Character = {
+    ...createDefaultNPC(),
+    id: 'npc-1',
+    name: 'Bandit',
+    slottedAbilities: [rage],
+  }
+  dbMap.set(npc.id, npc)
+  useCharacterStore.setState({ currentCharacter: npc, characters: [npc] })
+
+  render(
+    <NPCAbilitiesSection
+      abilities={npc.slottedAbilities}
+      ownerId={npc.id}
+      owner={npc}
+    />,
+  )
+
+  const toggle = screen.getByRole('switch', { name: /Apply Rage modifiers/i })
+  expect(toggle).toBeDisabled()
+  expect(toggle).toHaveAttribute(
+    'title',
+    expect.stringMatching(/static references/i),
+  )
+  expect(screen.getByText('+2 Evasion')).toBeInTheDocument()
+
+  fireEvent.click(toggle)
+  expect(
+    useCharacterStore.getState().characters[0].slottedAbilities[0].modifiersActive,
+  ).toBeUndefined()
+})
+
 test('the sub-ability editor hides the Show Activate toggle on an NPC sheet', () => {
   const npc = seedNpc()
   render(

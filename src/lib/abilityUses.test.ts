@@ -17,11 +17,14 @@ import {
   buildAbilityUses,
   expendsUseOnActivate,
   hasUsesRemaining,
+  instanceAbilityUsesRemaining,
   isLimitedAbility,
   normalizeAbilityUses,
+  normalizeInstanceAbilityUses,
   restoreAllAbilityUses,
   setAbilityUsesRemaining,
   spendAbilityUse,
+  withInstanceAbilityUses,
 } from '@/lib/abilityUses'
 import type { AbilityBlock, Character } from '@/types'
 
@@ -276,4 +279,88 @@ test('restoreAllAbilityUses: keeps untouched sibling references stable', () => {
   expect(restored).not.toBe(char)
   expect(restored.slottedAbilities[0]).toBe(full)
   expect(restored.slottedAbilities[1]).not.toBe(spent)
+})
+
+// ---- NPC instances (GM Screen) ---------------------------------------------
+
+test('normalizeInstanceAbilityUses: repairs an untrusted map', () => {
+  expect(normalizeInstanceAbilityUses({ a: 2, b: '1', c: -3, d: 1.9, e: 'x' })).toEqual({
+    a: 2,
+    b: 1,
+    c: 0,
+    d: 1,
+  })
+  // A blank id, a non-numeric count and a count above the ceiling are dropped
+  // or clamped; a non-object reads as an untouched map.
+  expect(normalizeInstanceAbilityUses({ '': 2, a: MAX_ABILITY_USES + 50 })).toEqual({
+    a: MAX_ABILITY_USES,
+  })
+  expect(normalizeInstanceAbilityUses(null)).toEqual({})
+  expect(normalizeInstanceAbilityUses(['a'])).toEqual({})
+})
+
+test('instanceAbilityUsesRemaining: an untouched ability reads as its maximum', () => {
+  // The base's own `current` is deliberately ignored: 1 of 3 spent on the base
+  // sheet must not reach an instance spawned from it.
+  const ability = limited('a', 1)
+  expect(instanceAbilityUsesRemaining(ability, undefined)).toBe(3)
+  expect(instanceAbilityUsesRemaining(ability, null)).toBe(3)
+  expect(instanceAbilityUsesRemaining(ability, 0)).toBe(0)
+  expect(instanceAbilityUsesRemaining(ability, 2)).toBe(2)
+  // A stale count is tightened by the ability's current maximum.
+  expect(instanceAbilityUsesRemaining(ability, 9)).toBe(3)
+  expect(instanceAbilityUsesRemaining(ability, -2)).toBe(0)
+  // Unlimited abilities have no budget to read.
+  expect(instanceAbilityUsesRemaining(block({ id: 'plain' }), 2)).toBe(0)
+})
+
+test('withInstanceAbilityUses: an untouched instance renders the base itself', () => {
+  // Every authored ability is at its maximum, so there is nothing to project:
+  // the base reference survives and no card below is asked to re-render.
+  const char = characterWith(limited('a', 3), { ...block(), id: 'plain' })
+  expect(withInstanceAbilityUses(char, {})).toBe(char)
+  expect(withInstanceAbilityUses(char, undefined)).toBe(char)
+})
+
+test('withInstanceAbilityUses: applies the instance’s count, not the base’s', () => {
+  const char = characterWith(limited('a', 3), limited('b', 3))
+
+  const projected = withInstanceAbilityUses(char, { a: 1 })
+
+  expect(abilityUsesRemaining(slotted(projected, 'a'))).toBe(1)
+  // The ability the instance has not spent into keeps its authored maximum.
+  expect(abilityUsesRemaining(slotted(projected, 'b'))).toBe(3)
+  // Sibling references are preserved so an untouched card cannot re-render.
+  expect(slotted(projected, 'b')).toBe(slotted(char, 'b'))
+  // The base record itself is untouched.
+  expect(abilityUsesRemaining(slotted(char, 'a'))).toBe(3)
+})
+
+test('withInstanceAbilityUses: a depleted base ability starts full on the instance', () => {
+  const char = characterWith(limited('a', 0))
+  const projected = withInstanceAbilityUses(char, {})
+  expect(abilityUsesRemaining(slotted(projected, 'a'))).toBe(3)
+  expect(projected).not.toBe(char)
+})
+
+test('withInstanceAbilityUses: clamps a stale count and reaches sub-abilities', () => {
+  const parent: AbilityBlock = {
+    ...block(),
+    id: 'parent',
+    subAbilitiesUnderDescription: [limited('sub', 3)],
+  }
+  const char = characterWith(parent, limited('a', 3))
+
+  const projected = withInstanceAbilityUses(char, { a: 9, sub: 0 })
+
+  expect(abilityUsesRemaining(slotted(projected, 'a'))).toBe(3)
+  expect(
+    abilityUsesRemaining(slotted(projected, 'parent').subAbilitiesUnderDescription[0]),
+  ).toBe(0)
+})
+
+test('withInstanceAbilityUses: leaves unlimited abilities and unknown ids alone', () => {
+  const char = characterWith({ ...block(), id: 'plain' })
+  const projected = withInstanceAbilityUses(char, { plain: 1, nope: 2 })
+  expect(projected).toBe(char)
 })

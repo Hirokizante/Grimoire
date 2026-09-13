@@ -2044,7 +2044,7 @@
   transition: color 0.15s ease;
 }
 
-.modifier-switch:hover {
+.modifier-switch:not(:disabled):hover {
   color: var(--text-primary);
 }
 
@@ -2082,6 +2082,14 @@
 .modifier-switch[aria-checked='true'] .modifier-switch__thumb {
   transform: translateX(1rem);
   background: var(--bg-base);
+}
+
+/* A static reference (an NPC base sheet) shows the switch and its state but
+   cannot flip it — the whole control is quieted, and it never reacts to hover
+   (a disabled button still matches :hover, which reads as clickable). */
+.modifier-switch:disabled {
+  cursor: default;
+  opacity: 0.55;
 }
 
 .ability-modifiers__list {
@@ -2517,8 +2525,10 @@
 }
 
 /* The overlay is a picture, not a control surface: its cards are live copies,
-   so their uses steppers would otherwise take clicks mid-drag. */
-.sortable-ability--overlay .ability-uses__step {
+   so their uses steppers and modifier switches would otherwise take clicks
+   mid-drag. */
+.sortable-ability--overlay .ability-uses__step,
+.sortable-ability--overlay .modifier-switch {
   pointer-events: none;
 }
 

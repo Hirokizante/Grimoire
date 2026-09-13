@@ -21,6 +21,17 @@ import {
 } from '@/lib/db'
 import { MAX_AP, generateId } from '@/constants/gameData'
 import { MAX_PANEL_STATUS_STACKS } from '@/constants/statusDurations'
+import {
+  effectiveNPCStats,
+  findAbility,
+  hasAbilityModifiers,
+} from '@/lib/abilityModifiers'
+import {
+  abilityUses,
+  expendsUseOnActivate,
+  instanceAbilityUsesRemaining,
+} from '@/lib/abilityUses'
+import { withInstanceState } from '@/lib/gmScreenUtils'
 import { rollDie } from '@/lib/dice'
 import { rollOnMortalWoundTable } from '@/lib/mortalWounds'
 import { resolveRecharge, rollRechargeDie, type RechargeOutcome } from '@/lib/abilityRecharge'
@@ -267,6 +278,51 @@ export interface GMScreenActions {
     abilityId: string,
   ) => void
   /**
+   * Set how many uses this instance has left of one of the base record's
+   * limited abilities. Clamped to the ability's authored `max` (read from the
+   * base — the panel never trusts the number the caller saw), and moves only
+   * the **instance's** count: the base record is never written to.
+   *
+   * A write that lands on the ability's full budget drops the entry instead of
+   * storing it, so "untouched" stays distinguishable from "spent down and
+   * handed back" — see {@link NpcInstanceState.abilityUses}.
+   */
+  setInstanceAbilityUses: (
+    screenId: string,
+    panelId: string,
+    abilityId: string,
+    remaining: number,
+  ) => void
+  /**
+   * Spend one use of a limited ability on this instance (the Activate path).
+   * Returns whether a use was really spent — false for an unknown ability, an
+   * unlimited one, one whose author switched off `expendOnActivate`, or one at
+   * 0 uses, so the caller's toast never claims a use it did not spend.
+   */
+  spendInstanceAbilityUse: (
+    screenId: string,
+    panelId: string,
+    abilityId: string,
+  ) => boolean
+  /**
+   * Switch one of the base record's abilities' stat/attribute modifiers on or
+   * off **for this instance**. No-op for an ability that declares no modifiers,
+   * and moves only the instance's own switch: the base record is never written
+   * to.
+   *
+   * A switch that lands back on the ability's own `modifiersActive` value drops
+   * the entry instead of storing it, so "untouched" stays distinguishable from
+   * "flipped here" — see {@link NpcInstanceState.abilityModifiers}. Switching a
+   * Max HP modifier off clamps the instance's current HP to the new maximum,
+   * exactly as the sheet's own action does.
+   */
+  setInstanceAbilityModifiersActive: (
+    screenId: string,
+    panelId: string,
+    abilityId: string,
+    active: boolean,
+  ) => void
+  /**
    * Start an NPC instance's next turn: refill its Action Points and roll the
    * Recharge Die once, bringing every cooling ability whose Recharge value is
    * at or below the roll back online (and dropping ids that no longer resolve
@@ -295,10 +351,34 @@ export interface GMScreenActions {
 
 export type GMScreenStore = GMScreenState & GMScreenActions
 
-/** Max HP of an NPC instance = the base's manual `npcStats.hp`. */
-function baseMaxHP(base: Character | null): number {
-  const hp = base?.npcStats?.hp
-  return typeof hp === 'number' && Number.isFinite(hp) ? hp : 0
+/**
+ * Max HP of one NPC **instance**: the base's manual `npcStats.hp` with the
+ * instance's own active Max HP modifiers applied, read through the same
+ * projection the panel renders (`withInstanceState`), so the HP bar's cap, the
+ * damage pipeline's Mortal Wound reset, and healing's clamp all agree with the
+ * Combat Stats row.
+ *
+ * A base with no usable HP stat still reads 0 — the instance has no pool to
+ * measure, exactly as before modifiers existed.
+ */
+function instanceMaxHP(
+  base: Character | null | undefined,
+  state: NpcInstanceState,
+): number {
+  if (!base) return 0
+  const raw = base.npcStats?.hp
+  if (typeof raw !== 'number' || !Number.isFinite(raw)) return 0
+  return effectiveNPCStats(withInstanceState(base, state)).hp
+}
+
+/**
+ * Armor of one NPC instance, with its own active modifiers applied. A player
+ * sheet's damage pipeline reads `effectiveCombatStats(character).armor` for the
+ * same reason: a "+2 Armor" ability the GM switched on this panel has to reduce
+ * the damage this instance takes, not just change a number on its stat row.
+ */
+function instanceArmor(entity: Character | null): number {
+  return entity ? effectiveNPCStats(entity).armor : 0
 }
 
 /**
@@ -337,6 +417,27 @@ function autoInstanceLabel(screen: GMScreen, base: Character): string {
 /** Panel id for a new panel. */
 function newPanelId(): string {
   return generateId()
+}
+
+/**
+ * Fold a remaining-uses write back into an instance's sparse
+ * {@link NpcInstanceState.abilityUses} map.
+ *
+ * A count that lands on the ability's authored maximum is stored as **absence**
+ * — the map records only budgets an instance has actually spent into — so a
+ * fresh instance (and one the GM has handed every use back to) reads the base's
+ * maximum at render time and follows it if the base's budget is later raised.
+ */
+function withRecordedAbilityUse(
+  recorded: Record<string, number>,
+  abilityId: string,
+  remaining: number,
+  max: number,
+): Record<string, number> {
+  const next = { ...recorded }
+  if (remaining >= max) delete next[abilityId]
+  else next[abilityId] = remaining
+  return next
 }
 
 export const useGMScreenStore = create<GMScreenStore>()((set, get) => {
@@ -510,6 +611,26 @@ export const useGMScreenStore = create<GMScreenStore>()((set, get) => {
         .characters.find((c) => c.id === baseNpcId)
       const id = newPanelId()
       const resolvedLabel = label?.trim() || (base ? autoInstanceLabel(screen, base) : '')
+      // A fresh instance has taken no wounds (its allowance is the base's
+      // `npcStats.mortalWounds`, read at damage time — not copied here), spent
+      // none of its limited abilities' uses, and flipped none of its modifier
+      // switches. Both maps are deliberately empty rather than snapshots of the
+      // base: an instance records only what it changes itself, so every
+      // instance starts on the base's own (template) state and tracks its own
+      // from there.
+      const state: NpcInstanceState = {
+        currentHP: 0,
+        tempHP: 0,
+        condition: 'active',
+        currentAP: MAX_AP,
+        cooldowns: [],
+        mortalWounds: [],
+        abilityUses: {},
+        abilityModifiers: {},
+      }
+      // Spawned at the instance's full pool, which is the base's HP with any
+      // template-level Max HP modifier the base record carries.
+      state.currentHP = instanceMaxHP(base, state)
       const panel: ScreenPanel = {
         kind: 'npc-instance',
         id,
@@ -517,16 +638,7 @@ export const useGMScreenStore = create<GMScreenStore>()((set, get) => {
         label: resolvedLabel,
         density: 'compact',
         statuses: [],
-        state: {
-          currentHP: baseMaxHP(base ?? null),
-          tempHP: 0,
-          condition: 'active',
-          currentAP: MAX_AP,
-          cooldowns: [],
-          // A fresh instance has taken no wounds. Its allowance is the base's
-          // `npcStats.mortalWounds`, read at damage time — not copied here.
-          mortalWounds: [],
-        },
+        state,
       }
       commit({ ...screen, panels: [...screen.panels, panel] })
       return id
@@ -540,22 +652,27 @@ export const useGMScreenStore = create<GMScreenStore>()((set, get) => {
         .getState()
         .characters.find((c) => c.id === panel.baseNpcId)
       const id = newPanelId()
+      // A duplicate is a FRESH instance at full HP — never a HP copy, and no
+      // inherited statuses, Mortal Wounds, spent uses or flipped modifier
+      // switches either: the GM applied those to the original. Its turn is
+      // fresh too (full AP, nothing on cooldown).
+      const state: NpcInstanceState = {
+        currentHP: 0,
+        tempHP: 0,
+        condition: 'active',
+        currentAP: MAX_AP,
+        cooldowns: [],
+        mortalWounds: [],
+        abilityUses: {},
+        abilityModifiers: {},
+      }
+      state.currentHP = instanceMaxHP(base, state)
       const copy: ScreenPanel = {
         ...panel,
         id,
         label: base ? autoInstanceLabel(screen, base) : panel.label,
-        // A duplicate is a FRESH instance at full HP — never a HP copy, and no
-        // inherited statuses or Mortal Wounds either: the GM applied those to
-        // the original. Its turn is fresh too: full AP and nothing on cooldown.
         statuses: [],
-        state: {
-          currentHP: baseMaxHP(base ?? null),
-          tempHP: 0,
-          condition: 'active',
-          currentAP: MAX_AP,
-          cooldowns: [],
-          mortalWounds: [],
-        },
+        state,
       }
       withPanels(screenId, (panels) => [...panels, copy])
       return id
@@ -667,7 +784,12 @@ export const useGMScreenStore = create<GMScreenStore>()((set, get) => {
       const base = useCharacterStore
         .getState()
         .characters.find((c) => c.id === found.panel.baseNpcId)
-      const armor = base?.npcStats?.armor ?? 0
+      // Every stat this pipeline reads goes through the instance's own
+      // projection: a "+3 Armor" ability the GM switched on this panel has to
+      // reduce the damage this instance takes, not just decorate its stat row.
+      const entity = base ? withInstanceState(base, found.panel.state) : null
+      const armor = instanceArmor(entity)
+      const maxHP = instanceMaxHP(base, found.panel.state)
       const { applyArmor = false, resistant = false, ignoreTempHP = false } = opts
 
       let dmg = amount
@@ -717,7 +839,7 @@ export const useGMScreenStore = create<GMScreenStore>()((set, get) => {
         mortalWounds.push({ roll: wound.roll, name: wound.name })
         // HP resets to max after a mortal wound, excess spills over — which can
         // drive it to 0 again and cost a second wound, exactly as on a sheet.
-        newHP = baseMaxHP(base ?? null) - Math.abs(newHP)
+        newHP = maxHP - Math.abs(newHP)
       }
       const downedNow = newHP <= 0
       if (downedNow) newHP = 0
@@ -754,7 +876,9 @@ export const useGMScreenStore = create<GMScreenStore>()((set, get) => {
       const base = useCharacterStore
         .getState()
         .characters.find((c) => c.id === found.panel.baseNpcId)
-      const maxHP = baseMaxHP(base ?? null)
+      // The instance's own Max HP modifiers raise/lower the cap healing stops
+      // at, exactly as they do for a player sheet.
+      const maxHP = instanceMaxHP(base, found.panel.state)
       get().updateInstanceState(screenId, panelId, (state) => ({
         ...state,
         currentHP: Math.min(maxHP, state.currentHP + amount),
@@ -777,7 +901,7 @@ export const useGMScreenStore = create<GMScreenStore>()((set, get) => {
       const base = useCharacterStore
         .getState()
         .characters.find((c) => c.id === found.panel.baseNpcId)
-      const maxHP = baseMaxHP(base ?? null)
+      const maxHP = instanceMaxHP(base, found.panel.state)
       if (delta < 0) {
         // Downward steps run through the full damage pipeline (temp HP first,
         // Mortal Wounds at 0 HP), so stepping the bar matches applying damage.
@@ -843,6 +967,95 @@ export const useGMScreenStore = create<GMScreenStore>()((set, get) => {
       get().updateInstanceState(screenId, panelId, (state) => ({
         ...state,
         cooldowns: [...state.cooldowns, abilityId],
+      }))
+    },
+
+    // ---- Live play: instance ability uses --------------------------------------
+
+    setInstanceAbilityUses: (screenId, panelId, abilityId, remaining) => {
+      const found = findInstance(screenId, panelId)
+      if (!found || !abilityId) return
+      const base = useCharacterStore
+        .getState()
+        .characters.find((c) => c.id === found.panel.baseNpcId)
+      const ability = base ? findAbility(base, abilityId) : null
+      if (!ability) return
+      const uses = abilityUses(ability)
+      // An unlimited ability has no budget to set.
+      if (!uses) return
+      const clamped = Math.min(uses.max, Math.max(0, Math.floor(remaining)))
+      const recorded = found.panel.state.abilityUses ?? {}
+      if (instanceAbilityUsesRemaining(ability, recorded[abilityId]) === clamped) {
+        return
+      }
+      get().updateInstanceState(screenId, panelId, (state) => ({
+        ...state,
+        abilityUses: withRecordedAbilityUse(
+          state.abilityUses ?? {},
+          abilityId,
+          clamped,
+          uses.max,
+        ),
+      }))
+    },
+
+    spendInstanceAbilityUse: (screenId, panelId, abilityId) => {
+      const found = findInstance(screenId, panelId)
+      if (!found || !abilityId) return false
+      const base = useCharacterStore
+        .getState()
+        .characters.find((c) => c.id === found.panel.baseNpcId)
+      const ability = base ? findAbility(base, abilityId) : null
+      if (!ability) return false
+      const uses = abilityUses(ability)
+      // Mirrors characterStore.spendAbilityUse: only a limited ability the
+      // author opted into the use economy, and only with a use left, spends.
+      if (!uses || !expendsUseOnActivate(ability)) return false
+      const recorded = found.panel.state.abilityUses ?? {}
+      const remaining = instanceAbilityUsesRemaining(ability, recorded[abilityId])
+      if (remaining <= 0) return false
+      get().updateInstanceState(screenId, panelId, (state) => ({
+        ...state,
+        abilityUses: withRecordedAbilityUse(
+          state.abilityUses ?? {},
+          abilityId,
+          remaining - 1,
+          uses.max,
+        ),
+      }))
+      return true
+    },
+
+    setInstanceAbilityModifiersActive: (screenId, panelId, abilityId, active) => {
+      const found = findInstance(screenId, panelId)
+      if (!found || !abilityId) return
+      const base = useCharacterStore
+        .getState()
+        .characters.find((c) => c.id === found.panel.baseNpcId)
+      const ability = base ? findAbility(base, abilityId) : null
+      // An ability that declares no modifiers has nothing to switch.
+      if (!ability || !hasAbilityModifiers(ability)) return
+      const recorded = found.panel.state.abilityModifiers ?? {}
+      const authored = ability.modifiersActive === true
+      // Already in the requested state: no write, no autosave.
+      if ((recorded[abilityId] ?? authored) === active) return
+      // A switch that lands back on the ability's own flag is stored as
+      // *absence* (the instance never touched it); anything else is recorded.
+      // Unlike uses, both directions can be a real change: a base whose flag is
+      // on can be switched off on one instance without touching the base.
+      const abilityModifiers = { ...recorded }
+      if (active === authored) delete abilityModifiers[abilityId]
+      else abilityModifiers[abilityId] = active
+      // Switching a Max HP modifier off can leave current HP above the new
+      // maximum — clamp here, exactly as characterStore's own switch does.
+      const maxHP = instanceMaxHP(base, {
+        ...found.panel.state,
+        abilityModifiers,
+      })
+      get().updateInstanceState(screenId, panelId, (state) => ({
+        ...state,
+        abilityModifiers,
+        currentHP: Math.min(state.currentHP, maxHP),
       }))
     },
 

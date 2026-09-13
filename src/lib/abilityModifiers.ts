@@ -17,6 +17,13 @@
  *
  * So switching a modifier off (or deleting the Ability) instantly restores the
  * sheet to its unmodified values.
+ *
+ * **NPC instances are the exception.** A base NPC record is a static reference
+ * — the GM Screen spawns instances *from* it — so its own switches are template
+ * data shown read-only on the base sheet, and each instance keeps its own
+ * (`NpcInstanceState.abilityModifiers`, projected back onto the base by
+ * {@link withInstanceAbilityModifiers}). See the "NPC instances" section at the
+ * bottom of this file.
  */
 
 import { ATTRIBUTE_LIST } from '@/constants/gameData'
@@ -174,6 +181,129 @@ export function forEachAbility(
       for (const ability of section.abilities ?? []) walk(ability)
     }
   }
+}
+
+/**
+ * The AbilityBlock with `id` anywhere on the character — core, slotted, pool,
+ * custom-tab sections, or nested as a Sub-Ability — or null when the character
+ * has no such block. Same sheet-tree walk as {@link forEachAbility}, and stops
+ * at the first match (duplicate ids cannot exist on a healthy record; a
+ * hand-merged import that carries one resolves to the first, which is the copy
+ * {@link forEachAbility} would visit first too).
+ */
+export function findAbility(
+  character: Character,
+  abilityId: string,
+): AbilityBlock | null {
+  if (!abilityId) return null
+  let found: AbilityBlock | null = null
+  forEachAbility(character, (ability) => {
+    if (found || ability.id !== abilityId) return
+    found = ability
+  })
+  return found
+}
+
+/**
+ * Map every AbilityBlock on the character — core, slotted, pool, custom-tab
+ * sections, and nested Sub-Abilities — through `mapper`. Maps are rebuilt only
+ * along the path that actually changed, so an untouched branch keeps its
+ * reference (and its components skip re-rendering). The character itself is
+ * returned unchanged when nothing matched, so a caller can use identity to
+ * detect a no-op.
+ *
+ * The writing counterpart of {@link forEachAbility}: every `set…` helper walks
+ * the tree this way, and the GM Screen's instance projections use it so an
+ * untouched instance still renders the base record itself.
+ */
+export function mapAbilities(
+  character: Character,
+  mapper: (ability: AbilityBlock) => AbilityBlock,
+): Character {
+  let touched = false
+
+  const apply = (ability: AbilityBlock): AbilityBlock => {
+    let changed = false
+
+    const subsUnderDescription = (ability.subAbilitiesUnderDescription ?? []).map(
+      (sub) => {
+        const mapped = apply(sub)
+        if (mapped !== sub) changed = true
+        return mapped
+      },
+    )
+    const subsUnderOvercharge = (ability.subAbilitiesUnderOvercharge ?? []).map(
+      (sub) => {
+        const mapped = apply(sub)
+        if (mapped !== sub) changed = true
+        return mapped
+      },
+    )
+
+    const self = mapper(ability)
+    if (self !== ability) changed = true
+    if (!changed) return ability
+
+    touched = true
+    return {
+      ...self,
+      subAbilitiesUnderDescription: subsUnderDescription,
+      subAbilitiesUnderOvercharge: subsUnderOvercharge,
+    }
+  }
+
+  const mapList = (
+    list: AbilityBlock[] | undefined,
+    fn: (ability: AbilityBlock) => AbilityBlock,
+  ): AbilityBlock[] | undefined => {
+    if (!list || list.length === 0) return list
+    let changed = false
+    const next = list.map((item) => {
+      const mapped = fn(item)
+      if (mapped !== item) changed = true
+      return mapped
+    })
+    return changed ? next : list
+  }
+
+  const next: Character = { ...character }
+
+  const innateAbilities = mapList(character.innateAbilities, apply)
+  if (innateAbilities !== character.innateAbilities) {
+    next.innateAbilities = innateAbilities ?? []
+  }
+  const slottedAbilities = mapList(character.slottedAbilities, apply)
+  if (slottedAbilities !== character.slottedAbilities) {
+    next.slottedAbilities = slottedAbilities ?? []
+  }
+  const abilityPool = mapList(character.abilityPool, apply)
+  if (abilityPool !== character.abilityPool) {
+    next.abilityPool = abilityPool ?? []
+  }
+
+  const tabs = character.customTabs
+  if (tabs && tabs.length > 0) {
+    let tabsChanged = false
+    const customTabs = tabs.map((tab) => {
+      let tabChanged = false
+      const sections = (tab.sections ?? []).map((section) => {
+        if (section.kind !== 'ability') return section
+        const abilities = mapList(section.abilities, apply)
+        if (abilities === section.abilities) return section
+        tabChanged = true
+        return { ...section, abilities: abilities ?? [] }
+      })
+      if (!tabChanged) return tab
+      tabsChanged = true
+      return { ...tab, sections }
+    })
+    if (tabsChanged) next.customTabs = customTabs
+  }
+
+  if (character.basicAttack) next.basicAttack = apply(character.basicAttack)
+  if (character.fatebreaker) next.fatebreaker = apply(character.fatebreaker)
+
+  return touched ? next : character
 }
 
 /** The summed value of every active modifier on the character, by target. */
@@ -350,6 +480,74 @@ export function setAbilityModifiersActive(
   }
 
   return touched ? next : character
+}
+
+// ---- NPC instances (GM Screen) ----------------------------------------------
+//
+// A GM Screen NPC instance is a **delta, not a clone** (see types/gmScreen.ts):
+// its abilities are the base record's, read at render time, and one of the two
+// pieces of ability state it owns is which modifier switches are on for *this*
+// instance (`NpcInstanceState.abilityModifiers`). The base's own
+// `modifiersActive` flag is template data — the base sheet shows it read-only —
+// so an absent entry means "untouched, still matching the base", and the
+// helpers below read and apply the map.
+
+/**
+ * Validate/repair an instance's modifier-switch map (imports, older screens).
+ * Entries whose value is not a boolean are dropped; the ability's own
+ * `modifiersActive` flag is not known here (it lives on the base record), so
+ * the render helper decides what an absent entry means.
+ */
+export function normalizeInstanceAbilityModifiers(
+  raw: unknown,
+): Record<string, boolean> {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {}
+  const out: Record<string, boolean> = {}
+  for (const [abilityId, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (!abilityId || typeof value !== 'boolean') continue
+    out[abilityId] = value
+  }
+  return out
+}
+
+/**
+ * Whether one of an NPC instance's abilities has its modifiers on: the switch
+ * the instance recorded, or the ability's own `modifiersActive` flag when the
+ * instance has not touched it. An ability that declares no modifiers is never
+ * active — there is nothing to apply.
+ */
+export function instanceAbilityModifiersActive(
+  ability: AbilityBlock,
+  recorded: boolean | null | undefined,
+): boolean {
+  if (!hasAbilityModifiers(ability)) return false
+  return recorded ?? ability.modifiersActive === true
+}
+
+/**
+ * The entity a GM Screen NPC panel renders: the base record with this
+ * instance's own modifier switches applied to its abilities (pairs with
+ * `abilityUses.withInstanceAbilityUses`, which does the same for limited-use
+ * budgets — `gmScreenUtils.withInstanceState` composes both).
+ *
+ * A *render-time projection*, not a clone: `mapAbilities` returns the base
+ * reference untouched while the instance's switches match the base's, and
+ * rebuilds only the abilities that differ — which is what makes an instance's
+ * Evasion/Armor/Movement/Save DC/Max HP/Attributes (and the dice rolls that
+ * resolve against them) follow its own switches while base edits keep
+ * propagating. Nothing here is ever written back to the base record.
+ */
+export function withInstanceAbilityModifiers(
+  base: Character,
+  recorded: Record<string, boolean> | null | undefined,
+): Character {
+  if (!recorded) return base
+  return mapAbilities(base, (ability) => {
+    if (!hasAbilityModifiers(ability)) return ability
+    const active = instanceAbilityModifiersActive(ability, recorded[ability.id])
+    if ((ability.modifiersActive === true) === active) return ability
+    return { ...ability, modifiersActive: active }
+  })
 }
 
 /** Format a signed modifier value ("+2", "−2") for display. */

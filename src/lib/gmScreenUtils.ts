@@ -5,8 +5,32 @@
  * and the GM Screen page itself describe screen references identically.
  */
 
-import type { Character, ScreenPanel } from '@/types'
+import { withInstanceAbilityModifiers } from '@/lib/abilityModifiers'
+import { withInstanceAbilityUses } from '@/lib/abilityUses'
+import type { Character, NpcInstanceState, ScreenPanel } from '@/types'
 import type { DamageResult } from '@/store/characterStore'
+
+/**
+ * Apply an NPC instance's own live ability state to its base record: remaining
+ * uses first, then the modifier switches.
+ *
+ * This is the **one** definition of "the entity behind an instance" — the
+ * expanded panel renders it, and `gmScreenStore` reads the instance's effective
+ * Max HP and Armor from it — so a panel's body, its chrome and its damage
+ * pipeline can never disagree about what an instance's switches do. Both
+ * projections are deltas: each returns the base reference while the instance
+ * matches it and rebuilds only what actually differs, so nothing is copied and
+ * the base record is never written to.
+ */
+export function withInstanceState(
+  base: Character,
+  state: NpcInstanceState,
+): Character {
+  return withInstanceAbilityModifiers(
+    withInstanceAbilityUses(base, state.abilityUses),
+    state.abilityModifiers,
+  )
+}
 
 /**
  * One-line outcome of damage applied to a GM panel target, for its toast and

@@ -3,8 +3,10 @@
  *
  * Covers the user-facing contract: the switch only appears when an ability
  * declares modifiers, reflects/updates the switched state, is independent from
- * the Activate button, and lets an embedded-NPC parent supply its own
- * persistence handler.
+ * the Activate button, and follows the same writer contract as the use steppers
+ * — interactive only where something can persist the flip (the store's current
+ * player character, or a writer a surface like a GM Screen instance supplies),
+ * visible but inert everywhere else.
  */
 
 import { fireEvent, render, screen } from '@testing-library/react'
@@ -12,11 +14,14 @@ import { beforeEach, expect, test, vi } from 'vitest'
 
 import AbilityBlockCard from '@/components/sheet/AbilityBlockCard'
 import { blankAbility } from '@/components/sheet/AbilityBlockEditor'
-import type { AbilityBlock } from '@/types'
+import { createDefaultCharacter, createDefaultNPC } from '@/constants/gameData'
+import type { AbilityBlock, Character } from '@/types'
 
-const { setAbilityModifiersActive, roll } = vi.hoisted(() => ({
+const { setAbilityModifiersActive, roll, storeRef } = vi.hoisted(() => ({
   setAbilityModifiersActive: vi.fn(),
   roll: vi.fn(),
+  /** The mock store's `currentCharacter`, per test. */
+  storeRef: { current: null as Character | null },
 }))
 
 vi.mock('@/store/characterStore', () => ({
@@ -24,7 +29,7 @@ vi.mock('@/store/characterStore', () => ({
     selector: (state: Record<string, unknown>) => unknown,
   ) =>
     selector({
-      currentCharacter: null,
+      currentCharacter: storeRef.current,
       setAbilityModifiersActive,
       spendAbilityUse: vi.fn(() => false),
     }),
@@ -56,6 +61,7 @@ function ability(overrides: Partial<AbilityBlock> = {}): AbilityBlock {
 
 beforeEach(() => {
   setAbilityModifiersActive.mockReset()
+  storeRef.current = null
 })
 
 test('renders no modifier switch for an ability without modifiers', () => {
@@ -65,6 +71,7 @@ test('renders no modifier switch for an ability without modifiers', () => {
 })
 
 test('renders a switch and the modifier chips when modifiers exist', () => {
+  storeRef.current = createDefaultCharacter()
   render(
     <AbilityBlockCard
       ability={ability({
@@ -79,11 +86,13 @@ test('renders a switch and the modifier chips when modifiers exist', () => {
 
   const toggle = screen.getByRole('switch', { name: /apply battle focus modifiers/i })
   expect(toggle).toHaveAttribute('aria-checked', 'false')
+  expect(toggle).toBeEnabled()
   expect(screen.getByText('+2 Evasion')).toBeInTheDocument()
   expect(screen.getByText('-1 AGI')).toBeInTheDocument()
 })
 
 test('switching on flips the toggle without touching the Activate flow', () => {
+  storeRef.current = createDefaultCharacter()
   render(
     <AbilityBlockCard
       ability={ability({
@@ -101,7 +110,8 @@ test('switching on flips the toggle without touching the Activate flow', () => {
   expect(setAbilityModifiersActive).toHaveBeenCalledWith(expect.any(String), false)
 })
 
-test('an explicit onToggle handler wins over the store (attached NPCs)', () => {
+test('an explicit onToggle handler wins over the store (GM panels)', () => {
+  storeRef.current = createDefaultCharacter()
   const onToggle = vi.fn()
   render(
     <AbilityBlockCard
@@ -113,6 +123,58 @@ test('an explicit onToggle handler wins over the store (attached NPCs)', () => {
 
   fireEvent.click(screen.getByRole('switch'))
   expect(onToggle).toHaveBeenCalledWith(expect.any(String), true)
+  expect(setAbilityModifiersActive).not.toHaveBeenCalled()
+})
+
+test('a card that is not the current character renders the switch inert', () => {
+  // The store action switches the ability on `currentCharacter`, so a card
+  // belonging to anybody else has no writer — the switch must not pretend.
+  storeRef.current = createDefaultCharacter()
+  const other: Character = { ...createDefaultCharacter(), id: 'someone-else' }
+  render(
+    <AbilityBlockCard
+      ability={ability({ modifiers: [{ target: 'evasion', value: 2 }] })}
+      mode="view"
+      character={other}
+    />,
+  )
+
+  const toggle = screen.getByRole('switch')
+  expect(toggle).toBeDisabled()
+  expect(toggle).toHaveAttribute('title', expect.stringMatching(/in play/i))
+  fireEvent.click(toggle)
+  expect(setAbilityModifiersActive).not.toHaveBeenCalled()
+})
+
+test('an NPC base record keeps its switch visible but inert', () => {
+  // A base NPC sheet is a static reference the GM Screen spawns instances from,
+  // so its switches are template data: the modifier list and the switch state
+  // read, nothing here may flip them — not even though this record is the
+  // store's current character (which is what makes a player sheet interactive).
+  const npc: Character = {
+    ...createDefaultNPC(),
+    id: 'npc-1',
+    name: 'Bandit',
+  }
+  storeRef.current = npc
+  render(
+    <AbilityBlockCard
+      ability={ability({ modifiers: [{ target: 'evasion', value: 2 }] })}
+      mode="view"
+      character={npc}
+    />,
+  )
+
+  const toggle = screen.getByRole('switch')
+  expect(toggle).toBeDisabled()
+  expect(toggle).toHaveAttribute('aria-checked', 'false')
+  expect(toggle).toHaveAttribute(
+    'title',
+    expect.stringMatching(/static references/i),
+  )
+  expect(screen.getByText('+2 Evasion')).toBeInTheDocument()
+
+  fireEvent.click(toggle)
   expect(setAbilityModifiersActive).not.toHaveBeenCalled()
 })
 

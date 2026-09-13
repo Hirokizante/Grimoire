@@ -47,6 +47,20 @@ export interface AbilityActivationProps {
    * editor. Omitted everywhere else, where `showActivate` keeps deciding.
    */
   activateOverride?: AbilityActivationOverrideResolver
+  /**
+   * Persist a manual ± adjustment of a limited ability's remaining uses for an
+   * entity the character store does not own — a GM panel's NPC instance, whose
+   * budget lives on the panel. Omitted on the sheet pages, where the card falls
+   * back to the store (player sheets) or renders a read-only meter (NPC bases).
+   */
+  onSetUses?: (abilityId: string, remaining: number) => void
+  /**
+   * Persist the stat/attribute modifier switch for an entity the store does not
+   * own — the same GM panel NPC instance, whose switches live on the panel.
+   * Omitted on the sheet pages, where the card falls back to the store (player
+   * sheets) or renders a visible-but-inert switch (NPC bases).
+   */
+  onToggleModifiers?: (abilityId: string, active: boolean) => void
 }
 
 /**
@@ -59,11 +73,15 @@ function ActivatableCard({
   character,
   override,
   activateOverride,
+  onSetUses,
+  onToggleModifiers,
 }: {
   ability: AbilityBlock
   character: Character
   override: AbilityActivationOverride | null
   activateOverride?: AbilityActivationOverrideResolver
+  onSetUses?: (abilityId: string, remaining: number) => void
+  onToggleModifiers?: (abilityId: string, active: boolean) => void
 }) {
   const plan = useAbilityActivation(ability, character, override?.options)
 
@@ -74,6 +92,8 @@ function ActivatableCard({
         mode="view"
         character={character}
         activateOverride={activateOverride}
+        onSetUses={onSetUses}
+        onToggleModifiers={onToggleModifiers}
       />
       <div className="ability-activation__footer">
         <button
@@ -94,6 +114,8 @@ export default function AbilityActivation({
   ability,
   character: explicitCharacter,
   activateOverride,
+  onSetUses,
+  onToggleModifiers,
 }: AbilityActivationProps) {
   const storeCharacter = useCharacterStore((s) => s.currentCharacter)
   const character = explicitCharacter ?? storeCharacter
@@ -120,6 +142,8 @@ export default function AbilityActivation({
         mode="view"
         character={character}
         activateOverride={activateOverride}
+        onSetUses={onSetUses}
+        onToggleModifiers={onToggleModifiers}
       />
     )
   }
@@ -130,6 +154,8 @@ export default function AbilityActivation({
       character={character}
       override={override}
       activateOverride={activateOverride}
+      onSetUses={onSetUses}
+      onToggleModifiers={onToggleModifiers}
     />
   )
 }

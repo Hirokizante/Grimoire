@@ -8,7 +8,8 @@
  * and the standalone NPC sheet stays a static reference — so this hook points
  * the shared activation path (`useAbilityActivation`) at the **panel's** state:
  *
- *   - `resources`  → the instance's `currentAP` (NPC panels track no END/FP),
+ *   - `resources`  → the instance's `currentAP` (NPC panels track no END/FP)
+ *     and its own remaining ability uses,
  *   - `blockedReason` → "On cooldown — Recharge N" while cooling,
  *   - `onActivated` → marks the ability's Recharge cooldown,
  *   - `status`     → the {@link RechargeBadge} under the card.
@@ -22,9 +23,17 @@
  * ability's `showActivate` flag, which the NPC editor never even offers. An
  * ability with neither stays a plain reference card.
  *
- * **Limited uses stay read-only here**, exactly as the uses meter does on every
- * GM panel: the budget lives on the shared base record, so spending it from one
- * instance would silently drain it for the others.
+ * **Limited uses and modifier switches belong to the instance.** Activating a
+ * limited ability spends one of *this panel's* uses
+ * (`spendInstanceAbilityUse`), the panel's ± steppers persist through
+ * {@link NpcInstanceActivation.setAbilityUses}, and an ability's stat/attribute
+ * switch persists through
+ * {@link NpcInstanceActivation.setAbilityModifiersActive}; all three write
+ * `panel.state`, never the shared base record. The counts and switches a card
+ * renders — and the effective stats the panel shows — come from that same
+ * state: `lib/abilityUses.ts`'s `withInstanceAbilityUses` and
+ * `lib/abilityModifiers.ts`'s `withInstanceAbilityModifiers`, composed by the
+ * panel through `lib/gmScreenUtils.ts`'s `withInstanceState`.
  */
 
 import { useCallback, useMemo } from 'react'
@@ -63,6 +72,18 @@ export interface NpcInstanceActivation {
   startTurn: () => void
   /** True while nothing is cooling down — used to explain an idle turn. */
   hasCooldowns: boolean
+  /**
+   * Persist a manual adjustment (± stepper) of one of the instance's ability
+   * budgets. Same writer contract as a sheet's `onSetUses`: it *requests* a
+   * count and the store clamps it against the base ability's maximum.
+   */
+  setAbilityUses: (abilityId: string, remaining: number) => void
+  /**
+   * Flip one of the instance's ability modifier switches. Same writer contract
+   * as a sheet's `onToggleModifiers`: the switch is per instance, so three
+   * spawned Bandits can rage independently.
+   */
+  setAbilityModifiersActive: (abilityId: string, active: boolean) => void
 }
 
 export function useNpcInstanceActivation(
@@ -72,6 +93,11 @@ export function useNpcInstanceActivation(
 ): NpcInstanceActivation {
   const spendInstanceAP = useGMScreenStore((s) => s.spendInstanceAP)
   const markAbilityCooldown = useGMScreenStore((s) => s.markAbilityCooldown)
+  const setInstanceAbilityUses = useGMScreenStore((s) => s.setInstanceAbilityUses)
+  const spendInstanceAbilityUse = useGMScreenStore((s) => s.spendInstanceAbilityUse)
+  const setInstanceAbilityModifiersActive = useGMScreenStore(
+    (s) => s.setInstanceAbilityModifiersActive,
+  )
   const startInstanceTurn = useGMScreenStore((s) => s.startInstanceTurn)
   const logRoll = useRollLogStore((s) => s.logRoll)
   const { notify } = useNotification()
@@ -97,10 +123,35 @@ export function useNpcInstanceActivation(
       spendEND: () => false,
       spendFP: () => false,
       spendCustom: () => false,
-      // Limited uses live on the shared base record (see the hook doc).
-      spendUse: () => false,
+      // Limited uses are the instance's own (panel.state.abilityUses).
+      spendUse: (abilityId) =>
+        spendInstanceAbilityUse(screenId, panelId, abilityId),
     }),
-    [ap, screenId, panelId, spendInstanceAP],
+    [ap, screenId, panelId, spendInstanceAP, spendInstanceAbilityUse],
+  )
+
+  /**
+   * The ± stepper writer for this instance's ability budgets. Threaded to the
+   * cards so a limited ability on the panel shows working steppers — exactly
+   * the control a player's own sheet has, pointed at the panel instead of a
+   * sheet record.
+   */
+  const setAbilityUses = useCallback(
+    (abilityId: string, remaining: number) =>
+      setInstanceAbilityUses(screenId, panelId, abilityId, remaining),
+    [screenId, panelId, setInstanceAbilityUses],
+  )
+
+  /**
+   * The modifier-switch writer for this instance. Threaded to the cards so an
+   * ability's switch flips *this panel's* state — its effective Evasion, Armor,
+   * Movement, Save DC, Max HP and Attributes (and the dice resolved against
+   * them) follow, and the base record is never written to.
+   */
+  const setAbilityModifiersActive = useCallback(
+    (abilityId: string, active: boolean) =>
+      setInstanceAbilityModifiersActive(screenId, panelId, abilityId, active),
+    [screenId, panelId, setInstanceAbilityModifiersActive],
   )
 
   const activation = useCallback<AbilityActivationOverrideResolver>(
@@ -159,5 +210,11 @@ export function useNpcInstanceActivation(
     })
   }, [base.id, label, logRoll, notify, panelId, screenId, startInstanceTurn])
 
-  return { activation, startTurn, hasCooldowns: cooldowns.length > 0 }
+  return {
+    activation,
+    startTurn,
+    hasCooldowns: cooldowns.length > 0,
+    setAbilityUses,
+    setAbilityModifiersActive,
+  }
 }

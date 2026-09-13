@@ -11,16 +11,23 @@
  * Keeping the state on the AbilityBlock (rather than in a character-level map
  * keyed by ability id) means a block is self-contained wherever it appears —
  * core, slotted, pool, custom tabs, and nested Sub-Abilities all read the same
- * field — and every mutation below mirrors the sheet-tree walk used by
- * lib/abilityModifiers.ts's setAbilityModifiersActive, so an ability is found
- * no matter where on the sheet it lives.
+ * field — and every mutation below goes through lib/abilityModifiers.ts's
+ * `mapAbilities`/`findAbility`, the shared sheet-tree walk, so an ability is
+ * found no matter where on the sheet it lives.
  *
  * Sub-Abilities may be limited too (they carry the same editor and their own
  * Activate button, see SubAbilityBlock), so every helper recurses into both
  * nesting points.
+ *
+ * **NPC instances are the exception that proves the rule.** A base NPC record is
+ * a static reference — the GM Screen spawns instances *from* it — so its own
+ * `uses.current` is never live state an instance reads: an instance keeps its
+ * own sparse count per ability (`NpcInstanceState.abilityUses`) and renders the
+ * base through {@link withInstanceAbilityUses}. See the "NPC instances" section
+ * at the bottom of this file.
  */
 
-import { forEachAbility } from '@/lib/abilityModifiers'
+import { findAbility, mapAbilities } from '@/lib/abilityModifiers'
 import type { AbilityBlock, AbilityUses, Character } from '@/types'
 
 /**
@@ -125,104 +132,6 @@ export function buildAbilityUses(opts: {
 }
 
 /**
- * Map every AbilityBlock on the character — core, slotted, pool, custom-tab
- * sections, and nested Sub-Abilities — through `mapper`. Maps are rebuilt only
- * along the path that actually changed, so an untouched branch keeps its
- * reference (and its components skip re-rendering). The character itself is
- * returned unchanged when nothing matched, so a caller can use identity to
- * detect a no-op.
- */
-export function mapAbilities(
-  character: Character,
-  mapper: (ability: AbilityBlock) => AbilityBlock,
-): Character {
-  let touched = false
-
-  const apply = (ability: AbilityBlock): AbilityBlock => {
-    let changed = false
-
-    const subsUnderDescription = (ability.subAbilitiesUnderDescription ?? []).map(
-      (sub) => {
-        const mapped = apply(sub)
-        if (mapped !== sub) changed = true
-        return mapped
-      },
-    )
-    const subsUnderOvercharge = (ability.subAbilitiesUnderOvercharge ?? []).map(
-      (sub) => {
-        const mapped = apply(sub)
-        if (mapped !== sub) changed = true
-        return mapped
-      },
-    )
-
-    const self = mapper(ability)
-    if (self !== ability) changed = true
-    if (!changed) return ability
-
-    touched = true
-    return {
-      ...self,
-      subAbilitiesUnderDescription: subsUnderDescription,
-      subAbilitiesUnderOvercharge: subsUnderOvercharge,
-    }
-  }
-
-  const mapList = (
-    list: AbilityBlock[] | undefined,
-    fn: (ability: AbilityBlock) => AbilityBlock,
-  ): AbilityBlock[] | undefined => {
-    if (!list || list.length === 0) return list
-    let changed = false
-    const next = list.map((item) => {
-      const mapped = fn(item)
-      if (mapped !== item) changed = true
-      return mapped
-    })
-    return changed ? next : list
-  }
-
-  const next: Character = { ...character }
-
-  const innateAbilities = mapList(character.innateAbilities, apply)
-  if (innateAbilities !== character.innateAbilities) {
-    next.innateAbilities = innateAbilities ?? []
-  }
-  const slottedAbilities = mapList(character.slottedAbilities, apply)
-  if (slottedAbilities !== character.slottedAbilities) {
-    next.slottedAbilities = slottedAbilities ?? []
-  }
-  const abilityPool = mapList(character.abilityPool, apply)
-  if (abilityPool !== character.abilityPool) {
-    next.abilityPool = abilityPool ?? []
-  }
-
-  const tabs = character.customTabs
-  if (tabs && tabs.length > 0) {
-    let tabsChanged = false
-    const customTabs = tabs.map((tab) => {
-      let tabChanged = false
-      const sections = (tab.sections ?? []).map((section) => {
-        if (section.kind !== 'ability') return section
-        const abilities = mapList(section.abilities, apply)
-        if (abilities === section.abilities) return section
-        tabChanged = true
-        return { ...section, abilities: abilities ?? [] }
-      })
-      if (!tabChanged) return tab
-      tabsChanged = true
-      return { ...tab, sections }
-    })
-    if (tabsChanged) next.customTabs = customTabs
-  }
-
-  if (character.basicAttack) next.basicAttack = apply(character.basicAttack)
-  if (character.fatebreaker) next.fatebreaker = apply(character.fatebreaker)
-
-  return touched ? next : character
-}
-
-/**
  * Set the remaining uses on one limited ability, matched by id anywhere on the
  * sheet. Values are clamped into `[0, max]`; an unknown id, or one whose block
  * is not limited, leaves the character untouched (same reference).
@@ -258,11 +167,7 @@ export function spendAbilityUse(
   character: Character,
   abilityId: string,
 ): { character: Character; spent: boolean } {
-  let target: AbilityBlock | null = null
-  forEachAbility(character, (ability) => {
-    if (target) return
-    if (ability.id === abilityId) target = ability
-  })
+  const target = findAbility(character, abilityId)
 
   if (!target) return { character, spent: false }
   const uses = abilityUses(target)
@@ -287,5 +192,79 @@ export function restoreAllAbilityUses(character: Character): Character {
     const uses = abilityUses(ability)
     if (!uses || uses.current === uses.max) return ability
     return { ...ability, uses: { ...uses, current: uses.max } }
+  })
+}
+
+// ---- NPC instances (GM Screen) ----------------------------------------------
+//
+// A GM Screen NPC instance is a **delta, not a clone** (see types/gmScreen.ts):
+// its abilities are the base record's, read at render time, and the one piece
+// of ability state it owns is how many uses it has left of each limited one.
+// `NpcInstanceState.abilityUses` stores that as a sparse `{ abilityId: count }`
+// map — an absent entry means "untouched, still on the ability's authored
+// maximum" — and the helpers below read and apply it.
+
+/**
+ * Validate/repair an instance's remaining-uses map (imports, older screens).
+ * Entries with a blank id or an unusable count are dropped, and every count is
+ * floored into `[0, MAX_ABILITY_USES]`. The per-ability maximum is not known
+ * here — it lives on the base record — so the render helper clamps against it.
+ */
+export function normalizeInstanceAbilityUses(
+  raw: unknown,
+): Record<string, number> {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {}
+  const out: Record<string, number> = {}
+  for (const [abilityId, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (!abilityId) continue
+    const num = typeof value === 'number' ? value : Number(value)
+    if (!Number.isFinite(num)) continue
+    out[abilityId] = Math.min(MAX_ABILITY_USES, Math.max(0, Math.floor(num)))
+  }
+  return out
+}
+
+/**
+ * How many uses an NPC instance has left of one limited ability: the count the
+ * instance recorded for it, or the ability's authored maximum when it has not
+ * touched it. Recorded counts are clamped to `[0, max]`, so lowering an
+ * ability's maximum on the base tightens every instance that had spent into it,
+ * and the base record's own live-play `current` is **never** read — a base sheet
+ * is a static reference, so an instance always starts full.
+ *
+ * Unlimited abilities answer 0 (they have no budget to read).
+ */
+export function instanceAbilityUsesRemaining(
+  ability: AbilityBlock,
+  recorded: number | null | undefined,
+): number {
+  const uses = abilityUses(ability)
+  if (!uses) return 0
+  if (recorded == null || !Number.isFinite(recorded)) return uses.max
+  return Math.min(uses.max, Math.max(0, Math.floor(recorded)))
+}
+
+/**
+ * The entity a GM Screen NPC panel renders: the base record with this
+ * instance's own remaining-uses counts applied to its abilities, and the
+ * authored maximum wherever the instance has not spent into the budget.
+ *
+ * This is a *render-time projection*, not a clone — `mapAbilities` rebuilds only
+ * the branches that actually differ, so a base that is already full (every
+ * normally-authored one) comes back as the very same reference and editing the
+ * base keeps reaching every instance. Nothing here is ever written back to the
+ * base record.
+ */
+export function withInstanceAbilityUses(
+  base: Character,
+  recorded: Record<string, number> | null | undefined,
+): Character {
+  if (!recorded) return base
+  return mapAbilities(base, (ability) => {
+    const uses = abilityUses(ability)
+    if (!uses) return ability
+    const current = instanceAbilityUsesRemaining(ability, recorded[ability.id])
+    if (current === uses.current) return ability
+    return { ...ability, uses: { ...uses, current } }
   })
 }

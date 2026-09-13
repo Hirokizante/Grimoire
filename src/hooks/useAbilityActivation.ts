@@ -61,8 +61,14 @@ export interface AbilityActivationResources {
   spendFP: (amount: number) => boolean
   /** Deduct one custom bar; false when it cannot afford it. */
   spendCustom: (barId: string, amount: number) => boolean
-  /** Consume one use of a limited ability; true when a use was really spent. */
-  spendUse: () => boolean
+  /**
+   * Consume one use of a limited ability; true when a use was really spent
+   * (false for an unlimited ability, one opted out of the use economy, or one
+   * with nothing left). Takes the ability id so one adapter can serve every
+   * ability on an entity — the GM Screen's instance adapter needs it to reach
+   * the right entry in the panel's own remaining-uses map.
+   */
+  spendUse: (abilityId: string) => boolean
 }
 
 /** Optional overrides for an activation that does not run against a sheet. */
@@ -176,11 +182,10 @@ export function useAbilityActivation(
       spendFP: (amount) => storeSpendFP(character.id, amount),
       spendCustom: (barId, amount) =>
         storeSpendCustomResourceBar(character.id, barId, amount),
-      spendUse: () => storeSpendAbilityUse(character.id, ability.id),
+      spendUse: (abilityId) => storeSpendAbilityUse(character.id, abilityId),
     }),
     [
       character,
-      ability.id,
       storeSpendAP,
       storeSpendEND,
       storeSpendFP,
@@ -278,7 +283,7 @@ export function useAbilityActivation(
     // opted this ability into the use economy. `spendUse` reports what
     // actually happened, so the toast never claims a use was spent when the
     // ability is unlimited or opted out.
-    const spentUse = resources.spendUse()
+    const spentUse = resources.spendUse(ability.id)
     // The caller's post-activation step (a Recharge cooldown on GM panels) can
     // add its own note to the same toast.
     const note = onActivated?.(ability)

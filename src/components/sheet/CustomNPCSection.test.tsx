@@ -14,8 +14,14 @@ import type {
 // Shared mock state recreated per test so the NPC lookups are easy to control.
 // `charactersRef` must live in vi.hoisted so the hoisted vi.mock factory can
 // reach it (the classic vi.mock hoisting gotcha).
-const { roll, removeCustomSection, updateCharacter, charactersRef, dragEndRef } =
-  vi.hoisted(() => ({
+const {
+  roll,
+  removeCustomSection,
+  updateCharacter,
+  charactersRef,
+  currentCharacterRef,
+  dragEndRef,
+} = vi.hoisted(() => ({
     roll: vi.fn(),
     removeCustomSection: vi.fn(),
     // The section's only store write: an id-targeted updater. Applied to the
@@ -26,6 +32,10 @@ const { roll, removeCustomSection, updateCharacter, charactersRef, dragEndRef } 
       )
     }),
     charactersRef: { current: [] as Character[] },
+    // `AbilityBlockCard` falls back to the store's `currentCharacter` when no
+    // use writer is threaded in — the case a test flips on to prove an NPC base
+    // record still gets no steppers.
+    currentCharacterRef: { current: null as Character | null },
     // Captures the drag handler from the section's (nested) DndContext: jsdom
     // has no layout, so a real drag cannot resolve a drop target here. The
     // pointer path is covered end to end by e2e/npc-abilities.spec.ts.
@@ -43,6 +53,7 @@ vi.mock('@/store/characterStore', () => ({
   useCharacterStore: (selector: (state: Record<string, unknown>) => unknown) =>
     selector({
       characters: charactersRef.current,
+      currentCharacter: currentCharacterRef.current,
       removeCustomSection,
       updateCharacter,
     }),
@@ -95,6 +106,7 @@ const section: CustomNPCSectionType = {
 
 beforeEach(() => {
   charactersRef.current = []
+  currentCharacterRef.current = null
   roll.mockReset()
   removeCustomSection.mockReset()
   updateCharacter.mockClear()
@@ -317,4 +329,79 @@ test('an attached NPC list is not draggable in view mode', () => {
 
   expect(container.querySelectorAll('.ability-card')).toHaveLength(3)
   expect(container.querySelectorAll('.drag-handle')).toHaveLength(0)
+})
+
+test('an attached NPC’s limited uses are read-only', () => {
+  const npc: Character = {
+    ...makeNPC(),
+    slottedAbilities: [
+      {
+        id: 'a1',
+        name: 'Cleave',
+        traits: [],
+        cost: { ap: 1 },
+        damage: '',
+        description: '',
+        overcharge: '',
+        flavorText: '',
+        isMinor: false,
+        showActivate: true,
+        uses: { max: 3, current: 2, expendOnActivate: true },
+        subAbilitiesUnderDescription: [],
+        subAbilitiesUnderOvercharge: [],
+      },
+    ],
+  }
+  charactersRef.current = [npc]
+  // The attached record is also the store's current character — the situation
+  // that gives a *player* sheet its steppers. A base NPC record is a static
+  // reference the GM Screen spawns instances from, so it must stay read-only
+  // here: the count reads, nothing moves it, and no write reaches the record.
+  currentCharacterRef.current = npc
+
+  render(<CustomNPCSection tabId="tab-1" section={section} mode="view" />)
+
+  expect(
+    screen.getByRole('img', { name: '2 of 3 uses remaining' }),
+  ).toBeInTheDocument()
+  expect(screen.queryAllByRole('button', { name: /one use of/i })).toHaveLength(0)
+  expect(updateCharacter).not.toHaveBeenCalled()
+})
+
+test('an attached NPC’s modifier switch is visible but inert', () => {
+  const npc: Character = {
+    ...makeNPC(),
+    slottedAbilities: [
+      {
+        id: 'a1',
+        name: 'Rage',
+        traits: [],
+        cost: {},
+        damage: '',
+        description: '',
+        overcharge: '',
+        flavorText: '',
+        isMinor: false,
+        showActivate: true,
+        modifiers: [{ target: 'evasion', value: 2 }],
+        subAbilitiesUnderDescription: [],
+        subAbilitiesUnderOvercharge: [],
+      },
+    ],
+  }
+  charactersRef.current = [npc]
+  // Same trap as the limited-use test: the attached record is the store's
+  // current character, which is exactly what makes a *player* sheet's switch
+  // interactive. An NPC base record stays a static reference either way, so the
+  // switch renders and reads but cannot be flipped, and no write reaches it.
+  currentCharacterRef.current = npc
+
+  render(<CustomNPCSection tabId="tab-1" section={section} mode="view" />)
+
+  const toggle = screen.getByRole('switch', { name: /Apply Rage modifiers/i })
+  expect(toggle).toBeDisabled()
+  expect(screen.getByText('+2 Evasion')).toBeInTheDocument()
+
+  fireEvent.click(toggle)
+  expect(updateCharacter).not.toHaveBeenCalled()
 })

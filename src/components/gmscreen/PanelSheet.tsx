@@ -53,6 +53,20 @@ export interface PanelSheetProps {
    */
   npcActivation?: AbilityActivationOverrideResolver
   /**
+   * NPC-instance limited-use writer: persists a ± stepper adjustment to the
+   * **panel's** own remaining-uses map. Only NPC panels pass it — a player
+   * panel's cards write through the character store instead, and an NPC base
+   * sheet gets no writer at all (a base record is a static reference).
+   */
+  npcOnSetUses?: (abilityId: string, remaining: number) => void
+  /**
+   * NPC-instance modifier-switch writer: flips one ability's stat/attribute
+   * modifiers on the **panel's** own state, so each instance can rage on its
+   * own. Same rule as `npcOnSetUses` — an NPC base sheet passes nothing and its
+   * cards render the switch read-only.
+   */
+  npcOnToggleModifiers?: (abilityId: string, active: boolean) => void
+  /**
    * Suppress the sheet body's own Action Points bar. A player panel shows AP in
    * its chrome, directly under the HP bar, so the body must not print a second
    * copy of the same number (see PanelApBar).
@@ -71,6 +85,8 @@ export default function PanelSheet({
   entity,
   mode = 'view',
   npcActivation,
+  npcOnSetUses,
+  npcOnToggleModifiers,
   hideAP = false,
   hideMortalWounds = false,
 }: PanelSheetProps) {
@@ -145,6 +161,8 @@ export default function PanelSheet({
           mode={mode}
           viewMode="list"
           activation={npcActivation}
+          onSetUses={npcOnSetUses}
+          onToggleModifiers={npcOnToggleModifiers}
         />
       ) : (
         <SlottedAbilitiesSection

@@ -30,14 +30,17 @@ import { useModalDialog } from '@/hooks/useModalDialog'
 import { useNotification } from '@/context/NotificationContext'
 import { useCharacterStore, type DamageResult } from '@/store/characterStore'
 import { useGMScreenStore } from '@/store/gmScreenStore'
-import { effectiveCombatStats } from '@/lib/abilityModifiers'
+import { effectiveCombatStats, effectiveNPCStats } from '@/lib/abilityModifiers'
 import { panelDamageOutcome } from '@/lib/gmScreenUtils'
 import type { Character } from '@/types'
 
 /**
- * Describes an NPC instance panel as a damage target. The instance's armor,
- * max HP, and temp HP live on the base record / panel state, not on a
- * Character's live-play fields.
+ * Describes an NPC instance panel as a damage target. The instance's armor and
+ * max HP come from the panel's own entity — the base record with the instance's
+ * live ability state applied (see `gmScreenUtils.withInstanceState`), so an
+ * armor or Max HP modifier the GM switched on this panel is what the dialog
+ * shows and what the store's pipeline rolls against — and its temp HP lives on
+ * the panel state.
  */
 export interface NpcInstanceTarget {
   /** The owning screen (for `updateInstanceState`). */
@@ -46,7 +49,12 @@ export interface NpcInstanceTarget {
   panelId: string
   /** Display label, shown in the dialog title. */
   label: string
-  /** The base NPC record (armor + max HP source). */
+  /**
+   * The instance's entity: the base NPC record with this instance's own live
+   * ability state applied (armor + max HP source). Pass
+   * `gmScreenUtils.withInstanceState(base, state)` rather than the raw record,
+   * so the readouts match the damage the instance really takes.
+   */
   base: Character
   /** Current instance HP. */
   currentHP: number
@@ -100,10 +108,13 @@ export default function DamageDialog({
     ? npcInstance.base
     : (character ?? (characterId ? null : storeCharacter))
 
-  // Armor for characters includes any ability modifiers currently switched on;
-  // NPC instances use the base record's manual `npcStats.armor`.
+  // Armor includes any ability modifiers currently switched on — for a
+  // character through `effectiveCombatStats`, for an NPC instance through
+  // `effectiveNPCStats` on the entity the panel passed (the base record with
+  // this instance's own switches applied), so the preview matches the roll
+  // `gmScreenStore.damageInstance` is about to make.
   const armor = npcInstance
-    ? (npcInstance.base.npcStats?.armor ?? 0)
+    ? effectiveNPCStats(npcInstance.base).armor
     : target
       ? effectiveCombatStats(target).armor
       : 0

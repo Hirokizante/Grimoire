@@ -11,7 +11,7 @@ import { test, expect, beforeEach, afterEach, vi } from 'vitest'
 import { useGMScreenStore, npcMortalWoundAllowance } from '@/store/gmScreenStore'
 import { useCharacterStore } from '@/store/characterStore'
 import { createDefaultCharacter, createDefaultNPC } from '@/constants/gameData'
-import type { Character, GMScreen } from '@/types'
+import type { AbilityBlock, Character, GMScreen } from '@/types'
 
 // ---- Mock IndexedDB -------------------------------------------------------
 
@@ -695,7 +695,17 @@ test('instance wounds are per-panel: damaging one instance never touches its sib
 
 /** A base NPC whose slotted abilities carry the given traits. */
 function npcWithAbilities(
-  abilities: { id: string; name: string; traits: string[] }[],
+  abilities: {
+    id: string
+    name: string
+    traits: string[]
+    /** Optional limited-use budget (unlimited when omitted). */
+    uses?: AbilityBlock['uses']
+    /** Optional stat/attribute modifiers (none when omitted). */
+    modifiers?: AbilityBlock['modifiers']
+    /** Whether those modifiers start switched on (template state). */
+    modifiersActive?: boolean
+  }[],
 ): Character {
   return makeNpc({
     id: 'n1',
@@ -710,6 +720,9 @@ function npcWithAbilities(
       flavorText: '',
       isMinor: false,
       showActivate: true,
+      ...(a.uses ? { uses: a.uses } : {}),
+      ...(a.modifiers ? { modifiers: a.modifiers } : {}),
+      ...(a.modifiersActive ? { modifiersActive: true } : {}),
       subAbilitiesUnderDescription: [],
       subAbilitiesUnderOvercharge: [],
     })),
@@ -759,6 +772,283 @@ test('instances of the same base keep independent AP', async () => {
 
   expect(instanceState(0).currentAP).toBe(2)
   expect(instanceState(1).currentAP).toBe(3)
+})
+
+// ---- Instance ability uses (live play) -------------------------------------
+
+/** The base ability's own uses budget, as stored on the NPC record. */
+function baseAbilityUses(id = 'a1') {
+  const base = useCharacterStore.getState().characters.find((c) => c.id === 'n1')
+  return base?.slottedAbilities.find((a) => a.id === id)?.uses
+}
+
+/** A limited 3-use ability for the shared `n1` base. */
+function limitedNpc(current = 3) {
+  return npcWithAbilities([
+    {
+      id: 'a1',
+      name: 'Cleave',
+      traits: [],
+      uses: { max: 3, current, expendOnActivate: true },
+    },
+  ])
+}
+
+test('addNpcInstancePanel: spawns with no use spent (the map starts empty)', async () => {
+  const screen = await useGMScreenStore.getState().createScreen('S')
+  seedCharacters(limitedNpc())
+  useGMScreenStore.getState().addNpcInstancePanel(screen.id, 'n1')
+
+  // Empty — not a snapshot of the base's counts: an absent entry reads as the
+  // ability's authored maximum (see lib/abilityUses.ts).
+  expect(instanceState().abilityUses).toEqual({})
+})
+
+test('spendInstanceAbilityUse: spends the instance’s own count, never the base’s', async () => {
+  const screen = await useGMScreenStore.getState().createScreen('S')
+  seedCharacters(limitedNpc())
+  const panelId = useGMScreenStore.getState().addNpcInstancePanel(screen.id, 'n1')
+
+  const store = useGMScreenStore.getState()
+  expect(store.spendInstanceAbilityUse(screen.id, panelId, 'a1')).toBe(true)
+  expect(store.spendInstanceAbilityUse(screen.id, panelId, 'a1')).toBe(true)
+
+  expect(instanceState().abilityUses).toEqual({ a1: 1 })
+  // The base record still holds a full budget — a panel never writes to it.
+  expect(baseAbilityUses()).toEqual({ max: 3, current: 3, expendOnActivate: true })
+})
+
+test('spendInstanceAbilityUse: refuses an unlimited or opted-out ability', async () => {
+  const screen = await useGMScreenStore.getState().createScreen('S')
+  seedCharacters(
+    npcWithAbilities([
+      { id: 'plain', name: 'Bite', traits: [] },
+      {
+        id: 'tracked',
+        name: 'Focus',
+        traits: [],
+        uses: { max: 3, current: 3, expendOnActivate: false },
+      },
+    ]),
+  )
+  const panelId = useGMScreenStore.getState().addNpcInstancePanel(screen.id, 'n1')
+  const store = useGMScreenStore.getState()
+
+  expect(store.spendInstanceAbilityUse(screen.id, panelId, 'plain')).toBe(false)
+  expect(store.spendInstanceAbilityUse(screen.id, panelId, 'tracked')).toBe(false)
+  // An ability that does not exist on the base is refused too.
+  expect(store.spendInstanceAbilityUse(screen.id, panelId, 'nope')).toBe(false)
+  expect(instanceState().abilityUses).toEqual({})
+})
+
+test('spendInstanceAbilityUse: refuses at 0 uses and for an unknown panel', async () => {
+  const screen = await useGMScreenStore.getState().createScreen('S')
+  seedCharacters(limitedNpc())
+  const panelId = useGMScreenStore.getState().addNpcInstancePanel(screen.id, 'n1')
+  const store = useGMScreenStore.getState()
+
+  store.setInstanceAbilityUses(screen.id, panelId, 'a1', 0)
+  expect(store.spendInstanceAbilityUse(screen.id, panelId, 'a1')).toBe(false)
+  expect(instanceState().abilityUses).toEqual({ a1: 0 })
+  expect(store.spendInstanceAbilityUse(screen.id, 'nope', 'a1')).toBe(false)
+})
+
+test('setInstanceAbilityUses: clamps to the ability’s authored maximum', async () => {
+  const screen = await useGMScreenStore.getState().createScreen('S')
+  seedCharacters(limitedNpc())
+  const panelId = useGMScreenStore.getState().addNpcInstancePanel(screen.id, 'n1')
+  const store = useGMScreenStore.getState()
+
+  store.setInstanceAbilityUses(screen.id, panelId, 'a1', 99)
+  // Above the maximum is "untouched": stored as absence, not a bigger number.
+  expect(instanceState().abilityUses).toEqual({})
+  store.setInstanceAbilityUses(screen.id, panelId, 'a1', -4)
+  expect(instanceState().abilityUses).toEqual({ a1: 0 })
+  store.setInstanceAbilityUses(screen.id, panelId, 'a1', 2.7)
+  expect(instanceState().abilityUses).toEqual({ a1: 2 })
+  // Handing every use back clears the entry again.
+  store.setInstanceAbilityUses(screen.id, panelId, 'a1', 3)
+  expect(instanceState().abilityUses).toEqual({})
+})
+
+test('setInstanceAbilityUses: ignores unlimited abilities and unknown ids', async () => {
+  const screen = await useGMScreenStore.getState().createScreen('S')
+  seedCharacters(
+    npcWithAbilities([
+      { id: 'plain', name: 'Bite', traits: [] },
+      { id: 'a1', name: 'Cleave', traits: [], uses: { max: 3, current: 3, expendOnActivate: true } },
+    ]),
+  )
+  const panelId = useGMScreenStore.getState().addNpcInstancePanel(screen.id, 'n1')
+  const store = useGMScreenStore.getState()
+
+  store.setInstanceAbilityUses(screen.id, panelId, 'plain', 1)
+  store.setInstanceAbilityUses(screen.id, panelId, 'nope', 1)
+  store.setInstanceAbilityUses(screen.id, panelId, 'a1', 2)
+  expect(instanceState().abilityUses).toEqual({ a1: 2 })
+})
+
+// ---- Instance ability modifier switches (live play) -------------------------
+
+/** The NPC base as the character store holds it. */
+function storedBase(): Character {
+  const base = useCharacterStore.getState().characters.find((c) => c.id === 'n1')
+  if (!base) throw new Error('base npc missing')
+  return base
+}
+
+/** A base ability's own switch state, as stored on the record. */
+function baseModifiersActive(id = 'a1'): boolean | undefined {
+  return storedBase().slottedAbilities.find((a) => a.id === id)?.modifiersActive
+}
+
+test('setInstanceAbilityModifiersActive: flips this instance’s switch only', async () => {
+  const screen = await useGMScreenStore.getState().createScreen('S')
+  seedCharacters(
+    npcWithAbilities([
+      { id: 'a1', name: 'Rage', traits: [], modifiers: [{ target: 'evasion', value: 2 }] },
+    ]),
+  )
+  const store = useGMScreenStore.getState()
+  const firstId = store.addNpcInstancePanel(screen.id, 'n1')
+  store.addNpcInstancePanel(screen.id, 'n1')
+
+  store.setInstanceAbilityModifiersActive(screen.id, firstId, 'a1', true)
+  expect(instanceState(0).abilityModifiers).toEqual({ a1: true })
+  // The sibling and the base record are untouched.
+  expect(instanceState(1).abilityModifiers).toEqual({})
+  expect(baseModifiersActive()).toBeUndefined()
+
+  // Switching it back to the ability's own (off) state clears the entry.
+  store.setInstanceAbilityModifiersActive(screen.id, firstId, 'a1', false)
+  expect(instanceState(0).abilityModifiers).toEqual({})
+})
+
+test('setInstanceAbilityModifiersActive: refuses an ability with no modifiers', async () => {
+  const screen = await useGMScreenStore.getState().createScreen('S')
+  seedCharacters(npcWithAbilities([{ id: 'plain', name: 'Bite', traits: [] }]))
+  const panelId = useGMScreenStore.getState().addNpcInstancePanel(screen.id, 'n1')
+  const store = useGMScreenStore.getState()
+
+  store.setInstanceAbilityModifiersActive(screen.id, panelId, 'plain', true)
+  store.setInstanceAbilityModifiersActive(screen.id, panelId, 'nope', true)
+  store.setInstanceAbilityModifiersActive(screen.id, 'nope', 'plain', true)
+
+  expect(instanceState().abilityModifiers).toEqual({})
+})
+
+test('setInstanceAbilityModifiersActive: can switch a base’s own flag off', async () => {
+  // A base record may carry `modifiersActive` as template data (imports, or an
+  // ability authored that way). An instance starts matching it, and switching
+  // it off here records the difference instead of writing the base.
+  const screen = await useGMScreenStore.getState().createScreen('S')
+  seedCharacters(
+    npcWithAbilities([
+      {
+        id: 'a1',
+        name: 'Rage',
+        traits: [],
+        modifiers: [{ target: 'evasion', value: 2 }],
+        modifiersActive: true,
+      },
+    ]),
+  )
+  const panelId = useGMScreenStore.getState().addNpcInstancePanel(screen.id, 'n1')
+  const store = useGMScreenStore.getState()
+
+  // Spawned matching the base: no entry, so the switch reads from the record.
+  expect(instanceState().abilityModifiers).toEqual({})
+  store.setInstanceAbilityModifiersActive(screen.id, panelId, 'a1', false)
+  expect(instanceState().abilityModifiers).toEqual({ a1: false })
+  expect(baseModifiersActive()).toBe(true)
+  // Switching it back on matches the base again → entry dropped.
+  store.setInstanceAbilityModifiersActive(screen.id, panelId, 'a1', true)
+  expect(instanceState().abilityModifiers).toEqual({})
+})
+
+test('setInstanceAbilityModifiersActive: clamps HP when a Max HP switch goes off', async () => {
+  const screen = await useGMScreenStore.getState().createScreen('S')
+  // Base HP 20, a +10 Max HP ability: switching it on raises the cap to 30.
+  seedCharacters(
+    npcWithAbilities([
+      { id: 'a1', name: 'Colossus', traits: [], modifiers: [{ target: 'maxHP', value: 10 }] },
+    ]),
+  )
+  const panelId = useGMScreenStore.getState().addNpcInstancePanel(screen.id, 'n1')
+  const store = useGMScreenStore.getState()
+  expect(instanceState().currentHP).toBe(20)
+
+  store.setInstanceAbilityModifiersActive(screen.id, panelId, 'a1', true)
+  store.healInstance(screen.id, panelId, 99)
+  // Healing stops at the instance's own (modified) maximum.
+  expect(instanceState().currentHP).toBe(30)
+
+  store.setInstanceAbilityModifiersActive(screen.id, panelId, 'a1', false)
+  // Switching it off leaves HP above the cap unless it is clamped.
+  expect(instanceState().currentHP).toBe(20)
+})
+
+test('damageInstance: an instance’s own Armor modifier reduces the damage it takes', async () => {
+  const screen = await useGMScreenStore.getState().createScreen('S')
+  seedCharacters(
+    npcWithAbilities([
+      { id: 'a1', name: 'Bulwark', traits: [], modifiers: [{ target: 'armor', value: 3 }] },
+    ]),
+  )
+  const panelId = useGMScreenStore.getState().addNpcInstancePanel(screen.id, 'n1')
+  const store = useGMScreenStore.getState()
+
+  // Armor rolls 1d6 per point: pin every die to 1, so 3 armor = 3 reduction.
+  vi.spyOn(Math, 'random').mockReturnValue(0)
+  const unarmored = store.damageInstance(screen.id, panelId, 10, { applyArmor: true })
+  expect(unarmored?.afterArmor).toBe(10)
+
+  store.setInstanceAbilityModifiersActive(screen.id, panelId, 'a1', true)
+  const armored = store.damageInstance(screen.id, panelId, 10, { applyArmor: true })
+  expect(armored?.afterArmor).toBe(7)
+})
+
+test('duplicatePanel: a fresh instance starts on the base’s own switches', async () => {
+  const screen = await useGMScreenStore.getState().createScreen('S')
+  seedCharacters(
+    npcWithAbilities([
+      { id: 'a1', name: 'Rage', traits: [], modifiers: [{ target: 'evasion', value: 2 }] },
+    ]),
+  )
+  const store = useGMScreenStore.getState()
+  const firstId = store.addNpcInstancePanel(screen.id, 'n1')
+  store.setInstanceAbilityModifiersActive(screen.id, firstId, 'a1', true)
+
+  store.duplicatePanel(screen.id, firstId)
+
+  expect(instanceState(0).abilityModifiers).toEqual({ a1: true })
+  expect(instanceState(1).abilityModifiers).toEqual({})
+})
+
+test('instance ability uses are per-panel', async () => {
+  const screen = await useGMScreenStore.getState().createScreen('S')
+  seedCharacters(limitedNpc())
+  const store = useGMScreenStore.getState()
+  const firstId = store.addNpcInstancePanel(screen.id, 'n1')
+  store.addNpcInstancePanel(screen.id, 'n1')
+
+  store.spendInstanceAbilityUse(screen.id, firstId, 'a1')
+
+  expect(instanceState(0).abilityUses).toEqual({ a1: 2 })
+  expect(instanceState(1).abilityUses).toEqual({})
+})
+
+test('duplicatePanel: a fresh instance gets its own full use budgets', async () => {
+  const screen = await useGMScreenStore.getState().createScreen('S')
+  seedCharacters(limitedNpc())
+  const store = useGMScreenStore.getState()
+  const firstId = store.addNpcInstancePanel(screen.id, 'n1')
+  store.spendInstanceAbilityUse(screen.id, firstId, 'a1')
+
+  store.duplicatePanel(screen.id, firstId)
+
+  expect(instanceState(0).abilityUses).toEqual({ a1: 2 })
+  expect(instanceState(1).abilityUses).toEqual({})
 })
 
 test('spendInstanceAP: deducts, and refuses when the instance cannot afford it', async () => {
