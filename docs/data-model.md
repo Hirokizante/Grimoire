@@ -1,0 +1,183 @@
+# Data model
+
+The domain types Grimoire stores and derives: character sheets, the abilities on
+them, custom sections, GM screens, and the compendium records they reference.
+This page is for contributors and agents changing sheets, abilities, exports or
+persistence; storage internals — IndexedDB object stores, `db.ts`,
+normalization on read and autosave — live in [architecture.md](architecture.md).
+
+---
+
+## Character
+
+The central domain object is a **`Character`**, which holds everything about a
+single Divergence character sheet:
+
+| Field | Purpose |
+| --- | --- |
+| `kind` | Discriminator: `'character'` (player sheet) or `'npc'` (static NPC reference) |
+| `id`, `name`, `playerName` | Identity |
+| `version` | Semantic version (MAJOR.MINOR.PATCH) for export tracking |
+| `milestones` | Character progression level |
+| `attributes` | The five Attributes (MAR, POW, AGI, VIT, GRT) |
+| `skills` | The fifteen Skills |
+| `maxFP`, `maxAbilitySlots` | Caps that grow with milestones |
+| `currentHP`, `tempHP`, `currentEND`, `currentAP`, `currentFP` | Live-play resource pools |
+| `mortalWounds` | Up to 2 active wounds (by name; `Pending Roll` while a slot awaits its D20 — a hand-picked wound is stored by its table name, so its entry's D20 comes back with it) |
+| `deathSaves` | Success/failure tracker |
+| `innateDescription`, `innateAbilities` | Core Ability narrative + mechanical innates |
+| `basicAttack`, `fatebreaker` | Fixed-shape core abilities |
+| `slottedAbilities`, `abilityPool` | Active vs. inactive slotted abilities |
+| `portrait` | Base64 data URL |
+| `physicalDescription`, `backstory` | Bio fields |
+| `customTabs` | User-created tabs with sections (`CustomAbilitySection`, `CustomNPCSection`, or `CustomTextSection`) |
+| `config` | Full aesthetic configuration (colors, fonts, CSS, background image) |
+| `viewModes` | Per-section grid/list preference |
+| `customResourceBars` | User-defined resource pools |
+| `npcStats` | Manually-entered combat stats (NPCs only: evasion, armor, movement, save DC, HP, mortal wounds) |
+| `description` | Long-form NPC description (NPCs only) |
+| `createdAt`, `updatedAt` | Timestamps |
+
+---
+
+## AbilityBlock
+
+**AbilityBlock** is the structured representation of any ability (Core, Slotted,
+or Pool):
+
+| Field | Purpose |
+| --- | --- |
+| `id`, `name` | Identity |
+| `traits` | Free-form tags (Action, Range, Type, Status, etc.) |
+| `cost` | AP / END / FP costs (all optional) |
+| `damage` | Dice notation string (e.g. `2d6+POW`) |
+| `description`, `overcharge`, `flavorText` | Prose fields (Markdown-supported) |
+| `isMinor` | Half-slot flag |
+| `showActivate` | Whether to show the Activate button in view mode. Offered in the player ability editors only — an NPC's ability editor (and every sub-ability editor on an NPC sheet) hides it, because an NPC outside a GM Screen never activates |
+| `modifiers` | Stat/attribute modifiers applied while the card's modifier toggle is on (`[{ target, value }]`; signed — positive adds, negative subtracts) |
+| `modifiersActive` | Whether those modifiers are currently applied to the sheet (view-mode switch; defaults to `false`). On an NPC base record it is template data — the base sheet shows it read-only, and a GM Screen instance records its own switch state instead (`NpcInstanceState.abilityModifiers`) |
+| `uses` | Limited-use budget, present only on abilities flagged as limited: `{ max, current, expendOnActivate }`. `current` moves when the ability is activated and is refilled to `max` on a full restore; omitted entirely for unlimited abilities. On an NPC base record it is template data — the base sheet shows it read-only, and a GM Screen instance tracks its own counts instead (`NpcInstanceState.abilityUses`) |
+
+On an NPC base record, `modifiersActive` and `uses` are **template data**: the
+base sheet renders both read-only, and a GM Screen instance records its own
+switch state (`NpcInstanceState.abilityModifiers`) and its own counts
+(`NpcInstanceState.abilityUses`) instead — see [gm-screen.md](gm-screen.md).
+
+---
+
+## Custom sections
+
+**CustomSection** is a discriminated union describing one section inside a
+custom tab:
+
+| Variant | Shape |
+| --- | --- |
+| `CustomAbilitySection` (`kind: 'ability'`) | `{ kind, id, name, abilities: AbilityBlock[] }` — a free-form group of abilities |
+| `CustomNPCSection` (`kind: 'npc'`) | `{ kind, id, name, npcId }` — a reference to a bundled NPC `Character` (with `kind: 'npc'`) |
+| `CustomTextSection` (`kind: 'text'`) | `{ kind, id, name, content }` — a free-form Markdown body (mechanics, flavor text, lore) |
+
+---
+
+## GM screens
+
+**GMScreen** is a saved, named list of panels:
+
+| Field | Purpose |
+| --- | --- |
+| `id`, `name` | Identity; the name is shown in the screen switcher |
+| `panels` | Ordered `ScreenPanel[]` — array order is display order |
+| `createdAt`, `updatedAt` | Timestamps |
+
+### ScreenPanel
+
+`ScreenPanel` is a discriminated union on `kind`:
+
+| Variant | Shape |
+| --- | --- |
+| `'character'` | `{ id, characterId, density }` — a reference to a player sheet |
+| `'npc-instance'` | `{ id, baseNpcId, label, density, state }`, where `state` is the instance's own live play: `{ currentHP, tempHP, condition, currentAP, cooldowns, mortalWounds, abilityUses, abilityModifiers }` |
+
+See [gm-screen.md](gm-screen.md) for the full GM Screen data model and store API.
+
+---
+
+## Status conditions
+
+**StatusCondition** is a compendium record referenced from any sheet text:
+
+| Field | Purpose |
+| --- | --- |
+| `id`, `name` | Identity; `[name]` references match case-insensitively |
+| `icon`, `iconType` | Icon payload (`'emoji'`, `'pack'` RPG-Awesome class key such as `'ra-crossed-swords'`, or `'image'` data URL). Lucide keys saved by older releases still render |
+| `description` | Full rules text for the condition |
+| `tags` | Categorization tags; built-ins carry `'Default'` |
+| `createdAt`, `updatedAt` | Timestamps |
+
+---
+
+## Derived values
+
+The following are derived from Attributes and Milestones and are always
+read-only:
+
+| Field | Formula |
+| --- | --- |
+| HP | `max(20, 20 + VIT × 5)` |
+| Evasion | `10 + AGI` |
+| Armor | `floor(VIT / 2)` |
+| Movement | `5 + floor(AGI / 2)` |
+| Milestone Bonus | `floor(Milestones / 2)` |
+| Save DC | `10 + Milestone Bonus` |
+| END Recovery | `max(1, 1 + floor(GRT / 2))` |
+
+### Modifier layering
+
+Ability modifiers layer on top of these formulas without ever changing them:
+
+- Attribute modifiers change the Attributes first, so `+1 VIT` also raises Max
+  HP and Armor.
+- Direct stat modifiers are then added to the derived values.
+- Everything that reads an attribute or a combat stat — display, dice rolls,
+  damage/armor resolution, heal caps, END Recovery — uses the *effective* value,
+  and switching the modifier off restores the base instantly.
+
+---
+
+## Slots
+
+- A regular Slotted Ability occupies **1 slot**.
+- A Minor Slotted Ability occupies **0.5 slots**.
+- Characters start with **3 slots** and gain an additional slot every 2
+  Milestones (or choose +1 Max FP instead).
+
+---
+
+## View modes
+
+- **Edit Mode** — all fields editable; live-play trackers hidden.
+- **View Mode** — all fields read-only; live-play interactions enabled
+  (resource bars, dice rolling, ability activation, ability modifier switches,
+  damage, death saves, mortal wounds — rolled *or* picked by hand from the
+  table).
+
+---
+
+## Dice notation
+
+The dice parser supports:
+
+- Standard dice: `d20`, `2d6`, `3d8`
+- Constants: `+4`, `-1`
+- Variables: `POW`, `MAR`, `Sneak` (resolved to the character's actual value)
+- Variable alternatives: `POW/MAR` (player's choice; higher used by default)
+- Combined: `2d6+POW`, `d20+3`, `1d6+POW/MAR`
+
+---
+
+## Related
+
+- [architecture.md](architecture.md) — stores, persistence and IndexedDB
+  invariants, theming, drag and drop.
+- [gm-screen.md](gm-screen.md) — GM Screen panels, turns, damage, Mortal
+  Wounds, statuses, and the store API.
+- [features.md](features.md) — the complete feature reference.
