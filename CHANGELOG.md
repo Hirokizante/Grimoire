@@ -6,6 +6,43 @@ characters regularly.
 
 ## Unreleased
 
+### Mobile — the list pages' menus and the status grid stay on-screen
+
+- **The Filter and Sort menus no longer hang off the left edge of a phone
+  screen.** Both panels are much wider than the button they hang from and were
+  anchored to it with `right: 0`. At phone widths the list head right-aligns its
+  action row, so the Filter button ends up a button's width from the LEFT
+  gutter — at 360px a 16rem panel anchored to its right edge started **108px
+  off-screen**, taking the panel's own header and its entire first column of
+  options with it, with nothing to scroll (the panel is not inside a scroller).
+  The panel is now measured on open and clamped into the viewport by the new
+  `useViewportClampedPanel` hook, shared by `FilterDropdown`, `SortDropdown` and
+  the in-sheet `SelectDropdown` (which opens rightwards and had the
+  mirror-image problem). Right-aligned panels still hug their trigger exactly as
+  before while there is room — desktop geometry is unchanged — and a viewport
+  resize re-places an open panel. The `@media (max-width: 400px)` fallbacks now
+  only keep each panel's `min-width` under its viewport-derived `max-width`.
+- **The status compendium keeps two cards per row on a phone without cutting the
+  second one off.** `.status-grid` used `repeat(2, 1fr)`; `1fr` is
+  `minmax(auto, 1fr)`, whose auto floor is a grid item's **min-content** width,
+  so one long unbroken status name widened its own track and pushed the second
+  column past the right edge of the screen (measured at 430px: `301px 126px`
+  tracks and a grid 37px wider than the page). The grid is now
+  `minmax(0, 1fr)` at every breakpoint, with a `min-width: 0` card, and the
+  phone layout shrinks the card itself — padding, gap, name / description / tag
+  sizes — so a 2-up row still fits inside the gutter at 360px. The ✕ delete
+  button is always visible on touch, so the heading row now reserves room for it
+  instead of letting it sit on the truncated status name; a long unbreakable
+  word in a description wraps instead of being sliced at the card edge; and
+  below 340px (folded covers) the grid falls back to a single column.
+- **Testing.** `e2e/mobile-layout.spec.ts` pins both in a real browser against
+  the production build at 360px and 430px: it creates an NPC (the shortest route
+  to the five-button head that triggers the panel overflow), opens the Filter and
+  Sort menus and asserts both boxes and the panel header sit inside the viewport,
+  then creates a 34-character status name and asserts two columns, no card past
+  the viewport edge, no ✕-over-name overlap, and no sideways page scroll. Both
+  assertions were confirmed to fail against the unfixed source.
+
 ### Custom tab sections — shift them with ↑ / ↓
 
 - **A custom tab's sections can be reordered.** Until now a section sat wherever

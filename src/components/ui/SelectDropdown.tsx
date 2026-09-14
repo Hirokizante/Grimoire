@@ -6,10 +6,16 @@
  * color scheme through the shared CSS variables. Purely presentational — the
  * parent owns the selected value. Unlike <select>, this is fully styled by
  * the sheet theme.
+ *
+ * Its panel opens rightwards (`left: 0`) and is clamped to the viewport
+ * (useViewportClampedPanel) so a trigger near the right edge of a phone
+ * screen cannot push the options off-screen.
  */
 
 import { useEffect, useRef, useState } from 'react'
 import { ChevronDown } from 'lucide-react'
+
+import { useViewportClampedPanel } from '@/hooks/useViewportClampedPanel'
 
 export interface SelectOption {
   /** Unique value (returned by onSelect). */
@@ -43,6 +49,7 @@ export default function SelectDropdown({
 }: SelectDropdownProps) {
   const [open, setOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
+  const panelRef = useViewportClampedPanel(open, containerRef, 'start')
 
   // Close on click-outside.
   useEffect(() => {
@@ -88,7 +95,12 @@ export default function SelectDropdown({
       </button>
 
       {open && (
-        <div className="select-dropdown__panel" role="dialog" aria-label={title}>
+        <div
+          className="select-dropdown__panel"
+          ref={panelRef}
+          role="dialog"
+          aria-label={title}
+        >
           <div className="select-dropdown__header">
             <span className="select-dropdown__title">{title}</span>
           </div>

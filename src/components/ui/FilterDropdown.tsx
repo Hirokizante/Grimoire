@@ -6,11 +6,16 @@
  * states: unchecked → include (✓, success color) → exclude (✕, danger color)
  * → unchecked. Click-outside closes the panel. The parent owns the selection
  * state and filtering logic — this component is purely presentational.
+ *
+ * The panel is wider than the button it hangs from, so its position is
+ * clamped to the viewport (see useViewportClampedPanel) — otherwise a trigger
+ * near the left edge of a phone screen pushes the panel off-screen.
  */
 
 import { useEffect, useRef, useState } from 'react'
 import { Check, Filter, X } from 'lucide-react'
 
+import { useViewportClampedPanel } from '@/hooks/useViewportClampedPanel'
 import type { FilterMode, PageSelection } from '@/store/listPrefsStore'
 
 export interface FilterOption {
@@ -57,6 +62,7 @@ export default function FilterDropdown({
 }: FilterDropdownProps) {
   const [open, setOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
+  const panelRef = useViewportClampedPanel(open, containerRef)
 
   // Close on click-outside.
   useEffect(() => {
@@ -107,7 +113,12 @@ export default function FilterDropdown({
       </button>
 
       {open && (
-        <div className="filter-dropdown__panel" role="dialog" aria-label="Filters">
+        <div
+          className="filter-dropdown__panel"
+          ref={panelRef}
+          role="dialog"
+          aria-label="Filters"
+        >
           <div className="filter-dropdown__header">
             <span className="filter-dropdown__title">Filters</span>
             <button

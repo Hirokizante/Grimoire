@@ -1366,7 +1366,12 @@ body:has(.modal-overlay) .app-header__nav {
   margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  /* minmax(0, 1fr), never a bare 1fr: `1fr` is `minmax(auto, 1fr)`, and the
+     auto floor is the card's MIN-CONTENT width — a long status name (nowrap)
+     or a long tag then widens its track past the page gutter and the second
+     column is cut off by the right edge of the screen (shipped once; the
+     two-column phone layout is what made it obvious). */
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 1rem;
 }
 
@@ -1374,6 +1379,9 @@ body:has(.modal-overlay) .app-header__nav {
   position: relative;
   display: flex;
   flex-direction: column;
+  /* Same reason as the grid's minmax(0, 1fr): a grid item refuses to shrink
+     below its min-content width unless its automatic minimum size is cleared. */
+  min-width: 0;
   background: var(--bg-surface);
   border: 1px solid var(--border-soft);
   border-radius: 12px;
@@ -1426,6 +1434,11 @@ body:has(.modal-overlay) .app-header__nav {
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  /* A long unbreakable token (a URL, a mashed status name) must wrap inside
+     the card: the clamp already hides the overflow, but without this the word
+     is sliced mid-glyph at the card's edge instead of continuing on the next
+     line — most visible on the narrow two-up phone cards. */
+  overflow-wrap: anywhere;
 }
 
 .status-card__tags {
@@ -1703,6 +1716,11 @@ body:has(.modal-overlay) .app-header__nav {
 }
 
 @media (max-width: 400px) {
+  /* Keep min-width under the viewport-derived max-width (min-width wins over
+     max-width in CSS, which would otherwise re-create the overflow). WHERE the
+     panel sits is decided at runtime by useViewportClampedPanel, which writes
+     an inline left/width — the `right: 0` here is only the pre-measurement
+     fallback. */
   .filter-dropdown__panel {
     right: 0;
     min-width: min(16rem, calc(100vw - 2rem));
@@ -1841,6 +1859,8 @@ body:has(.modal-overlay) .app-header__nav {
 }
 
 @media (max-width: 400px) {
+  /* See .filter-dropdown__panel: placement is inline (useViewportClampedPanel),
+     this only keeps min-width below the viewport-derived max-width. */
   .sort-dropdown__panel {
     right: 0;
     min-width: min(13rem, calc(100vw - 2rem));
@@ -2139,17 +2159,57 @@ body:has(.modal-overlay) .app-header__nav {
 
 @media (max-width: 900px) {
   .status-grid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
-@media (max-width: 400px) {
+/* Phones keep TWO cards per row — the CARD shrinks, the column count does not.
+   Padding, gap and type step down together so a 2-up row still fits inside the
+   page gutter at 360px instead of the second column running off the right edge;
+   the delete button keeps its always-visible touch treatment. */
+@media (max-width: 600px) {
   .status-grid {
-    grid-template-columns: 1fr;
+    gap: 0.6rem;
+  }
+
+  .status-card__main {
+    gap: 0.4rem;
+    padding: 0.7rem;
+  }
+
+  /* The delete button is always visible on touch, and a narrow card has no
+     slack: without this the ✕ sits on top of the (truncated) status name. */
+  .status-card__head {
+    padding-right: 1rem;
+  }
+
+  .status-card__name {
+    font-size: 0.92rem;
+  }
+
+  .status-card__desc {
+    font-size: 0.78rem;
+  }
+
+  .status-tag {
+    font-size: 0.64rem;
+    padding: 1px 6px;
   }
 
   .status-card__delete {
+    top: 0.25rem;
+    right: 0.25rem;
+    width: 1.4rem;
+    height: 1.4rem;
     opacity: 1;
+  }
+}
+
+/* Narrower than any common phone (folded covers, 320px-era handsets): two
+   ~120px slivers stop being readable, so fall back to a single column. */
+@media (max-width: 340px) {
+  .status-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 

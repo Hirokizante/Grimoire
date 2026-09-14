@@ -4,10 +4,16 @@
  * Mirrors FilterDropdown's look and behavior: a button showing the active
  * sort option next to an icon opens a dropdown panel; clicking an option
  * moves the checkmark. Click-outside and Escape close the panel.
+ *
+ * Like FilterDropdown's, the panel is wider than its trigger and is clamped
+ * to the viewport before it is shown (useViewportClampedPanel), so it cannot
+ * hang off the left edge of a phone screen.
  */
 
 import { useEffect, useRef, useState } from 'react'
 import { ArrowUpDown, Check, X } from 'lucide-react'
+
+import { useViewportClampedPanel } from '@/hooks/useViewportClampedPanel'
 
 export interface SortOption {
   /** Unique value (matches the page's sort key). */
@@ -35,6 +41,7 @@ export default function SortDropdown({
 }: SortDropdownProps) {
   const [open, setOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
+  const panelRef = useViewportClampedPanel(open, containerRef)
 
   // Close on click-outside.
   useEffect(() => {
@@ -82,7 +89,12 @@ export default function SortDropdown({
       </button>
 
       {open && (
-        <div className="sort-dropdown__panel" role="dialog" aria-label="Sort">
+        <div
+          className="sort-dropdown__panel"
+          ref={panelRef}
+          role="dialog"
+          aria-label="Sort"
+        >
           <div className="sort-dropdown__header">
             <span className="sort-dropdown__title">Sort by</span>
             <button
