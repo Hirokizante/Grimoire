@@ -8,21 +8,32 @@
  * via `dangerouslySetInnerHTML`). `rehype-raw` ensures that raw HTML embeds
  * continue to display correctly, while new entries can use clean Markdown.
  *
- * Dice notation: when `mode` is 'view', any dice notation inside the text
- * (e.g. `1d6+POW`, `d20+3`) is rendered as a clickable button via the shared
- * {@link DiceHighlighter}, so the same click-to-roll experience offered in the
- * AbilityBlock damage field extends to every prose description field.
+ * Inline annotations: when `mode` is 'view', status references (`[Diseased]`)
+ * and dice notation (`1d6+POW`, `d20+3`) in the text are rendered as clickable
+ * pills/buttons via the shared {@link StatusHighlighter} — so the same
+ * click-to-roll experience offered in the AbilityBlock damage field extends to
+ * every prose description field.
+ *
+ * That scan happens on the *tree*, not per Markdown tag: the
+ * {@link rehypeInlineAnnotations} plugin wraps each annotatable text node in an
+ * {@link INLINE_ANNOTATION_TAG} element, which this component renders through
+ * the highlighter. Scanning only the tags Markdown produces (`p`, `li`, …) is
+ * not enough, because raw HTML blocks leave their neighbouring prose as a bare
+ * child of the root (see that plugin for the gory details) — which is exactly
+ * how `[Diseased]` used to survive as literal text.
  */
 
-import { Fragment, cloneElement, createElement } from 'react'
-import type { ReactNode, ReactElement } from 'react'
 import ReactMarkdown from 'react-markdown'
 import rehypeRaw from 'rehype-raw'
 import remarkGfm from 'remark-gfm'
-import type { Components } from 'react-markdown'
+import type { ReactNode } from 'react'
+import type { Components, ExtraProps } from 'react-markdown'
 
 import StatusHighlighter from '@/components/status/StatusHighlighter'
-import { hasStatusCandidate } from '@/lib/statusReference'
+import {
+  INLINE_ANNOTATION_TAG,
+  rehypeInlineAnnotations,
+} from '@/lib/rehypeInlineAnnotations'
 import type { Character } from '@/types/character'
 import type { RollSource } from '@/types/rollLog'
 import type { SheetMode } from '@/pages/CharacterSheetPage'
@@ -31,9 +42,10 @@ export interface MarkdownTextProps {
   children: string
   className?: string
   /**
-   * When 'view', dice notation is highlighted as clickable buttons. When
-   * 'edit', the text renders plainly. Defaults to 'view' so existing call
-   * sites keep behaviour unchanged.
+   * When 'view', status references and dice notation are highlighted as
+   * clickable pills/buttons. When 'edit', the text renders plainly so the
+   * author sees the raw source. Defaults to 'view' so existing call sites keep
+   * behaviour unchanged.
    */
   mode?: SheetMode
   /**
@@ -49,91 +61,18 @@ export interface MarkdownTextProps {
   source?: RollSource
 }
 
-/** Cheap pre-check: does this string contain any dice-notation shape at all? */
-function hasDiceCandidate(text: string): boolean {
-  return /\d*d\s*\d+/i.test(text)
-}
-
 /**
- * Recursively map over markdown children, replacing any plain string child
- * that contains dice notation with a clickable {@link DiceHighlighter}.
- * Non-string nodes are returned unchanged, but their string children are still
- * scanned recursively so notation nested in links/emphasis is also clickable.
+ * The text a marker element wraps.
+ *
+ * {@link rehypeInlineAnnotations} wraps exactly one text node per marker and
+ * react-markdown hands that node over (`passNode`), so the node is the
+ * authoritative source. The rendered children are only a fallback, for a marker
+ * that arrives without its node.
  */
-function highlightChildren(
-  children: ReactNode,
-  mode: SheetMode,
-  character?: Character,
-  source?: RollSource,
-): ReactNode {
-  if (children == null) return null
-
-  if (typeof children === 'string') {
-    if (hasDiceCandidate(children) || hasStatusCandidate(children)) {
-      return (
-        <StatusHighlighter text={children} mode={mode} character={character} source={source} />
-      )
-    }
-    return children
-  }
-
-  if (Array.isArray(children)) {
-    return children.map((child, i) => (
-      <Fragment key={i}>{highlightChildren(child, mode, character, source)}</Fragment>
-    ))
-  }
-
-  // A React element — recurse into its children, preserving the element itself.
-  const element = children as ReactElement<{ children?: ReactNode }>
-  if (element && element.props && element.props.children != null) {
-    return cloneElement(
-      element,
-      { children: highlightChildren(element.props.children, mode, character, source) },
-    )
-  }
-
-  return children
-}
-
-/**
- * Build a react-markdown `Components` override. Each registered tag renders its
- * own default element with its string children scanned for dice notation. We
- * preserve the element itself (so block tags keep their block layout) and only
- * replace string children that contain dice notation with clickable buttons.
- */
-function buildDiceComponents(mode: SheetMode, character?: Character, source?: RollSource): Components {
-  // Build a renderer that emits the real DOM element for `tag`, forwarding its
-  // props (className, etc.) while highlighting any dice-notation text children.
-  // `createElement` sidesteps JSX's generic LibraryManagedAttributes narrowing;
-  // the components are typed as `any` so they satisfy react-markdown's
-  // per-tag `ComponentType<...>` signature without losing element fidelity.
-  const makeRenderer = (tag: string) => {
-    const DiceText = (props: Record<string, unknown>) => {
-      const { node: _node, children, ...rest } = props
-      return createElement(
-        tag,
-        rest,
-        highlightChildren(children as ReactNode, mode, character, source),
-      )
-    }
-    return DiceText as unknown as (props: never) => ReactNode
-  }
-
-  return {
-    p: makeRenderer('p'),
-    li: makeRenderer('li'),
-    td: makeRenderer('td'),
-    th: makeRenderer('th'),
-    blockquote: makeRenderer('blockquote'),
-    em: makeRenderer('em'),
-    strong: makeRenderer('strong'),
-    h1: makeRenderer('h1'),
-    h2: makeRenderer('h2'),
-    h3: makeRenderer('h3'),
-    h4: makeRenderer('h4'),
-    h5: makeRenderer('h5'),
-    h6: makeRenderer('h6'),
-  } as unknown as Components
+function annotatedText(props: ExtraProps & { children?: ReactNode }): string {
+  const first = props.node?.children[0]
+  if (first?.type === 'text') return first.value
+  return typeof props.children === 'string' ? props.children : ''
 }
 
 export default function MarkdownText({
@@ -146,18 +85,30 @@ export default function MarkdownText({
   const classes = ['md', className].filter(Boolean).join(' ')
   const isView = mode === 'view'
 
-  // In edit mode we render plain Markdown (no clickable dice). In view mode we
-  // augment the renderer so text nodes inside block containers become
-  // clickable dice buttons.
+  // In edit mode we render plain Markdown so the author sees the exact source
+  // (no clickable pills/buttons). In view mode the annotation plugin marks every
+  // text node that may hold a status reference or dice notation, and the marker
+  // component renders it through the shared highlighter.
   const components: Components | undefined = isView
-    ? buildDiceComponents(mode, character, source)
+    ? ({
+        [INLINE_ANNOTATION_TAG]: (props: ExtraProps & { children?: ReactNode }) => (
+          <StatusHighlighter
+            text={annotatedText(props)}
+            mode={mode}
+            character={character}
+            source={source}
+          />
+        ),
+      } as unknown as Components)
     : undefined
 
   return (
     <div className={classes}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
-        rehypePlugins={[rehypeRaw]}
+        rehypePlugins={
+          isView ? [rehypeRaw, rehypeInlineAnnotations] : [rehypeRaw]
+        }
         components={components}
       >
         {children}

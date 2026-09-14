@@ -230,6 +230,7 @@ src/
 │   ├── gmScreenUtils.ts           # Panel resolution, damage outcome wording
 │   ├── dice.ts / diceParser.ts / diceRoller.ts  # Roll notation pipeline
 │   ├── markdown.ts                # Markdown → plain text for previews
+│   ├── rehypeInlineAnnotations.ts # Mark [Status]/dice text nodes for rendering
 │   ├── imageProcessing.ts         # Canvas resize + compression
 │   ├── emojiCatalog.ts            # Unicode emoji catalog + alias search
 │   ├── slotLogic.ts               # Minor/regular slot counting

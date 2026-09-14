@@ -6,6 +6,39 @@ characters regularly.
 
 ## Unreleased
 
+### Sheet prose — status references survive raw HTML blocks
+
+- **A `[StatusName]` reference no longer goes literal just because the description
+  around it is hand-written HTML.** Inline references and dice notation were
+  highlighted by rendering `p`, `li`, `em`, … through a component that scanned
+  their children, so only the text *Markdown* had wrapped was ever scanned. A raw
+  HTML block breaks that assumption: an HTML block stays open until a blank line,
+  so in the reported description the `<span>`/`<img>` coin markup and the prose
+  under it are **one** block, and `rehype-raw` hands that prose to the tree as a
+  bare child of the document root — never inside a `<p>`. `[Diseased]` there
+  stayed literal text while the identical text on its own rendered as a pill.
+  Text inside a raw `<div>`/`<span>` escaped the scan for the same reason: an
+  unregistered element never entered it.
+- **The scan moved from tags to text nodes.** A new rehype plugin
+  (`src/lib/rehypeInlineAnnotations.ts`) walks the *rendered tree* after
+  `rehype-raw` and wraps every text node that could hold an annotation in a marker
+  element, which `MarkdownText` renders through the existing `StatusHighlighter`.
+  Where the text sits no longer matters — paragraph, list item, table cell, raw
+  HTML block, or bare child of the root — and the cheap `[`…`]` / dice-shape
+  pre-check keeps plain prose unwrapped, so its DOM is unchanged. Text inside
+  raw-text elements (`<style>`, `<script>`, …) is deliberately skipped: that is
+  CSS/JS, and splicing markup into it would corrupt it. Edit mode still renders
+  the raw source, and the scanning itself is unchanged — still the one
+  `StatusHighlighter`, so unmatched brackets stay literal and matching stays
+  case-insensitive.
+- **Testing.** `src/components/ui/MarkdownText.test.tsx` renders the reported
+  description verbatim and asserts the pill appears beside the author's own HTML,
+  plus cases for a raw `<div>`, inline HTML inside a paragraph, dice notation, an
+  unmatched `[Bracket]` staying literal, `<style>` being left alone, and edit mode
+  showing the raw source. `src/lib/rehypeInlineAnnotations.test.ts` pins the tree
+  walk itself (including "never wrap twice" and the raw-text skip). The three
+  raw-HTML/dice cases fail against the unfixed source.
+
 ### Mobile — the list pages' menus and the status grid stay on-screen
 
 - **The Filter and Sort menus no longer hang off the left edge of a phone

@@ -189,6 +189,17 @@ export function parseDiceNotation(notation: string): ParsedExpression {
 export const DICE_NOTATION_REGEX = /(\d*d\d+(?:\s*[+-]\s*(?:(?:MAR|POW|AGI|VIT|GRT)|\d+|[A-Za-z][A-Za-z ]*(?:\/[A-Za-z][A-Za-z ]*)?))*)/gi
 
 /**
+ * Cheap pre-check: does this string contain any dice-notation shape at all?
+ *
+ * Deliberately looser than {@link DICE_NOTATION_REGEX} — it only has to avoid
+ * running the full parse on prose that cannot contain a roll. Callers that need
+ * the exact matches still use {@link findDiceNotation}.
+ */
+export function hasDiceCandidate(text: string): boolean {
+  return /\d*d\s*\d+/i.test(text)
+}
+
+/**
  * Find all dice notation matches in a string. Returns the matched text and
  * its position for highlighting.
  */
