@@ -4,6 +4,11 @@
  * and moved between sections within the same tab.
  *
  * SortableContext for each section lives inside CustomAbilitySection itself.
+ *
+ * Both ends of a drag are resolved against the **tab record**, not against the
+ * drag payload: the payload names only the list a card was rendered in, while
+ * whether that list takes part in a tab drag is a fact about the section's
+ * `kind`, which only the store holds.
  */
 
 import { useState } from 'react'
@@ -71,24 +76,26 @@ export default function CustomTabDndContext({
     const activeId = active.id as string
     const overId = over.id as string
 
-    const fromSectionKind = active.data.current?.sectionKind as
-      | 'ability'
-      | 'npc'
-      | undefined
+    // The drag payload only names the list a card was rendered in. Whether
+    // that list takes part in a tab drag is a fact about the tab record, so
+    // both ends are resolved there — the payload carries no `kind`, and asking
+    // it for one turned every custom-tab drag into a silent no-op.
     const fromSection = active.data.current?.section as string | undefined
     const overSection = (over.data.current?.section as string | undefined) ??
       (typeof overId === 'string' ? overId : undefined)
-
-    // Only ability sections participate in drag-and-drop.
     if (!fromSection || !overSection) return
-    if (fromSectionKind !== 'ability') return
 
     const char = useCharacterStore.getState().currentCharacter
     if (!char) return
     const tab = char.customTabs.find((t) => t.id === tabId)
     if (!tab) return
 
-    // Don't drop into an NPC section.
+    // Only ability sections participate in drag-and-drop. An NPC's list is
+    // reorder-only and lives in its own nested context, so a card can never be
+    // lifted out of an ability section into an NPC.
+    const sourceSection = tab.sections.find((s) => s.id === fromSection)
+    if (!sourceSection || sourceSection.kind !== 'ability') return
+
     const targetSection = tab.sections.find((s) => s.id === overSection)
     if (!targetSection || targetSection.kind !== 'ability') return
 

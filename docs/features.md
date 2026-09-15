@@ -152,6 +152,13 @@ Grimoire is built to support that freedom:
   tab. The first section's ↑ and the last section's ↓ render disabled rather than hidden (the
   control never moves or disappears as a section walks the tab), and the new order is saved with the
   sheet.
+- **Moving ability cards** — in edit mode every card in an **Ability Block** section carries the same
+  drag grip as the main sheet's ability lists. Drag a card onto a sibling card to reorder that
+  section, or onto a card, the list body, or the "drag one in" drop zone of **another ability
+  section in the same tab** to move it there — it lands at the end of that section's list, exactly
+  like a Slotted Abilities ↔ Ability Pool move. Sections do not trade cards across tabs, and a card
+  can never be dropped into an NPC or Text section (the bundled NPC's list is a separate,
+  reorder-only drag).
 
 ### NPC sections
 

@@ -215,6 +215,38 @@ characters regularly.
   moved up, and the resulting order — `text, npc, ability` — read back after a
   reload with no arrows in view mode.
 
+### Custom tab abilities — drag a card within a section, or into another
+
+- **Dragging an ability card inside a custom tab did nothing.** Every drag in a
+  custom ability section was silently cancelled: `CustomTabDndContext` asked the
+  drag payload for a `sectionKind` that no card ever wrote, and rejected the
+  drag when it read back `undefined`. Both halves of the feature went with it —
+  reordering a section's own cards, and moving a card into another ability
+  section of the same tab. The kind now comes from the tab record itself (the
+  only place it is guaranteed to exist), resolved for both ends of the drag, so
+  a custom ability section's cards reorder and move again while an NPC section
+  still refuses them.
+- **What the drop does.** Dropping a card on a card or on the list body of
+  another ability section moves it to that section, landing at the end of the
+  list — the same cross-list rule the Slotted Abilities ↔ Ability Pool drag
+  follows — while a drop inside its own section reorders it to the hovered
+  position. An empty section works too: its "drag one in" drop zone is a
+  droppable in its own right. The tab's own section order (the ↑ / ↓ arrows),
+  per-section view modes and the NPC section's separate, reorder-only drag are
+  untouched.
+- **Testing.** `CustomTabDndContext.test.tsx` replays drag events built from
+  what the real cards and sections register with dnd-kit (`useSortable` /
+  `useDroppable` are captured), so a payload that stops naming its section fails
+  the suite instead of quietly disabling the feature: it pins a move onto a card
+  in another section, a move onto the section body, a reorder inside a section,
+  a drop past the last card, and an NPC section refusing a card. Both drags —
+  the reorder and the cross-section move — were confirmed to fail against the
+  unfixed source. `e2e/custom-sections.spec.ts` then performs them with a real
+  pointer against the production build: an ability dragged onto a sibling card
+  reorders, one dragged onto the other section's card moves there (and onto an
+  empty section's drop zone in its own test), and the resulting layout is read
+  back after a reload with no grips in view mode.
+
 ## v0.9.0-alpha — 2026-09-13
 
 The table release. Ten commits since `v0.8.0-alpha`, and they all point the same

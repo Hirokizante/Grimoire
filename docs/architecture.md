@@ -149,7 +149,12 @@ Built on `@dnd-kit`. Four contexts cover the app's drag surfaces:
 
 - **`AbilitiesDndContext`** — wraps the Slotted Abilities and Ability Pool sections, enabling
   cross-list moves (slotted ↔ pool) and reordering within a list.
-- **`CustomTabDndContext`** — custom ability sections have their own context.
+- **`CustomTabDndContext`** — custom ability sections have their own context, so a card can be
+  reordered inside its section or moved into another ability section of the same tab. Both ends of
+  the drag are resolved against the **tab record**, never against a `kind` on the drag payload: the
+  payload names only the list a card was rendered in, and a section's `kind` exists in the store
+  alone. A cross-section drop appends to the target list (the pool ↔ slotted rule), and a drop on an
+  NPC section is refused.
 - **`NpcAbilitiesDndContext`** — an NPC has a single ability list, so this one only reorders. It
   is mounted *inside* `NPCAbilitiesSection`, so the same drag works on the NPC's own sheet page
   and in an NPC section bundled into a player sheet's custom tab while staying out of that tab's
