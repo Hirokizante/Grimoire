@@ -33,6 +33,7 @@ import {
   spendAbilityUse as applySpendAbilityUse,
 } from '@/lib/abilityUses'
 import { rollDie } from '@/lib/dice'
+import { clampCustomAttributeValue } from '@/lib/customAttributes'
 import {
   PENDING_MORTAL_WOUND,
   isKnockedOut,
@@ -54,6 +55,7 @@ import type {
   AbilityBlock,
   AttributeKey,
   Character,
+  CustomAttribute,
   CustomResourceBar,
   MortalWoundRoll,
   Semver,
@@ -443,6 +445,27 @@ export interface CharacterStoreActions {
   spendCustomResourceBar: (id: string, barId: string, amount?: number) => boolean
   /** Restore to a custom resource bar (capped at max). */
   restoreCustomResourceBar: (id: string, barId: string, amount?: number) => void
+  /** Add a new custom attribute to the current character's hero strip. */
+  addCustomAttribute: (attribute: CustomAttribute) => void
+  /** Update an existing custom attribute by id. */
+  updateCustomAttribute: (
+    id: string,
+    updater: (attribute: CustomAttribute) => CustomAttribute,
+  ) => void
+  /** Remove a custom attribute by id. */
+  removeCustomAttribute: (id: string) => void
+  /**
+   * Nudge one custom attribute's value by `delta` — the view-mode steppers.
+   * Id-targeted, like the resource-bar spend/restore pair, so a GM panel can
+   * drive a sheet that is not the selected one. The new value is clamped to a
+   * whole number inside `lib/customAttributes.ts`'s steppable range; an entry
+   * already at the bound is left exactly as it was (no write, no autosave).
+   */
+  adjustCustomAttributeValue: (
+    id: string,
+    attributeId: string,
+    delta: number,
+  ) => void
   /**
    * Replace the current character's labels (the Edit Labels modal saves the
    * whole list). Local-only metadata — never exported.
@@ -1870,6 +1893,53 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
         bar.id === barId ? { ...bar, current: Math.min(bar.max, bar.current + amount) } : bar,
       ),
     }))
+  },
+
+  // ---- Custom attributes -------------------------------------------------------
+
+  addCustomAttribute: (attribute) => {
+    get().updateCurrentCharacter((char) => ({
+      ...char,
+      customAttributes: [...(char.customAttributes ?? []), attribute],
+    }))
+  },
+
+  updateCustomAttribute: (id, updater) => {
+    get().updateCurrentCharacter((char) => ({
+      ...char,
+      customAttributes: (char.customAttributes ?? []).map((attribute) =>
+        attribute.id === id ? updater(attribute) : attribute,
+      ),
+    }))
+  },
+
+  removeCustomAttribute: (id) => {
+    get().updateCurrentCharacter((char) => ({
+      ...char,
+      customAttributes: (char.customAttributes ?? []).filter(
+        (attribute) => attribute.id !== id,
+      ),
+    }))
+  },
+
+  adjustCustomAttributeValue: (id, attributeId, delta) => {
+    get().updateCharacter(id, (char) => {
+      const attributes = char.customAttributes ?? []
+      const target = attributes.find((a) => a.id === attributeId)
+      if (!target) return char
+      const next = clampCustomAttributeValue(target.value + delta)
+      // A step against a bound writes nothing: returning the same character
+      // skips the update (and its autosave) entirely.
+      if (next === target.value) return char
+      return {
+        ...char,
+        customAttributes: attributes.map((attribute) =>
+          attribute.id === attributeId
+            ? { ...attribute, value: next }
+            : attribute,
+        ),
+      }
+    })
   },
 
   // ---- Labels ------------------------------------------------------------------

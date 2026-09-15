@@ -14,8 +14,10 @@
  */
 
 import { findDiceNotation } from '@/lib/diceParser'
+import { customAttributeVariableNames } from '@/lib/customAttributes'
 import { findStatusReferences, statusByName } from '@/lib/statusReference'
 import { useStatusStore } from '@/store/statusStore'
+import { useCharacterStore } from '@/store/characterStore'
 import DiceHighlighter from '@/components/dice/DiceHighlighter'
 import StatusReference from '@/components/status/StatusReference'
 import type { Character } from '@/types/character'
@@ -56,6 +58,11 @@ export default function StatusHighlighter({
   source,
 }: StatusHighlighterProps) {
   const statuses = useStatusStore((s) => s.statuses)
+  // The same character DiceHighlighter falls back to, so both scanners agree on
+  // which custom-attribute names are notation tokens before their segments are
+  // merged.
+  const currentCharacter = useCharacterStore((s) => s.currentCharacter)
+  const rollCharacter = character ?? currentCharacter
 
   if (!text) return null
 
@@ -71,7 +78,10 @@ export default function StatusHighlighter({
   // unlikely event that a dice match overlaps a bracket, the earlier-starting
   // segment wins so text is never double-rendered.
   const segments: Segment[] = [
-    ...findDiceNotation(text).map<DiceSegment>((d) => ({
+    ...findDiceNotation(
+      text,
+      customAttributeVariableNames(rollCharacter?.customAttributes),
+    ).map<DiceSegment>((d) => ({
       start: d.start,
       end: d.end,
       kind: 'dice',

@@ -7,10 +7,15 @@
  * notation segments are rendered as clickable spans that trigger a dice roll
  * via the `useDiceRollStore`.
  *
+ * The character's custom attributes are part of the scanned vocabulary: their
+ * shorthands and full names are matched exactly (see
+ * `customAttributeVariableNames`), so a homebrew stat rolls like a built-in one.
+ *
  * In edit mode, highlighting is disabled (the text is just shown plainly).
  */
 
 import { findDiceNotation } from '@/lib/diceParser'
+import { customAttributeVariableNames } from '@/lib/customAttributes'
 import { useDiceRollStore } from '@/store/diceRollStore'
 import { useCharacterStore } from '@/store/characterStore'
 import type { Character } from '@/types/character'
@@ -52,7 +57,12 @@ export default function DiceHighlighter({
   if (!text) return null
 
   const isView = mode === 'view'
-  const matches = isView ? findDiceNotation(text) : []
+  // The character's custom attributes are first-class notation tokens: their
+  // shorthands and names are handed to the matcher so `2d6+FOO` (or a
+  // multi-word name) is detected as one variable and resolved by the roller.
+  const matches = isView
+    ? findDiceNotation(text, customAttributeVariableNames(character?.customAttributes))
+    : []
 
   // No matches and not view mode — just render the text.
   if (matches.length === 0) {

@@ -37,6 +37,8 @@ import MortalWoundRoller from '@/components/sheet/MortalWoundRoller'
 import RecoverAction from '@/components/sheet/RecoverAction'
 import ResourceBar from '@/components/sheet/ResourceBar'
 import CustomResourceBarModal from '@/components/sheet/CustomResourceBarModal'
+import CustomAttributeModal from '@/components/sheet/CustomAttributeModal'
+import CustomAttributeStrip from '@/components/sheet/CustomAttributeStrip'
 import ConfirmModal from '@/components/sheet/ConfirmModal'
 import {
   calcArmor,
@@ -56,7 +58,7 @@ import {
   type StatTokenLabelMode,
 } from '@/components/sheet/statTokenLabels'
 import type { StatColorKey } from '@/lib/themeUtils'
-import type { Character, CustomResourceBar } from '@/types'
+import type { Character, CustomAttribute, CustomResourceBar } from '@/types'
 import type { SheetMode } from '@/pages/CharacterSheetPage'
 
 export interface StatsSectionProps {
@@ -101,6 +103,17 @@ export interface StatsSectionProps {
    * from the Customization panel.
    */
   tokenColors?: Partial<Record<StatColorKey, string>>
+  /**
+   * Show the custom-attribute strip (and, in edit mode, the "Add Attribute"
+   * button beside "Add Resource Bar").
+   *
+   * The hero section opts in — that is where the strip belongs: with the
+   * resource bars above it (turn actions first, in view mode) and the Mortal
+   * Wounds block below. A GM Screen panel (which renders this same section with
+   * `variant="flat"`) leaves it off: a custom attribute is part of the player's
+   * own sheet, and the panel is there to run the encounter.
+   */
+  showCustomAttributes?: boolean
   /**
    * How much of each stat name the token prints.
    *
@@ -148,6 +161,7 @@ export default function StatsSection({
   hideMortalWounds = false,
   tokenColors,
   tokenLabels = 'full',
+  showCustomAttributes = false,
 }: StatsSectionProps) {
   const { attributes, milestones } = character
 
@@ -175,6 +189,9 @@ export default function StatsSection({
   const removeCustomResourceBar = useCharacterStore((s) => s.removeCustomResourceBar)
   const spendCustomResourceBar = useCharacterStore((s) => s.spendCustomResourceBar)
   const restoreCustomResourceBar = useCharacterStore((s) => s.restoreCustomResourceBar)
+  const addCustomAttribute = useCharacterStore((s) => s.addCustomAttribute)
+  const updateCustomAttribute = useCharacterStore((s) => s.updateCustomAttribute)
+  const removeCustomAttribute = useCharacterStore((s) => s.removeCustomAttribute)
   // Read the bars off the character being rendered, not off `currentCharacter`:
   // an expanded GM-screen panel shows a character that may not be selected.
   const customResourceBars = character.customResourceBars ?? []
@@ -183,6 +200,9 @@ export default function StatsSection({
   const [showAddBar, setShowAddBar] = useState(false)
   const [barToEdit, setBarToEdit] = useState<CustomResourceBar | null>(null)
   const [barToRemove, setBarToRemove] = useState<{ id: string; name: string } | null>(null)
+  const [showAddAttribute, setShowAddAttribute] = useState(false)
+  const [attributeToEdit, setAttributeToEdit] = useState<CustomAttribute | null>(null)
+  const [attributeToRemove, setAttributeToRemove] = useState<{ id: string; name: string } | null>(null)
   const { notify } = useNotification()
   const isView = mode === 'view'
   const isEdit = mode === 'edit'
@@ -358,6 +378,15 @@ export default function StatsSection({
           >
             + Add Resource Bar
           </button>
+          {showCustomAttributes && (
+            <button
+              type="button"
+              className="btn btn--ghost section-add-btn"
+              onClick={() => setShowAddAttribute(true)}
+            >
+              + Add Attribute
+            </button>
+          )}
         </div>
       )}
 
@@ -381,7 +410,43 @@ export default function StatsSection({
         onClose={() => setBarToEdit(null)}
       />
 
+      <CustomAttributeModal
+        open={showAddAttribute}
+        onSave={addCustomAttribute}
+        onClose={() => setShowAddAttribute(false)}
+      />
+
+      <CustomAttributeModal
+        open={attributeToEdit != null}
+        attribute={attributeToEdit ?? undefined}
+        onSave={(updated) =>
+          updateCustomAttribute(updated.id, () => updated)
+        }
+        onDelete={() => {
+          if (!attributeToEdit) return
+          // Same single confirmation path the resource bars use.
+          setAttributeToRemove({
+            id: attributeToEdit.id,
+            name: attributeToEdit.name,
+          })
+          setAttributeToEdit(null)
+        }}
+        onClose={() => setAttributeToEdit(null)}
+      />
+
       {isView && <RecoverAction characterId={character.id} />}
+
+      {/* The player's own attributes — a horizontal, centered strip below the
+        * turn actions (Recover / End Turn, view mode only) and above the Mortal
+        * Wounds block. In edit mode, where there are no turn actions, it follows
+        * the resource bars directly. */}
+      {showCustomAttributes && (
+        <CustomAttributeStrip
+          character={character}
+          mode={mode}
+          onEdit={(attribute) => setAttributeToEdit(attribute)}
+        />
+      )}
 
       {/* View mode always shows the block — the counter and the manual add
         * included — because it is also where a specific wound is recorded by
@@ -427,6 +492,27 @@ export default function StatsSection({
             setBarToRemove(null)
           }}
           onClose={() => setBarToRemove(null)}
+        />
+      )}
+
+      {attributeToRemove && (
+        <ConfirmModal
+          title="Remove Attribute?"
+          message={
+            <>
+              Are you sure you want to remove{' '}
+              <strong>"{attributeToRemove.name}"</strong>? Any dice notation
+              that references it will no longer resolve.
+            </>
+          }
+          confirmLabel="Remove"
+          cancelLabel="Cancel"
+          variant="danger"
+          onConfirm={() => {
+            removeCustomAttribute(attributeToRemove.id)
+            setAttributeToRemove(null)
+          }}
+          onClose={() => setAttributeToRemove(null)}
         />
       )}
     </section>

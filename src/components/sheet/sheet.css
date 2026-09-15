@@ -987,8 +987,144 @@
   width: 120px;
 }
 
+/* The add row carries one button per user-created block kind: "+ Add Resource
+   Bar" and "+ Add Attribute" sit side by side, wrapping only when the column
+   is too narrow for both. Their shared .section-add-btn bottom margin is
+   dropped — the row's own spacing separates them from what follows. */
 .stat-bars-add {
   margin-top: 0.75rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.stat-bars-add .section-add-btn {
+  margin-bottom: 0;
+}
+
+/* ---- Custom attributes strip (hero) --------------------------------------- */
+
+/* The player's own attributes, sitting between the resource bars and the
+   Mortal Wounds block: the same boxes the five Divergence Attributes use
+   (shorthand / value / name), laid out as one horizontal strip.
+   `justify-content: center` is the point of the block — a sheet with two
+   custom attributes reads as a deliberately placed pair rather than two boxes
+   hanging off the left edge of a section-wide row. */
+.custom-attr-strip {
+  display: flex;
+  flex-flow: row wrap;
+  justify-content: center;
+  align-items: stretch;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.custom-attr-box {
+  flex: 0 0 auto;
+  min-width: 4.75rem;
+  padding: 0.45rem 0.6rem 0.5rem;
+}
+
+/* A row, not a grid: a long custom name must not stretch every other box on
+   the strip with it, so each box keeps its natural width and the overflow is
+   trimmed instead. */
+.custom-attr-box__abbr {
+  max-width: 8rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.custom-attr-box__value-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+}
+
+.custom-attr-box__value {
+  min-width: 2.2rem;
+}
+
+.custom-attr-box__input {
+  width: 3.2rem;
+}
+
+/* − / + steppers: the view-mode way to nudge an attribute that changes a lot
+   without leaving live play (opt-in per attribute). Icon buttons follow the
+   sheet's frameless rule — the shared `.btn--icon` keeps the box and the hover
+   tint, and nothing here declares a visible border. */
+.custom-attr-step {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  min-width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1;
+  border-radius: 6px;
+}
+
+.custom-attr-step:active {
+  transform: scale(0.94);
+}
+
+/* Edit-mode pencil, corner-pinned so the box keeps the three-line attribute
+   shape (shorthand / value / name) it has in view mode. */
+.custom-attr-box__edit {
+  position: absolute;
+  top: 0.15rem;
+  right: 0.15rem;
+  min-width: 0;
+  padding: 0.15rem;
+  line-height: 1;
+  color: var(--text-muted);
+  opacity: 0.7;
+}
+
+.custom-attr-box__edit:hover {
+  color: var(--accent-violet-soft);
+  opacity: 1;
+}
+
+/* ---- Custom attribute modal --------------------------------------------- */
+
+.custom-attribute-modal {
+  max-width: 440px;
+}
+
+.custom-attribute-modal__body {
+  padding: 1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.custom-attribute-modal__shorthand {
+  text-transform: uppercase;
+}
+
+.custom-attribute-modal__hint {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.custom-attribute-modal__hint code {
+  font-size: 0.78rem;
+  color: var(--accent-violet-soft);
+}
+
+/* Edit mode: pin the Delete button to the left of the footer so Cancel/Save
+   group on the right (the resource-bar modal's shape). */
+.custom-attribute-modal__delete {
+  margin-right: auto;
 }
 
 /* ---- Compact sheet action buttons ---------------------------------------- */

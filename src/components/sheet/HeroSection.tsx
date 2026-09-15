@@ -154,7 +154,12 @@ export default function HeroSection({ character, mode = 'view', onLevelUp, onCus
       )}
 
       <div className="hero-section__stats-row">
-        <StatsSection character={character} mode={mode} variant="flat" />
+        <StatsSection
+          character={character}
+          mode={mode}
+          variant="flat"
+          showCustomAttributes
+        />
         <AttributesSection character={character} attributes={character.attributes} mode={mode} variant="flat" />
       </div>
 

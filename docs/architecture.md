@@ -80,7 +80,7 @@ older records to the latest shape:
 
 - migrating `innateAbility` → `innateAbilities`
 - adding `showActivate`
-- ensuring `customTabs` and `customResourceBars` exist
+- ensuring `customTabs`, `customResourceBars` and `customAttributes` exist
 - sanitizing ability `modifiers` (unknown targets / non-finite values dropped; the modifier switch
   is dropped when nothing survives)
 - stamping the `kind` discriminator on legacy custom-tab sections

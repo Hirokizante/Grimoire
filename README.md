@@ -31,13 +31,15 @@ tracking resources and rolling dice.
 - **Character sheets** — the five Attributes (MAR, POW, AGI, VIT, GRT) and
   fifteen Skills with click-to-roll support, a Core Ability, slotted abilities
   with drag-and-drop, an unlimited ability pool, sub-abilities, custom tabs and
-  sections, portraits, and Markdown-supported bio fields.
+  sections, your own **custom attributes** (with optional view-mode steppers),
+  portraits, and Markdown-supported bio fields.
 - **Live play** — a View mode that locks the sheet and enables resource
   tracking: HP with Armor / Resistance / Temp HP handling, AP, END and FP,
   Recover and End Turn, Mortal Wounds, and Death Saves.
-- **Dice roller** — inline notation (`d20`, `2d6+4`, `1d6+POW`, `2d6+POW/MAR`)
-  that becomes clickable in view mode, with a per-die breakdown, critical and
-  fumble badges, and a persistent roll log.
+- **Dice roller** — inline notation (`d20`, `2d6+4`, `1d6+POW`, `2d6+POW/MAR`,
+  or a custom attribute like `2d6+SAN`) that becomes clickable in view mode,
+  with a per-die breakdown, critical and fumble badges, and a persistent roll
+  log.
 - **GM Screen** — a saved surface holding one panel per sheet you are running:
   live references to player characters, or NPC instances with their own HP,
   turns, Recharge cooldowns, Mortal Wounds, limited uses, and tracked statuses.

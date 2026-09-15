@@ -6,6 +6,49 @@ characters regularly.
 
 ## Unreleased
 
+### Custom attributes — the player's own stats, usable in dice notation
+
+- **A sheet can define its own attributes.** In edit mode **+ Add Attribute**
+  sits beside **+ Add Resource Bar**; the dialog asks for a name, a value, an
+  optional **shorthand** (the short form — Martial → MAR), and whether view mode
+  should show steppers. The attributes render as a **horizontal, centered strip**
+  of the same attribute boxes the five Divergence Attributes use — shorthand on
+  top, value in the middle, full name underneath — inside the hero section,
+  below the resource bars and, in view mode, below the **Recover / End Turn**
+  row, with the Mortal Wounds block beneath it. Each box is click-to-roll
+  (`d20 + value`) like a built-in attribute box and carries an edit pencil in
+  edit mode (rename, re-value, shorthand, steppers, delete with confirmation).
+  An attribute whose value changes a lot in play can opt into **− / + steppers**
+  in view mode, so it is nudged without going back to edit mode.
+- **They are dice-notation tokens — that is their purpose.** `1d6+SAN` or
+  `2d6+Martial Arts` in any sheet prose (ability descriptions, innate text,
+  custom sections, damage fields) highlights as one token and resolves to the
+  attribute's **current** value, exactly as `POW` does. Resolution order stays
+  canonical-first: the five Attributes, then Skills, then custom attributes — a
+  custom "Sneak" can never take over Sneak rolls. `normalizeCharacter` backfills
+  `customAttributes` on read (entries without a name are dropped), so existing
+  sheets, exports and version snapshots load unchanged.
+- **The notation matcher now knows the sheet's vocabulary.**
+  `findDiceNotation(text, extraVariables)` takes the character's shorthands and
+  names, tried longest-first and ahead of the built-in abbreviations and the
+  permissive word fallback — so `2d6+FOO` stops before trailing prose
+  ("2d6+FOO damage") and a multi-word name matches whole, while a character with
+  no custom attributes keeps the historical behavior exactly. Every named branch
+  (`MAR`, `POW`, …, custom names) now refuses to match the prefix of a longer
+  word: the full attribute names `resolveVariable` has always accepted
+  (`2d6+Power`, `2d6+Martial`) highlight as the one variable they are instead of
+  being clipped to the abbreviation inside them, and the documented `X/Y`
+  alternative form (`1d6+POW/MAR`) finally highlights as one term instead of
+  stopping at `POW`.
+- **Testing.** `src/lib/customAttributes.test.ts` pins normalization, lookup and
+  the matcher's custom vocabulary (prefix, multi-word and trailing-prose cases);
+  `CustomAttributeStrip.test.tsx` renders the real `StatsSection` for the strip's
+  placement below the turn actions and above the wound block, the add/edit/delete flow, the
+  steppers' store writes and their bounds; `DiceHighlighter.test.tsx` pins
+  detection → click → evaluated result end to end; `e2e/custom-attributes.spec.ts`
+  measures the centered row and its position below the Recover / End Turn row,
+  the steppers, notation rolling, and a 360px viewport with no sideways scroll.
+
 ### Sheet prose — status references survive raw HTML blocks
 
 - **A `[StatusName]` reference no longer goes literal just because the description

@@ -31,6 +31,7 @@ export type {
   CustomSection,
   CustomTab,
   CustomResourceBar,
+  CustomAttribute,
   SheetLabel,
   CharacterViewModes,
 } from './character'

@@ -133,6 +133,30 @@ Grimoire is built to support that freedom:
 - **Custom resource bars** — define named point pools (current/max) rendered below Endurance, with
   optional refill on Recover.
 
+### Custom attributes
+
+- **What they are** — your own stats beside the five Attributes (MAR, POW, AGI, VIT, GRT): a name,
+  a value, and an optional **shorthand** (the short form, the way Martial is abbreviated MAR).
+  Homebrew a "Sanity", a "Doom", a "Martial Arts" — whatever the character needs.
+- **Where they live** — a **horizontal strip** of attribute boxes inside the hero section: below the
+  resource bars (and, in view mode, below the **Recover / End Turn** row) and above the Mortal Wounds
+  block, centered so a strip of two or three reads as deliberately placed rather than left-hanging.
+  Shorthand on top, value in the middle, full name underneath (with no shorthand, the name is the
+  box's own label).
+- **Building them** — in edit mode **+ Add Attribute** sits next to **+ Add Resource Bar**; the
+  dialog asks for the name, the value, the optional shorthand, and whether view mode should offer
+  steppers. Each box also carries an edit pencil (rename, re-value, shorthand, steppers) and a
+  Delete that asks for confirmation like every other destructive action.
+- **Rolling them** — the point of them: write the shorthand or the full name in **any dice
+  notation** (`1d6+SAN`, `2d6+Martial Arts`) and it resolves to the attribute's current value,
+  exactly as `POW` does. They are also click-to-roll like the built-in attribute boxes (a box click
+  rolls `d20 + value`), and the roll reads the live value — nudge it and the next roll uses the new
+  number.
+- **Steppers (opt-in per attribute)** — an attribute that changes a lot during play can show **− / +**
+  buttons beside its value in **view** mode, so it is adjusted without switching back to edit mode.
+  The built-in stats and skills still win a name collision: a custom "Sneak" never takes over Sneak
+  rolls.
+
 ### Portraits and bio
 
 - **Portrait upload** — square-crop your portrait first (rule-of-thirds grid overlay with a zoom
@@ -204,8 +228,10 @@ Grimoire is built to support that freedom:
 
 - **Inline dice notation** — `d20`, `2d6+4`, `1d6+POW`, `2d6+POW/MAR` are auto-detected in any text
   field and become clickable in view mode.
-- **Variable substitution** — attribute abbreviations (MAR, POW, AGI, VIT, GRT) and skill names
-  resolve to the character's actual values.
+- **Variable substitution** — attribute abbreviations (MAR, POW, AGI, VIT, GRT), full attribute
+  names, skill names, and the sheet's own **custom attributes** (by shorthand or name — see
+  [Custom attributes](#custom-attributes)) resolve to the character's actual values. Canonical
+  stats win a name collision.
 - **Roll breakdown** — full per-term breakdown showing each die, each substituted variable, and the
   total (e.g. `2d6+POW → 4 + 3 + 4 = 11`).
 - **Critical / fumble detection** — nat 20 and nat 1 badges on d20 rolls.

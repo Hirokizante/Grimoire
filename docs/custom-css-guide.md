@@ -225,6 +225,7 @@ can style. You only need the names of things you want to touch.
 │   ├── .hero-section__player            the player name
 │   ├── .stat-tokens / .stat-token       Combat Stats tokens (__label, __value, __icon)
 │   ├── .stat-bars / .resource-bar       HP, FP, AP, END, custom bars
+│   ├── .custom-attr-strip / .custom-attr-box   the player's own attributes (__abbr, __value, __name, −/+ steppers)
 │   └── .stat-mortals / .mw-card         Mortal Wounds
 ├── .sheet-section--attributes   .attr-boxes (grid) / .attribute-list (list)
 ├── .sheet-section--core         innate / basic attack / fatebreaker

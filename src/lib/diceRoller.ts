@@ -9,6 +9,7 @@
 import { rollDie } from '@/lib/dice'
 import { parseDiceNotation, type ParsedExpression, type ParsedTerm } from '@/lib/diceParser'
 import { effectiveAttributes } from '@/lib/abilityModifiers'
+import { findCustomAttribute } from '@/lib/customAttributes'
 import type { Character } from '@/types'
 import { SKILL_LIST, ATTRIBUTE_LIST } from '@/constants/gameData'
 
@@ -38,7 +39,8 @@ export interface RollResult {
 
 /**
  * Resolve a variable name to a numeric value from the character.
- * Returns null if the name is not a recognized attribute or skill.
+ * Returns null if the name is not a recognized attribute, skill, or custom
+ * attribute.
  */
 export function resolveVariable(
   name: string,
@@ -58,6 +60,12 @@ export function resolveVariable(
   // Check skills (exact match, case-insensitive).
   const skill = SKILL_LIST.find((s) => s.toLowerCase() === name.toLowerCase())
   if (skill) return character.skills[skill]
+
+  // Check the sheet's own custom attributes last, by shorthand or full name.
+  // They come after the canonical stats on purpose: a custom attribute named
+  // "Sneak" cannot quietly take over every Sneak roll on the sheet.
+  const custom = findCustomAttribute(character.customAttributes, name)
+  if (custom) return custom.value
 
   return null
 }

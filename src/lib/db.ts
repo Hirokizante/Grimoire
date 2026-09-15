@@ -19,6 +19,7 @@ import {
   normalizeModifiers,
 } from '@/lib/abilityModifiers'
 import { normalizeAbilityUses, normalizeInstanceAbilityUses } from '@/lib/abilityUses'
+import { normalizeCustomAttributes } from '@/lib/customAttributes'
 
 const DB_NAME = 'grimoire'
 const DB_VERSION = 5
@@ -497,6 +498,11 @@ export function normalizeCharacter(raw: Character): Character {
   if (!Array.isArray(result.customResourceBars)) {
     result.customResourceBars = []
   }
+
+  // Ensure customAttributes exists and every entry is usable (migration for
+  // records created before the feature, and a guard against hand-edited JSON:
+  // an attribute without a name could never be referenced in dice notation).
+  result.customAttributes = normalizeCustomAttributes(result.customAttributes)
 
   // Ensure labels exists and every entry carries id/name/value (migration
   // for records created before the labels feature; also guards against

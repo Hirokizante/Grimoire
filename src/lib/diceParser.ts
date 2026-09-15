@@ -177,6 +177,80 @@ export function parseDiceNotation(notation: string): ParsedExpression {
 
 // ---- Pattern matching for highlighting --------------------------------------
 
+/** The five built-in Attribute abbreviations, always recognized. */
+const BUILTIN_ABBREVIATIONS = 'MAR|POW|AGI|VIT|GRT'
+
+/**
+ * A free-form variable word: any capitalized/plain word, optionally written
+ * with the `POW/MAR` alternative syntax. This is the permissive last resort —
+ * an unknown name still highlights and rolls as 0 rather than staying literal,
+ * which is what makes a typo visible in the roll breakdown.
+ */
+const WORD_VARIABLE = '[A-Za-z][A-Za-z ]*(?:\\/[A-Za-z][A-Za-z ]*)?'
+
+/** The five built-in abbreviations, never matching the prefix of a longer word. */
+const BUILTIN_VARIABLE = `(?:${BUILTIN_ABBREVIATIONS})(?![A-Za-z])`
+
+/** Escape a literal variable name for embedding in a regular expression. */
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+/**
+ * Normalize a caller-supplied variable list: trim, drop empties, de-duplicate
+ * case-insensitively, and order longest-first.
+ *
+ * Longest-first matters because JavaScript alternation is first-match: with
+ * "Martial" and "Martial Arts" both on the sheet, `2d6+Martial Arts` has to try
+ * the longer name first or it would stop at "Martial".
+ */
+function normalizeVariables(extraVariables: readonly string[]): string[] {
+  const seen = new Set<string>()
+  const names: string[] = []
+  for (const raw of extraVariables) {
+    const name = raw.trim()
+    if (!name) continue
+    const key = name.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    names.push(name)
+  }
+  return names.sort((a, b) => b.length - a.length)
+}
+
+/**
+ * Build the dice-notation pattern, optionally teaching it a character's own
+ * variable names (their custom attributes' shorthands and full names).
+ *
+ * Known names are tried before the built-in abbreviations and before the
+ * permissive word fallback, so `2d6+FOO` in "2d6+FOO damage" stops at the
+ * attribute instead of swallowing the following prose into the variable name —
+ * and a multi-word custom name ("Martial Arts") matches whole. Every named
+ * branch (custom names and the five abbreviations alike) refuses to match the
+ * prefix of a longer word, so the full attribute names `resolveVariable` has
+ * always accepted — `2d6+Martial`, `2d6+Power` — highlight as the one variable
+ * they are instead of being clipped to the abbreviation inside them.
+ *
+ * The `/` alternative syntax is offered on both named branches, so
+ * `1d6+POW/MAR` and `1d6+FOO/BAR` each highlight as one term.
+ */
+function diceNotationPattern(extraVariables: readonly string[] = []): string {
+  const variables = normalizeVariables(extraVariables)
+  const escaped = variables.map(escapeRegExp).join('|')
+  // The `X/Y` alternative form ("use either stat"), available to both kinds of
+  // name; the custom names are listed first so they win a tie as usual.
+  const altNames =
+    variables.length > 0
+      ? `${escaped}|${BUILTIN_ABBREVIATIONS}`
+      : BUILTIN_ABBREVIATIONS
+  const alt = `(?:\\s*\\/\\s*(?:${altNames}))?`
+  const customBranch =
+    variables.length > 0 ? `(?:${escaped})(?![A-Za-z])${alt}|` : ''
+  const variableAlternation =
+    `(?:${customBranch}${BUILTIN_VARIABLE}${alt}|\\d+|${WORD_VARIABLE})`
+  return `(\\d*d\\d+(?:\\s*[+-]\\s*${variableAlternation})*)`
+}
+
 /**
  * Regex that matches dice notation in free text. Used by the DiceHighlighter
  * component to find and make notation clickable.
@@ -185,8 +259,35 @@ export function parseDiceNotation(notation: string): ParsedExpression {
  *   - 1d6, 2d6, 3d20, d20
  *   - 1d6+POW, 2d6+MAR, d20+3
  *   - 1d6+POW/MAR, 2d6-1+Sneak
+ *
+ * This is the character-less pattern (built-in stats and free-form words only);
+ * {@link findDiceNotation} with a variable list is what knows a sheet's custom
+ * attributes.
  */
-export const DICE_NOTATION_REGEX = /(\d*d\d+(?:\s*[+-]\s*(?:(?:MAR|POW|AGI|VIT|GRT)|\d+|[A-Za-z][A-Za-z ]*(?:\/[A-Za-z][A-Za-z ]*)?))*)/gi
+export const DICE_NOTATION_REGEX = new RegExp(diceNotationPattern(), 'gi')
+
+/**
+ * Compiled character-aware patterns, keyed by the variable list they were built
+ * from. A sheet renders one highlighter per prose field, all with the same
+ * vocabulary, so caching keeps a re-render from rebuilding the same regex.
+ */
+const patternCache = new Map<string, RegExp>()
+
+/** How many distinct vocabularies to keep compiled before starting over. */
+const MAX_CACHED_PATTERNS = 32
+
+/** The (cached) regex for a variable vocabulary; the shared one when none. */
+function notationRegex(extraVariables: readonly string[]): RegExp {
+  const variables = normalizeVariables(extraVariables)
+  if (variables.length === 0) return DICE_NOTATION_REGEX
+  const key = variables.join('\u0000').toLowerCase()
+  const cached = patternCache.get(key)
+  if (cached) return cached
+  const regex = new RegExp(diceNotationPattern(variables), 'gi')
+  if (patternCache.size >= MAX_CACHED_PATTERNS) patternCache.clear()
+  patternCache.set(key, regex)
+  return regex
+}
 
 /**
  * Cheap pre-check: does this string contain any dice-notation shape at all?
@@ -202,13 +303,23 @@ export function hasDiceCandidate(text: string): boolean {
 /**
  * Find all dice notation matches in a string. Returns the matched text and
  * its position for highlighting.
+ *
+ * `extraVariables` is the character's own variable vocabulary (a sheet's custom
+ * attribute shorthands and names — see `customAttributeVariableNames`). Passing
+ * it makes those names first-class tokens: they are matched exactly, keep
+ * multi-word names whole, and end the match before trailing prose. Omitting it
+ * leaves the historical character-less behavior untouched.
  */
-export function findDiceNotation(text: string): { match: string; start: number; end: number }[] {
+export function findDiceNotation(
+  text: string,
+  extraVariables: readonly string[] = [],
+): { match: string; start: number; end: number }[] {
   const results: { match: string; start: number; end: number }[] = []
+  const regex = notationRegex(extraVariables)
   // Reset regex state.
-  DICE_NOTATION_REGEX.lastIndex = 0
+  regex.lastIndex = 0
   let m: RegExpExecArray | null
-  while ((m = DICE_NOTATION_REGEX.exec(text)) !== null) {
+  while ((m = regex.exec(text)) !== null) {
     results.push({ match: m[0], start: m.index, end: m.index + m[0].length })
   }
   return results

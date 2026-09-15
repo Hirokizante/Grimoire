@@ -429,6 +429,11 @@ export interface Character {
   /** User-created custom resource bars rendered below Endurance. */
   customResourceBars: CustomResourceBar[]
   /**
+   * User-created attributes rendered as a horizontal strip in the hero
+   * section, between the resource bars and the Mortal Wounds block.
+   */
+  customAttributes: CustomAttribute[]
+  /**
    * User-created organizational labels (tags) for filtering sheets in the
    * list pages. Local-only metadata — never exported with the sheet.
    */
@@ -458,4 +463,39 @@ export interface CustomResourceBar {
   color: string
   /** When true, the bar refills to max upon Recover. */
   refillsOnRecover: boolean
+}
+
+/**
+ * A user-created attribute on a player sheet.
+ *
+ * Custom attributes are the homebrew counterpart of the five Divergence
+ * Attributes (MAR, POW, AGI, VIT, GRT): they render as a horizontal strip in
+ * the hero section, between the resource bars and the Mortal Wounds block, and
+ * — the point of them — **resolve inside dice notation**. Writing `2d6+FOO`
+ * (or the attribute's full name, e.g. `2d6+Martial`) anywhere the sheet
+ * highlights dice substitutes this attribute's `value`, exactly as `POW` does.
+ *
+ * A custom attribute carries no derived-stat effects: it is a number the
+ * player names and rolls with, not a second VIT. Ability modifiers cannot
+ * target one for the same reason.
+ */
+export interface CustomAttribute {
+  /** Stable unique identifier. */
+  id: string
+  /** Display name of the attribute (e.g. "Martial"). */
+  name: string
+  /** The number substituted into dice notation in this attribute's place. */
+  value: number
+  /**
+   * Optional short name used in dice notation and printed on the strip's top
+   * line (e.g. "MAR" for Martial — the way the five Attributes are
+   * abbreviated). Empty string = none; the full name then stands in for it.
+   */
+  shorthand: string
+  /**
+   * When true, view mode shows +/− steppers beside the value so it can be
+   * nudged in play (for an attribute that changes often), without switching
+   * back to edit mode.
+   */
+  showSteppers: boolean
 }

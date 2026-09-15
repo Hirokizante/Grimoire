@@ -34,6 +34,7 @@ single Divergence character sheet:
 | `config` | Full aesthetic configuration (colors, fonts, CSS, background image) |
 | `viewModes` | Per-section grid/list preference |
 | `customResourceBars` | User-defined resource pools |
+| `customAttributes` | User-defined attributes (`CustomAttribute[]`) — the player's own stats, rolled from dice notation |
 | `npcStats` | Manually-entered combat stats (NPCs only: evasion, armor, movement, save DC, HP, mortal wounds) |
 | `description` | Long-form NPC description (NPCs only) |
 | `createdAt`, `updatedAt` | Timestamps |
@@ -62,6 +63,26 @@ On an NPC base record, `modifiersActive` and `uses` are **template data**: the
 base sheet renders both read-only, and a GM Screen instance records its own
 switch state (`NpcInstanceState.abilityModifiers`) and its own counts
 (`NpcInstanceState.abilityUses`) instead — see [gm-screen.md](gm-screen.md).
+
+---
+
+## Custom attributes
+
+**CustomAttribute** is a player-defined stat living beside the five Attributes:
+
+| Field | Purpose |
+| --- | --- |
+| `id`, `name` | Identity; the name is also a dice-notation token |
+| `value` | The number substituted into dice notation in this attribute's place |
+| `shorthand` | Optional short token (`"MAR"` for Martial). Empty = none; the full name stands in |
+| `showSteppers` | Whether view mode offers −/+ steppers to nudge the value in play |
+
+Unlike the five Attributes they drive nothing derived — no HP, no Evasion — and
+ability modifiers cannot target them. Their purpose is dice notation: `2d6+SAN`
+(or `2d6+Sanity`) resolves through the attribute's current value. Resolution
+order is the five Attributes, then Skills, then custom attributes, so a custom
+attribute can never shadow a canonical stat. Names and shorthands must be unique
+per sheet to be unambiguous, and both are matched case-insensitively.
 
 ---
 
@@ -168,7 +189,9 @@ The dice parser supports:
 
 - Standard dice: `d20`, `2d6`, `3d8`
 - Constants: `+4`, `-1`
-- Variables: `POW`, `MAR`, `Sneak` (resolved to the character's actual value)
+- Variables: `POW`, `MAR`, `Sneak` (resolved to the character's actual value),
+  plus the character's own **custom attributes** by shorthand or full name
+  (`2d6+SAN`, `2d6+Sanity`)
 - Variable alternatives: `POW/MAR` (player's choice; higher used by default)
 - Combined: `2d6+POW`, `d20+3`, `1d6+POW/MAR`
 
