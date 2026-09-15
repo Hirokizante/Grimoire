@@ -4,7 +4,27 @@ All notable changes to Grimoire are documented here. This project is in alpha:
 storage format may change between pre-1.0 releases, so export (or back up) your
 characters regularly.
 
-## Unreleased
+## v0.10.0-alpha — 2026-09-15
+
+The dice release. Eleven commits since `v0.9.0-alpha`, and the through-line is
+that the sheet now does its own arithmetic. Notation grows from "a die plus
+modifiers" into an **expression language** — parentheses, `*` and `/`, signed
+factors and negation — so `(1d6+POW)*2/2d6+MAR` is one clickable pill that
+rolls exactly what it reads; an ability can **roll its own dice the moment it is
+activated** (accuracy, damage and any number of named custom rolls, together in
+one window, resolved against whoever activated it); and a sheet can define
+**attributes of its own** that are dice-notation tokens like any built-in one.
+The rest of the cycle is table friction: `[Status]` references survive a
+hand-written HTML block, a custom tab's sections reorder with ↑ / ↓ and its
+ability cards drag between sections again, the Filter / Sort menus and the
+status grid stay on a 360px phone, and a swatch's color picker opens fully
+on-screen.
+
+**No migration to run** — the IndexedDB schema stays at version 5, and
+everything new is additive and backfilled by `normalizeCharacter` on read: an
+ability stored by `v0.9.0-alpha` loads as "rolls nothing on activation", and a
+sheet written before this release simply has no custom attributes until one is
+added.
 
 ### Compound dice notation — parentheses, multiplication and division
 
