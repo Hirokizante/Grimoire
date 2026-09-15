@@ -154,3 +154,169 @@ test('evaluateExpression: negative constant', async () => {
 
   spy.mockRestore()
 })
+
+// ---- Compound notation -------------------------------------------------------
+
+test('evaluateExpression: parentheses and precedence decide the order', async () => {
+  const dice = await import('@/lib/dice')
+  const spy = vi.spyOn(dice, 'rollDie').mockReturnValue(3)
+
+  const { evaluateExpression } = await import('@/lib/diceRoller')
+  const char = makeTestChar() // POW = 4, MAR = 3
+  const expr = parseDiceNotation('(1d6+POW)*2/2d6+MAR')
+  const result = evaluateExpression(expr, char)
+
+  // ((3 + 4) × 2) ÷ (3 + 3) + 3 = 14 ÷ 6 (rounded down) + 3
+  expect(result.total).toBe(5)
+  expect(result.breakdown).toBe(
+    '(1d6+POW)*2/2d6+MAR → (3 + 4) × 2 ÷ (3 + 3) + 3 = 5',
+  )
+
+  spy.mockRestore()
+})
+
+test('evaluateExpression: multiplication is not addition', async () => {
+  const dice = await import('@/lib/dice')
+  const spy = vi.spyOn(dice, 'rollDie').mockReturnValue(3)
+
+  const { evaluateExpression } = await import('@/lib/diceRoller')
+  const char = makeTestChar()
+  // 3 + 2 × 3 = 9, not (3 + 2) × 3 = 15.
+  expect(evaluateExpression(parseDiceNotation('1d6+2*3'), char).total).toBe(9)
+  // 3 × 2 = 6, and several dice keep their own sum: (3 + 3) × 2 = 12.
+  expect(evaluateExpression(parseDiceNotation('1d6*2'), char).total).toBe(6)
+  expect(evaluateExpression(parseDiceNotation('2d6*2'), char).total).toBe(12)
+
+  spy.mockRestore()
+})
+
+test('evaluateExpression: every leaf carries the operator that joins it', async () => {
+  const dice = await import('@/lib/dice')
+  const spy = vi.spyOn(dice, 'rollDie').mockReturnValue(3)
+
+  const { evaluateExpression } = await import('@/lib/diceRoller')
+  const char = makeTestChar()
+  const result = evaluateExpression(
+    parseDiceNotation('(1d6+POW)*2/2d6+MAR'),
+    char,
+  )
+
+  // The breakdown prints a constant's or a variable's own sign, so only the
+  // multiplicative operators (and a subtracted die) need the op on the term —
+  // and a term joined by one of those wears no leading `+` at all.
+  expect(result.terms.map((t) => t.op ?? null)).toEqual([null, '+', '*', '/', '+'])
+  expect(result.terms.map((t) => t.label)).toEqual([
+    '1d6',
+    '+POW(4)',
+    '2',
+    '2d6',
+    '+MAR(3)',
+  ])
+
+  spy.mockRestore()
+})
+
+test('evaluateExpression: a subtracted product is negated in the terms too', async () => {
+  const dice = await import('@/lib/dice')
+  const spy = vi.spyOn(dice, 'rollDie').mockReturnValue(5)
+
+  const { evaluateExpression } = await import('@/lib/diceRoller')
+  const char = makeTestChar()
+
+  // The term list must read like the working: 5 - 2 × 3 = -1, not 5 + 2 × 3.
+  const product = evaluateExpression(parseDiceNotation('1d6-2*3'), char)
+  expect(product.total).toBe(-1)
+  expect(product.terms.map((t) => `${t.op ?? ''}${t.label}`)).toEqual([
+    '1d6',
+    '+-2',
+    '*3',
+  ])
+
+  // Negation distributes over a group: -(2+3) is -2-3, and the dice rolled 5.
+  const group = evaluateExpression(parseDiceNotation('d20-(2+3)'), char)
+  expect(group.total).toBe(0)
+  expect(group.terms.map((t) => `${t.op ?? ''}${t.label}`)).toEqual([
+    '1d20',
+    '+-2',
+    '+-3',
+  ])
+
+  spy.mockRestore()
+})
+
+test('evaluateExpression: a multiplied or divided stat prints no sign', async () => {
+  const dice = await import('@/lib/dice')
+  const spy = vi.spyOn(dice, 'rollDie').mockReturnValue(5)
+
+  const { evaluateExpression } = await import('@/lib/diceRoller')
+  const char = makeTestChar() // POW = 4
+
+  const multiplied = evaluateExpression(parseDiceNotation('2d6*POW'), char)
+  const divided = evaluateExpression(parseDiceNotation('2d6/POW'), char)
+
+  expect(multiplied.terms[1].label).toBe('POW(4)')
+  expect(multiplied.terms[1].op).toBe('*')
+  expect(multiplied.total).toBe(40) // (5 + 5) × 4
+  expect(divided.terms[1].label).toBe('POW(4)')
+  expect(divided.terms[1].op).toBe('/')
+  expect(divided.total).toBe(2) // (5 + 5) ÷ 4
+
+  spy.mockRestore()
+})
+
+test('evaluateExpression: division rounds down and never divides by zero', async () => {
+  const dice = await import('@/lib/dice')
+  const spy = vi.spyOn(dice, 'rollDie').mockReturnValue(5)
+
+  const { rollNotation } = await import('@/lib/diceRoller')
+  const char = makeTestChar() // VIT = 0
+
+  expect(rollNotation('1d6/2', char).total).toBe(2) // 5 ÷ 2 = 2.5 → 2
+  expect(rollNotation('1d6/4', char).total).toBe(1)
+  const byZero = rollNotation('d20/VIT', char)
+  expect(byZero.total).toBe(0)
+  expect(byZero.breakdown).toBe('d20/VIT → 5 ÷ 0 = 0')
+
+  spy.mockRestore()
+})
+
+test('evaluateExpression: a subtracted die is negated', async () => {
+  const dice = await import('@/lib/dice')
+  const spy = vi.spyOn(dice, 'rollDie').mockReturnValue(3)
+
+  const { evaluateExpression } = await import('@/lib/diceRoller')
+  const char = makeTestChar()
+  const result = evaluateExpression(parseDiceNotation('d20-2d6'), char)
+
+  expect(result.total).toBe(-3) // 3 - (3 + 3)
+  expect(result.breakdown).toBe('d20-2d6 → 3 - (3 + 3) = -3')
+  expect(result.terms[1].op).toBe('-')
+  // Both dice are still recorded individually, exactly as an added term's are.
+  expect(result.terms[1].rolls).toEqual([3, 3])
+
+  spy.mockRestore()
+})
+
+test('evaluateExpression: an unknown name inside a group counts 0', async () => {
+  const dice = await import('@/lib/dice')
+  const spy = vi.spyOn(dice, 'rollDie').mockReturnValue(3)
+
+  const { evaluateExpression } = await import('@/lib/diceRoller')
+  const char = makeTestChar()
+  const result = evaluateExpression(parseDiceNotation('(1d6+FOO)*2'), char)
+
+  expect(result.total).toBe(6)
+  expect(result.terms[1].label).toBe('FOO(?)')
+  expect(result.breakdown).toBe('(1d6+FOO)*2 → (3 + 0) × 2 = 6')
+
+  spy.mockRestore()
+})
+
+test('evaluateExpression: an unreadable expression totals zero', async () => {
+  const { evaluateExpression } = await import('@/lib/diceRoller')
+  const result = evaluateExpression(parseDiceNotation('+++'), makeTestChar())
+
+  expect(result.total).toBe(0)
+  expect(result.terms).toHaveLength(0)
+  expect(result.breakdown).toBe('+++ → 0')
+})

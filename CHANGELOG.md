@@ -6,6 +6,70 @@ characters regularly.
 
 ## Unreleased
 
+### Compound dice notation — parentheses, multiplication and division
+
+- **Dice notation can now express a whole calculation.** Until now the parser
+  read a die followed by any number of `+`/`-` terms, so an expression that
+  halved, doubled or scaled anything had to be worked out at the table. It now
+  parses an **expression tree**: `*` and `/` (which bind tighter than `+`/`-`),
+  parentheses to override them, and signed factors, so
+  `(1d6+POW)*2/2d6+MAR` is one clickable token that does exactly what it reads —
+  double the d6 plus POW, divide that by a fresh 2d6, then add MAR. Division is
+  integer division and **rounds down** (`1d6/2` on a 5 is 2), and dividing by
+  zero contributes 0 instead of poisoning the total. A subtracted die now
+  subtracts: `d20-2d6` was read as `d20+2d6` before, because dice "are always
+  positive".
+- **The matcher reads the same expression out of prose.** `findDiceNotation` no
+  longer pattern-matches a dice term followed by modifiers; it runs the parser
+  from each candidate start and keeps the longest expression that contains a die
+  (`(1d6+POW)*2/2d6+MAR` in a description highlights as one pill, and
+  `2*(1d6+2)` comes along whole). Two shape rules keep it out of prose's way:
+  **`*` and `/` must be written tight** (`2d6*3`, `1d6/POW`) while `+`/`-` stay
+  free-spaced, so Markdown emphasis is not multiplication (`*1d6+2* slashing`
+  highlights `1d6+2`); and a slash between two bare names is still the
+  `POW/MAR` alternative form, not division — division is what a number, a die or
+  a group on either side means (`2d6/POW`, `1d6+POW/2`). A match must roll at
+  least one die, so arithmetic and bullet dashes stay literal, and a dice-shaped
+  token the parser refuses (`0d6`, or a count past 1 000) is skipped whole
+  rather than matched as its `d6` tail.
+- **The result window shows the working, not a flat sum.** Each term keeps the
+  operator that joins it to the one before it (`+POW(4)`, `× 2`, `÷ 2d6`,
+  `+MAR(3)`) and the breakdown line keeps the expression's shape —
+  `(1d6+POW)*2/2d6+MAR → (3 + 4) × 2 ÷ (3 + 3) + 3 = 5` — so a compound roll is
+  checkable at the table. A subtracted group wears its minus in the term list too
+  (`1d6-2*3` lists `-2`, `× 3` — not `+2` beside a negative total). Simple
+  notation renders exactly as before.
+- **Pasted text cannot hang or crash a sheet.** The scanner now skips a whole
+  token instead of stepping one character at a time (a pasted run of 50 000
+  digits took seconds inside a render), and the parser refuses what it cannot
+  walk safely rather than throwing mid-render: a die of more sides than
+  `Number` can hold (`1d<400 nines>` used to parse as `Infinity`), an expression
+  of more than 64 terms, and groups or signs nested more than 32 deep are simply
+  not notation — nothing highlights, nothing rolls. A die hidden inside a word
+  run (`...and d20+3`) is still found.
+- **Compatibility.** `RollResult` keeps its shape (`notation`, `total`, `terms`,
+  `breakdown`): `TermResult.op` is additive, so roll-log entries stored by an
+  earlier version still render, and crit/fumble detection reads the same dice
+  leaves wherever they sit in the expression (a d20 inside `(d20+POW)/2` still
+  counts). `ParsedExpression.terms` — an internal flat list nothing but the
+  emptiness check consumed — is replaced by the parsed `root`, and activation
+  rolls skip an expression the parser cannot read exactly as before.
+- **Testing.** `diceParser.test.ts` pins groups, precedence, the tight-operator
+  and alt-vs-division rules, negation, backtracking and free-text matching
+  (`*1d6+2*` emphasis, bullet dashes, `0d6`, `2000d6`, half-typed operators),
+  plus the runaway-input guards (deep parens, term chains past the budget, long
+  digit and letter runs) and that each stays fast;
+  `diceRoller.test.ts` pins the evaluated totals, the floor division and
+  divide-by-zero rules, the per-term operators, the negated-group terms and the
+  shaped breakdown;
+  `DiceTermBreakdown.test.tsx` pins the operators drawn for a compound working
+  and the unchanged flat rendering; `DiceHighlighter.test.tsx` drives detection
+  → click → evaluated result for a compound expression; and
+  `e2e/dice-notation.spec.ts` writes `(1d6+POW)*2/2d6+AGI` into a real
+  description in the production build, checks it highlights as one pill with the
+  prose around it untouched, and reads the operators and the working back out of
+  the result window.
+
 ### Automatic dice rolls on ability activation
 
 - **An ability can roll its own dice the moment it is activated.** The Ability

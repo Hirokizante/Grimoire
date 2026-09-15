@@ -147,3 +147,38 @@ test('a built-in attribute roll is unaffected', () => {
     `+POW(${character.attributes.POW})`,
   )
 })
+
+test('a compound expression highlights as one token and rolls whole', () => {
+  const character = makeCharacter([SANITY])
+  render(
+    <DiceHighlighter
+      text="Deal (1d6+POW)*2/2d6+MAR damage"
+      mode="view"
+      character={character}
+    />,
+  )
+
+  const token = screen.getByRole('button', { name: '(1d6+POW)*2/2d6+MAR' })
+  fireEvent.click(token)
+
+  const roll = useDiceRollStore.getState()
+  expect(roll.notation).toBe('(1d6+POW)*2/2d6+MAR')
+  expect(roll.result!.terms.map((t) => t.term.type)).toEqual([
+    'dice',
+    'variable',
+    'constant',
+    'dice',
+    'variable',
+  ])
+  // The operator that joins each term is recorded, so the breakdown can print
+  // the working as written rather than a flat sum.
+  expect(roll.result!.terms.map((t) => t.op ?? null)).toEqual([
+    null,
+    '+',
+    '*',
+    '/',
+    '+',
+  ])
+  // The trailing word stayed prose.
+  expect(screen.getByText(/damage/)).toBeInTheDocument()
+})

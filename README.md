@@ -37,8 +37,9 @@ tracking resources and rolling dice.
   tracking: HP with Armor / Resistance / Temp HP handling, AP, END and FP,
   Recover and End Turn, Mortal Wounds, and Death Saves.
 - **Dice roller** — inline notation (`d20`, `2d6+4`, `1d6+POW`, `2d6+POW/MAR`,
-  or a custom attribute like `2d6+SAN`) that becomes clickable in view mode,
-  with a per-die breakdown, critical and fumble badges, and a persistent roll
+  a custom attribute like `2d6+SAN`, or a whole calculation such as
+  `(1d6+POW)*2/2d6+MAR`) that becomes clickable in view mode, with a per-die
+  breakdown, critical and fumble badges, and a persistent roll
   log. An ability can also **roll its own dice on activation** — accuracy,
   damage, and any custom rolls you add — shown together in one result window.
 - **GM Screen** — a saved surface holding one panel per sheet you are running:

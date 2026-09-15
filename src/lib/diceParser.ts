@@ -1,18 +1,33 @@
 /**
  * Dice notation parser for the Divergence TTRPG.
  *
- * Parses strings like "2d6+POW", "d20+3", "1d6+POW/MAR", "1d6" into a
- * structured representation that the roller can evaluate.
+ * Parses strings like "2d6+POW", "d20+3", "1d6+POW/MAR", "1d6" and compound
+ * expressions like "(1d6+POW)*2/2d6+MAR" into an expression tree that the
+ * roller evaluates.
  *
  * Supported syntax:
- *   - Dice:   `NdS` or `dS` (N defaults to 1), e.g. `2d6`, `d20`, `3d6`
- *   - Constants:  plain numbers, e.g. `+3`, `-1`
- *   - Variables:  attribute/skill names, e.g. `POW`, `MAR`, `Sneak`
+ *   - Dice:         `NdS` or `dS` (N defaults to 1), e.g. `2d6`, `d20`, `3d6`
+ *   - Constants:    plain numbers, e.g. `+3`, `-1`
+ *   - Variables:    attribute/skill names, e.g. `POW`, `MAR`, `Sneak`
  *   - Variable alt: `POW/MAR` means "use POW or MAR, player's choice"
- *   - Operators:  `+` and `-` between terms
+ *   - Operators:    `+`, `-`, `*`, `/` and parentheses for grouping
  *
- * The parser is deliberately permissive — anything it can't parse as dice
- * or a known variable is left as-is in the output for the roller to handle.
+ * Precedence is the usual one — `*` and `/` bind tighter than `+` and `-`, and
+ * parentheses override both — so `(1d6+POW)*2/2d6+MAR` halves the doubled
+ * attack before adding MAR. Division is integer division rounded down.
+ *
+ * Two shape rules keep notation out of prose's way:
+ *
+ *   - `*` and `/` must be written **tight** (`2d6*3`, `1d6/POW`), while `+` and
+ *     `-` may be spaced as before. A spaced asterisk in prose is Markdown
+ *     emphasis (`*1d6+2* slashing`), and reading it as multiplication would
+ *     swallow the following words into the roll.
+ *   - A slash between two bare names is the `POW/MAR` alternative form rather
+ *     than division, so the documented "either stat" syntax keeps working.
+ *
+ * The parser is deliberately permissive: anything it can't read as dice or a
+ * known variable is taken as a variable name, which the roller resolves to 0 —
+ * a typo shows up in the breakdown instead of swallowing the whole roll.
  */
 
 /** A single dice term in a parsed expression (e.g. 2d6). */
@@ -40,167 +55,154 @@ export interface VariableTerm {
   sign: 1 | -1
 }
 
-/** Any term in a parsed dice expression. */
+/** A leaf of a parsed dice expression. */
 export type ParsedTerm = DiceTerm | ConstantTerm | VariableTerm
+
+/** Every operator a notation can write. */
+export type BinaryOp = '+' | '-' | '*' | '/'
+
+/**
+ * A node of the parsed expression tree.
+ *
+ * Subtraction never reaches the tree: `a-b` is parsed as `a + (-b)`, and a
+ * minus in front of a constant or variable is folded into that leaf's `sign`.
+ * A negated die or group — `-1d6`, `-(1d6+2)` — is the one case that needs an
+ * explicit {@link NegateNode}.
+ */
+export type ExprNode =
+  | { kind: 'term'; term: ParsedTerm }
+  | { kind: 'binary'; op: '+' | '*' | '/'; left: ExprNode; right: ExprNode }
+  | { kind: 'negate'; operand: ExprNode }
 
 /** A fully parsed dice expression. */
 export interface ParsedExpression {
   /** The original notation string. */
   notation: string
-  /** The parsed terms in order. */
-  terms: ParsedTerm[]
+  /** The parsed expression tree, or null when nothing could be read at all. */
+  root: ExprNode | null
 }
 
 // ---- Tokenizer ---------------------------------------------------------------
 
-/** A single token from the raw notation string. */
-interface Token {
-  kind: 'dice' | 'number' | 'variable' | 'plus' | 'minus'
-  text: string
+/** Where the parser is in the input. */
+interface Cursor {
+  input: string
+  pos: number
+  /** Leaves read so far, against {@link MAX_EXPRESSION_NODES}. */
+  nodes: number
+  /**
+   * Set when the expression grew past its budget. Backtracking means a partial
+   * parse still comes back, so the entry points check this and refuse the whole
+   * notation rather than accepting the truncated prefix.
+   */
+  overBudget: boolean
 }
+
+/** A dice term at the cursor: `2d6`, `d20`, `3D8`. */
+const DICE_AT = /(\d*)d(\d+)/iy
+
+/** A constant at the cursor. */
+const NUMBER_AT = /\d+/y
 
 /**
- * Tokenize the notation string. We scan left to right, splitting on `+`/`-`
- * (keeping the operator) and identifying each segment as dice, number, or
- * variable.
+ * The permissive last resort for a variable name: a letter followed by letters
+ * and spaces (`2d6+Martial Arts`, and the historical "swallow the trailing
+ * prose" reading for a sheet that defines no such attribute).
  */
-function tokenize(input: string): Token[] {
-  const tokens: Token[] = []
-  // Insert spaces around + and - (but not within variable names like "Use Force")
-  // Strategy: walk the string, splitting at +/- operators.
-  let current = ''
-
-  const flush = () => {
-    const trimmed = current.trim()
-    if (trimmed === '') return
-
-    // Check if it's a dice term: \d*d\d+ or d\d+
-    if (/^\d*d\d+$/i.test(trimmed)) {
-      tokens.push({ kind: 'dice', text: trimmed })
-    } else if (/^-?\d+$/.test(trimmed)) {
-      tokens.push({ kind: 'number', text: trimmed })
-    } else {
-      // Otherwise treat as a variable name (may contain spaces, slashes)
-      tokens.push({ kind: 'variable', text: trimmed })
-    }
-    current = ''
-  }
-
-  // We need to handle the first segment (no preceding operator).
-  let i = 0
-
-  while (i < input.length) {
-    const ch = input[i]
-
-    if (ch === '+' || ch === '-') {
-      // Flush whatever we accumulated so far.
-      flush()
-
-      // Emit the operator.
-      if (ch === '+') {
-        tokens.push({ kind: 'plus', text: '+' })
-      } else {
-        tokens.push({ kind: 'minus', text: '-' })
-      }
-      i++
-      continue
-    }
-
-    current += ch
-    i++
-  }
-
-  // Flush the last segment.
-  flush()
-
-  return tokens
-}
-
-// ---- Parser ------------------------------------------------------------------
-
-/**
- * Parse a dice notation string into a structured {@link ParsedExpression}.
- *
- * Returns terms in order; dice terms are always positive (you roll dice,
- * you don't un-roll them). Constants and variables carry their own sign.
- */
-export function parseDiceNotation(notation: string): ParsedExpression {
-  const trimmed = notation.trim()
-  if (trimmed === '') return { notation, terms: [] }
-
-  const tokens = tokenize(trimmed)
-  const terms: ParsedTerm[] = []
-
-  let sign: 1 | -1 = 1
-
-  for (const token of tokens) {
-    switch (token.kind) {
-      case 'plus':
-        sign = 1
-        break
-      case 'minus':
-        sign = -1
-        break
-      case 'dice': {
-        const parts = token.text.toLowerCase().split('d')
-        const count = parts[0] === '' ? 1 : parseInt(parts[0], 10)
-        const sides = parseInt(parts[1], 10)
-        if (Number.isFinite(count) && Number.isFinite(sides) && count > 0 && sides > 0) {
-          terms.push({ type: 'dice', count, sides })
-        }
-        break
-      }
-      case 'number': {
-        const value = parseInt(token.text, 10)
-        if (Number.isFinite(value)) {
-          terms.push({ type: 'constant', value: Math.abs(value), sign })
-        }
-        break
-      }
-      case 'variable': {
-        // Handle "POW/MAR" — split on /
-        const slashIdx = token.text.indexOf('/')
-        if (slashIdx > 0) {
-          const primary = token.text.slice(0, slashIdx).trim()
-          const alt = token.text.slice(slashIdx + 1).trim()
-          terms.push({ type: 'variable', name: primary, alt, sign })
-        } else {
-          terms.push({ type: 'variable', name: token.text.trim(), sign })
-        }
-        break
-      }
-    }
-  }
-
-  return { notation, terms }
-}
-
-// ---- Pattern matching for highlighting --------------------------------------
+const WORD_AT = /[A-Za-z][A-Za-z ]*/y
 
 /** The five built-in Attribute abbreviations, always recognized. */
-const BUILTIN_ABBREVIATIONS = 'MAR|POW|AGI|VIT|GRT'
+const BUILTIN_ABBREVIATIONS = ['MAR', 'POW', 'AGI', 'VIT', 'GRT']
 
 /**
- * A free-form variable word: any capitalized/plain word, optionally written
- * with the `POW/MAR` alternative syntax. This is the permissive last resort —
- * an unknown name still highlights and rolls as 0 rather than staying literal,
- * which is what makes a typo visible in the roll breakdown.
+ * The most dice one term may roll before the notation is refused outright.
+ * A pasted `999999d6` should cost the player a highlight, not the browser.
  */
-const WORD_VARIABLE = '[A-Za-z][A-Za-z ]*(?:\\/[A-Za-z][A-Za-z ]*)?'
+const MAX_DICE_COUNT = 1000
 
-/** The five built-in abbreviations, never matching the prefix of a longer word. */
-const BUILTIN_VARIABLE = `(?:${BUILTIN_ABBREVIATIONS})(?![A-Za-z])`
+/** The most sides a die may have; past this the notation is a typo. */
+const MAX_DICE_SIDES = 1000000
 
-/** Escape a literal variable name for embedding in a regular expression. */
-function escapeRegExp(text: string): string {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+/**
+ * How many leaves one expression may hold. The scanner and the roller walk the
+ * tree recursively, so a pasted run of thousands of `+1d6` terms has to read as
+ * "not notation" rather than blowing the stack mid-render. Real notation uses a
+ * handful — the activation accuracy bonus, a damage expression, a stat or two.
+ */
+const MAX_EXPRESSION_NODES = 64
+
+/**
+ * How deeply groups and signs may nest. The parser descends a few frames per
+ * level, and it runs on whatever prose a sheet holds, so a pasted run of
+ * thousands of `(` must read as "not notation" rather than blowing the stack
+ * mid-render. Real notation nests one or two deep.
+ */
+const MAX_NESTING_DEPTH = 32
+
+/** Whether a character is whitespace (tolerates running off the end). */
+function isSpace(ch: string | undefined): boolean {
+  return ch != null && /\s/.test(ch)
+}
+
+/** Advance the cursor past whitespace. */
+function skipSpaces(p: Cursor): void {
+  while (isSpace(p.input[p.pos])) p.pos++
+}
+
+/** Whether a factor may start with this character (signs included). */
+function isPrimaryStart(ch: string | undefined): boolean {
+  if (ch == null) return false
+  return ch === '(' || ch === '+' || ch === '-' || /[A-Za-z0-9]/.test(ch)
+}
+
+/**
+ * Match a dice term at the cursor, refusing counts/sides that cannot be rolled
+ * (`0d6`) or that would roll an unreasonable number of dice.
+ */
+function matchDice(p: Cursor): DiceTerm | null {
+  DICE_AT.lastIndex = p.pos
+  const match = DICE_AT.exec(p.input)
+  if (!match) return null
+  const count = match[1] === '' ? 1 : Number(match[1])
+  const sides = Number(match[2])
+  if (count < 1 || count > MAX_DICE_COUNT) return null
+  if (sides < 1 || sides > MAX_DICE_SIDES) return null
+  p.pos = DICE_AT.lastIndex
+  return { type: 'dice', count, sides }
+}
+
+/** Count a leaf against the expression budget; false once it is spent. */
+function spendNode(p: Cursor): boolean {
+  p.nodes++
+  if (p.nodes > MAX_EXPRESSION_NODES) {
+    p.overBudget = true
+    return false
+  }
+  return true
+}
+
+// ---- Variables ---------------------------------------------------------------
+
+/** One matched variable name: what it is, where it ends, how it was matched. */
+interface MatchedName {
+  /** The name as the author wrote it (`SAN`, `Sanity`, `sneak`). */
+  name: string
+  /** Index just past the name. */
+  end: number
+  /**
+   * True when the name is one the vocabulary knows — a custom attribute or a
+   * built-in abbreviation. Only a named left side is allowed a `/` alternative
+   * that is also a name; the permissive word branch keeps its historical
+   * "either word" reading.
+   */
+  named: boolean
 }
 
 /**
  * Normalize a caller-supplied variable list: trim, drop empties, de-duplicate
  * case-insensitively, and order longest-first.
  *
- * Longest-first matters because JavaScript alternation is first-match: with
+ * Longest-first matters because the matcher tries names in order: with
  * "Martial" and "Martial Arts" both on the sheet, `2d6+Martial Arts` has to try
  * the longer name first or it would stop at "Martial".
  */
@@ -218,76 +220,305 @@ function normalizeVariables(extraVariables: readonly string[]): string[] {
   return names.sort((a, b) => b.length - a.length)
 }
 
-/**
- * Build the dice-notation pattern, optionally teaching it a character's own
- * variable names (their custom attributes' shorthands and full names).
- *
- * Known names are tried before the built-in abbreviations and before the
- * permissive word fallback, so `2d6+FOO` in "2d6+FOO damage" stops at the
- * attribute instead of swallowing the following prose into the variable name —
- * and a multi-word custom name ("Martial Arts") matches whole. Every named
- * branch (custom names and the five abbreviations alike) refuses to match the
- * prefix of a longer word, so the full attribute names `resolveVariable` has
- * always accepted — `2d6+Martial`, `2d6+Power` — highlight as the one variable
- * they are instead of being clipped to the abbreviation inside them.
- *
- * The `/` alternative syntax is offered on both named branches, so
- * `1d6+POW/MAR` and `1d6+FOO/BAR` each highlight as one term.
- */
-function diceNotationPattern(extraVariables: readonly string[] = []): string {
-  const variables = normalizeVariables(extraVariables)
-  const escaped = variables.map(escapeRegExp).join('|')
-  // The `X/Y` alternative form ("use either stat"), available to both kinds of
-  // name; the custom names are listed first so they win a tie as usual.
-  const altNames =
-    variables.length > 0
-      ? `${escaped}|${BUILTIN_ABBREVIATIONS}`
-      : BUILTIN_ABBREVIATIONS
-  const alt = `(?:\\s*\\/\\s*(?:${altNames}))?`
-  const customBranch =
-    variables.length > 0 ? `(?:${escaped})(?![A-Za-z])${alt}|` : ''
-  const variableAlternation =
-    `(?:${customBranch}${BUILTIN_VARIABLE}${alt}|\\d+|${WORD_VARIABLE})`
-  return `(\\d*d\\d+(?:\\s*[+-]\\s*${variableAlternation})*)`
+/** Match one literal name at `pos`, case-insensitively and never mid-word. */
+function matchName(input: string, pos: number, name: string): number | null {
+  const end = pos + name.length
+  if (end > input.length) return null
+  if (input.slice(pos, end).toLowerCase() !== name.toLowerCase()) return null
+  // A named branch refuses to match the prefix of a longer word, so the full
+  // attribute names `resolveVariable` accepts (`Power`, `Martial`) are one
+  // variable rather than the abbreviation inside them.
+  const next = input[end]
+  if (next != null && /[A-Za-z]/.test(next)) return null
+  return end
 }
 
 /**
- * Regex that matches dice notation in free text. Used by the DiceHighlighter
- * component to find and make notation clickable.
- *
- * Matches patterns like:
- *   - 1d6, 2d6, 3d20, d20
- *   - 1d6+POW, 2d6+MAR, d20+3
- *   - 1d6+POW/MAR, 2d6-1+Sneak
- *
- * This is the character-less pattern (built-in stats and free-form words only);
- * {@link findDiceNotation} with a variable list is what knows a sheet's custom
- * attributes.
+ * Match a variable name at `pos`: a name the sheet knows, then a built-in
+ * abbreviation, then the permissive word fallback.
  */
-export const DICE_NOTATION_REGEX = new RegExp(diceNotationPattern(), 'gi')
+function matchVariableName(
+  input: string,
+  pos: number,
+  vocabulary: readonly string[],
+): MatchedName | null {
+  for (const name of vocabulary) {
+    const end = matchName(input, pos, name)
+    if (end !== null) return { name: input.slice(pos, end), end, named: true }
+  }
+  for (const name of BUILTIN_ABBREVIATIONS) {
+    const end = matchName(input, pos, name)
+    if (end !== null) return { name: input.slice(pos, end), end, named: true }
+  }
+  WORD_AT.lastIndex = pos
+  const word = WORD_AT.exec(input)
+  if (!word) return null
+  // The free-form branch may run over inner spaces ("Sanity psychic damage"),
+  // but it ends on the last letter: a trailing space would make the following
+  // word look like a tight operand (`and *1d6` reading as a multiplication).
+  const name = word[0].replace(/\s+$/, '')
+  if (!name) return null
+  return { name, end: pos + name.length, named: false }
+}
+
+/** Whether a matched name is one the sheet's vocabulary or the builtins own. */
+function isKnownVariableName(
+  name: string,
+  vocabulary: readonly string[],
+): boolean {
+  const lower = name.toLowerCase()
+  return (
+    BUILTIN_ABBREVIATIONS.some((builtin) => builtin.toLowerCase() === lower) ||
+    vocabulary.some((known) => known.toLowerCase() === lower)
+  )
+}
 
 /**
- * Compiled character-aware patterns, keyed by the variable list they were built
- * from. A sheet renders one highlighter per prose field, all with the same
- * vocabulary, so caching keeps a re-render from rebuilding the same regex.
+ * Whether a right-hand operand can be divided by.
+ *
+ * A number, a die, a group or a known name is fine. A multi-word free-form name
+ * ("half of that") is prose rather than a stat, and the matcher has always
+ * stopped there — so it stops here too.
  */
-const patternCache = new Map<string, RegExp>()
-
-/** How many distinct vocabularies to keep compiled before starting over. */
-const MAX_CACHED_PATTERNS = 32
-
-/** The (cached) regex for a variable vocabulary; the shared one when none. */
-function notationRegex(extraVariables: readonly string[]): RegExp {
-  const variables = normalizeVariables(extraVariables)
-  if (variables.length === 0) return DICE_NOTATION_REGEX
-  const key = variables.join('\u0000').toLowerCase()
-  const cached = patternCache.get(key)
-  if (cached) return cached
-  const regex = new RegExp(diceNotationPattern(variables), 'gi')
-  if (patternCache.size >= MAX_CACHED_PATTERNS) patternCache.clear()
-  patternCache.set(key, regex)
-  return regex
+function isDivisionOperand(
+  node: ExprNode,
+  vocabulary: readonly string[],
+): boolean {
+  if (node.kind !== 'term' || node.term.type !== 'variable') return true
+  const { name } = node.term
+  if (!/\s/.test(name)) return true
+  return isKnownVariableName(name, vocabulary)
 }
+
+/**
+ * The `POW/MAR` alternative form after a matched variable, if one follows.
+ *
+ * Spaces around the slash are allowed — it is the documented "either stat"
+ * syntax, and division never has a bare name on both sides (`2d6/POW` is
+ * division, because its left side is a die).
+ */
+function matchAlt(
+  input: string,
+  from: number,
+  left: MatchedName,
+  vocabulary: readonly string[],
+): MatchedName | null {
+  let i = from
+  while (isSpace(input[i])) i++
+  if (input[i] !== '/') return null
+  i++
+  while (isSpace(input[i])) i++
+  const right = matchVariableName(input, i, vocabulary)
+  if (!right) return null
+  if (left.named && !right.named) return null
+  return right
+}
+
+// ---- Parser ------------------------------------------------------------------
+
+/**
+ * Fold a leading minus into a node.
+ *
+ * Constants and variables carry their own sign, so `-3` and `-POW` stay plain
+ * leaves; a die or a group cannot, and becomes a negate node.
+ */
+function negate(node: ExprNode): ExprNode {
+  if (node.kind === 'term' && node.term.type !== 'dice') {
+    const sign: 1 | -1 = node.term.sign === 1 ? -1 : 1
+    return { kind: 'term', term: { ...node.term, sign } }
+  }
+  if (node.kind === 'negate') return node.operand
+  return { kind: 'negate', operand: node }
+}
+
+/** A factor: a signed primary, a `(...)` group, dice, a number or a variable. */
+function parseUnary(
+  p: Cursor,
+  vocabulary: readonly string[],
+  depth: number,
+): ExprNode | null {
+  skipSpaces(p)
+  const ch = p.input[p.pos]
+  if (ch === '-' || ch === '+') {
+    if (depth >= MAX_NESTING_DEPTH) return null
+    const start = p.pos
+    p.pos++
+    const operand = parseUnary(p, vocabulary, depth + 1)
+    if (!operand) {
+      p.pos = start
+      return null
+    }
+    return ch === '-' ? negate(operand) : operand
+  }
+  return parsePrimary(p, vocabulary, depth)
+}
+
+/** A primary: `(expression)`, dice, a constant, or a variable. */
+function parsePrimary(
+  p: Cursor,
+  vocabulary: readonly string[],
+  depth: number,
+): ExprNode | null {
+  skipSpaces(p)
+
+  if (p.input[p.pos] === '(') {
+    if (depth >= MAX_NESTING_DEPTH) return null
+    const start = p.pos
+    p.pos++
+    const inner = parseAdditive(p, vocabulary, depth + 1)
+    if (inner) {
+      skipSpaces(p)
+      if (p.input[p.pos] === ')') {
+        p.pos++
+        return inner
+      }
+    }
+    // An unclosed or empty group is not notation; leave the text as it was.
+    p.pos = start
+    return null
+  }
+
+  const dice = matchDice(p)
+  if (dice) {
+    if (!spendNode(p)) return null
+    return { kind: 'term', term: dice }
+  }
+
+  // A dice-shaped token the matcher refused (`0d6`, or a count past the cap) is
+  // a notation error, not a constant followed by junk — ending here keeps
+  // `2000d6` from parsing as the number 2000.
+  DICE_AT.lastIndex = p.pos
+  if (DICE_AT.test(p.input)) return null
+
+  NUMBER_AT.lastIndex = p.pos
+  const number = NUMBER_AT.exec(p.input)
+  if (number) {
+    if (!spendNode(p)) return null
+    p.pos += number[0].length
+    return {
+      kind: 'term',
+      term: { type: 'constant', value: Number(number[0]), sign: 1 },
+    }
+  }
+
+  const variable = matchVariableName(p.input, p.pos, vocabulary)
+  if (!variable) return null
+  if (!spendNode(p)) return null
+  const term: VariableTerm = { type: 'variable', name: variable.name, sign: 1 }
+  p.pos = variable.end
+  const alt = matchAlt(p.input, variable.end, variable, vocabulary)
+  if (alt) {
+    term.alt = alt.name
+    p.pos = alt.end
+  }
+  return { kind: 'term', term }
+}
+
+/**
+ * Multiplication and division, which bind tighter than `+`/`-`.
+ *
+ * Both operators must be written tight on both sides: `2d6*3`, `1d6/POW`,
+ * `(1d6+2)/2`. A spaced operator is prose (`*1d6+2* slashing`) and ends the
+ * expression instead.
+ */
+function parseMultiplicative(
+  p: Cursor,
+  vocabulary: readonly string[],
+  depth: number,
+): ExprNode | null {
+  let left = parseUnary(p, vocabulary, depth)
+  if (!left) return null
+
+  for (;;) {
+    const opPos = p.pos
+    const op = p.input[opPos]
+    if (op !== '*' && op !== '/') return left
+    if (!isPrimaryStart(p.input[opPos + 1])) return left
+    p.pos = opPos + 1
+    const right = parseUnary(p, vocabulary, depth)
+    if (!right || (op === '/' && !isDivisionOperand(right, vocabulary))) {
+      p.pos = opPos
+      return left
+    }
+    left = { kind: 'binary', op, left, right }
+  }
+}
+
+/**
+ * The additive chain that ties an expression together: `2d6+POW`, `d20 - 1`,
+ * `1d6+2*3`. Spacing around `+`/`-` is free.
+ *
+ * A trailing operator with nothing after it (`1d6+`) ends the expression at the
+ * last complete term rather than failing outright, so half-typed notation still
+ * highlights the part that makes sense.
+ */
+function parseAdditive(
+  p: Cursor,
+  vocabulary: readonly string[],
+  depth: number,
+): ExprNode | null {
+  let left = parseMultiplicative(p, vocabulary, depth)
+  if (!left) return null
+
+  for (;;) {
+    const start = p.pos
+    let i = start
+    while (isSpace(p.input[i])) i++
+    const op = p.input[i]
+    if (op !== '+' && op !== '-') {
+      p.pos = start
+      return left
+    }
+    p.pos = i + 1
+    const right = parseMultiplicative(p, vocabulary, depth)
+    if (!right) {
+      p.pos = start
+      return left
+    }
+    left = {
+      kind: 'binary',
+      op: '+',
+      left,
+      right: op === '-' ? negate(right) : right,
+    }
+  }
+}
+
+/**
+ * Parse a dice notation string into a structured {@link ParsedExpression}.
+ *
+ * The whole string is read from the left; anything the parser cannot use
+ * (trailing prose, a half-typed operator) is simply where the expression stops.
+ */
+export function parseDiceNotation(notation: string): ParsedExpression {
+  const cursor: Cursor = { input: notation, pos: 0, nodes: 0, overBudget: false }
+  const root = parseAdditive(cursor, [], 0)
+  return { notation, root: cursor.overBudget ? null : root }
+}
+
+// ---- Finding notation in free text -------------------------------------------
+
+/** Whether an expression tree rolls any dice at all. */
+function hasDice(node: ExprNode): boolean {
+  switch (node.kind) {
+    case 'term':
+      return node.term.type === 'dice'
+    case 'negate':
+      return hasDice(node.operand)
+    case 'binary':
+      return hasDice(node.left) || hasDice(node.right)
+  }
+}
+
+/**
+ * Regex that matches a dice term in free text — the only thing, besides an
+ * opening parenthesis, that can start a notation match.
+ *
+ * It is a cheap public probe, not the matcher: reading a whole expression
+ * (groups, operators, a sheet's own vocabulary) needs the parser, which is what
+ * {@link findDiceNotation} runs.
+ */
+export const DICE_NOTATION_REGEX = /\d*d\d+/gi
 
 /**
  * Cheap pre-check: does this string contain any dice-notation shape at all?
@@ -300,9 +531,57 @@ export function hasDiceCandidate(text: string): boolean {
   return /\d*d\s*\d+/i.test(text)
 }
 
+/** The next index at which a factor could start, or -1 when there is none. */
+function nextCandidate(text: string, from: number): number {
+  for (let i = from; i < text.length; i++) {
+    const ch = text[i]
+    if (ch === '(' || /[A-Za-z0-9]/.test(ch)) return i
+  }
+  return -1
+}
+
+/**
+ * Where to resume after an attempt at `start` found nothing: past the token
+ * that was read.
+ *
+ * A refused die (`0d6`, a count past the cap) goes whole, so its `d6` tail is
+ * not read as a term of its own, and a long run of digits or letters is not
+ * re-tried at every offset — that is quadratic, and a pasted run of 50 000
+ * digits took seconds inside a render.
+ *
+ * A **word** run is the one place a die can hide from that skip: the permissive
+ * word branch swallows letters, so "for damage and d20+3" ends on the `d` of
+ * `d20`, and the run is only skipped up to the die that starts the next match.
+ */
+function resumeAfterFailed(text: string, start: number): number {
+  DICE_AT.lastIndex = start
+  const dice = DICE_AT.exec(text)
+  if (dice) return start + dice[0].length
+
+  NUMBER_AT.lastIndex = start
+  const number = NUMBER_AT.exec(text)
+  if (number) return start + number[0].length
+
+  WORD_AT.lastIndex = start
+  const word = WORD_AT.exec(text)
+  if (!word) return start + 1
+  const end = start + word[0].length
+  for (let i = start + 1; i < end; i++) {
+    DICE_AT.lastIndex = i
+    if (DICE_AT.test(text)) return i
+  }
+  return end
+}
+
 /**
  * Find all dice notation matches in a string. Returns the matched text and
  * its position for highlighting.
+ *
+ * A match is the longest expression that parses from a candidate start and
+ * contains at least one die, so groups, operators and precedence come along
+ * whole: `(1d6+POW)*2/2d6+MAR` is one token, `d20+3` is another. A bare number
+ * or word before a die is only ever part of a match when the text really reads
+ * as one expression (`2*(1d6+2)`), never as prose ("2 rounds").
  *
  * `extraVariables` is the character's own variable vocabulary (a sheet's custom
  * attribute shorthands and names — see `customAttributeVariableNames`). Passing
@@ -314,13 +593,38 @@ export function findDiceNotation(
   text: string,
   extraVariables: readonly string[] = [],
 ): { match: string; start: number; end: number }[] {
+  const vocabulary = normalizeVariables(extraVariables)
   const results: { match: string; start: number; end: number }[] = []
-  const regex = notationRegex(extraVariables)
-  // Reset regex state.
-  regex.lastIndex = 0
-  let m: RegExpExecArray | null
-  while ((m = regex.exec(text)) !== null) {
-    results.push({ match: m[0], start: m.index, end: m.index + m[0].length })
+  let i = 0
+
+  while (i < text.length) {
+    const start = nextCandidate(text, i)
+    if (start < 0) break
+
+    const cursor: Cursor = {
+      input: text,
+      pos: start,
+      nodes: 0,
+      overBudget: false,
+    }
+    const root = parseAdditive(cursor, vocabulary, 0)
+
+    if (!cursor.overBudget && root && hasDice(root)) {
+      // The permissive word branch may have swallowed trailing spaces; the
+      // pill should not wear them.
+      let end = cursor.pos
+      while (end > start && isSpace(text[end - 1])) end--
+      results.push({ match: text.slice(start, end), start, end })
+      i = Math.max(end, start + 1)
+      continue
+    }
+
+    // Nothing usable here. The token that was read is skipped whole: a
+    // dice-shaped token the parser refused (`0d6`, a count past the cap) must not
+    // be re-read as its own `d6` tail, and a long run of digits or letters must
+    // not be re-tried at every offset.
+    i = Math.max(resumeAfterFailed(text, start), start + 1)
   }
+
   return results
 }
