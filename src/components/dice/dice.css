@@ -108,6 +108,17 @@
   color: var(--accent-violet-soft);
 }
 
+/* The operator joining a term to the one before it in compound notation
+   ("× 2", "÷ 2d6"); a term that prints its own sign needs no glyph. */
+.dice-modal__term-op {
+  font-family: var(--sheet-label-font, inherit);
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--accent-violet-soft);
+  min-width: 0.7rem;
+  text-align: center;
+}
+
 .dice-modal__rolls {
   display: inline-flex;
   gap: 0.3rem;

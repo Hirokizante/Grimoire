@@ -196,8 +196,39 @@ The dice parser supports:
 - Variables: `POW`, `MAR`, `Sneak` (resolved to the character's actual value),
   plus the character's own **custom attributes** by shorthand or full name
   (`2d6+SAN`, `2d6+Sanity`)
-- Variable alternatives: `POW/MAR` (player's choice; higher used by default)
-- Combined: `2d6+POW`, `d20+3`, `1d6+POW/MAR`
+- Variable alternatives: `POW/MAR` means "use either stat" — the roll uses the
+  first name, so writing the one that applies is how the player picks
+- Operators: `+`, `-`, `*`, `/`, and parentheses for grouping
+- Combined: `2d6+POW`, `d20+3`, `1d6+POW/MAR`,
+  `(1d6+POW)*2/2d6+MAR`
+
+**Precedence** is the usual one: `*` and `/` bind tighter than `+` and `-`, and
+parentheses override both. `(1d6+POW)*2/2d6+MAR` therefore doubles the d6 plus
+POW, divides that by a fresh `2d6`, then adds MAR. Multiplication and division
+are integer arithmetic and **division rounds down** (`1d6/2` with a 5 is 2);
+dividing by zero contributes 0 rather than an unusable total.
+
+Two shape rules keep notation out of prose's way, and both matter when the
+matcher scans a description for something clickable:
+
+- `*` and `/` must be written **tight** — `2d6*3`, `1d6/POW` — while `+` and `-`
+  may be spaced as before. A spaced asterisk is Markdown emphasis
+  (`*1d6+2* slashing`), and reading it as multiplication would swallow the
+  sentence after it.
+- A slash between two bare names is the `POW/MAR` alternative form rather than
+  division; division is what a number, a die or a group on either side means
+  (`2d6/POW`, `1d6+POW/2`).
+
+The roller evaluates the parsed tree, so a compound roll reports every die it
+rolled *and* the working it followed
+(`(1d6+POW)*2/2d6+MAR → (3 + 4) × 2 ÷ (3 + 3) + 3 = 5`). A typo stays visible
+the way it always has: an unknown name resolves to 0 inside whatever expression
+it sits in.
+
+Notation is bounded so that pasted text can never hang or crash a sheet: a term
+rolls at most 1 000 dice of at most 1 000 000 sides, one expression holds at
+most 64 terms, and groups nest at most 32 deep. Past any of those the text is
+simply not notation — nothing is highlighted and nothing is rolled.
 
 ---
 

@@ -307,7 +307,7 @@ export function runActivationRollPlan(
 
   for (const spec of plan) {
     const expression = parseDiceNotation(spec.notation)
-    if (expression.terms.length === 0) continue
+    if (!expression.root) continue
     const outcome: ActivationRollOutcome = {
       ...spec,
       character,

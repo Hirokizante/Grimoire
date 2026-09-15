@@ -271,12 +271,18 @@ Grimoire is built to support that freedom:
 
 - **Inline dice notation** — `d20`, `2d6+4`, `1d6+POW`, `2d6+POW/MAR` are auto-detected in any text
   field and become clickable in view mode.
+- **Compound notation** — `+`, `-`, `*`, `/` and parentheses all work with the usual precedence, so
+  `(1d6+POW)*2/2d6+MAR` is one clickable token that does exactly what it reads: double the d6 plus
+  POW, divide by a fresh 2d6, add MAR. Division rounds down, and an unknown name counts 0 wherever it
+  sits (see [Dice notation](data-model.md#dice-notation) for the two shape rules that keep `*` and
+  `/` out of prose's way).
 - **Variable substitution** — attribute abbreviations (MAR, POW, AGI, VIT, GRT), full attribute
   names, skill names, and the sheet's own **custom attributes** (by shorthand or name — see
   [Custom attributes](#custom-attributes)) resolve to the character's actual values. Canonical
   stats win a name collision.
 - **Roll breakdown** — full per-term breakdown showing each die, each substituted variable, and the
-  total (e.g. `2d6+POW → 4 + 3 + 4 = 11`).
+  total (e.g. `2d6+POW → 4 + 3 + 4 = 11`). A compound roll keeps its shape too, operators and
+  parentheses included (`(1d6+POW)*2/2d6+MAR → (3 + 4) × 2 ÷ (3 + 3) + 3 = 5`).
 - **Activation rolls** — one Activate press can perform several rolls at once (accuracy, damage, and
   hand-authored extras — see [Roll dice on activation](#roll-dice-on-activation)). They are shown
   stacked in one result window in the order they were rolled, each with its own breakdown, and each
