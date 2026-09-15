@@ -4166,6 +4166,9 @@
   border-color: var(--accent-violet);
 }
 
+/* Anchored to the swatch's left edge; the left/right inline offsets are then
+   clamped into the viewport by ColorSwatch (useViewportClampedPanel) so a
+   right-column swatch cannot push the picker off the drawer's right edge. */
 .customize__popover {
   position: absolute;
   z-index: 100;

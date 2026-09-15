@@ -247,6 +247,30 @@ characters regularly.
   empty section's drop zone in its own test), and the resulting layout is read
   back after a reload with no grips in view mode.
 
+### Customize drawer — a swatch's color picker opens fully on-screen
+
+- **The picker no longer runs off the right edge of the drawer.** A swatch's
+  popover hangs off the swatch's **left** edge (`left: 0`) and react-colorful's
+  picker is a fixed 200px wide, while the drawer is 340px wide against the right
+  edge of the screen — about 305px of grid content, in two columns. A
+  right-column swatch therefore started ~176px in and pushed the picker 36.5px
+  past the drawer, which is also the edge of the screen: the body's
+  `overflow-y: auto` computes `overflow-x: auto`, so the picker's right side —
+  hue slider included — was clipped with no way to scroll it back, and a swatch
+  near that edge could not be given a color by eye at all. `ColorSwatch` now
+  places its popover with the shared `useViewportClampedPanel` hook, which is
+  the drawer's own right edge; the clamp only bites where there is no room, so
+  every other swatch still opens directly under its own left edge.
+- **Testing.** `e2e/customize-color-picker.spec.ts` opens all 26 swatches of the
+  real drawer against the production build, at desktop width and at 360px, and
+  asserts each picker's box sits inside the drawer's sides — plus that a picker
+  below the fold is still reachable by the body's own scroll, that a swatch with
+  room to spare still hugs its own left edge, and that the clamped picker still
+  picks a color when the far right of its saturation field is clicked. All three
+  fail against the unfixed source: every right-column picker hung 36.5px past
+  the drawer at desktop width and 26px past it in the phone bottom sheet, and
+  the clipped strip swallowed the click.
+
 ## v0.9.0-alpha — 2026-09-13
 
 The table release. Ten commits since `v0.8.0-alpha`, and they all point the same

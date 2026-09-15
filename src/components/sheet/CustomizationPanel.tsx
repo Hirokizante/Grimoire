@@ -23,6 +23,7 @@ import { X } from 'lucide-react'
 import { processImage } from '@/lib/imageProcessing'
 import { useCharacterStore } from '@/store/characterStore'
 import { colorVars } from '@/lib/themeUtils'
+import { useViewportClampedPanel } from '@/hooks/useViewportClampedPanel'
 import { FontImportSection } from '@/components/sheet/FontImportSection'
 import {
   DEFAULT_SHEET_COLORS,
@@ -507,8 +508,20 @@ function ColorSwatch({
 }) {
   const [open, setOpen] = useState(false)
 
+  // The popover hangs off the swatch's left edge (`left: 0`) and the picker is
+  // a fixed 200px wide, but the drawer's grid is ~305px of content in two
+  // columns: a right-column swatch starts ~176px in, so the picker ran ~37px
+  // past the drawer — and the drawer IS the right edge of the screen, so the
+  // body's `overflow-y: auto` (which computes `overflow-x: auto`) clipped the
+  // picker's right side, hue slider included, with no way to scroll it back.
+  // The drawer's right edge is the viewport's, so clamping the popover into
+  // the viewport (the shared useViewportClampedPanel) is what keeps the whole
+  // picker reachable — it only bites for the right-column swatches.
+  const wrapRef = useRef<HTMLDivElement>(null)
+  const popoverRef = useViewportClampedPanel(open, wrapRef, 'start')
+
   return (
-    <div className="customize__swatch-wrap">
+    <div className="customize__swatch-wrap" ref={wrapRef}>
       <button
         type="button"
         className="customize__swatch"
@@ -527,7 +540,7 @@ function ColorSwatch({
         onClick={(e) => e.stopPropagation()}
       />
       {open && (
-        <div className="customize__popover">
+        <div className="customize__popover" ref={popoverRef}>
           <HexColorPicker
             color={value}
             onChange={onChange}
