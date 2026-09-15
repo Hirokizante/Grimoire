@@ -27,7 +27,7 @@ vi.mock('@/store/rollLogStore', () => ({
 }))
 
 import DiceResultModal from '@/components/dice/DiceResultModal'
-import { useDiceRollStore } from '@/store/diceRollStore'
+import { useDiceRollStore, type ActivationRollRequest } from '@/store/diceRollStore'
 import { rollNotation } from '@/lib/diceRoller'
 import { createDefaultNPC } from '@/constants/gameData'
 import type { RollResult } from '@/lib/diceRoller'
@@ -44,7 +44,7 @@ function part(
   kind: 'accuracy' | 'damage' | 'custom',
   notation: string,
   result: RollResult = rollNotation(notation, bandit),
-) {
+): ActivationRollRequest {
   return {
     notation,
     kind,
@@ -56,7 +56,7 @@ function part(
 }
 
 function openActivation(
-  rolls: ReturnType<typeof part>[],
+  rolls: ActivationRollRequest[],
   abilityName = 'Cleave',
 ) {
   useDiceRollStore.setState({
