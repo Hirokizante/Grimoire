@@ -1,11 +1,15 @@
 /**
- * diceRollStore tests — the roll modal's theme resolution.
+ * diceRollStore tests — the roll modal's theme resolution, plus the grouped
+ * activation rolls that one Activate press produces.
  *
  * themeEntity decides whose palette the dice-result modal renders with:
  *   - player sheets → their own per-sheet colors
  *   - embedded NPC sections (rolled from inside a player sheet tab) → the
  *     host player sheet's colors
  *   - standalone NPC sheets → a config carrying the app theme's palette
+ *
+ * rollActivation decides how an activation's several rolls reach the log and
+ * the modal: one log entry each, one grouped modal.
  *
  * IndexedDB and the roll-log store are mocked so the store runs in isolation.
  */
@@ -15,7 +19,10 @@ import { createDefaultCharacter, createDefaultNPC } from '@/constants/gameData'
 import { DEFAULT_SHEET_COLORS } from '@/constants/gameData'
 import type { Character } from '@/types'
 
-const { dbMap } = vi.hoisted(() => ({ dbMap: new Map<string, unknown>() }))
+const { dbMap, logged } = vi.hoisted(() => ({
+  dbMap: new Map<string, unknown>(),
+  logged: [] as unknown[],
+}))
 
 vi.mock('@/lib/db', () => ({
   putRollLogEntry: vi.fn(async () => {}),
@@ -24,11 +31,19 @@ vi.mock('@/lib/db', () => ({
   // complete without pulling in real IndexedDB.
   getAllCharacters: vi.fn(async () => []),
   getAllStatuses: vi.fn(async () => []),
+  getAllScreens: vi.fn(async () => []),
+  getAllVersionSnapshots: vi.fn(async () => []),
+  getAllRollLogEntries: vi.fn(async () => []),
+  replaceAllData: vi.fn(async () => {}),
 }))
 
 vi.mock('@/store/rollLogStore', () => ({
   useRollLogStore: {
-    getState: () => ({ logRoll: vi.fn() }),
+    getState: () => ({
+      logRoll: (entry: unknown) => {
+        logged.push(entry)
+      },
+    }),
   },
 }))
 
@@ -43,6 +58,8 @@ import { useDiceRollStore, themeEntity } from '@/store/diceRollStore'
 import { useCharacterStore } from '@/store/characterStore'
 import { useAppThemeStore } from '@/store/appThemeStore'
 import { PARCHMENT_SHEET_COLORS } from '@/constants/gameData'
+import { rollNotation } from '@/lib/diceRoller'
+import { blankAbility } from '@/components/sheet/AbilityBlockEditor'
 
 function makePlayer(overrides: Partial<Character> = {}): Character {
   return { ...createDefaultCharacter(), ...overrides }
@@ -59,7 +76,17 @@ function makeNPC(): Character {
 
 beforeEach(() => {
   dbMap.clear()
+  logged.length = 0
   useAppThemeStore.setState({ theme: 'parchment' })
+  useDiceRollStore.setState({
+    isVisible: false,
+    result: null,
+    notation: '',
+    source: null,
+    ability: null,
+    rollCharacter: null,
+    activation: null,
+  })
 })
 
 test('player sheet rolls theme with their own colors', () => {
@@ -139,4 +166,106 @@ test('GM screen player-panel rolls use that player’s own sheet colors', () => 
   const entity = themeEntity()
   expect(entity?.id).toBe('player-2')
   expect(entity?.config.colors.accent).toBe('#654321')
+})
+
+// ---- Activation rolls -------------------------------------------------------
+
+/** One evaluated part of an activation, as the activation hook hands it over. */
+function activationRoll(
+  kind: 'accuracy' | 'damage' | 'custom',
+  notation: string,
+  character: Character,
+  label?: string,
+) {
+  return {
+    notation,
+    kind,
+    groupLabel:
+      kind === 'custom' ? 'Custom' : kind === 'accuracy' ? 'Accuracy' : 'Damage',
+    label,
+    hidden: false,
+    result: rollNotation(notation, character),
+  }
+}
+
+function activate(character: Character, rolls: ReturnType<typeof activationRoll>[]) {
+  useDiceRollStore.getState().rollActivation({
+    abilityName: 'Cleave',
+    abilityId: 'ab-1',
+    character,
+    rolls,
+  })
+}
+
+test('an activation logs each roll and opens them together', () => {
+  const bandit = makeNPC()
+  activate(bandit, [
+    activationRoll('accuracy', 'd20+POW', bandit),
+    activationRoll('damage', '2d6', bandit),
+    activationRoll('custom', '1d6', bandit, 'Burn'),
+  ])
+
+  // One entry per roll, each carrying the part it was.
+  expect(logged).toHaveLength(3)
+  const sources = logged.map(
+    (e) =>
+      (e as { source: { type: string; rollKind?: string; rollLabel?: string } })
+        .source,
+  )
+  expect(sources.map((s) => s.type)).toEqual([
+    'ability-activation',
+    'ability-activation',
+    'ability-activation',
+  ])
+  expect(sources.map((s) => s.rollKind)).toEqual(['accuracy', 'damage', 'custom'])
+  expect(sources[2].rollLabel).toBe('Burn')
+
+  // …and one modal holding all three, in the order they were rolled.
+  const state = useDiceRollStore.getState()
+  expect(state.isVisible).toBe(true)
+  expect(state.activation?.abilityName).toBe('Cleave')
+  expect(state.activation?.rolls.map((r) => r.notation)).toEqual([
+    'd20+POW',
+    '2d6',
+    '1d6',
+  ])
+  // The modal is a group, not a single roll: the single-roll fields stay empty
+  // so nothing renders twice.
+  expect(state.result).toBeNull()
+  expect(state.ability).toBeNull()
+  expect(state.rollCharacter).toBe(bandit)
+})
+
+test('an activation with nothing rolled does not open the modal', () => {
+  activate(makeNPC(), [])
+
+  expect(logged).toHaveLength(0)
+  expect(useDiceRollStore.getState().isVisible).toBe(false)
+})
+
+test('dismissing closes the activation and clears its rolls', () => {
+  const bandit = makeNPC()
+  activate(bandit, [activationRoll('accuracy', 'd20+POW', bandit)])
+
+  useDiceRollStore.getState().dismiss()
+
+  const state = useDiceRollStore.getState()
+  expect(state.isVisible).toBe(false)
+  expect(state.activation).toBeNull()
+  expect(state.rollCharacter).toBeNull()
+})
+
+test('a single roll replaces an open activation', () => {
+  const bandit = makeNPC()
+  activate(bandit, [activationRoll('accuracy', 'd20+POW', bandit)])
+
+  useDiceRollStore.getState().roll({
+    notation: '1d20',
+    character: bandit,
+    ability: { ...blankAbility(), name: 'Cleave' },
+  })
+
+  const state = useDiceRollStore.getState()
+  expect(state.activation).toBeNull()
+  expect(state.result?.notation).toBe('1d20')
 })

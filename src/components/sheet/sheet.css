@@ -2589,6 +2589,116 @@
   }
 }
 
+/* Ability editor: the "Roll Dice on Activation" block — the feature toggle plus
+   its three parts (accuracy, damage, custom rolls). Same boxed treatment as the
+   modifier and limited-use blocks so the optional features read consistently. */
+.ability-editor__activation-rolls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.5rem 0.55rem;
+  border-radius: 8px;
+  border: 1px dashed var(--border-soft);
+  background: color-mix(in srgb, var(--accent-violet) 4%, transparent);
+}
+
+.ability-editor__activation-roll-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding-left: 0.6rem;
+  border-left: 2px solid color-mix(in srgb, var(--accent-violet) 25%, transparent);
+}
+
+/* [d20 + MAR ▾] [+2] [adds +3 from MAR] — wraps on a narrow modal. */
+.ability-editor__activation-roll-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.ability-editor__activation-attr {
+  flex: 0 1 auto;
+  font-size: 0.8rem;
+  padding: 0.3rem 0.5rem;
+}
+
+.ability-editor__activation-bonus {
+  flex: 0 0 7rem;
+  width: 7rem;
+}
+
+.ability-editor__activation-roll-hint {
+  font-family: var(--sheet-helper-font, inherit);
+  font-size: 0.72rem;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+
+.ability-editor__activation-roll-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+/* [notation] [name] [Hide result] [✕] */
+.ability-editor__activation-roll-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.ability-editor__activation-roll-notation {
+  flex: 1 1 7rem;
+  min-width: 0;
+}
+
+.ability-editor__activation-roll-label {
+  flex: 1 1 7rem;
+  min-width: 0;
+}
+
+.ability-editor__activation-roll-hidden {
+  flex: 0 0 auto;
+  gap: 0.25rem;
+  white-space: nowrap;
+}
+
+/* The one label in this block that is NOT an uppercased field label: it sits
+   inline with the row's inputs ("Hide result"), so it reads as body text. */
+.ability-editor__activation-roll-hidden-label {
+  font-family: var(--sheet-label-font, inherit);
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.ability-editor__activation-roll-item .ability-editor__remove-cost-btn {
+  align-self: center;
+}
+
+/* Phone widths: the two text inputs share the first line, and the hide toggle
+   and its ✕ drop below rather than squeezing both fields to nothing. */
+@media (max-width: 480px) {
+  .ability-editor__activation-roll-notation,
+  .ability-editor__activation-roll-label {
+    flex: 1 1 100%;
+  }
+
+  .ability-editor__activation-attr {
+    flex: 1 1 100%;
+    justify-content: space-between;
+  }
+
+  .ability-editor__activation-bonus {
+    flex: 1 1 auto;
+  }
+}
+
 /* ---- Wide modal for side-by-side editor ----------------------------------- */
 
 /* Expand the modal when the sub-ability panel is open. */

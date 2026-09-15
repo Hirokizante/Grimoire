@@ -6,6 +6,9 @@ export type {
   AbilityCost,
   AbilityStatModifier,
   AbilityUses,
+  ActivationAccuracySource,
+  ActivationRoll,
+  ActivationRolls,
   ModifierTarget,
   ResolvedCustomAbilityCost,
 } from './ability'

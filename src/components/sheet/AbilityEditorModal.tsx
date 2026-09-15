@@ -14,7 +14,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import AbilityBlockEditor from '@/components/sheet/AbilityBlockEditor'
 import ConfirmModal from '@/components/sheet/ConfirmModal'
 import { useModalDialog } from '@/hooks/useModalDialog'
-import type { AbilityBlock } from '@/types'
+import type { AbilityBlock, Character } from '@/types'
 
 export interface AbilityEditorModalProps {
   /** The ability to edit, or null when creating a new one. */
@@ -32,6 +32,13 @@ export interface AbilityEditorModalProps {
    * "Add Sub-Ability" buttons). Used by the Sub-Ability editor modal.
    */
   isSubAbility?: boolean
+  /**
+   * The entity this ability belongs to, for the parts of the editor that read
+   * the sheet itself (the activation-roll accuracy picker's Attributes and
+   * custom attributes, a custom cost's target bars). Defaults to the store's
+   * `currentCharacter`; pass it where the edited entity is not that character.
+   */
+  character?: Character | null
 }
 
 export default function AbilityEditorModal({
@@ -41,6 +48,7 @@ export default function AbilityEditorModal({
   onClose,
   npcMode = false,
   isSubAbility = false,
+  character,
 }: AbilityEditorModalProps) {
   // Stable key so a fresh AbilityBlockEditor mounts on every open (clean state).
   const editorKey = useMemo(
@@ -131,6 +139,7 @@ export default function AbilityEditorModal({
             npcMode={npcMode}
             isSubAbility={isSubAbility}
             onSubEditorToggle={handleSubEditorToggle}
+            character={character}
           />
         </div>
       </div>

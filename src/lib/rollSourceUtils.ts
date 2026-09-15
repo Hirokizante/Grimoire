@@ -24,6 +24,12 @@ export function sourceLabel(
       return `Damage: ${source.abilityName}`
     case 'ability-roll':
       return `Roll: ${source.abilityName}`
+    case 'ability-activation': {
+      // Every part of one activation reads as one thing, distinguished by the
+      // part it rolled — "Activation: Fireball (accuracy)".
+      const part = source.rollLabel?.trim() || source.rollKind
+      return `Activation: ${source.abilityName} (${part})`
+    }
     case 'skill-check':
       return `${prefix}${source.skillName}`
     case 'attribute-check':

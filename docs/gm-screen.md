@@ -166,6 +166,13 @@ NPC instances follow one rule: **instances are deltas, not clones.**
   uses on the panel and spends one per Activate when the ability is set to (an instance never
   spends a use for an ability whose *Expend on activate* is off, and a limited ability at 0
   uses has its button disabled with the usual "No uses" tooltip).
+- **Activation rolls resolve against the instance** — an ability authored to roll on
+  activation (accuracy / damage / custom — see
+  [features.md](features.md#roll-dice-on-activation)) rolls against the panel's own entity:
+  the base record with *this* instance's modifier switches applied, so an active `+2 MAR`
+  moves the accuracy total on this panel only. Every roll opens together in the shared result
+  window, and the activation's own side effects — the instance's AP, its uses, its Recharge
+  cooldown — happen exactly as they do without the rolls.
 - **The − / + steppers work here too** — they move *that panel's* count without touching AP,
   resources, or the base record.
 - **Three spawned Bandits** therefore each begin at the ability's authored maximum and drain
@@ -357,6 +364,11 @@ NPC instances follow one rule: **instances are deltas, not clones.**
 
 - **Resolve against the panel's entity** — attribute, skill, and ability rolls from a panel
   resolve against that panel's entity and land in the roll log.
+- **Activation rolls** — an ability's automatic activation rolls (see
+  [features.md](features.md#roll-dice-on-activation)) resolve against the panel's entity too,
+  so a player panel rolls that player's real stats and an NPC instance rolls the base record
+  plus that instance's own modifier switches. Each part of the activation is logged
+  separately with an `ability-activation` source.
 - **Instance labels** — rolls from an instance are noted with the instance label
   ("Bandit 2"), so they stay distinguishable.
 - **Roll log** — the roll-log drawer is available on the screen in "all characters" mode.

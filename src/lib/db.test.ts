@@ -358,6 +358,84 @@ test('normalizeCharacter: modifier normalization is idempotent', () => {
   expect(normalizeCharacter(once)).toEqual(once)
 })
 
+// ---- automatic rolls on activation ------------------------------------------
+
+test('normalizeCharacter: sanitizes an ability activation-roll config', () => {
+  const char = withModifierAbility({
+    activationRolls: {
+      accuracy: { modifier: { kind: 'attribute', key: 'POW' }, bonus: '+2' },
+      damage: true,
+      custom: [
+        { notation: '2d6', label: 'Burn', hidden: true },
+        { notation: '   ' },
+        'nonsense',
+      ],
+    },
+  })
+  const out = normalizeCharacter(char)
+
+  expect(out.slottedAbilities[0].activationRolls).toEqual({
+    accuracy: { modifier: { kind: 'attribute', key: 'POW' }, bonus: '+2' },
+    damage: true,
+    custom: [{ notation: '2d6', label: 'Burn', hidden: true }],
+  })
+})
+
+test('normalizeCharacter: an unusable activation-roll config drops the key', () => {
+  const char = withModifierAbility({
+    activationRolls: {
+      accuracy: { modifier: { kind: 'attribute', key: 'NOT_A_STAT' } },
+      custom: [{ notation: '' }],
+    },
+  })
+  const out = normalizeCharacter(char)
+  const ability = out.slottedAbilities[0] as unknown as Record<string, unknown>
+  expect('activationRolls' in ability).toBe(false)
+})
+
+test('normalizeCharacter: sub-ability activation rolls are normalized too', () => {
+  const char = withModifierAbility({
+    subAbilitiesUnderDescription: [
+      {
+        id: 'sub-1',
+        name: 'Riposte',
+        traits: [],
+        cost: {},
+        damage: '1d6',
+        description: '',
+        overcharge: '',
+        flavorText: '',
+        isMinor: false,
+        showActivate: true,
+        subAbilitiesUnderDescription: [],
+        subAbilitiesUnderOvercharge: [],
+        activationRolls: {
+          accuracy: { modifier: { kind: 'custom', id: 'attr-1', token: 'SAN' } },
+          custom: [{ notation: '1d4' }, { notation: '' }],
+        },
+      },
+    ],
+  })
+  const out = normalizeCharacter(char)
+
+  expect(out.slottedAbilities[0].subAbilitiesUnderDescription[0].activationRolls)
+    .toEqual({
+      accuracy: { modifier: { kind: 'custom', id: 'attr-1', token: 'SAN' } },
+      custom: [{ notation: '1d4' }],
+    })
+})
+
+test('normalizeCharacter: activation-roll normalization is idempotent', () => {
+  const char = withModifierAbility({
+    activationRolls: {
+      accuracy: { modifier: { kind: 'custom', id: 'attr-1', token: 'SAN' } },
+      custom: [{ notation: '1d4', hidden: true }],
+    },
+  })
+  const once = normalizeCharacter(char)
+  expect(normalizeCharacter(once)).toEqual(once)
+})
+
 test('normalizeCharacter: switches in custom-tab abilities are normalized too', () => {
   const char = createDefaultCharacter()
   const base = asCharacter({

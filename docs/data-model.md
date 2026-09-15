@@ -58,11 +58,15 @@ or Pool):
 | `modifiers` | Stat/attribute modifiers applied while the card's modifier toggle is on (`[{ target, value }]`; signed — positive adds, negative subtracts) |
 | `modifiersActive` | Whether those modifiers are currently applied to the sheet (view-mode switch; defaults to `false`). On an NPC base record it is template data — the base sheet shows it read-only, and a GM Screen instance records its own switch state instead (`NpcInstanceState.abilityModifiers`) |
 | `uses` | Limited-use budget, present only on abilities flagged as limited: `{ max, current, expendOnActivate }`. `current` moves when the ability is activated and is refilled to `max` on a full restore; omitted entirely for unlimited abilities. On an NPC base record it is template data — the base sheet shows it read-only, and a GM Screen instance tracks its own counts instead (`NpcInstanceState.abilityUses`) |
+| `activationRolls` | Automatic rolls performed the moment the ability is activated — `{ accuracy?, damage?, custom? }`, omitted entirely when the ability rolls nothing. `accuracy` is `{ modifier: { kind: 'attribute', key } \| { kind: 'custom', id, token }, bonus? }`; `damage` is a plain `true`, because the ability's own `damage` field *is* the notation; `custom` is `[{ notation, label?, hidden? }]`. Roll order is fixed — accuracy, then damage, then the custom rolls as authored |
 
 On an NPC base record, `modifiersActive` and `uses` are **template data**: the
 base sheet renders both read-only, and a GM Screen instance records its own
 switch state (`NpcInstanceState.abilityModifiers`) and its own counts
 (`NpcInstanceState.abilityUses`) instead — see [gm-screen.md](gm-screen.md).
+`activationRolls` is configuration rather than live state, so a GM Screen
+instance reads it from the base record and resolves it against the instance's
+own stats — see [Automatic rolls on activation](#automatic-rolls-on-activation).
 
 ---
 
@@ -194,6 +198,50 @@ The dice parser supports:
   (`2d6+SAN`, `2d6+Sanity`)
 - Variable alternatives: `POW/MAR` (player's choice; higher used by default)
 - Combined: `2d6+POW`, `d20+3`, `1d6+POW/MAR`
+
+---
+
+## Automatic rolls on activation
+
+An ability can roll its own dice the moment its **Activate** button is pressed.
+The authored config lives on the ability (`activationRolls`, above) but the
+notation is built at **roll time**, against the entity that is activating — so
+one authored `d20+MAR` rolls with the GM's Bandit's MAR when the Bandit
+activates it and with the player's MAR when the player does. `lib/activationRolls.ts`
+owns every step; nothing else builds a roll by hand.
+
+The order is fixed, and it is the whole point of the feature:
+
+1. **Accuracy** — `d20 + <attribute>`, where the attribute is one of the five
+   Divergence Attributes or one of the sheet's own
+   [custom attributes](#custom-attributes). Attributes resolve through
+   `effectiveAttributes`, so a switched-on `+3 MAR` is included. An optional
+   extra bonus (`+2`, `+1d4`) is appended to the d20.
+2. **Damage** — the ability's own `damage` field, parsed and rolled. There is no
+   second copy of the expression to keep in sync; if the field is empty, this
+   part simply rolls nothing.
+3. **Custom rolls** — the author's own expressions, in the order they were
+   authored.
+
+Each part is evaluated with the same `lib/diceRoller.ts` code a hand-clicked
+piece of notation uses, so the two can never disagree. All parts are shown
+together in one result modal (accuracy first, then damage, then the custom
+rolls), and each part is also written to the roll log as its own entry with an
+`ability-activation` source — the log stays a roll-by-roll history.
+
+Two deliberate degradations, rather than errors:
+
+- A **custom attribute the sheet no longer defines** resolves to `+0`, exactly
+  as an unknown variable does anywhere else in dice notation: the accuracy roll
+  becomes a plain `d20` instead of the ability breaking.
+- A custom expression the parser can make no sense of is **skipped** rather
+  than rolled as zero — a typo should cost a line in the result, not a wrong
+  number.
+
+`normalizeCharacter` sanitizes the stored config on read (an unknown
+`accuracy`/`damage`/`custom` shape is dropped, and the key is omitted entirely
+when nothing usable survives), so older records, hand-edited exports and
+imported bundles load as "this ability rolls nothing on activation".
 
 ---
 

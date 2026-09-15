@@ -6,6 +6,67 @@ characters regularly.
 
 ## Unreleased
 
+### Automatic dice rolls on ability activation
+
+- **An ability can roll its own dice the moment it is activated.** The Ability
+  Block editor gains **Roll Dice on Activation**, which reveals three parts: an
+  **accuracy** roll (`d20 + ` any of the five Attributes **or any of the
+  sheet's own custom attributes**, listed side by side in the one picker, with
+  an optional extra notation bonus like `+2` or `+1d4`; an NPC's picker offers
+  the five Attributes alone, since custom attributes are a player-sheet
+  feature), a **damage** roll (the ability's own Damage field — no second copy
+  of the expression to keep in sync, and the box stays disabled until there is
+  damage to roll), and **custom rolls** (`+ Add Custom Roll`, each with an
+  optional name and an optional **Hide result**). Unticking the box stores
+  nothing at all.
+- **One Activate press, one window.** Every configured roll happens in a fixed
+  order — **accuracy, then damage, then the custom rolls as authored** — and all
+  of them appear together in the shared dice-result modal, headed by the
+  ability's name and stacked as cards: which part of the activation it was, the
+  notation, the big total, the individual dice, the working
+  (`d20+MAR → 15 + 4 = 19`) and a nat 20 / nat 1 badge where it applies. Each
+  card wears the colour of its part (violet for accuracy, red for damage, blush
+  for a custom roll) as a thin border around the whole card. A roll marked
+  *Hide result* keeps its total but folds its working behind **Show result**, so
+  a long optional list still reads at the table. Each part is also written to
+  the roll log as its own entry (`Activation: Cleave (accuracy)`), so the log
+  stays a roll-by-roll history.
+- **The notation resolves against whoever activated it.** `lib/activationRolls.ts`
+  builds the plan at roll time from the acting entity, so the same authored
+  `d20+MAR` uses each activator's own value — a player's sheet, a sub-ability's
+  own button, a GM Screen **player panel**, and an NPC **instance** on the GM
+  Screen (the base record plus that instance's own modifier switches, spending
+  that instance's AP and taking its own Recharge cooldown). Attributes resolve
+  through the *effective* values, so a switched-on `+3 MAR` is included exactly
+  as it is for hand-clicked notation. Two deliberate degradations rather than
+  errors: a custom attribute the sheet no longer defines rolls a plain `d20`
+  (an unknown variable is `+0`), and an expression the parser cannot read is
+  skipped instead of rolled as zero. A blocked activation — no uses left,
+  unaffordable, on cooldown — rolls nothing.
+- **NPCs activate only in the GM Screen, exactly as before.** The option is
+  authored in the NPC ability editor (and in a sub-ability's), and a base NPC
+  sheet still renders no Activate button — it is the static reference the GM
+  Screen spawns instances from.
+- **Storage.** `AbilityBlock.activationRolls` is sanitized by
+  `normalizeCharacter` on read (unknown accuracy/damage/custom shapes dropped,
+  the key omitted entirely when nothing usable survives), so older records,
+  hand-edited exports and imported bundles load as "this ability rolls nothing
+  on activation".
+- **Testing.** `src/lib/activationRolls.test.ts` pins normalization, the built
+  notation (attributes, custom attributes by shorthand or name, deleted
+  attributes, bonuses), the fixed roll order and the grouping; a new
+  `useAbilityActivation.test.tsx` drives the real Activate path for a player
+  card, a sub-ability and a GM panel instance's resource adapter (and pins that
+  a blocked activation rolls nothing);
+  `ActivationRollFields.test.tsx` covers the editor's toggle, pickers, damage
+  opt-in and custom-roll rows; `DiceResultModal.test.tsx` covers both modal
+  shapes and the hidden-roll toggle; `diceRollStore.test.ts` pins one log entry
+  per part plus the single grouped modal; the GM Screen panel spec adds
+  activation-with-rolls on an instance; and `e2e/activation-rolls.spec.ts`
+  authors the config in the real editor, activates on a player sheet and checks
+  the grouped window and the hidden roll, then does the same on the GM Screen
+  under an NPC instance (and pins that the base sheet never activates).
+
 ### Custom attributes — the player's own stats, usable in dice notation
 
 - **A sheet can define its own attributes.** In edit mode **+ Add Attribute**

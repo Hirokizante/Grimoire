@@ -15,7 +15,7 @@ import AbilityBlockEditor, {
 } from '@/components/sheet/AbilityBlockEditor'
 import ConfirmModal from '@/components/sheet/ConfirmModal'
 import { useModalDialog } from '@/hooks/useModalDialog'
-import type { AbilityBlock } from '@/types'
+import type { AbilityBlock, Character } from '@/types'
 
 export interface SubAbilityEditorModalProps {
   /** The sub-ability to edit, or null when creating a new one. */
@@ -38,6 +38,13 @@ export interface SubAbilityEditorModalProps {
    * same controls under `npcMode`.
    */
   npcMode?: boolean
+  /**
+   * The entity this sub-ability belongs to (the activation-roll accuracy
+   * picker reads its Attributes and custom attributes). Defaults to the
+   * store's `currentCharacter`; a section editing an entity other than that
+   * character passes it through. Same contract as `AbilityEditorModal`'s prop.
+   */
+  character?: Character | null
 }
 
 export default function SubAbilityEditorModal({
@@ -48,6 +55,7 @@ export default function SubAbilityEditorModal({
   onSave,
   onClose,
   npcMode = false,
+  character,
 }: SubAbilityEditorModalProps) {
   const editorKey = useMemo(
     () => (ability ? `sub-edit-${ability.id}` : 'new-sub-ability'),
@@ -126,6 +134,7 @@ export default function SubAbilityEditorModal({
             onDirtyChange={handleDirtyChange}
             isSubAbility
             npcMode={npcMode}
+            character={character}
           />
         </div>
       </div>

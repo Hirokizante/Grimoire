@@ -27,8 +27,10 @@ import { useState, useEffect, useCallback, Fragment } from 'react'
 
 import SelectDropdown from '@/components/ui/SelectDropdown'
 import AbilityModifierFields from '@/components/sheet/AbilityModifierFields'
+import ActivationRollFields from '@/components/sheet/ActivationRollFields'
 import { generateId } from '@/constants/gameData'
 import { normalizeModifiers } from '@/lib/abilityModifiers'
+import { normalizeActivationRolls } from '@/lib/activationRolls'
 import {
   DEFAULT_ABILITY_USES,
   MAX_ABILITY_USES,
@@ -42,6 +44,8 @@ import type {
   AbilityBlock,
   AbilityCost,
   AbilityStatModifier,
+  ActivationRolls,
+  Character,
   CustomResourceBar,
 } from '@/types'
 
@@ -72,6 +76,15 @@ export interface AbilityBlockEditorProps {
    * uses this to expand its width for the side-by-side layout.
    */
   onSubEditorToggle?: (isOpen: boolean) => void
+  /**
+   * The entity this ability belongs to — whose Attributes and custom attributes
+   * the activation-roll accuracy picker offers, and whose custom resource bars
+   * a custom cost may target. Defaults to the store's `currentCharacter`, which
+   * is the sheet being edited on every sheet page; a section that edits an
+   * entity other than the store's current character (a bundled NPC inside a
+   * player's custom tab) passes it explicitly.
+   */
+  character?: Character | null
 }
 
 /** Build a blank AbilityBlock for the "new" case. */
@@ -132,6 +145,7 @@ export default function AbilityBlockEditor({
   npcMode = false,
   isSubAbility = false,
   onSubEditorToggle,
+  character: explicitCharacter,
 }: AbilityBlockEditorProps) {
   const [draft, setDraft] = useState<AbilityBlock>(ability ?? blankAbility())
   const [traitsText, setTraitsText] = useState(serializeTraits(draft.traits))
@@ -210,6 +224,8 @@ export default function AbilityBlockEditor({
         JSON.stringify(normalizeModifiers(original.modifiers)) ||
       JSON.stringify(normalizeAbilityUses(draft.uses)) !==
         JSON.stringify(normalizeAbilityUses(original.uses)) ||
+      JSON.stringify(normalizeActivationRolls(draft.activationRolls) ?? null) !==
+        JSON.stringify(normalizeActivationRolls(original.activationRolls) ?? null) ||
       draft.cost.ap !== original.cost.ap ||
       draft.cost.end !== original.cost.end ||
       draft.cost.fp !== original.cost.fp ||
@@ -284,9 +300,9 @@ export default function AbilityBlockEditor({
   // -- custom resource costs ---------------------------------------------------
   // The character's own custom resource bars — these are what a cost can
   // target. NPCs have no resource bars, so the whole feature is hidden there.
-  const characterBars: CustomResourceBar[] = useCharacterStore(
-    (s) => s.currentCharacter?.customResourceBars ?? [],
-  )
+  const storeCharacter = useCharacterStore((s) => s.currentCharacter)
+  const owner = explicitCharacter ?? storeCharacter
+  const characterBars: CustomResourceBar[] = owner?.customResourceBars ?? []
   const customCostEntries: [string, number][] = Object.entries(
     draft.cost.custom ?? {},
   )
@@ -331,6 +347,15 @@ export default function AbilityBlockEditor({
     })
   }
 
+  // -- automatic rolls on activation -------------------------------------------
+  /** Replace the draft's activation-roll config (undefined = rolls nothing). */
+  const setActivationRolls = (next: ActivationRolls | undefined) => {
+    const updated: AbilityBlock = { ...draft }
+    if (next) updated.activationRolls = next
+    else delete updated.activationRolls
+    setDraft(updated)
+  }
+
   const handleSave = () => {
     // Drop zero/empty entries so only real costs persist; omit `custom`
     // entirely when nothing remains (keeps stored shape clean).
@@ -368,6 +393,14 @@ export default function AbilityBlockEditor({
       final.uses = finalUses
     } else {
       delete final.uses
+    }
+    // And for the automatic activation rolls: sanitize the authored config and
+    // drop the key entirely when the ability rolls nothing.
+    const finalActivationRolls = normalizeActivationRolls(draft.activationRolls)
+    if (finalActivationRolls) {
+      final.activationRolls = finalActivationRolls
+    } else {
+      delete final.activationRolls
     }
     onSave(final)
   }
@@ -681,6 +714,17 @@ export default function AbilityBlockEditor({
             )}
           </div>
 
+          {/* Automatic rolls on activation — accuracy, the ability's own
+              damage, and any extra rolls the author wants, all performed the
+              moment Activate is pressed and shown together in one modal. */}
+          <ActivationRollFields
+            rolls={draft.activationRolls}
+            onChange={setActivationRolls}
+            damage={draft.damage}
+            character={owner}
+            npcMode={npcMode}
+          />
+
           <label className="ability-editor__field">
             <span className="ability-editor__label">Flavor Text</span>
             <input
@@ -818,6 +862,7 @@ export default function AbilityBlockEditor({
               hideTitle
               npcMode={npcMode}
               isSubAbility
+              character={owner}
             />
           </div>
         </div>

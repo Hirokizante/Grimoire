@@ -39,7 +39,8 @@ tracking resources and rolling dice.
 - **Dice roller** — inline notation (`d20`, `2d6+4`, `1d6+POW`, `2d6+POW/MAR`,
   or a custom attribute like `2d6+SAN`) that becomes clickable in view mode,
   with a per-die breakdown, critical and fumble badges, and a persistent roll
-  log.
+  log. An ability can also **roll its own dice on activation** — accuracy,
+  damage, and any custom rolls you add — shown together in one result window.
 - **GM Screen** — a saved surface holding one panel per sheet you are running:
   live references to player characters, or NPC instances with their own HP,
   turns, Recharge cooldowns, Mortal Wounds, limited uses, and tracked statuses.

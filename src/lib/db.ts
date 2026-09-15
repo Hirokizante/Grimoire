@@ -19,6 +19,7 @@ import {
   normalizeModifiers,
 } from '@/lib/abilityModifiers'
 import { normalizeAbilityUses, normalizeInstanceAbilityUses } from '@/lib/abilityUses'
+import { normalizeActivationRolls } from '@/lib/activationRolls'
 import { normalizeCustomAttributes } from '@/lib/customAttributes'
 
 const DB_NAME = 'grimoire'
@@ -409,6 +410,18 @@ export function normalizeCharacter(raw: Character): Character {
     } else {
       delete (normalized as unknown as Record<string, unknown>).uses
     }
+    // Sanitize the automatic activation rolls (added with the Roll Dice on
+    // Activation feature): entries with no expression, an unknown accuracy
+    // attribute and so on are dropped, and the key is omitted entirely when the
+    // ability rolls nothing — so an older record and a hand-edited export both
+    // load as "this ability rolls nothing on activation" rather than crashing
+    // the roller mid-activation.
+    const activationRolls = normalizeActivationRolls(a.activationRolls)
+    if (activationRolls) {
+      normalized.activationRolls = activationRolls
+    } else {
+      delete (normalized as unknown as Record<string, unknown>).activationRolls
+    }
     // Sub-Abilities carry the same shape (and can be limited too) but are never
     // recursively visited by the caller, so sanitize one nesting level here.
     // Sub-Abilities cannot have sub-abilities of their own, so one pass ends it.
@@ -419,6 +432,7 @@ export function normalizeCharacter(raw: Character): Character {
     for (const key of subArrays) {
       normalized[key] = normalized[key].map((sub) => {
         const subUses = normalizeAbilityUses(sub.uses)
+        const subActivationRolls = normalizeActivationRolls(sub.activationRolls)
         const nextSub: AbilityBlock = {
           ...sub,
           cost: (sub.cost ?? {}) as AbilityCost,
@@ -426,6 +440,8 @@ export function normalizeCharacter(raw: Character): Character {
         }
         if (subUses) nextSub.uses = subUses
         else delete (nextSub as unknown as Record<string, unknown>).uses
+        if (subActivationRolls) nextSub.activationRolls = subActivationRolls
+        else delete (nextSub as unknown as Record<string, unknown>).activationRolls
         return nextSub
       })
     }

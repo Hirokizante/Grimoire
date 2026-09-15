@@ -14,6 +14,21 @@ import type { RollResult } from '@/lib/diceRoller'
 export type RollSource =
   | { type: 'ability-damage'; abilityName: string; abilityId?: string }
   | { type: 'ability-roll'; abilityName: string; abilityId?: string }
+  | {
+      /**
+       * A roll performed automatically by an ability's activation (see
+       * lib/activationRolls.ts). The ability was activated once, but each part
+       * of it is its own roll-log entry, so `rollKind` says which part this one
+       * was — and a sub-ability's activation reads exactly like its parent's.
+       */
+      type: 'ability-activation'
+      abilityName: string
+      abilityId?: string
+      /** Which part of the activation rolled this expression. */
+      rollKind: 'accuracy' | 'damage' | 'custom'
+      /** The custom roll's own name, when the author gave it one. */
+      rollLabel?: string
+    }
   | { type: 'saving-throw'; stat?: string }
   | { type: 'skill-check'; skillName: string }
   | { type: 'attribute-check'; attributeKey: string; attributeName: string }

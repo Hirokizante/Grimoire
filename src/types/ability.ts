@@ -6,6 +6,8 @@
  * "Ability Block" section of DESIGN.md for the field-by-field rationale.
  */
 
+import type { AttributeKey } from './character'
+
 /**
  * The resource costs an Ability may require to activate. All fields are
  * optional — an AbilityBlock need only list the resources it actually
@@ -78,6 +80,70 @@ export interface ResolvedCustomAbilityCost {
   color: string
   /** Amount the ability costs. */
   amount: number
+}
+
+/**
+ * Which value an automatic **accuracy roll** adds to its d20.
+ *
+ * - `attribute` — one of the five Divergence Attributes, stored by
+ *   {@link AttributeKey} (which is also the dice-notation token, so the roll is
+ *   `d20+MAR`).
+ * - `custom` — one of the sheet's own {@link CustomAttribute}s, stored by id
+ *   (the stable handle) together with the notation token to roll with (the
+ *   attribute's shorthand, or its full name when it has none). A custom
+ *   attribute the sheet no longer defines resolves to +0, exactly as an unknown
+ *   variable does anywhere else in dice notation — so a deleted attribute
+ *   degrades to a plain d20 instead of breaking the ability.
+ */
+export type ActivationAccuracySource =
+  | { kind: 'attribute'; key: AttributeKey }
+  | { kind: 'custom'; id: string; token: string }
+
+/**
+ * One automatically-rolled dice expression on activation: what to roll, what to
+ * call it in the result modal, and whether its result starts hidden.
+ */
+export interface ActivationRoll {
+  /** Dice notation (e.g. `2d6+POW`, `1d8+2`). */
+  notation: string
+  /** Short description shown on the result ("Fire damage", "Bleed"). */
+  label?: string
+  /**
+   * Render the roll's result collapsed in the activation modal, with a
+   * "Show result" toggle. Used to keep a long list of optional rolls readable;
+   * the roll still happens and still lands in the roll log.
+   */
+  hidden?: boolean
+}
+
+/**
+ * The automatic dice rolls an Ability performs when it is activated, authored
+ * in the ability editor's "Roll Dice on Activation" section.
+ *
+ * The order the rolls happen in is fixed: **accuracy first, then damage, then
+ * the custom rolls in the order they were authored** — see
+ * lib/activationRolls.ts, which is also where the notation is built and where
+ * the plan is executed.
+ *
+ * Every part is optional and the whole field is omitted when the feature is
+ * off, so an ability that rolls nothing keeps its stored shape untouched.
+ * Sub-Abilities carry the same field and roll it through the same code path.
+ */
+export interface ActivationRolls {
+  /** Roll `d20 + <attribute>` as the attack/accuracy check. */
+  accuracy?: {
+    /** The d20's flat modifier — an Attribute or a custom attribute. */
+    modifier: ActivationAccuracySource
+    /** Optional extra notation appended to the d20 (e.g. `+2`, `+1d4`). */
+    bonus?: string
+  }
+  /**
+   * Roll the Ability's own `damage` field. The field itself is the notation, so
+   * editing the damage updates the activation roll with it.
+   */
+  damage?: boolean
+  /** Extra rolls the author wants on activation, in order. */
+  custom?: ActivationRoll[]
 }
 
 /**
@@ -171,6 +237,14 @@ export interface AbilityBlock {
    * rest / full restore. See lib/abilityUses.ts.
    */
   uses?: AbilityUses
+  /**
+   * Automatic dice rolls this Ability performs the moment it is activated
+   * (added with the Roll Dice on Activation feature): an accuracy check, its
+   * own damage, and any number of extra rolls the author wants. Authored in the
+   * ability editor and shown together in one result modal; omitted entirely
+   * when the ability rolls nothing. See lib/activationRolls.ts.
+   */
+  activationRolls?: ActivationRolls
   /**
    * Sub-Abilities nested under the Description field. Bound to their parent
    * — they always move with it and cannot be independently slotted/unslotted.

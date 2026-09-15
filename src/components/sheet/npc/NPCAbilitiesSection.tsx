@@ -187,6 +187,11 @@ export default function NPCAbilitiesSection({
     // outside a GM Screen never renders an Activate button, so it offers no
     // "Show Activate button" toggle (nor the character-only END/FP costs).
     npcMode: true,
+    // The section edits an NPC that is not necessarily the store's current
+    // character (a bundled NPC inside a player's custom tab), so the editors
+    // are told which entity to read: the activation-roll accuracy picker needs
+    // *this* NPC's attributes, not the host player's.
+    character: owner,
   })
 
   /**
@@ -420,6 +425,7 @@ export default function NPCAbilitiesSection({
         onSave={handleSave}
         onClose={handleCancel}
         npcMode
+        character={owner}
       />
 
       {subAbilityEditorModal}

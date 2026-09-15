@@ -20,7 +20,7 @@
 import { useState, useCallback, useMemo } from 'react'
 
 import SubAbilityEditorModal from '@/components/sheet/SubAbilityEditorModal'
-import type { AbilityBlock } from '@/types'
+import type { AbilityBlock, Character } from '@/types'
 
 export interface UseSubAbilityEditorOptions {
   /**
@@ -37,11 +37,19 @@ export interface UseSubAbilityEditorOptions {
    * cannot do anything.
    */
   npcMode?: boolean
+  /**
+   * The entity these sub-abilities belong to, for the editor's sheet-reading
+   * controls (the activation-roll accuracy picker). Defaults to the store's
+   * `currentCharacter`; a section editing a different entity (a bundled NPC in
+   * a player's custom tab) passes its owner through.
+   */
+  character?: Character | null
 }
 
 export function useSubAbilityEditor({
   onUpdateParent,
   npcMode = false,
+  character,
 }: UseSubAbilityEditorOptions) {
   const [editingSub, setEditingSub] = useState<AbilityBlock | null>(null)
   const [editingParent, setEditingParent] = useState<AbilityBlock | null>(null)
@@ -145,6 +153,7 @@ export function useSubAbilityEditor({
       onSave={handleSave}
       onClose={handleClose}
       npcMode={npcMode}
+      character={character}
     />
   )
 

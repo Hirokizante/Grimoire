@@ -164,6 +164,127 @@
   width: 100%;
 }
 
+/* ---- Activation results (one Activate press, several rolls) ----------------- */
+
+/* Wider than the single-roll modal because it stacks a whole action's rolls,
+ * and scrollable so a long custom list cannot push the Done button off a
+ * phone screen. */
+.dice-modal--activation {
+  max-width: 540px;
+}
+
+.dice-modal--activation .dice-modal__body {
+  max-height: 78vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.dice-activation {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+  text-align: left;
+}
+
+/* One roll, outlined in its part's colour: the whole-card border (rather than
+ * a stripe down one side) is the at-a-glance key to which part of the
+ * activation this is — accuracy, damage, or an author's own roll. The tint
+ * stays quiet: four stacked outlines are read at a glance, so they read as
+ * borders, not as four coloured blocks. */
+.dice-activation__roll {
+  border: 1px solid color-mix(in srgb, var(--accent-violet) 55%, var(--border-soft));
+  border-radius: 10px;
+  padding: 0.7rem 0.85rem;
+  background: color-mix(in srgb, var(--bg-surface-raised) 70%, transparent);
+}
+
+.dice-activation__roll--damage {
+  border-color: color-mix(in srgb, var(--danger, #ef4444) 55%, var(--border-soft));
+}
+
+.dice-activation__roll--custom {
+  border-color: color-mix(
+    in srgb,
+    var(--accent-blush, var(--accent-violet-soft)) 55%,
+    var(--border-soft)
+  );
+}
+
+.dice-activation__roll-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.35rem;
+}
+
+.dice-activation__roll-kind {
+  font-family: var(--sheet-label-font, inherit);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--accent-violet-soft);
+}
+
+.dice-activation__roll--damage .dice-activation__roll-kind {
+  color: var(--danger, #ef4444);
+}
+
+.dice-activation__roll--custom .dice-activation__roll-kind {
+  color: var(--text-muted);
+}
+
+.dice-activation__roll-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.dice-activation__roll-notation {
+  font-family: var(--sheet-label-font, inherit);
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-left: auto;
+}
+
+.dice-activation__roll-total-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.dice-activation__roll-total {
+  font-family: var(--sheet-heading-font, inherit);
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--text-primary);
+}
+
+.dice-activation__reveal {
+  margin-left: auto;
+  font-size: 0.75rem;
+  padding: 0.25rem 0.6rem;
+}
+
+/* Inside a stacked roll the term rows sit tighter and lose the section's own
+ * top/bottom rules — the card is already the boundary. */
+.dice-activation__roll .dice-modal__terms {
+  padding: 0.4rem 0 0;
+  margin-bottom: 0.35rem;
+  border-top: none;
+  border-bottom: none;
+  gap: 0.3rem;
+}
+
+.dice-activation__roll .dice-modal__breakdown {
+  text-align: left;
+  margin-bottom: 0;
+}
+
 /* ---- Roll log tab + drawer ------------------------------------------------- */
 
 .roll-log-tab {

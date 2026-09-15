@@ -55,6 +55,45 @@ Grimoire is built to support that freedom:
   Ability Block editor picks a bar, and the cost renders as a color-matched badge next to AP/END/FP
   and auto-deducts on Activate (sub-abilities included).
 
+### Roll dice on activation
+
+- **Authoring** — ticking **Roll Dice on Activation** in the Ability Block editor reveals three
+  parts, each optional and free to combine with the others:
+  - **Roll accuracy** — `d20 + an attribute`, chosen from the five Divergence Attributes **or any of
+    the sheet's own custom attributes** (both lists are in the same picker), with an optional extra
+    bonus written as notation (`+2`, `+1d4`). The picker prints what the choice currently adds
+    (`adds +4 from MAR`). An **NPC**'s picker offers the five Attributes alone: custom attributes
+    are a player-sheet feature, so the option is not shown there at all. A player sheet with none
+    says so, and points at the hero section where they are added.
+  - **Roll damage** — rolls the ability's own **Damage** field. There is no second copy of the
+    expression to keep in sync: edit Damage and this roll follows it. The box stays disabled until
+    the ability has a damage expression to roll.
+  - **Custom rolls** — **+ Add Custom Roll** appends any number of extra expressions, each with an
+    optional name ("Bleed") and an optional **Hide result**, for rolls the table only occasionally
+    needs to read.
+- **What Activate does** — every configured roll happens in a fixed order: **accuracy, then damage,
+  then the custom rolls as authored**. All of them appear **together in one result window** headed by
+  the ability's name, each card outlined in its part's colour and showing its notation, its dice, its
+  working (`d20+MAR → 15 + 4 = 19`) and its total, plus a nat 20 / nat 1 badge where one applies. A
+  roll marked **Hide result** shows its total with its working folded behind a **Show result**
+  toggle.
+- **Who rolls what** — the notation resolves against whoever activated the ability: a player's own
+  attributes and custom attributes on their sheet, an NPC instance's own stats on the GM Screen. The
+  values are the *effective* ones, so an active `+3 MAR` stance is included — exactly as it is when
+  the same notation is clicked by hand.
+- **Everything is logged** — each part of an activation is its own entry in the roll log
+  ("Activation: Cleave (accuracy)"), so the log stays a roll-by-roll history even though the results
+  are read as one action.
+- **Sub-abilities** — a sub-ability carries the same option and rolls it through the same code, so a
+  follow-up attack rolls its own accuracy and damage when its own Activate button is pressed.
+- **NPCs** — authored on the ability in the NPC editor like any other field, and rolled on the **GM
+  Screen** under an NPC instance, where it spends that instance's own AP and takes that instance's
+  own Recharge cooldown. An NPC's base sheet still activates nothing: it is a static reference, so no
+  Activate button appears there.
+- **Graceful edges** — a custom attribute the sheet no longer defines rolls as a plain `d20` (an
+  unknown variable is `+0` in dice notation), and an expression the parser cannot read is skipped
+  rather than rolled as zero.
+
 ### Ability stat & attribute modifiers
 
 - **Targets** — an ability can modify the sheet's Attributes (MAR, POW, AGI, VIT, GRT) and combat
@@ -221,6 +260,10 @@ Grimoire is built to support that freedom:
   its card and spends one per Activate when configured to. At zero uses the Activate button is
   disabled until a rest refills the budget, and unlimited abilities are completely unaffected. NPC
   base sheets show the budget read-only; a GM Screen instance owns and spends its own.
+- **Activation rolls** — an ability authored to roll on activation (see
+  [Roll dice on activation](#roll-dice-on-activation)) performs its rolls on the same click that
+  spends the resources, and shows them together in one result window. A blocked activation — no
+  uses left, unaffordable, or on cooldown — rolls nothing at all.
 
 ---
 
@@ -234,6 +277,10 @@ Grimoire is built to support that freedom:
   stats win a name collision.
 - **Roll breakdown** — full per-term breakdown showing each die, each substituted variable, and the
   total (e.g. `2d6+POW → 4 + 3 + 4 = 11`).
+- **Activation rolls** — one Activate press can perform several rolls at once (accuracy, damage, and
+  hand-authored extras — see [Roll dice on activation](#roll-dice-on-activation)). They are shown
+  stacked in one result window in the order they were rolled, each with its own breakdown, and each
+  is logged separately.
 - **Critical / fumble detection** — nat 20 and nat 1 badges on d20 rolls.
 - **Roll log** — persistent, per-character roll history in a slide-out drawer; entries are saved to
   IndexedDB and survive reloads.
@@ -387,7 +434,8 @@ their own:
 
 - **Each NPC instance's own turn** — 3 AP, working Activate buttons, its own limited-ability uses
   (spent on Activate and steppable by hand), its own stat/attribute modifier switches, and Recharge
-  cooldowns resolved by a Recharge Die roll.
+  cooldowns resolved by a Recharge Die roll. An ability authored to roll on activation rolls against
+  the **instance's** stats and shows its results in the same window the player sheets use.
 - **Mortal Wounds on both panel kinds** — the same wound track sits under the HP bar and the panel
   resolves the D20 for the GM: an NPC instance uses the base's own **Mortal Wounds** stat as its
   allowance, and a player character's two slots are rolled as the panel deals the damage instead of

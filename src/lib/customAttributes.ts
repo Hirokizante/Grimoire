@@ -115,3 +115,27 @@ export function findCustomAttribute(
   if (byShorthand) return byShorthand
   return attributes.find((a) => a.name.trim().toLowerCase() === needle) ?? null
 }
+
+/**
+ * Resolve a custom attribute by its **id** — the stable handle a stored
+ * reference keeps (an ability's activation accuracy roll, for instance) when
+ * the attribute is renamed. Returns null when the sheet no longer defines it,
+ * which callers read as "this reference is dangling" rather than an error.
+ */
+export function findCustomAttributeById(
+  attributes: readonly CustomAttribute[] | null | undefined,
+  id: string,
+): CustomAttribute | null {
+  if (!attributes || attributes.length === 0 || !id) return null
+  return attributes.find((a) => a.id === id) ?? null
+}
+
+/**
+ * The dice-notation token to write for a custom attribute: its shorthand when
+ * it has one, otherwise its full name. This is the name `resolveVariable` and
+ * the notation matcher both accept, so a stored reference can always be turned
+ * back into a rollable expression even after the attribute is renamed.
+ */
+export function customAttributeToken(attribute: CustomAttribute): string {
+  return attribute.shorthand.trim() || attribute.name.trim()
+}

@@ -15,6 +15,7 @@ import CharacterPanel from '@/components/gmscreen/CharacterPanel'
 import NpcInstancePanel from '@/components/gmscreen/NpcInstancePanel'
 import CharacterSheet from '@/components/sheet/CharacterSheet'
 import StatsSection from '@/components/sheet/StatsSection'
+import DiceRollOverlay from '@/components/dice/DiceRollOverlay'
 import { NotificationProvider } from '@/context/NotificationContext'
 import { useCharacterStore } from '@/store/characterStore'
 import { useGMScreenStore } from '@/store/gmScreenStore'
@@ -26,7 +27,22 @@ import { useAppThemeStore } from '@/store/appThemeStore'
 import { useGmPanelThemeStore } from '@/store/gmPanelThemeStore'
 import type { AbilityBlock, Character } from '@/types'
 
-const { dbMap } = vi.hoisted(() => ({ dbMap: new Map<string, unknown>() }))
+const { dbMap, dieQueue } = vi.hoisted(() => ({
+  dbMap: new Map<string, unknown>(),
+  /** Queued die faces for the tests that need exact rolls; empty = real dice. */
+  dieQueue: [] as number[],
+}))
+
+// Dice go through this one function, so a test can queue the exact faces it
+// wants to reason about without touching the RNG everyone else uses (Recharge
+// Die, Mortal Wounds, armor reduction). An empty queue falls through to a real
+// roll, so every other test keeps its randomness.
+vi.mock('@/lib/dice', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/dice')>()
+  return {
+    rollDie: (sides: number) => dieQueue.shift() ?? actual.rollDie(sides),
+  }
+})
 
 vi.mock('@/lib/db', () => ({
   getAllScreens: vi.fn(async () => Array.from(dbMap.values())),
@@ -1330,6 +1346,9 @@ function renderNpcPanel(base: Character, density: 'compact' | 'expanded' = 'expa
   return render(
     <NotificationProvider>
       <NpcPanelHarness base={base} />
+      {/* The app mounts this next to the page (App.tsx), so the panel's
+        * activation rolls have somewhere to land on the GM screen. */}
+      <DiceRollOverlay />
     </NotificationProvider>,
   )
 }
@@ -1347,6 +1366,9 @@ function mockRechargeRoll(value: number) {
 beforeEach(() => {
   // The recharge turn logs its roll; start every test from an empty log.
   useRollLogStore.setState({ entries: [], isLoaded: true })
+  // …and from an empty die queue, so a test that queued faces it never used
+  // cannot leak them into the next one.
+  dieQueue.length = 0
 })
 
 /**
@@ -1896,6 +1918,49 @@ test('NPC panel: every ability with a cost gets a working Activate button', () =
   expect(panelState().currentAP).toBe(1)
   expect(base.currentAP).toBe(3)
   expect(screen.getByText(/Activated Cleave/)).toBeInTheDocument()
+})
+
+test('NPC panel: activating an ability with automatic rolls opens them together', () => {
+  // The instance rolls with ITS OWN entity: the base's MAR is 2 and the panel
+  // is what the notation resolves against — the base record is never written to.
+  const base = makeBaseWith(
+    [
+      makeAbility({
+        id: 'a1',
+        name: 'Cleave',
+        cost: { ap: 1 },
+        damage: '2d6',
+        activationRolls: {
+          accuracy: { modifier: { kind: 'attribute', key: 'MAR' } },
+          damage: true,
+          custom: [{ notation: '1d4', label: 'Bleed' }],
+        },
+      }),
+    ],
+    { attributes: { MAR: 2, POW: 0, AGI: 0, VIT: 0, GRT: 0 } },
+  )
+  renderNpcPanel(base)
+
+  // d20 = 10 → 10 + MAR(2) = 12; 2d6 = 1 + 1; 1d4 = 3.
+  dieQueue.push(10, 1, 1, 3)
+
+  fireEvent.click(activateButtons()[0])
+
+  // The instance paid for it…
+  expect(panelState().currentAP).toBe(2)
+  expect(base.currentAP).toBe(3)
+  // …and every roll is shown at once, in the result window the ability names.
+  const modal = screen.getByRole('dialog', { name: 'Cleave' })
+  const cards = within(
+    within(modal).getByRole('status', { name: /activation rolls for/i }),
+  ).getAllByRole('article')
+  expect(cards).toHaveLength(3)
+  // The breakdown proves which entity resolved the notation: the instance's
+  // MAR(2), not the store's player character.
+  expect(within(cards[0]).getByText('d20+MAR → 10 + 2 = 12')).toBeInTheDocument()
+  expect(within(cards[1]).getByText('2d6 → 1 + 1 = 2')).toBeInTheDocument()
+  expect(within(cards[2]).getByText('Bleed')).toBeInTheDocument()
+  expect(within(cards[2]).getByText('1d4 → 3 = 3')).toBeInTheDocument()
 })
 
 test('NPC panel: the Activate button is automatic — showActivate does not gate it', () => {

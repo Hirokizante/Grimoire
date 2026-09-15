@@ -9,11 +9,20 @@
  *      FP / custom resource bars, plus any tracked status pool.
  *   2. Does it still have uses left? A limited ability at 0 uses cannot be
  *      activated at all, however much AP the character has.
- *   3. What happens when it is clicked? Deduct the costs, and — when the
- *      ability is limited with `expendOnActivate` on — consume one use.
+ *   3. What happens when it is clicked? Deduct the costs, consume one use when
+ *      the ability is limited with `expendOnActivate` on, and — when the author
+ *      configured automatic rolls (accuracy / damage / custom, see
+ *      lib/activationRolls.ts) — roll them and open the shared result modal.
  *
- * The hook is purely a planner: it never writes, so it is safe to call from a
- * component that only renders a card.
+ * The hook is a planner plus one writer: the click handler performs exactly the
+ * writes an activation owns, so a component that only renders a card is safe to
+ * call it from and nothing else can activate an ability behind its back.
+ *
+ * **Automatic rolls resolve against the acting entity.** `character` is who the
+ * notation is evaluated for — the store's current character on the sheets, a GM
+ * panel's own entity on the GM Screen — so one authored ability rolls `d20+MAR`
+ * with each activator's own MAR. The modal shows every part of the activation
+ * at once, and each part is also logged to the roll log individually.
  *
  * **Resources are pluggable.** By default the costs come from the sheet's own
  * `characterStore` actions (the sheet pages). A GM Screen NPC *instance* is not
@@ -29,12 +38,18 @@ import type { ReactNode } from 'react'
 
 import { useNotification } from '@/context/NotificationContext'
 import { useCharacterStore } from '@/store/characterStore'
+import { useDiceRollStore } from '@/store/diceRollStore'
 import {
   canAffordCustomCosts,
   insufficientCustomCostParts,
   resolveCustomAbilityCosts,
 } from '@/lib/abilityCosts'
 import { expendsUseOnActivate, hasUsesRemaining } from '@/lib/abilityUses'
+import {
+  activationRollOutcomes,
+  hasActivationRollOutcomes,
+  rollAbilityActivation,
+} from '@/lib/activationRolls'
 import type { AbilityBlock, Character, CustomResourceBar } from '@/types'
 
 /**
@@ -141,7 +156,10 @@ export interface AbilityActivationPlan {
   canActivate: boolean
   /** Hover text: why the button is blocked, or what activation spends. */
   tooltip: string
-  /** Click handler: deducts the costs, then consumes a use when configured to. */
+  /**
+   * Click handler: deducts the costs, consumes a use when configured to, then
+   * rolls whatever the ability rolls on activation.
+   */
   activate: () => void
 }
 
@@ -164,6 +182,7 @@ export function useAbilityActivation(
     (s) => s.spendCustomResourceBar,
   )
   const storeSpendAbilityUse = useCharacterStore((s) => s.spendAbilityUse)
+  const rollActivationResults = useDiceRollStore((s) => s.rollActivation)
   const { notify } = useNotification()
 
   const { resources: overrideResources, blockedReason, onActivated } = options
@@ -287,6 +306,29 @@ export function useAbilityActivation(
     // The caller's post-activation step (a Recharge cooldown on GM panels) can
     // add its own note to the same toast.
     const note = onActivated?.(ability)
+
+    // Automatic rolls, in the authored order: accuracy, then damage, then the
+    // custom rolls. They resolve against `character` — the entity that paid for
+    // the activation — and every part opens together in one result modal. A
+    // configured-but-empty ability (damage switched on with no damage written)
+    // simply rolls nothing and no modal opens.
+    const group = rollAbilityActivation(ability, character)
+    if (hasActivationRollOutcomes(group)) {
+      rollActivationResults({
+        abilityName: ability.name || 'Untitled Ability',
+        abilityId: ability.id,
+        character,
+        rolls: activationRollOutcomes(group).map((outcome) => ({
+          notation: outcome.notation,
+          kind: outcome.kind,
+          groupLabel: outcome.groupLabel,
+          label: outcome.label,
+          hidden: outcome.hidden,
+          result: outcome.result,
+        })),
+      })
+    }
+
     const extras: string[] = []
     if (spentUse) extras.push('1 use spent')
     if (typeof note === 'string' && note) extras.push(note)
@@ -298,6 +340,7 @@ export function useAbilityActivation(
     )
   }, [
     ability,
+    character,
     name,
     apCost,
     endCost,
@@ -309,6 +352,7 @@ export function useAbilityActivation(
     blocked,
     onActivated,
     notify,
+    rollActivationResults,
   ])
 
   return {
