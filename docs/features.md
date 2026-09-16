@@ -38,7 +38,10 @@ Grimoire is built to support that freedom:
 
 - **Core Ability** — Innate narrative, Innate Abilities, Basic Attack, and Fatebreaker ultimate.
 - **Slotted Abilities** — equip abilities for an encounter; drag-and-drop to reorder or move to/from
-  the pool.
+  the pool. In edit mode the whole card can be grabbed (its buttons still click), and the card is
+  drawn in the slot it will take while a line across that slot's leading edge marks exactly where it
+  will go. A drop that would overflow the slot budget is refused *while dragging*: the line turns
+  red instead of accepting the card and discarding it.
 - **Ability Pool** — unlimited inactive abilities available to swap in before an encounter. Nothing
   in the pool activates: pooled cards carry no Activate button, and neither do the sub-abilities
   nested under them (a sub-ability is bound to its parent and cannot be slotted on its own). Only
@@ -152,12 +155,16 @@ Grimoire is built to support that freedom:
   tab. The first section's ↑ and the last section's ↓ render disabled rather than hidden (the
   control never moves or disappears as a section walks the tab), and the new order is saved with the
   sheet.
-- **Moving ability cards** — in edit mode every card in an **Ability Block** section carries the same
-  drag grip as the main sheet's ability lists. Drag a card onto a sibling card to reorder that
-  section, or onto a card, the list body, or the "drag one in" drop zone of **another ability
-  section in the same tab** to move it there — it lands at the end of that section's list, exactly
-  like a Slotted Abilities ↔ Ability Pool move. Sections do not trade cards across tabs, and a card
-  can never be dropped into an NPC or Text section (the bundled NPC's list is a separate,
+- **Moving ability cards** — in edit mode a card **is** the drag surface: grab it anywhere except
+  its own buttons (the grip at the top is simply the easiest place, and the keyboard's). While the
+  card is in the air it is drawn, faded, in the slot it is about to take, the cards it passes slide
+  up to close the gap it left, and a line across that slot's leading edge marks where it will land
+  — no card is ever squashed or stretched on the way, whatever the cards' heights. Release on the
+  near half of a card to land before it, on the far half to land after; the same preview shows in
+  the Slotted Abilities ↔ Ability Pool lists, so all four drag surfaces behave alike. Dropping on a
+  card, the list body, or the "drag one in" drop zone of **another ability section in the same tab**
+  moves the card there, at the position the line drew. Sections do not trade cards across tabs, and
+  a card can never be dropped into an NPC or Text section (the bundled NPC's list is a separate,
   reorder-only drag).
 
 ### NPC sections

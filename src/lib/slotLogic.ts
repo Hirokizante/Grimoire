@@ -48,3 +48,27 @@ export function formatSlots(n: number): string {
 export function isOverflowed(abilities: AbilityBlock[], maxSlots: number): boolean {
   return slotsUsed(abilities) > maxSlots
 }
+
+/**
+ * Whether a card being dragged over Slotted Abilities may land there.
+ *
+ * A card already slotted is always allowed: it already occupies its slot, so
+ * re-asking "is there room for one more?" would make a section that is exactly
+ * full — the normal, healthy state — refuse to let its own abilities be
+ * reordered. Only a genuine arrival is measured against the budget.
+ *
+ * This is the single definition of "this section is full" shared by the drag
+ * context (which refuses the drop) and the card grid (which reddens the
+ * indicator while the card hovers), so a drop can never be previewed as valid
+ * and then thrown away.
+ */
+export function canAcceptIntoSlots(
+  abilityId: string,
+  current: AbilityBlock[],
+  maxSlots: number,
+  candidate: AbilityBlock | undefined,
+): boolean {
+  if (!candidate) return true
+  if (current.some((a) => a.id === abilityId)) return true
+  return canSlot(current, maxSlots, candidate)
+}

@@ -166,6 +166,21 @@ Built on `@dnd-kit`. Four contexts cover the app's drag surfaces:
 Every ability list uses that same activation constraint, `closestCorners` collision detection,
 keyboard sensor and drag overlay, so a reorder feels identical wherever it happens.
 
+What a list shows while the card is in the air is shared too, and it is computed from the one index
+the drop itself will use (`previewOffsets` / `dropLineTarget` in `src/lib/abilityDropTarget.ts`):
+the lifted card is drawn in the slot it is about to take, the cards it passes slide up to close the
+gap it left, and a thin bar marks that slot's leading edge. dnd-kit's own sorting strategies are
+switched off deliberately — `rectSortingStrategy` resolves the destination from the hovered card
+alone (one slot away from the pointer-side rule the drop uses) and *scales* each card to the box it
+moves onto, which squashes and stretches cards of different heights in the masonry grid. The slots
+those translations are measured against are captured once per drag by `useAbilityCardSlots`, so the
+preview never feeds back into the hit-testing.
+
+The line is the **list's** element, positioned on the slot's measured box rather than hung inside
+the card it marks: Chromium positions an absolutely positioned box inside a multi-column item
+against the column box instead of the item, so a line drawn on a card in the second or third column
+of the masonry grid landed in the wrong column entirely.
+
 ---
 
 ## Storage & privacy

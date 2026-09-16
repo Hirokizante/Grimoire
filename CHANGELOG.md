@@ -4,6 +4,63 @@ All notable changes to Grimoire are documented here. This project is in alpha:
 storage format may change between pre-1.0 releases, so export (or back up) your
 characters regularly.
 
+## Unreleased
+
+### Ability card drag — a preview that shows the landing slot, undeformed
+
+- **The drag preview squashed and stretched the cards it moved.** Every ability
+  list hangs off dnd-kit's `rectSortingStrategy`, which moves each card onto the
+  *box* of another card and **scales** it to that box's size. That is fine for a
+  uniform grid and wrong for this one: the card grid is a masonry of cards with
+  different heights, so the cards sliding past were visibly deformed, and the
+  lifted card's own faded placeholder — the translucent preview that shows where
+  the block will land — was deformed too as it was scaled into the destination
+  slot. It also resolved the destination from the hovered card alone, which is
+  one slot away from the pointer-side rule the drop itself uses, so the preview
+  could promise a slot the release did not take. The preview is now computed from
+  the resolved drop index (`previewOffsets`): each card is **translated** onto
+  the slot the drop will leave it in and never scaled, and the lifted card is
+  drawn in the destination slot itself. dnd-kit's sorting transform is switched
+  off in `AbilityBlockList` so the two can't disagree; the slots the translations
+  are measured against are captured once per drag by the new
+  `useAbilityCardSlots`, so the preview never feeds back into hit-testing.
+- **The line indicator was vertical, stretched and in the wrong place.** It was a
+  full-height bar in the left gutter of whichever card had the dragged card's
+  index — in the first column that meant a stray bar outside the grid, and when
+  the drag moved forward the card it was drawn on had already slid up a slot, so
+  the line sat where the card had *come from* rather than where it was going. It
+  is now a thin horizontal bar spanning the full width of the slot the card lands
+  in, drawn in the gap on that slot's leading edge, in the masonry grid and the
+  list view alike (both flow cards down a column). "After the last card" is
+  marked under the last card it will follow instead of in a zero-width trailing
+  slot, which is gone. The line is the **list's** element, drawn on the slot box
+  the preview translates cards onto, rather than a child of the card it marks:
+  Chromium positions an absolutely positioned box inside a multi-column item
+  against the column box instead of the item, so a line hung inside a card in the
+  second or third column of the masonry grid was painted in another column
+  entirely — the drop preview test now uses cards of *different* heights, which
+  is what makes that measurable.
+- **Dropping a card in the gap under the last one did nothing.** The gap is a
+  gap index one past the end of the list, and `reorderAbility` rejected any
+  `toIndex` outside the list — so the drag was silently dropped while the preview
+  drew the card landing at the end. It now clamps, the way `moveAbility` already
+  did, so the card appends (and a card already last stays put).
+- **Testing.** `abilityDropTarget.test.ts` pins the arithmetic: the lifted card
+  is drawn in the slot it takes, a drop past the end previews as the last slot, a
+  card arriving from another list moves nothing, and — across every
+  active/gap pair on a six-card list — reading the drawn boxes back in slot order
+  reproduces the reorder exactly, as a permutation of the slots with nothing
+  stacked or lost. `characterStore.test.ts` pins the append.
+  `e2e/ability-card-drag.spec.ts` drags a card past a *taller* neighbour with a
+  real pointer and asserts every card's drawn box still matches its laid-out size
+  (a scaled card is exactly what that compares), that the line spans the landing
+  slot's width on its leading edge, and that the card settles where the preview
+  drew it; it also pins the "after the last card" line.
+  `e2e/custom-sections.spec.ts` does the same for a custom tab's sections, and
+  now waits for a previous drag's lifted copy to unmount before starting the next
+  one — it is a fixed overlay sitting where its card landed, and a press aimed
+  through it was silently swallowed.
+
 ## v0.10.0-alpha — 2026-09-15
 
 The dice release. Eleven commits since `v0.9.0-alpha`, and the through-line is

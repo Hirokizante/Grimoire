@@ -239,11 +239,17 @@ export interface CharacterStoreActions {
   addAbilityBlock: (section: AbilitySection, ability: AbilityBlock) => void
   /** Remove an AbilityBlock by id from a slotted/pool list. */
   removeAbilityBlock: (section: AbilitySection, id: string) => void
-  /** Move an AbilityBlock from one slotted/pool list to the other. */
+  /**
+   * Move an AbilityBlock from one slotted/pool list to the other, inserting it
+   * at `toIndex` (an index into the target list as it stands before the move).
+   * Omit it — or pass one past the end — to append, which is what the "Move to
+   * Pool" / "Move to Slotted" buttons do.
+   */
   moveAbility: (
     id: string,
     from: AbilitySection,
     to: AbilitySection,
+    toIndex?: number,
   ) => void
   /** Reorder an AbilityBlock within a single slotted/pool list. */
   reorderAbility: (
@@ -433,8 +439,18 @@ export interface CharacterStoreActions {
   removeCustomAbility: (tabId: string, sectionId: string, abilityId: string) => void
   /** Reorder an ability within a custom section (ability sections only). */
   reorderCustomAbility: (tabId: string, sectionId: string, fromIndex: number, toIndex: number) => void
-  /** Move an ability between custom sections (within the same tab). */
-  moveCustomAbility: (tabId: string, fromSectionId: string, toSectionId: string, abilityId: string) => void
+  /**
+   * Move an ability between custom sections (within the same tab), inserting it
+   * at `toIndex` (an index into the target section as it stands before the
+   * move). Omit it — or pass one past the end — to append.
+   */
+  moveCustomAbility: (
+    tabId: string,
+    fromSectionId: string,
+    toSectionId: string,
+    abilityId: string,
+    toIndex?: number,
+  ) => void
   /** Add a new custom resource bar. */
   addCustomResourceBar: (bar: CustomResourceBar) => void
   /** Update an existing custom resource bar by id. */
@@ -571,6 +587,20 @@ function noMortalWound(): MortalWoundResult {
     trackFull: false,
     knockedOut: false,
   }
+}
+
+/**
+ * Where a cross-list ability move inserts, given the index a drop resolved.
+ *
+ * A drop index is an index into the target list **as it stands before the
+ * move**, so `0 … length` are all meaningful — `length` means "after the last
+ * card". An omitted index (the "Move to Pool" / "Move to Slotted" buttons) and
+ * anything out of range both mean "append", where the store has always put
+ * them.
+ */
+function clampInsertIndex(index: number | undefined, length: number): number {
+  if (index == null || Number.isNaN(index)) return length
+  return Math.max(0, Math.min(index, length))
 }
 
 export const useCharacterStore = create<CharacterStore>()((set, get) => ({
@@ -811,15 +841,20 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
     }))
   },
 
-  moveAbility: (id, from, to) => {
+  moveAbility: (id, from, to, toIndex) => {
     if (from === to) return
     get().updateCurrentCharacter((char) => {
       const moved = char[from].find((a) => a.id === id)
       if (!moved) return char
+      const target = [...char[to]]
+      // The index the drop promised is an index into the list as it stands, so
+      // anything past the end (a drop below the last card) appends.
+      const at = clampInsertIndex(toIndex, target.length)
+      target.splice(at, 0, moved)
       return {
         ...char,
         [from]: char[from].filter((a) => a.id !== id),
-        [to]: [...char[to], moved],
+        [to]: target,
       }
     })
   },
@@ -829,9 +864,13 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
     get().updateCurrentCharacter((char) => {
       const list = [...char[section]]
       if (fromIndex < 0 || fromIndex >= list.length) return char
-      if (toIndex < 0 || toIndex >= list.length) return char
+      // `toIndex` names a gap in the list as it stands, so one past the last
+      // card — the gap the drop preview draws under the end of the list — means
+      // the end of the list. Rejecting it instead silently dropped that drag.
+      const at = clampInsertIndex(toIndex, list.length - 1)
+      if (at === fromIndex) return char
       const [moved] = list.splice(fromIndex, 1)
-      list.splice(toIndex, 0, moved)
+      list.splice(at, 0, moved)
       return { ...char, [section]: list }
     })
   },
@@ -1731,7 +1770,7 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
     })
   },
 
-  moveCustomAbility: (tabId, fromSectionId, toSectionId, abilityId) => {
+  moveCustomAbility: (tabId, fromSectionId, toSectionId, abilityId, toIndex) => {
     if (fromSectionId === toSectionId) return
     get().updateCurrentCharacter((char) => {
       const tabs = char.customTabs.map((t) => {
@@ -1751,7 +1790,12 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
               if (!fromSection || fromSection.kind !== 'ability') return s
               const moved = fromSection.abilities.find((a) => a.id === abilityId)
               if (!moved) return s
-              return { ...s, abilities: [...s.abilities, moved] }
+              const target = [...s.abilities]
+              // The index the drop promised is an index into the section as it
+              // stands, so anything past the end (a drop below the last card)
+              // appends.
+              target.splice(clampInsertIndex(toIndex, target.length), 0, moved)
+              return { ...s, abilities: target }
             }
             return s
           })

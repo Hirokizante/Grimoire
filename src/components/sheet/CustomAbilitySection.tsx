@@ -9,19 +9,13 @@
 import { useState, useCallback } from 'react'
 import { Pencil, Check, Trash2 } from 'lucide-react'
 
-import { useDroppable } from '@dnd-kit/core'
-import {
-  SortableContext,
-  rectSortingStrategy,
-  verticalListSortingStrategy,
-} from '@dnd-kit/sortable'
-
 import AbilityActivation from '@/components/sheet/AbilityActivation'
+import AbilityBlockList from '@/components/sheet/AbilityBlockList'
 import AbilityEditorModal from '@/components/sheet/AbilityEditorModal'
 import ConfirmModal from '@/components/sheet/ConfirmModal'
 import SectionViewToggle from '@/components/sheet/SectionViewToggle'
 import SectionReorderButtons from '@/components/sheet/SectionReorderButtons'
-import SortableAbilityCard from '@/components/sheet/SortableAbilityCard'
+import { useAbilityListDnd } from '@/hooks/useAbilityListDnd'
 import { useCharacterStore } from '@/store/characterStore'
 import { useSubAbilityEditor } from '@/hooks/useSubAbilityEditor'
 import type { AbilityBlock, CustomAbilitySection } from '@/types'
@@ -86,9 +80,10 @@ export default function CustomAbilitySection({
     setRenaming(false)
   }
 
-  const { setNodeRef, isOver } = useDroppable({
+  const { setDroppableRef, isOver } = useAbilityListDnd({
     id: section.id,
-    data: { section: section.id, sectionKind: 'ability' as const },
+    items: section.abilities,
+    layout: viewMode === 'list' ? 'list' : 'cards',
   })
 
   const openNew = () => {
@@ -190,65 +185,48 @@ export default function CustomAbilitySection({
         </button>
       )}
 
-      {section.abilities.length === 0 && !isEdit ? (
-        <p className="sheet-section__empty muted">
-          No abilities in this section.
-        </p>
-      ) : section.abilities.length === 0 ? (
-        <div
-          ref={setNodeRef}
-          className={
-            'ability-dropzone ability-dropzone--empty' +
-            (isOver ? ' ability-dropzone--over' : '')
-          }
-        >
+      {!isEdit ? (
+        section.abilities.length === 0 ? (
           <p className="sheet-section__empty muted">
-            No abilities yet — click "Add Ability" or drag one in.
+            No abilities in this section.
           </p>
-        </div>
-      ) : (
-        <div
-          ref={setNodeRef}
-          className={
-            (isListView
-              ? 'ability-grid ability-grid--list'
-              : 'ability-grid ability-grid--cards') +
-            (isOver ? ' ability-dropzone--over' : '')
-          }
-        >
-          <SortableContext
-            items={section.abilities.map((a) => a.id)}
-            strategy={isListView ? verticalListSortingStrategy : rectSortingStrategy}
+        ) : (
+          <div
+            className={
+              isListView
+                ? 'ability-grid ability-grid--list'
+                : 'ability-grid ability-grid--cards'
+            }
           >
-            {section.abilities.map((ability) =>
-              isEdit ? (
-                <SortableAbilityCard
-                  key={ability.id}
-                  ability={ability}
-                  section={section.id}
-                  mode={mode}
-                  subAbilityActions={isEdit ? subAbilityActions : undefined}
-                  actions={
-                    <>
-                      <button
-                        type="button"
-                        className="btn btn--ghost ability-card__action-btn"
-                        onClick={() => {
-                          setEditing(ability)
-                          setShowEditor(true)
-                        }}
-                      >
-                        Edit
-                      </button>
-                    </>
-                  }
-                />
-              ) : (
-                <AbilityActivation key={ability.id} ability={ability} />
-              )
-            )}
-          </SortableContext>
-        </div>
+            {section.abilities.map((ability) => (
+              <AbilityActivation key={ability.id} ability={ability} />
+            ))}
+          </div>
+        )
+      ) : (
+        <AbilityBlockList
+          section={section.id}
+          abilities={section.abilities}
+          layout={isListView ? 'list' : 'cards'}
+          droppableRef={setDroppableRef}
+          isOver={isOver}
+          subAbilityActions={subAbilityActions}
+          emptyMessage={
+            <>No abilities yet — click “Add Ability” or drag one in.</>
+          }
+          actions={(ability) => (
+            <button
+              type="button"
+              className="btn btn--ghost ability-card__action-btn"
+              onClick={() => {
+                setEditing(ability)
+                setShowEditor(true)
+              }}
+            >
+              Edit
+            </button>
+          )}
+        />
       )}
 
       <AbilityEditorModal

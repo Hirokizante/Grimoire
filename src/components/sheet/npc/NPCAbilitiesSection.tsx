@@ -44,22 +44,17 @@
  */
 
 import { useState, useCallback } from 'react'
-import { useDroppable } from '@dnd-kit/core'
-import {
-  SortableContext,
-  rectSortingStrategy,
-  verticalListSortingStrategy,
-} from '@dnd-kit/sortable'
 
 import AbilityActivation from '@/components/sheet/AbilityActivation'
 import AbilityBlockCard from '@/components/sheet/AbilityBlockCard'
+import AbilityBlockList from '@/components/sheet/AbilityBlockList'
 import AbilityEditorModal from '@/components/sheet/AbilityEditorModal'
 import ConfirmModal from '@/components/sheet/ConfirmModal'
 import SectionViewToggle from '@/components/sheet/SectionViewToggle'
-import SortableAbilityCard from '@/components/sheet/SortableAbilityCard'
 import NpcAbilitiesDndContext, {
   NPC_ABILITIES_SECTION_ID,
 } from '@/components/sheet/npc/NpcAbilitiesDndContext'
+import { useAbilityListDnd } from '@/hooks/useAbilityListDnd'
 import { useCharacterStore } from '@/store/characterStore'
 import { useSubAbilityEditor } from '@/hooks/useSubAbilityEditor'
 import {
@@ -215,11 +210,14 @@ export default function NPCAbilitiesSection({
     [updateCurrentCharacter],
   )
 
-  // Droppable — the list itself accepts a card dropped past its last one and
-  // highlights while a card is dragged over it (same as the slotted section).
-  const { setNodeRef, isOver } = useDroppable({
+  // Droppable + hint resolver for the list. An NPC has one list, so nothing is
+  // ever refused here; the registration lands in the nested context mounted
+  // around the editable list below, which is what keeps an NPC card's drop hint
+  // out of the surrounding custom tab's drag.
+  const { setDroppableRef, isOver } = useAbilityListDnd({
     id: NPC_ABILITIES_SECTION_ID,
-    data: { section: NPC_ABILITIES_SECTION_ID },
+    items: abilities,
+    layout: isListView ? 'list' : 'cards',
   })
 
   const openNew = () => {
@@ -268,112 +266,111 @@ export default function NPCAbilitiesSection({
   }
 
   /**
-   * The list itself — identical in both variants and both modes; only the cards
-   * differ (sortable with action buttons while editing).
+   * The list itself. In edit mode the shared {@link AbilityBlockList} renders
+   * the sortable cards (identical to the player sheet's ability sections); in
+   * view mode the cards are resolved here, because a GM panel's ability may
+   * activate while the rest stay static reference cards.
    */
-  const list =
-    abilities.length === 0 && !isEdit ? (
+  const viewCards =
+    abilities.length === 0 ? (
       <p className="sheet-section__empty muted">
         No abilities defined for this NPC.
       </p>
-    ) : abilities.length === 0 ? (
-      <div
-        ref={setNodeRef}
-        className={
-          'ability-dropzone ability-dropzone--empty' +
-          (isOver ? ' ability-dropzone--over' : '')
-        }
-      >
-        <p className="sheet-section__empty muted">
-          No abilities yet — click &ldquo;Add Ability&rdquo; to create one.
-        </p>
-      </div>
     ) : (
-      <div
-        ref={setNodeRef}
-        className={
-          (isListView
-            ? 'ability-grid ability-grid--list'
-            : 'ability-grid ability-grid--cards') +
-          (isOver ? ' ability-dropzone--over' : '')
+      abilities.map((ability) => {
+        // A GM panel resolves an override per ability: one with a cost (or on
+        // Recharge cooldown) activates, the rest stay reference cards.
+        const override = activateOverride(ability)
+        if (override) {
+          // The same writer both branches get: a GM panel's limited abilities
+          // keep working ± steppers on an activatable card, and an NPC base
+          // sheet receives none (so its meter stays read-only).
+          return (
+            <AbilityActivation
+              key={ability.id}
+              ability={ability}
+              character={owner}
+              activateOverride={activateOverride}
+              onSetUses={onSetUses}
+              onToggleModifiers={onToggleModifiers}
+            />
+          )
         }
-      >
-        {isEdit ? (
-          <SortableContext
-            items={abilities.map((a) => a.id)}
-            strategy={isListView ? verticalListSortingStrategy : rectSortingStrategy}
-          >
-            {abilities.map((ability) => (
-              <SortableAbilityCard
-                key={ability.id}
-                ability={ability}
-                section={NPC_ABILITIES_SECTION_ID}
-                mode={mode}
-                character={owner}
-                onToggleModifiers={onToggleModifiers}
-                onSetUses={onSetUses}
-                subAbilityActions={subAbilityActions}
-                // The parent is not activatable here, but its sub-abilities may
-                // be — the resolver travels with the card either way.
-                activateOverride={activateOverride}
-                actions={
-                  <>
-                    <button
-                      type="button"
-                      className="btn btn--ghost ability-card__action-btn"
-                      onClick={() => openEdit(ability)}
-                    >
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn--ghost ability-card__action-btn ability-card__action-btn--danger"
-                      onClick={() => handleRemoveRequest(ability.id)}
-                    >
-                      Remove
-                    </button>
-                  </>
-                }
-              />
-            ))}
-          </SortableContext>
-        ) : (
-          abilities.map((ability) => {
-            // A GM panel resolves an override per ability: one with a cost (or
-            // on Recharge cooldown) activates, the rest stay reference cards.
-            const override = activateOverride(ability)
-            if (override) {
-              // The same writer both branches get: a GM panel's limited
-              // abilities keep working ± steppers on an activatable card, and
-              // an NPC base sheet receives none (so its meter stays read-only).
-              return (
-                <AbilityActivation
-                  key={ability.id}
-                  ability={ability}
-                  character={owner}
-                  activateOverride={activateOverride}
-                  onSetUses={onSetUses}
-                  onToggleModifiers={onToggleModifiers}
-                />
-              )
-            }
-            return (
-              <AbilityBlockCard
-                key={ability.id}
-                ability={ability}
-                character={owner}
-                mode={mode}
-                onToggleModifiers={onToggleModifiers}
-                onSetUses={onSetUses}
-                // The parent is not activatable here, but its sub-abilities may
-                // be — the resolver travels with the card either way.
-                activateOverride={activateOverride}
-              />
-            )
-          })
-        )}
-      </div>
+        return (
+          <AbilityBlockCard
+            key={ability.id}
+            ability={ability}
+            character={owner}
+            mode={mode}
+            onToggleModifiers={onToggleModifiers}
+            onSetUses={onSetUses}
+            // The parent is not activatable here, but its sub-abilities may be —
+            // the resolver travels with the card either way.
+            activateOverride={activateOverride}
+          />
+        )
+      })
     )
+
+  const editList = (
+    <NpcAbilitiesDndContext
+      abilities={abilities}
+      onReorder={handleReorder}
+      owner={owner}
+    >
+      <AbilityBlockList
+        section={NPC_ABILITIES_SECTION_ID}
+        abilities={abilities}
+        layout={isListView ? 'list' : 'cards'}
+        droppableRef={setDroppableRef}
+        isOver={isOver}
+        character={owner}
+        onToggleModifiers={onToggleModifiers}
+        onSetUses={onSetUses}
+        subAbilityActions={subAbilityActions}
+        // The parent is not activatable here, but its sub-abilities may be —
+        // the resolver travels with the card either way.
+        activateOverride={activateOverride}
+        emptyMessage={
+          <>No abilities yet — click &ldquo;Add Ability&rdquo; to create one.</>
+        }
+        actions={(ability) => (
+          <>
+            <button
+              type="button"
+              className="btn btn--ghost ability-card__action-btn"
+              onClick={() => openEdit(ability)}
+            >
+              Edit
+            </button>
+            <button
+              type="button"
+              className="btn btn--ghost ability-card__action-btn ability-card__action-btn--danger"
+              onClick={() => handleRemoveRequest(ability.id)}
+            >
+              Remove
+            </button>
+          </>
+        )}
+      />
+    </NpcAbilitiesDndContext>
+  )
+
+  const list = isEdit ? (
+    editList
+  ) : abilities.length === 0 ? (
+    viewCards
+  ) : (
+    <div
+      className={
+        isListView
+          ? 'ability-grid ability-grid--list'
+          : 'ability-grid ability-grid--cards'
+      }
+    >
+      {viewCards}
+    </div>
+  )
 
   const viewToggle = onViewModeChange ? (
     <SectionViewToggle

@@ -2970,6 +2970,30 @@
 
 /* ---- Phase 6: drag-and-drop ----------------------------------------------- */
 
+/* The whole card is the drag surface (see AbilityCardPointerSensor): the
+   listeners live on `.sortable-ability`, and the sensor declines any press
+   that starts on a control inside it. The grip stays as the visible
+   affordance, so it keeps the grab cursor. */
+.sortable-ability {
+  position: relative;
+}
+
+.sortable-ability:has(.drag-handle) {
+  cursor: grab;
+}
+
+/* Controls inside a draggable card keep their own cursor: the card's grab
+   cursor must not promise a drag where a click is what will happen. */
+.sortable-ability .ability-card button,
+.sortable-ability .ability-card a,
+.sortable-ability .ability-card input,
+.sortable-ability .ability-card select,
+.sortable-ability .ability-card [role='button'],
+.sortable-ability .ability-card [role='slider'],
+.sortable-ability .ability-card [role='switch'] {
+  cursor: pointer;
+}
+
 .drag-handle {
   display: flex;
   align-items: center;
@@ -2984,8 +3008,20 @@
   transition: background-color 0.15s ease;
 }
 
+/* The grip sits on a card whose surface is already `--bg-surface-raised`, so its
+   hover has to lift rather than match it — otherwise the strip blends into the
+   card exactly when the user is reaching for it. */
 .drag-handle:hover {
-  background: var(--bg-surface-raised);
+  background: color-mix(in srgb, var(--bg-surface-hover) 70%, var(--accent-violet) 30%);
+}
+
+.drag-handle:hover .drag-handle__grip {
+  color: var(--text-secondary);
+}
+
+.drag-handle:focus-visible {
+  outline: 2px solid var(--accent-violet);
+  outline-offset: -2px;
 }
 
 .drag-handle:active {
@@ -2999,27 +3035,50 @@
   user-select: none;
 }
 
-.sortable-ability {
-  position: relative;
-}
-
 .sortable-ability--dragging {
   z-index: 100;
 }
 
-/* Drag overlay — follows the cursor */
-.sortable-ability--overlay {
-  opacity: 0.9;
+/* The card the user is dragging keeps its slot — that is what lets the drop
+   indicator's index and the drop's index be the same number — but fades to a
+   placeholder so the real card under the pointer is unmistakably the ghost. */
+.sortable-ability--dragging:has(.drag-handle) {
   cursor: grabbing;
-  transform: rotate(1deg);
-  box-shadow: 0 8px 28px color-mix(in srgb, var(--bg-base) 50%, transparent);
+}
+
+.sortable-ability--dragging > .drag-handle,
+.sortable-ability--dragging > .ability-card {
+  opacity: 0.32;
+  filter: saturate(0.3);
+  transition: opacity 0.12s ease;
+}
+
+/* A dashed outline around the slot the lifted card came from, so the gap it
+   leaves reads as "this card is out" rather than as a card that vanished. */
+.sortable-ability--dragging::before {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border: 1px dashed color-mix(in srgb, var(--accent-violet) 45%, transparent);
+  border-radius: 12px;
+  pointer-events: none;
+}
+
+/* Drag overlay — the card that follows the cursor. dnd-kit sizes the wrapper
+   from the source node, so the frame inside is the same markup the sortable
+   card renders and the drop animation has nothing to snap between. */
+.sortable-ability--overlay {
+  cursor: grabbing;
+  transform: rotate(1.5deg) scale(1.02);
+  box-shadow: 0 18px 40px -8px color-mix(in srgb, var(--bg-base) 75%, transparent),
+    0 2px 8px color-mix(in srgb, var(--bg-base) 45%, transparent);
+  border-radius: 10px;
 }
 
 /* The overlay is a picture, not a control surface: its cards are live copies,
-   so their uses steppers and modifier switches would otherwise take clicks
-   mid-drag. */
-.sortable-ability--overlay .ability-uses__step,
-.sortable-ability--overlay .modifier-switch {
+   so their controls would otherwise take clicks mid-drag. */
+.sortable-ability--overlay,
+.sortable-ability--overlay * {
   pointer-events: none;
 }
 
@@ -3038,12 +3097,99 @@
   border-bottom-right-radius: 10px;
 }
 
-/* Drop zone highlight */
+/* ---- Drop indicator ------------------------------------------------------
+   Where the dragged card will land, drawn in the gap on the leading edge of the
+   slot it lands in — a thin bar spanning the slot's full width, in the masonry
+   grid and the list view alike, because both of them flow cards down a column.
+   It replaces the stretched translucent ghost dnd-kit would otherwise leave
+   behind, which reads as a rendering glitch rather than as a destination.
+
+   The line belongs to the **list**, not to the card it marks: it is positioned
+   on the slot's own box, which is measured when the drag starts (see
+   AbilityBlockList / useAbilityCardSlots). Hanging it inside the card instead
+   looked equivalent and is not — Chromium positions an absolutely positioned
+   box inside a multi-column item against the column box rather than the item, so
+   a line drawn on a card in the second or third column landed in the wrong
+   column entirely. */
+.ability-grid {
+  position: relative;
+}
+
+/* The slot box: sized and placed from the measurement, never painted itself. */
+.ability-drop-slot {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 5;
+  pointer-events: none;
+  transition: transform 200ms ease;
+}
+
+.ability-drop-indicator {
+  position: absolute;
+  left: 0;
+  right: 0;
+  /* The gap between two cards is 0.7rem, so the bar is centred in it. */
+  top: calc(-0.35rem - 1.5px);
+  height: 3px;
+  border-radius: 3px;
+  background: var(--accent-violet);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent-violet) 30%, transparent),
+    0 0 12px 1px color-mix(in srgb, var(--accent-violet) 40%, transparent);
+  animation: ability-drop-indicator-in 0.12s ease-out;
+}
+
+/* "After the last card" is the one insertion point with no card to open a gap in
+   front of, so its bar sits in the gap on the slot's trailing edge instead. */
+.ability-drop-indicator--after {
+  top: auto;
+  bottom: calc(-0.35rem - 1.5px);
+}
+
+/* The round end-cap marks which end of the line the card lands at, so a bar in
+   a column reads as "here" rather than as a card edge. */
+.ability-drop-indicator__cap {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  top: 50%;
+  margin-top: -3.5px;
+  left: -3.5px;
+  background: var(--accent-violet-soft);
+  box-shadow: 0 0 8px 1px color-mix(in srgb, var(--accent-violet) 55%, transparent);
+}
+
+@keyframes ability-drop-indicator-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* A destination that will be refused (a full Slotted Abilities section) reads
+   as "not here" while the card is still in the air, instead of accepting the
+   drop and throwing it away on release. */
+.ability-drop-indicator--invalid {
+  background: var(--danger);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--danger) 30%, transparent),
+    0 0 12px 1px color-mix(in srgb, var(--danger) 40%, transparent);
+}
+
+.ability-drop-indicator--invalid .ability-drop-indicator__cap {
+  background: var(--danger);
+  box-shadow: 0 0 8px 1px color-mix(in srgb, var(--danger) 55%, transparent);
+}
+
+/* The list a card is hovering gets a soft frame — the indicator says *where*,
+   this says *which list*. Kept very light so it never competes with the line. */
 .ability-dropzone--over {
-  outline: 2px dashed var(--accent-violet);
+  outline: 2px dashed color-mix(in srgb, var(--accent-violet) 65%, transparent);
   outline-offset: 2px;
   border-radius: 10px;
-  background: color-mix(in srgb, var(--accent-violet) 6%, transparent);
+  background: color-mix(in srgb, var(--accent-violet) 5%, transparent);
   transition: outline-color 0.15s ease, background-color 0.15s ease;
 }
 
@@ -3061,6 +3207,23 @@
 .ability-dropzone--empty.ability-dropzone--over {
   border-color: var(--accent-violet);
   background: color-mix(in srgb, var(--accent-violet) 8%, transparent);
+}
+
+/* Respect a reduced-motion preference: the indicator appears instantly rather
+   than scaling in, the slot does not slide between positions, and the lifted
+   card does not tilt. */
+@media (prefers-reduced-motion: reduce) {
+  .ability-drop-indicator {
+    animation: none;
+  }
+
+  .ability-drop-slot {
+    transition: none;
+  }
+
+  .sortable-ability--overlay {
+    transform: none;
+  }
 }
 
 /* Slot overflow counter */

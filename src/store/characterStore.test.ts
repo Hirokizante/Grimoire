@@ -765,6 +765,28 @@ test('reorderAbility: reorders within slotted', () => {
   expect(updated.slottedAbilities.map((a) => a.id)).toEqual(['a2', 'a3', 'a1'])
 })
 
+test('reorderAbility: dropping past the last card appends', () => {
+  setupChar()
+  const ability = (id: string) => ({ id, name: id, traits: [], cost: {}, damage: '', description: '', overcharge: '', flavorText: '', isMinor: false, showActivate: true, subAbilitiesUnderDescription: [], subAbilitiesUnderOvercharge: [] })
+  for (const id of ['a1', 'a2', 'a3']) {
+    useCharacterStore.getState().addAbilityBlock('slottedAbilities', ability(id))
+  }
+  // The gap below the last card is a gap index one past the end of the list, and
+  // the drop preview draws the card landing there — so the drop has to take it
+  // rather than reject the index and leave the card where it was.
+  useCharacterStore.getState().reorderAbility('slottedAbilities', 0, 3)
+  expect(
+    useCharacterStore.getState().currentCharacter!.slottedAbilities.map((a) => a.id),
+  ).toEqual(['a2', 'a3', 'a1'])
+
+  // A card already last, dropped in the gap under itself, stays exactly where it
+  // is rather than being spliced out and back in.
+  useCharacterStore.getState().reorderAbility('slottedAbilities', 2, 3)
+  expect(
+    useCharacterStore.getState().currentCharacter!.slottedAbilities.map((a) => a.id),
+  ).toEqual(['a2', 'a3', 'a1'])
+})
+
 // ---- Export / versioning ----------------------------------------------------
 // (saveVersion auto-bumps by patch level)
 

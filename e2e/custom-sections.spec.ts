@@ -104,11 +104,23 @@ function card(section: Locator, name: string) {
 
 /**
  * Drag one ability card onto another (or onto a section's drop zone) with a
- * real pointer. The drag has to start on the card's grip handle: dnd-kit's
- * listeners live there rather than on the card body, which is what keeps the
- * card's own buttons clickable.
+ * real pointer, releasing over the given part of the target.
+ *
+ * The drag starts on the card's grip handle — the visible affordance, and the
+ * one place that is unambiguously a drag surface — and travels in two moves so
+ * the pointer sensor's 6px activation threshold is crossed before the long
+ * haul, the way a person's hand does it.
+ *
+ * Where the pointer is *released* decides the destination: past the middle of
+ * the hovered card means the far side of it. `side` therefore picks which half
+ * to aim at, and the tests below use it to pin both.
  */
-async function dragCardOnto(page: Page, from: Locator, to: Locator) {
+async function dragCardOnto(
+  page: Page,
+  from: Locator,
+  to: Locator,
+  side: 'near' | 'far' | 'middle' = 'middle',
+) {
   const handle = from.locator('.drag-handle')
   await handle.scrollIntoViewIfNeeded()
   await to.scrollIntoViewIfNeeded()
@@ -119,17 +131,103 @@ async function dragCardOnto(page: Page, from: Locator, to: Locator) {
 
   const startX = grip.x + grip.width / 2
   const startY = grip.y + grip.height / 2
+  const fraction = side === 'near' ? 0.2 : side === 'far' ? 0.8 : 0.5
 
   await page.mouse.move(startX, startY)
   await page.mouse.down()
   // PointerSensor needs 6px of travel before the drag actually starts.
   await page.mouse.move(startX + 14, startY + 14, { steps: 5 })
   await page.mouse.move(
-    target.x + target.width / 2,
+    target.x + target.width * fraction,
     target.y + target.height / 2,
     { steps: 14 },
   )
   await page.mouse.up()
+}
+
+/**
+ * Begin a drag and leave the pointer hovering `to`, returning what the sheet is
+ * showing *while the card is in the air*. The caller releases it (or drops it
+ * elsewhere); `dragCardOnto` is this plus the release, for the cases that only
+ * care where the card ends up.
+ */
+async function dragInFlight(
+  page: Page,
+  from: Locator,
+  to: Locator,
+  side: 'near' | 'far' | 'middle' = 'middle',
+) {
+  // A previous drag's lifted copy stays mounted for its drop animation, and it
+  // is a fixed overlay sitting exactly where its card landed — a press aimed
+  // through it is swallowed, so the next drag never starts. Wait for the sheet
+  // to be quiet first.
+  await expect(page.locator('.sortable-ability--overlay')).toHaveCount(0)
+
+  const handle = from.locator('.drag-handle')
+  await handle.scrollIntoViewIfNeeded()
+  await to.scrollIntoViewIfNeeded()
+
+  const grip = await handle.boundingBox()
+  const target = await to.boundingBox()
+  if (!grip || !target) throw new Error('ability card is not visible')
+
+  const startX = grip.x + grip.width / 2
+  const startY = grip.y + grip.height / 2
+  const fraction = side === 'near' ? 0.2 : side === 'far' ? 0.8 : 0.5
+
+  await page.mouse.move(startX, startY)
+  await page.mouse.down()
+  await page.mouse.move(startX + 14, startY + 14, { steps: 5 })
+  await page.mouse.move(
+    target.x + target.width * fraction,
+    target.y + target.height / 2,
+    { steps: 14 },
+  )
+  // React needs a frame to paint the indicator for the position just reached, and
+  // the cards slide into their preview positions on a 200ms transform
+  // transition — so wait for both before measuring where the preview put them.
+  await page.waitForTimeout(400)
+
+  return page.evaluate(() => {
+    const section = (el: Element | null) => el?.getAttribute('data-section') ?? null
+    const wrapOf = (el: Element | null) => el?.closest('.ability-card-wrap') ?? null
+    const indicator = document.querySelector('.ability-drop-indicator')
+    const dragging = document.querySelector('.sortable-ability--dragging')
+    // The slot the line is drawn on names the card it marks, so the same DOM
+    // lookup answers "which card is the drop landing on" as before.
+    const markedId = indicator?.closest('[data-drop-target]')?.getAttribute('data-drop-target')
+    const marked = markedId
+      ? document.querySelector(`.ability-card-wrap[data-ability-id="${markedId}"]`)
+      : null
+    /**
+     * The indicator's own line. `getBoundingClientRect` would union it with the
+     * end-cap, so the reported box would be a couple of pixels wider than the bar
+     * that marks the slot.
+     */
+    const lineRect = (el: Element | null) => {
+      if (!el) return null
+      const rects = Array.from(el.getClientRects())
+      const line = rects.sort((a, b) => b.width * b.height - a.width * a.height)[0]
+      return line ? line.toJSON() : null
+    }
+    const rect = (el: Element | null) =>
+      el ? el.getBoundingClientRect().toJSON() : null
+    return {
+      markedCard: marked?.querySelector('.ability-card__name')?.textContent ?? null,
+      markedSection: section(marked),
+      draggedCard: wrapOf(dragging)?.querySelector('.ability-card__name')?.textContent ?? null,
+      /** The lifted card is still laid out — drawn in the slot it is taking. */
+      sourceStillLaidOut: dragging !== null,
+      /** Where the lifted card is drawn: the slot the drop will leave it in. */
+      draggedRect: rect(wrapOf(dragging)),
+      indicatorVisible: indicator
+        ? getComputedStyle(indicator).display !== 'none'
+        : false,
+      indicatorRect: lineRect(indicator),
+      markedRect: rect(marked),
+      overlayCount: document.querySelectorAll('.sortable-ability--overlay').length,
+    }
+  })
 }
 
 test('a custom tab shifts its sections with the heading arrows', async ({
@@ -222,15 +320,16 @@ test('a custom tab drags ability cards between its ability sections', async ({
   // One grip per card: the lists are draggable in edit mode.
   await expect(offense.locator('.drag-handle')).toHaveCount(2)
 
-  // Within a section: dropping a card on another card reorders the list.
-  await dragCardOnto(page, card(offense, 'Cleave'), card(offense, 'Rush'))
+  // Within a section: releasing past the second card's middle swaps the two.
+  await dragCardOnto(page, card(offense, 'Cleave'), card(offense, 'Rush'), 'far')
   await expect(abilityNames(offense)).toHaveText(['Rush', 'Cleave'])
 
-  // Across sections: dropping a card on a card in the other section moves it
-  // there (to the end of that section's list, like a pool ↔ slotted move).
-  await dragCardOnto(page, card(offense, 'Cleave'), card(defense, 'Bulwark'))
+  // Across sections: releasing on the near side of the other section's card
+  // drops it *in front of* that card, not tacked onto the end — the position
+  // the indicator drew while the card was in the air.
+  await dragCardOnto(page, card(offense, 'Cleave'), card(defense, 'Bulwark'), 'near')
   await expect(abilityNames(offense)).toHaveText(['Rush'])
-  await expect(abilityNames(defense)).toHaveText(['Bulwark', 'Cleave'])
+  await expect(abilityNames(defense)).toHaveText(['Cleave', 'Bulwark'])
 
   // The move lands on the character record, so the layout survives a reload.
   await settleAutosave(page)
@@ -242,11 +341,86 @@ test('a custom tab drags ability cards between its ability sections', async ({
   const reloaded = page.locator('.custom-tab-content')
   await expect(abilityNames(sections(reloaded).nth(0))).toHaveText(['Rush'])
   await expect(abilityNames(sections(reloaded).nth(1))).toHaveText([
-    'Bulwark',
     'Cleave',
+    'Bulwark',
   ])
   // View mode is a static sheet: cards render, grips do not.
   await expect(reloaded.locator('.drag-handle')).toHaveCount(0)
+})
+
+test('the drop indicator shows which card the drop will land in front of', async ({
+  page,
+}) => {
+  await gotoHome(page)
+  await createPlayer(page, 'Vex')
+  await page.getByRole('tab', { name: 'Edit' }).click()
+
+  await page.getByRole('button', { name: 'Add new tab' }).click()
+  await page.getByRole('textbox').last().press('Enter')
+  await addSection(page, /^Ability Block/)
+  const tab = page.locator('.custom-tab-content')
+  const offense = sections(tab).nth(0)
+  for (const name of ['Cleave', 'Rush', 'Feint']) {
+    await addAbility(page, offense, name)
+  }
+
+  // Hovering the near half of the *next* card: the destination is the gap the
+  // lifted card already occupies, so the line marks its own slot's leading edge.
+  const near = await dragInFlight(page, card(offense, 'Cleave'), card(offense, 'Rush'), 'near')
+  expect(near.draggedCard).toBe('Cleave')
+  expect(near.markedCard).toBe('Cleave')
+  // The card is still laid out — which is what makes the indicator's index and
+  // the drop's index the same number — and the ghost following the pointer is a
+  // second, lifted copy.
+  expect(near.sourceStillLaidOut).toBe(true)
+  expect(near.overlayCount).toBe(1)
+  await page.mouse.up()
+  await expect(abilityNames(offense)).toHaveText(['Cleave', 'Rush', 'Feint'])
+  // Let the drop animation finish before the next press: it briefly leaves the
+  // lifted copy in the DOM, which would swallow it.
+  await expect(page.locator('.sortable-ability--overlay')).toHaveCount(0)
+
+  // Crossing the hovered card's middle moves the destination one slot on: Rush
+  // slides up into the lifted card's place and the lifted card is previewed in
+  // the slot it is about to take. The line marks *that slot* — Rush's box as it
+  // was, which the preview has handed to the lifted card — so it is measured
+  // against the lifted card, not against where Rush has slid to.
+  const far = await dragInFlight(page, card(offense, 'Cleave'), card(offense, 'Rush'), 'far')
+  expect(far.draggedCard).toBe('Cleave')
+  expect(far.markedCard).toBe('Rush')
+  expect(far.indicatorVisible).toBe(true)
+  expect(far.indicatorRect).not.toBeNull()
+  expect(far.markedRect).not.toBeNull()
+
+  // The line is a thin bar spanning the landing slot's full width, in the gap on
+  // its leading edge — not the stretched vertical bar in the grid's gutter this
+  // used to draw.
+  expect(Math.abs(far.indicatorRect!.width - far.draggedRect!.width)).toBeLessThan(2)
+  expect(far.indicatorRect!.height).toBeLessThan(6)
+  expect(Math.abs(far.indicatorRect!.x - far.draggedRect!.x)).toBeLessThan(2)
+  expect(Math.abs(far.indicatorRect!.bottom - far.draggedRect!.top)).toBeLessThan(8)
+  // And the marked card really has slid away from it: measuring the line against
+  // the card it is named for is what put it a slot behind the drop.
+  expect(Math.abs(far.markedRect!.x - far.draggedRect!.x)).toBeGreaterThan(50)
+
+  // And that slot is where the card really lands: releasing leaves it exactly
+  // where the preview drew it. The card settles through dnd-kit's layout-change
+  // transition, so this polls rather than reading the box once.
+  await page.mouse.up()
+  await expect(abilityNames(offense)).toHaveText(['Rush', 'Cleave', 'Feint'])
+  await expect
+    .poll(async () => {
+      const landed = (await card(offense, 'Cleave').boundingBox())!
+      return Math.max(
+        Math.abs(landed.x - far.draggedRect!.x),
+        Math.abs(landed.y - far.draggedRect!.y),
+      )
+    })
+    .toBeLessThan(2)
+
+  // Nothing drag-only survives the drop.
+  await expect(page.locator('.ability-drop-indicator')).toHaveCount(0)
+  await expect(page.locator('.sortable-ability--overlay')).toHaveCount(0)
 })
 
 test('a card can be dragged onto an empty ability section', async ({ page }) => {

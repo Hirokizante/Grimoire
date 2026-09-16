@@ -7,9 +7,11 @@
  * each card gains Edit, Remove, and "Move to Slotted" buttons and can be
  * dragged to reorder or to move into the slotted section.
  *
- * The section is wrapped in a dnd-kit `SortableContext` (vertical) and
- * `useDroppable` so it acts as a drop target for abilities dragged from the
- * slotted section. The parent {@link AbilitiesDndContext} handles the drag.
+ * The card grid is an {@link AbilityBlockList}: it registers this section as a
+ * drop target for abilities dragged out of the slotted section and reports the
+ * index a drop resolved to, which the parent {@link AbilitiesDndContext} uses
+ * as the destination. The pool has no budget of its own, so it never refuses a
+ * card.
  *
  * **Nothing in the pool activates.** These abilities are not slotted, so their
  * cards carry no Activate button — and because a sub-ability is bound to its
@@ -18,26 +20,20 @@
  */
 
 import { useState, useCallback } from 'react'
-import {
-  SortableContext,
-  rectSortingStrategy,
-  verticalListSortingStrategy,
-} from '@dnd-kit/sortable'
-import { useDroppable } from '@dnd-kit/core'
 
+import AbilityBlockCard from '@/components/sheet/AbilityBlockCard'
+import AbilityBlockList from '@/components/sheet/AbilityBlockList'
 import AbilityEditorModal from '@/components/sheet/AbilityEditorModal'
 import ConfirmModal from '@/components/sheet/ConfirmModal'
 import SectionViewToggle from '@/components/sheet/SectionViewToggle'
-import SortableAbilityCard, {
-  type AbilitySectionId,
-} from '@/components/sheet/SortableAbilityCard'
-import { useCharacterStore } from '@/store/characterStore'
+import { useAbilityListDnd } from '@/hooks/useAbilityListDnd'
 import { useSubAbilityEditor } from '@/hooks/useSubAbilityEditor'
+import { useCharacterStore } from '@/store/characterStore'
 import { NO_ACTIVATION } from '@/hooks/useAbilityActivation'
 import type { AbilityBlock } from '@/types'
 import type { SheetMode } from '@/pages/CharacterSheetPage'
 
-const SECTION: AbilitySectionId = 'abilityPool'
+const SECTION = 'abilityPool'
 
 export interface AbilityPoolSectionProps {
   abilities: AbilityBlock[]
@@ -53,7 +49,6 @@ export default function AbilityPoolSection({
   onViewModeChange,
 }: AbilityPoolSectionProps) {
   const isEdit = mode === 'edit'
-  const isListView = viewMode === 'list'
   const addAbilityBlock = useCharacterStore((s) => s.addAbilityBlock)
   const updateAbilityBlock = useCharacterStore((s) => s.updateAbilityBlock)
   const removeAbilityBlock = useCharacterStore((s) => s.removeAbilityBlock)
@@ -74,7 +69,12 @@ export default function AbilityPoolSection({
     onUpdateParent: handleUpdateParent,
   })
 
-  const { setNodeRef, isOver } = useDroppable({ id: SECTION, data: { section: SECTION } })
+  const layout = viewMode === 'list' ? 'list' : 'cards'
+  const { setDroppableRef, isOver } = useAbilityListDnd({
+    id: SECTION,
+    items: abilities,
+    layout,
+  })
 
   const openNew = () => {
     setEditing(null)
@@ -135,81 +135,72 @@ export default function AbilityPoolSection({
         </button>
       )}
 
-      {abilities.length === 0 && !isEdit ? (
-        <p className="sheet-section__empty muted">
-          The ability pool is empty.
-        </p>
-      ) : abilities.length === 0 ? (
-        <div
-          ref={setNodeRef}
-          className={
-            'ability-dropzone ability-dropzone--empty' +
-            (isOver ? ' ability-dropzone--over' : '')
-          }
-        >
-          <p className="sheet-section__empty muted">
-            The ability pool is empty — click “Add Ability” to create one.
-          </p>
-        </div>
-      ) : (
-        <div
-          ref={setNodeRef}
-          className={
-            (isListView
-              ? 'ability-grid ability-grid--list'
-              : 'ability-grid ability-grid--cards') +
-            (isOver ? ' ability-dropzone--over' : '')
-          }
-        >
-          <SortableContext
-            items={abilities.map((a) => a.id)}
-            strategy={isListView ? verticalListSortingStrategy : rectSortingStrategy}
+      {!isEdit ? (
+        abilities.length === 0 ? (
+          <p className="sheet-section__empty muted">The ability pool is empty.</p>
+        ) : (
+          <div
+            className={
+              layout === 'list'
+                ? 'ability-grid ability-grid--list'
+                : 'ability-grid ability-grid--cards'
+            }
           >
             {abilities.map((ability) => (
-              <SortableAbilityCard
+              <AbilityBlockCard
                 key={ability.id}
                 ability={ability}
-                section={SECTION}
                 mode={mode}
-                subAbilityActions={isEdit ? subAbilityActions : undefined}
                 // The pool is inactive by definition: nothing here activates.
-                // The resolver is the last word, which is what stops a nested
-                // sub-ability from falling back to its own `showActivate` flag
-                // and growing a button that spends the character's real AP.
                 activateOverride={NO_ACTIVATION}
-                actions={
-                  isEdit ? (
-                    <>
-                      <button
-                        type="button"
-                        className="btn btn--ghost ability-card__action-btn"
-                        onClick={() => openEdit(ability)}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn--ghost ability-card__action-btn"
-                        onClick={() =>
-                          moveAbility(ability.id, 'abilityPool', 'slottedAbilities')
-                        }
-                      >
-                        Move to Slotted
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn--ghost ability-card__action-btn ability-card__action-btn--danger"
-                        onClick={() => handleRemoveRequest(ability.id)}
-                      >
-                        Remove
-                      </button>
-                    </>
-                  ) : undefined
-                }
               />
             ))}
-          </SortableContext>
-        </div>
+          </div>
+        )
+      ) : (
+        <AbilityBlockList
+          section={SECTION}
+          abilities={abilities}
+          layout={layout}
+          droppableRef={setDroppableRef}
+          isOver={isOver}
+          subAbilityActions={subAbilityActions}
+          // The pool is inactive by definition: nothing here activates. The
+          // resolver is the last word, which is what stops a nested sub-ability
+          // from falling back to its own `showActivate` flag and growing a
+          // button that spends the character's real AP.
+          activateOverride={NO_ACTIVATION}
+          emptyMessage={
+            <>The ability pool is empty — click “Add Ability” to create one.</>
+          }
+          actions={(ability) => (
+            <>
+              <button
+                type="button"
+                className="btn btn--ghost ability-card__action-btn"
+                onClick={() => openEdit(ability)}
+              >
+                Edit
+              </button>
+              <button
+                type="button"
+                className="btn btn--ghost ability-card__action-btn"
+                onClick={() =>
+                  moveAbility(ability.id, 'abilityPool', 'slottedAbilities')
+                }
+              >
+                Move to Slotted
+              </button>
+              <button
+                type="button"
+                className="btn btn--ghost ability-card__action-btn ability-card__action-btn--danger"
+                onClick={() => handleRemoveRequest(ability.id)}
+              >
+                Remove
+              </button>
+            </>
+          )}
+        />
       )}
 
       <AbilityEditorModal

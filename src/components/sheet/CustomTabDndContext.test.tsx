@@ -28,7 +28,22 @@ import type {
   CustomTab,
 } from '@/types'
 
-type DragPayload = { id: string; data?: { current?: Record<string, unknown> } }
+type Box = { left: number; top: number; width: number; height: number }
+
+type DragPayload = {
+  id: string
+  data?: { current?: Record<string, unknown> }
+  /**
+   * The box dnd-kit measured for this end of the drag. Only the `over` end's
+   * box is read now — the pointer comes from the activator — but both are
+   * supplied so the payload stays the shape dnd-kit really sends: a card
+   * carries `{ current: { initial, translated } }`, a list carries the box.
+   */
+  rect?:
+    | { current: { initial: Box | null; translated: Box | null } }
+    | Box
+    | null
+}
 
 const {
   moveCustomAbility,
@@ -37,6 +52,7 @@ const {
   dragEndRef,
   sortableData,
   droppableData,
+  rects,
 } = vi.hoisted(() => ({
   moveCustomAbility: vi.fn(),
   reorderCustomAbility: vi.fn(),
@@ -47,12 +63,27 @@ const {
     current: null as null | ((event: {
       active: DragPayload
       over: DragPayload | null
+      activatorEvent?: Event
+      delta?: { x: number; y: number }
     }) => void),
   },
   // What each sortable card / droppable list registered with dnd-kit, keyed by
   // id — the honest source for a synthetic drag payload.
   sortableData: { current: {} as Record<string, Record<string, unknown>> },
   droppableData: { current: {} as Record<string, Record<string, unknown>> },
+  /**
+   * Measured boxes per card id, fed to the drop resolver. jsdom lays nothing
+   * out, so the resolver's before/after decision — which reads the pointer's
+   * own box against the hovered card's box — needs them supplied here. Absent
+   * entries stand in for "not measured", which the resolver treats as "not
+   * past" (the drop lands before the hovered card).
+   */
+  rects: {
+    current: {} as Record<
+      string,
+      { left: number; top: number; width: number; height: number } | undefined
+    >,
+  },
 }))
 
 vi.mock('@/store/characterStore', () => {
@@ -96,6 +127,8 @@ vi.mock('@dnd-kit/core', async (importOriginal) => {
       onDragEnd?: (event: {
         active: DragPayload
         over: DragPayload | null
+        activatorEvent?: Event
+        delta?: { x: number; y: number }
       }) => void
     }) => {
       dragEndRef.current = props.onDragEnd ?? null
@@ -114,6 +147,7 @@ vi.mock('@dnd-kit/sortable', async (importOriginal) => {
     ...actual,
     useSortable: (args: { id: string; data?: Record<string, unknown> }) => {
       sortableData.current[args.id] = args.data ?? {}
+      const rect = rects.current[args.id]
       return {
         attributes: {},
         listeners: {},
@@ -122,6 +156,8 @@ vi.mock('@dnd-kit/sortable', async (importOriginal) => {
         transform: null,
         transition: undefined,
         isDragging: false,
+        // dnd-kit measures the node; only the box matters to the resolver.
+        rect: { current: rect ? { initial: rect, translated: rect } : null },
       }
     },
   }
@@ -165,46 +201,70 @@ const tab: CustomTab = {
   ],
 }
 
+/**
+ * Render the tab's two ability sections from the *character record* rather than
+ * from the module fixture, so a test that installs a different tab (three cards
+ * instead of two) actually sees it — the sections take their list as a prop, and
+ * a fixture read here would silently keep rendering the old one.
+ */
 function renderTab() {
+  const sections = characterRef.current?.customTabs.find((t) => t.id === 'tab-1')
+    ?.sections as CustomAbilitySectionType[]
   return render(
     <NotificationProvider>
       <CustomTabDndContext tabId="tab-1">
-        <CustomAbilitySection
-          tabId="tab-1"
-          section={tab.sections[0] as CustomAbilitySectionType}
-          mode="edit"
-        />
-        <CustomAbilitySection
-          tabId="tab-1"
-          section={tab.sections[1] as CustomAbilitySectionType}
-          mode="edit"
-        />
+        <CustomAbilitySection tabId="tab-1" section={sections[0]} mode="edit" />
+        <CustomAbilitySection tabId="tab-1" section={sections[1]} mode="edit" />
       </CustomTabDndContext>
     </NotificationProvider>,
   )
 }
 
 /**
- * Replay a drag the way dnd-kit would deliver it: the active end is the
- * dragged card's own registered sortable data, and `over` defaults to whatever
- * the drop target registered (a card, or a section's droppable list).
+ * Replay a drag the way dnd-kit would deliver it: the active end is the dragged
+ * card's own registered sortable data plus the box it was measured with, and
+ * `over` is whatever the drop target registered plus its measured box.
+ *
+ * The `over` box is the part jsdom cannot produce. The resolver reads it, with
+ * the pointer, to decide which side of the hovered card the drop belongs on —
+ * the same comparison that draws the indicator — so the test supplies it from
+ * the same per-card table the boxes came from. `pointerX` stands in for where
+ * the cursor is, which dnd-kit reports as an activator event plus a delta.
  */
 function drag(
   activeId: string,
   overId: string,
   overData?: Record<string, unknown>,
+  pointerX?: number,
 ) {
   const current =
     overData ?? sortableData.current[overId] ?? droppableData.current[overId]
+  const activeRect = rects.current[activeId] ?? null
+  const overRect = rects.current[overId] ?? null
+  const startX = pointerX ?? overRect?.left ?? 0
   act(() => {
     dragEndRef.current?.({
       active: {
         id: activeId,
         data: { current: sortableData.current[activeId] },
+        rect: { current: { initial: activeRect, translated: activeRect } },
       },
-      over: { id: overId, data: { current } },
+      over: {
+        id: overId,
+        data: { current },
+        rect: overRect,
+      },
+      activatorEvent: new PointerEvent('pointerdown', { clientX: startX, clientY: 0 }),
+      delta: { x: 0, y: 0 },
     })
   })
+}
+
+/** A pointer aimed at the left or right part of the card at `overId`. */
+function pointerOn(overId: string, side: 'near' | 'far'): number {
+  const rect = rects.current[overId]
+  if (!rect) throw new Error(`no box placed for ${overId}`)
+  return side === 'near' ? rect.left + rect.width * 0.2 : rect.left + rect.width * 0.8
 }
 
 beforeEach(() => {
@@ -213,6 +273,7 @@ beforeEach(() => {
   dragEndRef.current = null
   sortableData.current = {}
   droppableData.current = {}
+  rects.current = {}
   characterRef.current = {
     ...createDefaultCharacter(),
     id: 'char-1',
@@ -220,18 +281,46 @@ beforeEach(() => {
   }
 })
 
-test('a card dragged onto a card in another section moves to that section', () => {
-  renderTab()
+/**
+ * Two cards side by side, the shape the masonry grid lays out: `left` is where
+ * a card sits, and a card the pointer has not reached is dropped *before* the
+ * one it hovers.
+ */
+function placeCards(...boxes: [string, number][]) {
+  for (const [id, left] of boxes) {
+    rects.current[id] = { left, top: 0, width: 100, height: 80 }
+  }
+}
 
-  drag('a1', 'b1')
+test('a card dragged onto the near side of a card elsewhere lands in front of it', () => {
+  renderTab()
+  placeCards(['a1', 0], ['b1', 300])
+
+  drag('a1', 'b1', undefined, pointerOn('b1', 'near'))
 
   expect(moveCustomAbility).toHaveBeenCalledWith(
     'tab-1',
     'section-a',
     'section-b',
     'a1',
+    0,
   )
   expect(reorderCustomAbility).not.toHaveBeenCalled()
+})
+
+test('a card dragged onto the far side of a card elsewhere lands behind it', () => {
+  renderTab()
+  placeCards(['a1', 0], ['b1', 300])
+
+  drag('a1', 'b1', undefined, pointerOn('b1', 'far'))
+
+  expect(moveCustomAbility).toHaveBeenCalledWith(
+    'tab-1',
+    'section-a',
+    'section-b',
+    'a1',
+    1,
+  )
 })
 
 test('a card dropped on the target section itself moves to that section', () => {
@@ -239,29 +328,130 @@ test('a card dropped on the target section itself moves to that section', () => 
 
   drag('a1', 'section-b')
 
+  // The list container is never "past": dropping on its padding means the end.
   expect(moveCustomAbility).toHaveBeenCalledWith(
     'tab-1',
     'section-a',
     'section-b',
     'a1',
+    1,
   )
 })
 
-test('a card dropped inside its own section reorders there', () => {
+test('a card hovered over its own next card is left where it is', () => {
   renderTab()
+  placeCards(['a1', 0], ['a2', 300])
 
-  drag('a1', 'a2')
+  drag('a1', 'a2', undefined, pointerOn('a2', 'near'))
+
+  // a2 has slid up into a1's vacated place, so the gap in front of a2 is where
+  // a1 already is. Releasing there is the no-op the reflow showed.
+  expect(reorderCustomAbility).not.toHaveBeenCalled()
+  expect(moveCustomAbility).not.toHaveBeenCalled()
+})
+
+test('a card dragged past its own next card swaps with it', () => {
+  renderTab()
+  placeCards(['a1', 0], ['a2', 300])
+
+  drag('a1', 'a2', undefined, pointerOn('a2', 'far'))
 
   expect(reorderCustomAbility).toHaveBeenCalledWith('tab-1', 'section-a', 0, 1)
   expect(moveCustomAbility).not.toHaveBeenCalled()
 })
 
-test('a card dropped past its own section’s last card lands at the end', () => {
+test('a card dropped on its own section’s padding lands at the end', () => {
   renderTab()
 
   drag('a1', 'section-a')
 
+  expect(reorderCustomAbility).toHaveBeenCalledWith('tab-1', 'section-a', 0, 2)
+})
+
+test('a drag lands where the pointer points, not merely on the card it is over', () => {
+  // The regression this file exists to catch: the same hovered card must produce
+  // different destinations from the two halves of it.
+  renderTab()
+  placeCards(['a1', 0], ['a2', 300])
+
+  drag('a1', 'a2', undefined, pointerOn('a2', 'near'))
+  expect(reorderCustomAbility).not.toHaveBeenCalled()
+
+  renderTab()
+  drag('a1', 'a2', undefined, pointerOn('a2', 'far'))
   expect(reorderCustomAbility).toHaveBeenCalledWith('tab-1', 'section-a', 0, 1)
+})
+
+test('an unmeasured card falls back to the gap in front of it', () => {
+  // jsdom measures nothing, and neither does a drag that has not moved yet: the
+  // pointer's side cannot be decided, so the drop keeps the card in front of the
+  // card it is over rather than reading a box that is not there.
+  renderTab()
+
+  drag('a1', 'a2')
+
+  expect(reorderCustomAbility).not.toHaveBeenCalled()
+})
+
+test('a card dropped further down its own section still moves', () => {
+  // The control for the case above: with three cards the same near-side release
+  // over the *last* card is a real move, so "no-op" is not simply the answer
+  // this context always gives.
+  characterRef.current = {
+    ...createDefaultCharacter(),
+    id: 'char-1',
+    customTabs: [
+      {
+        ...tab,
+        sections: [
+          {
+            ...(tab.sections[0] as CustomAbilitySectionType),
+            abilities: [
+              ability('a1', 'Cleave'),
+              ability('a2', 'Rush'),
+              ability('a3', 'Feint'),
+            ],
+          },
+          tab.sections[1],
+        ],
+      },
+    ],
+  }
+
+  renderTab()
+  drag('a1', 'a3')
+
+  // The gap in front of a3, once a1 is lifted out of the list.
+  expect(reorderCustomAbility).toHaveBeenCalledWith('tab-1', 'section-a', 0, 1)
+})
+
+test('a card dragged past the last card of a three-card section lands after it', () => {
+  characterRef.current = {
+    ...createDefaultCharacter(),
+    id: 'char-1',
+    customTabs: [
+      {
+        ...tab,
+        sections: [
+          {
+            ...(tab.sections[0] as CustomAbilitySectionType),
+            abilities: [
+              ability('a1', 'Cleave'),
+              ability('a2', 'Rush'),
+              ability('a3', 'Feint'),
+            ],
+          },
+          tab.sections[1],
+        ],
+      },
+    ],
+  }
+
+  renderTab()
+  placeCards(['a1', 0], ['a3', 600])
+  drag('a1', 'a3', undefined, pointerOn('a3', 'far'))
+
+  expect(reorderCustomAbility).toHaveBeenCalledWith('tab-1', 'section-a', 0, 2)
 })
 
 test('an NPC section refuses an ability card', () => {
