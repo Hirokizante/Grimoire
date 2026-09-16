@@ -109,12 +109,16 @@ export default function SortableAbilityCard({
   })
 
   // dnd-kit's transform is the list settling into its new order after a drop;
-  // the drag preview replaces it while a card is in the air.
+  // the drag preview replaces it while a card is in the air. The preview is a
+  // pure translation — `CSS.Translate` ignores the scale, but the transform type
+  // it takes carries them, and 1 is what "no scaling, ever" means here.
   const style = previewOffset
     ? {
         transform: CSS.Translate.toString({
           x: previewOffset.left,
           y: previewOffset.top,
+          scaleX: 1,
+          scaleY: 1,
         }),
         transition,
       }
