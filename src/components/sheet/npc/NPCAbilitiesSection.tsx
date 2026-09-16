@@ -20,11 +20,16 @@
  * **Drag and drop matches the player sheet's Slotted Abilities.** In edit mode
  * every card is a {@link SortableAbilityCard} with the same grip handle, inside
  * an {@link NpcAbilitiesDndContext} that reorders the list on drop (an NPC has
- * one ability list, so there is no cross-list move to make). The empty list is
- * a drop zone and the list highlights while a card hovers it, exactly as the
- * slotted section does. Reordering writes through `updateCharacter(ownerId, …)`,
- * so the standalone sheet reorders the NPC it is showing and an embedded
- * section reorders the attached NPC record.
+ * one ability list, so there is no cross-list move to make). The list itself is
+ * rendered by {@link NpcAbilityList} — a **child** of that context, because the
+ * drop-hint registration only reaches the context above it that way — so the
+ * whole preview the player sheet draws (the insertion line, the cards sliding
+ * into the slots the drop will leave them in, the hovered list's frame) is the
+ * player sheet's own, from the same `AbilityBlockList` and `lib/abilityDropTarget`
+ * maths. The empty list is a drop zone and the list highlights while a card
+ * hovers it, exactly as the slotted section does. Reordering writes through
+ * `updateCharacter(ownerId, …)`, so the standalone sheet reorders the NPC it is
+ * showing and an embedded section reorders the attached NPC record.
  *
  * **NPCs have no slots and no pool.** There is no slot counter, no overflow
  * warning, and no "Move to Pool" button — an NPC's list is a stat block, not an
@@ -210,16 +215,6 @@ export default function NPCAbilitiesSection({
     [updateCurrentCharacter],
   )
 
-  // Droppable + hint resolver for the list. An NPC has one list, so nothing is
-  // ever refused here; the registration lands in the nested context mounted
-  // around the editable list below, which is what keeps an NPC card's drop hint
-  // out of the surrounding custom tab's drag.
-  const { setDroppableRef, isOver } = useAbilityListDnd({
-    id: NPC_ABILITIES_SECTION_ID,
-    items: abilities,
-    layout: isListView ? 'list' : 'cards',
-  })
-
   const openNew = () => {
     setEditing(null)
     setShowEditor(true)
@@ -312,18 +307,18 @@ export default function NPCAbilitiesSection({
       })
     )
 
-  const editList = (
+  // The editable list is a **child** of the drag context, never a sibling of it:
+  // the context publishes the drop hint store the list registers with, so the
+  // registration only reaches it from below (see {@link NpcAbilityList}).
+  const list = isEdit ? (
     <NpcAbilitiesDndContext
       abilities={abilities}
       onReorder={handleReorder}
       owner={owner}
     >
-      <AbilityBlockList
-        section={NPC_ABILITIES_SECTION_ID}
+      <NpcAbilityList
         abilities={abilities}
         layout={isListView ? 'list' : 'cards'}
-        droppableRef={setDroppableRef}
-        isOver={isOver}
         character={owner}
         onToggleModifiers={onToggleModifiers}
         onSetUses={onSetUses}
@@ -331,9 +326,6 @@ export default function NPCAbilitiesSection({
         // The parent is not activatable here, but its sub-abilities may be —
         // the resolver travels with the card either way.
         activateOverride={activateOverride}
-        emptyMessage={
-          <>No abilities yet — click &ldquo;Add Ability&rdquo; to create one.</>
-        }
         actions={(ability) => (
           <>
             <button
@@ -354,10 +346,6 @@ export default function NPCAbilitiesSection({
         )}
       />
     </NpcAbilitiesDndContext>
-  )
-
-  const list = isEdit ? (
-    editList
   ) : abilities.length === 0 ? (
     viewCards
   ) : (
@@ -404,17 +392,7 @@ export default function NPCAbilitiesSection({
         </button>
       )}
 
-      {isEdit ? (
-        <NpcAbilitiesDndContext
-          abilities={abilities}
-          onReorder={handleReorder}
-          owner={owner}
-        >
-          {list}
-        </NpcAbilitiesDndContext>
-      ) : (
-        list
-      )}
+      {list}
 
       <AbilityEditorModal
         ability={editing}
@@ -455,5 +433,76 @@ export default function NPCAbilitiesSection({
     <section className="sheet-section sheet-section--slotted npc-abilities-section">
       {content}
     </section>
+  )
+}
+
+interface NpcAbilityListProps {
+  abilities: AbilityBlock[]
+  layout: 'cards' | 'list'
+  /** Entity the cards belong to — the NPC, which is not the store's character. */
+  character?: Character
+  onToggleModifiers?: (abilityId: string, active: boolean) => void
+  onSetUses?: (abilityId: string, remaining: number) => void
+  subAbilityActions?: (sub: AbilityBlock, parent: AbilityBlock) => React.ReactNode
+  activateOverride: AbilityActivationOverrideResolver
+  /** Per-card Edit / Remove buttons, rendered in the card footer. */
+  actions: (ability: AbilityBlock) => React.ReactNode
+}
+
+/**
+ * The NPC's editable ability list — the shared {@link AbilityBlockList}, wired
+ * to the NPC's own drag context.
+ *
+ * It is a separate component (deliberately not exported: it only makes sense
+ * under {@link NpcAbilitiesDndContext}) for one structural reason:
+ * {@link useAbilityListDnd} registers the list with the **nearest**
+ * `AbilityDropHintContext` above it, and that has to be the NPC's. A hook called
+ * in `NPCAbilitiesSection`'s own body sits *above* the context the section
+ * renders, so it registered with whatever wraps the section instead: the
+ * surrounding custom tab's drag context when the NPC is embedded in a player
+ * sheet, and nothing at all on the standalone NPC sheet (dnd-kit's internal
+ * context is defaulted, not thrown for). Either way the NPC context resolved no
+ * drop — no insertion indicator, no preview translation, no hover frame — while
+ * the reorder still landed through its fallback path. Both bugs came from the
+ * same place: the list has to be a **child** of the context it registers with,
+ * exactly as the player sheet's sections are children of
+ * {@link AbilitiesDndContext}.
+ */
+function NpcAbilityList({
+  abilities,
+  layout,
+  character,
+  onToggleModifiers,
+  onSetUses,
+  subAbilityActions,
+  activateOverride,
+  actions,
+}: NpcAbilityListProps) {
+  // An NPC has one list and no slots, so nothing is ever refused here. The
+  // registration lands in the nested context above, which is what keeps an NPC
+  // card's drop hint out of the surrounding custom tab's drag.
+  const { setDroppableRef, isOver } = useAbilityListDnd({
+    id: NPC_ABILITIES_SECTION_ID,
+    items: abilities,
+    layout,
+  })
+
+  return (
+    <AbilityBlockList
+      section={NPC_ABILITIES_SECTION_ID}
+      abilities={abilities}
+      layout={layout}
+      droppableRef={setDroppableRef}
+      isOver={isOver}
+      character={character}
+      onToggleModifiers={onToggleModifiers}
+      onSetUses={onSetUses}
+      subAbilityActions={subAbilityActions}
+      activateOverride={activateOverride}
+      emptyMessage={
+        <>No abilities yet — click &ldquo;Add Ability&rdquo; to create one.</>
+      }
+      actions={actions}
+    />
   )
 }

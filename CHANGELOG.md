@@ -60,6 +60,35 @@ characters regularly.
   now waits for a previous drag's lifted copy to unmount before starting the next
   one — it is a fixed overlay sitting where its card landed, and a press aimed
   through it was silently swallowed.
+- **An NPC's ability list drew no preview at all.** The list registered its drop
+  resolver with the wrong drag context. `useAbilityListDnd` files that resolver
+  with the *nearest* `AbilityDropHintContext` above it, and the hook was called in
+  `NPCAbilitiesSection`'s own body — which sits *above* the
+  `NpcAbilitiesDndContext` the section renders. The registration therefore landed
+  in whatever wrapped the section: a player sheet's custom tab drag context when
+  the NPC was embedded in one, and no store at all on the standalone NPC sheet,
+  where dnd-kit's defaulted internal context makes `useDroppable` and the
+  registration silently no-op rather than throw. The context that actually ran the
+  drag resolved no hint on any move, so the list drew no insertion line, never
+  slid the cards into the slots the drop would leave them in, and never framed
+  itself while hovered — while the reorder still landed, because `onDragEnd`
+  re-derives the destination from the hovered card when no hint was published.
+  That fallback is what made the gap invisible: the drag *worked*, it just showed
+  nothing. The list is now rendered by `NpcAbilityList`, a **child** of the
+  context, so both NPC surfaces (standalone and embedded) draw exactly what the
+  player sheet's sections draw — the same `AbilityBlockList`, the same
+  `previewOffsets` / `dropLineTarget` maths, the same resolved index behind the
+  line and the landing slot. The section also mounted its context twice in edit
+  mode; there is one now.
+- **Testing.** A unit test in `NPCAbilitiesSection.test.tsx` watches the hint
+  store's registrations and pins that the resolver reaches the NPC's *own*
+  context and never the one wrapping the section (it fails on the old wiring).
+  `e2e/npc-abilities.spec.ts` asserts the live preview on both NPC surfaces —
+  including the embedded one, nested inside its tab's context, where a
+  registration in the wrong store was invisible to the reorder — and drags a
+  player Ability Pool and an NPC list with the same gesture, comparing the two
+  drawings card for card: same marked slot, the same cards moved onto the same
+  slots, nothing scaled, and the card settling exactly where the line drew it.
 
 ## v0.10.0-alpha — 2026-09-15
 

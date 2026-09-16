@@ -25,6 +25,15 @@
  * the same reason: the NPC list registers itself here, so a tab-level drag can
  * never make it draw an indicator, and vice versa. Only edit mode mounts it; a
  * view-mode section renders plain cards with no drag handles.
+ *
+ * **The list must be a child of this component, not a sibling.** Everything the
+ * preview needs — the insertion line, the card translations, the hovered frame —
+ * is read back out of the hint store published here, and the list registers its
+ * resolver with the *nearest* provider above it. The section therefore renders
+ * {@link NpcAbilityList} (which calls `useAbilityListDnd`) inside this context;
+ * a registration made beside it would land in the surrounding tab's store, or in
+ * no store at all on the standalone NPC sheet, leaving this context unable to
+ * resolve a drop while its `onDragEnd` fallback still reordered the list.
  */
 
 import { useMemo, useRef, useState } from 'react'

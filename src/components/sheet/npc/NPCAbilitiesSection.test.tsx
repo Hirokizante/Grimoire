@@ -16,6 +16,10 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { beforeEach, expect, test, vi } from 'vitest'
 
 import NPCAbilitiesSection from '@/components/sheet/npc/NPCAbilitiesSection'
+import {
+  AbilityDropHintContext,
+  type AbilityDropHintStore,
+} from '@/components/sheet/AbilityDropHintContext'
 import { useCharacterStore } from '@/store/characterStore'
 import { createDefaultNPC } from '@/constants/gameData'
 import type { AbilityBlock, Character } from '@/types'
@@ -26,12 +30,51 @@ import type { AbilityBlock, Character } from '@/types'
  * own sensors and collision detection are exercised by the Playwright spec
  * (e2e/npc-abilities.spec.ts), which drags a real card with a real pointer.
  */
-const { dragEndRef, dbMap } = vi.hoisted(() => ({
+const { dragEndRef, dbMap, npcRegistrations } = vi.hoisted(() => ({
   dragEndRef: {
     current: null as null | ((event: { active: { id: string }; over: { id: string } | null }) => void),
   },
   dbMap: new Map<string, unknown>(),
+  /**
+   * Every list registration that reached the **NPC's own** hint store — the one
+   * `NpcAbilitiesDndContext` publishes. Captured by wrapping the store hook, so
+   * a test can tell "registered with the context that runs the drag" apart from
+   * "registered with whatever happens to wrap the section".
+   */
+  npcRegistrations: {
+    current: [] as { id: string; items: readonly { id: string }[]; resolver: unknown }[],
+  },
 }))
+
+vi.mock('@/components/sheet/AbilityDropHintContext', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@/components/sheet/AbilityDropHintContext')>()
+  const React = await import('react')
+  return {
+    ...actual,
+    // The store itself stays real — only its `register` is watched, so the
+    // rendered section still works exactly as it does in the app.
+    useAbilityDropHintStore: () => {
+      const store = actual.useAbilityDropHintStore()
+      return React.useMemo(
+        () => ({
+          ...store,
+          register: (registration: {
+            id: string
+            items: readonly { id: string }[]
+            resolver: unknown
+          }) => {
+            npcRegistrations.current.push(registration)
+            return store.register(
+              registration as Parameters<typeof store.register>[0],
+            )
+          },
+        }),
+        [store],
+      )
+    },
+  }
+})
 
 vi.mock('@dnd-kit/core', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@dnd-kit/core')>()
@@ -125,6 +168,7 @@ function seedNpc(): Character {
 
 beforeEach(() => {
   dbMap.clear()
+  npcRegistrations.current = []
   useCharacterStore.setState({ characters: [], currentCharacter: null })
 })
 
@@ -386,6 +430,60 @@ test('a cancelled drag (no drop target) leaves the list alone', () => {
   act(() => dragEndRef.current?.({ active: { id: 'a1' }, over: null }))
 
   expect(storedAbilityIds()).toEqual(['a1', 'a2', 'a3'])
+})
+
+test('the list registers its drop resolver with the NPC’s own drag context', () => {
+  const npc = seedNpcWithThree()
+  // Stands in for a context wrapping the section — a custom tab's drag context
+  // when the NPC is embedded in a player sheet. The list must NOT register here:
+  // a resolver in this store answers for a drag this section does not run.
+  const outerRegister = vi.fn(() => () => {})
+  const outerStore: AbilityDropHintStore = {
+    hint: null,
+    isDragging: false,
+    register: outerRegister,
+  }
+
+  render(
+    <AbilityDropHintContext.Provider value={outerStore}>
+      <NPCAbilitiesSection
+        abilities={npc.slottedAbilities}
+        ownerId={npc.id}
+        owner={npc}
+        mode="edit"
+      />
+    </AbilityDropHintContext.Provider>,
+  )
+
+  // One resolver, in the NPC's own store, naming the NPC's list…
+  expect(npcRegistrations.current.map((r) => r.id)).toEqual(['npcAbilities'])
+  expect(npcRegistrations.current[0].items.map((i) => i.id)).toEqual([
+    'a1',
+    'a2',
+    'a3',
+  ])
+  // …and nothing registered with the context above the section. That is what
+  // makes the drop preview possible at all: the drag context resolves a hint by
+  // asking *its own* registered sections, so a resolver filed anywhere else
+  // leaves it unable to answer "where would this land?" — no insertion
+  // indicator, no card translations, no hover frame — while `onDragEnd`'s
+  // fallback still reorders the list.
+  expect(outerRegister).not.toHaveBeenCalled()
+
+  // The registered resolver is live: hovering the list itself means "the end of
+  // the list", which is the answer the indicator and the drop both use.
+  const resolver = npcRegistrations.current[0].resolver as {
+    resolve: (
+      event: { active: { id: string }; over: { id: string } },
+      list: { id: string; items: readonly { id: string }[] },
+    ) => { section: string; index: number } | null
+  }
+  expect(
+    resolver.resolve(
+      { active: { id: 'a1' }, over: { id: 'npcAbilities' } },
+      { id: 'npcAbilities', items: npc.slottedAbilities },
+    ),
+  ).toMatchObject({ section: 'npcAbilities', index: 3 })
 })
 
 // ---- Layout parity between the two mount points -----------------------------
