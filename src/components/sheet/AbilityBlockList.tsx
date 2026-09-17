@@ -83,6 +83,18 @@ export interface AbilityBlockListProps {
   activateOverride?: React.ComponentProps<
     typeof SortableAbilityCard
   >['activateOverride']
+  /**
+   * Cards that belong to the section but never to its **order** — an NPC's
+   * Basic Attack, which is fixed: editable, never removable, never dragged.
+   *
+   * They render inside the same grid, ahead of the sortable cards, so the
+   * masonry columns (or the list's full width) lay them out with the rest. They
+   * are deliberately outside the `SortableContext` and carry none of a sortable
+   * card's markers, which is what keeps them out of the drop maths: the slots a
+   * drag measures are `:scope > .sortable-ability[data-ability-id]`, so a
+   * pinned card is neither a slot a drop can land in nor a card one can move.
+   */
+  pinnedCards?: React.ReactNode
   /** Shown in place of the grid while the list is empty. */
   emptyMessage: React.ReactNode
 }
@@ -99,6 +111,7 @@ export default function AbilityBlockList({
   actions,
   subAbilityActions,
   activateOverride,
+  pinnedCards,
   emptyMessage,
 }: AbilityBlockListProps) {
   const hint = useAbilityDropHint(section)
@@ -137,7 +150,10 @@ export default function AbilityBlockList({
   // guessed.
   const lineSlot = lineTarget ? slots?.get(lineTarget.id) : undefined
 
-  if (abilities.length === 0) {
+  // A list with nothing to show at all is the bare drop zone: no grid, no
+  // cards. A pinned card counts as something to show, so the grid is drawn and
+  // the empty message rides along inside it (see below).
+  if (abilities.length === 0 && !pinnedCards) {
     return (
       <div
         ref={attachContainer}
@@ -157,6 +173,10 @@ export default function AbilityBlockList({
           : 'ability-grid ability-grid--cards') + overClasses
       }
     >
+      {/* Fixed cards first — they are part of the list's layout but not of its
+          order (see `pinnedCards`). */}
+      {pinnedCards}
+
       <SortableContext
         items={abilities.map((a) => a.id)}
         strategy={NO_SORT_TRANSFORM}
@@ -177,6 +197,14 @@ export default function AbilityBlockList({
           />
         ))}
       </SortableContext>
+
+      {/* Nothing sortable yet, but a pinned card is on screen: the list still
+          says how to put an ability in it. */}
+      {abilities.length === 0 && (
+        <div className="ability-dropzone ability-dropzone--empty">
+          <p className="sheet-section__empty muted">{emptyMessage}</p>
+        </div>
+      )}
 
       {/* Where the card in the air will land: a bar across the leading edge of
           the slot it takes — or its trailing edge, for the one gap with no card

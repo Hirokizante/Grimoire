@@ -19,8 +19,10 @@
  * at-the-table information and made every expanded panel enormous:
  *   - the HP block on player panels (the panel header already carries an HP bar
  *     with its own steppers and Damage dialog),
- *   - the Core Ability section on NPC panels (NPCs have no core abilities — the
- *     fields only ever hold the generated Basic Attack / Fatebreaker defaults),
+ *   - the Core Ability section on NPC panels (an NPC has no Innate narrative and
+ *     no Fatebreaker — its `fatebreaker` field only ever holds the generated
+ *     default; the Basic Attack it *does* have is the pinned card at the head of
+ *     its ability list, where a GM looks for it),
  *   - Description / Character Background on both.
  *
  * Ability sections are always **list view** with no grid/list toggle: a grid
@@ -135,9 +137,11 @@ export default function PanelSheet({
         variant="flat-row"
       />
 
-      {/* 3. Core ability — players only. NPC sheets have no core abilities;
-       *    their `basicAttack`/`fatebreaker` fields only ever hold the
-       *    generated defaults, so the section was pure noise on a panel. */}
+      {/* 3. Core ability — players only. An NPC has no Innate narrative and no
+       *    Fatebreaker (its `fatebreaker` field only ever holds the generated
+       *    default), so the section was pure noise on a panel; the Basic Attack
+       *    an NPC does have travels with its ability list instead, as the
+       *    pinned card `NPCAbilitiesSection` renders. */}
       {!isNpc && (
         <CoreAbilitySection
           innateDescription={entity.innateDescription}
@@ -156,6 +160,7 @@ export default function PanelSheet({
       {isNpc ? (
         <NPCAbilitiesSection
           abilities={entity.slottedAbilities}
+          basicAttack={entity.basicAttack}
           ownerId={entity.id}
           owner={entity}
           mode={mode}

@@ -37,6 +37,12 @@ Grimoire is built to support that freedom:
 ### Abilities and slots
 
 - **Core Ability** — Innate narrative, Innate Abilities, Basic Attack, and Fatebreaker ultimate.
+- **The Basic Attack** — every sheet is born with one, and it is **fixed**: it can be renamed,
+  re-flavoured, given sub-abilities and retuned like any other ability, but it has no Remove button,
+  so a sheet can never be left without its fallback action. It arrives configured to **roll dice on
+  activation** (`d20 + MAR` accuracy and its own `1d6 + MAR` damage — both editable, and either one
+  can be switched off in the ability editor). An **NPC** carries the same block, pinned to the head
+  of its ability list (see [NPC sections](#npc-sections)).
 - **Slotted Abilities** — equip abilities for an encounter; drag-and-drop to reorder or move to/from
   the pool. In edit mode the whole card can be grabbed (its buttons still click), and the card is
   drawn in the slot it will take while a line across that slot's leading edge marks exactly where it
@@ -89,6 +95,12 @@ Grimoire is built to support that freedom:
   are read as one action.
 - **Sub-abilities** — a sub-ability carries the same option and rolls it through the same code, so a
   follow-up attack rolls its own accuracy and damage when its own Activate button is pressed.
+- **Basic Attacks come configured** — a fresh Basic Attack (on a new player character and on every
+  new NPC alike) ships with the box ticked: accuracy on MAR plus its own damage, so pressing
+  Activate on the sheet's Basic Attack — or on an NPC instance's pinned card on the GM Screen —
+  rolls the whole attack in one window. It is ordinary authored configuration from there on: retune
+  the attribute, add custom rolls, or untick the box to switch the automatic rolls off (the editor
+  stores nothing when it is off, so a switched-off Basic Attack stays switched off).
 - **NPCs** — authored on the ability in the NPC editor like any other field, and rolled on the **GM
   Screen** under an NPC instance, where it spends that instance's own AP and takes that instance's
   own Recharge cooldown. An NPC's base sheet still activates nothing: it is a static reference, so no
@@ -176,7 +188,10 @@ Grimoire is built to support that freedom:
   the grid/list toggle, same "+ Add Ability" button, same card grid, and the same drag-to-reorder
   grips in edit mode (only the section shell and the `h3` heading give way to the bundled NPC's `h5`
   block label). A drag reorders the attached NPC's own record, so the order matches the NPC's sheet
-  page.
+  page. The NPC's **Basic Attack is pinned to the head of that list** — the same fixed block a
+  player sheet keeps in its Core Ability, in the one ability surface an NPC has. It renders with the
+  rest of the grid, but it carries an **Edit** button and no **Remove**, and it is not sortable, so
+  no drag can move it or delete it.
 - **Export and removal** — attached NPCs are exported and re-imported alongside their parent
   character, and removing an NPC section only detaches the reference — the NPC record stays in the
   NPC list.

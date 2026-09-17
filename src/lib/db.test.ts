@@ -505,6 +505,49 @@ test('normalizeCharacter: backfills palette colors missing from old records', ()
   expect(normalizeCharacter(out).config.colors).toEqual(out.config.colors)
 })
 
+// ---- The Basic Attack (a block no record may be without) ---------------------
+
+test('normalizeCharacter: restores a missing Basic Attack with the default block', () => {
+  const char = createDefaultCharacter()
+  const out = normalizeCharacter(
+    asCharacter(omit(char as unknown as Record<string, unknown>, 'basicAttack')),
+  )
+
+  // The block is back — a Basic Attack is not removable on any surface, so a
+  // record that arrives without one (a hand-edited or truncated export) gets
+  // the same generated default a fresh sheet does.
+  expect(out.basicAttack).toBeDefined()
+  expect(out.basicAttack.name).toBe('Basic Attack')
+  expect(out.basicAttack.cost).toEqual({ ap: 1 })
+  expect(out.basicAttack.damage).toBe('1d6 + MAR')
+  // …configured to roll on activation, like every Basic Attack it creates.
+  expect(out.basicAttack.activationRolls).toEqual({
+    accuracy: { modifier: { kind: 'attribute', key: 'MAR' } },
+    damage: true,
+  })
+  // And the restored block carries the current schema's shape (normalizeBlock).
+  expect(out.basicAttack.showActivate).toBe(true)
+  expect(out.basicAttack.subAbilitiesUnderDescription).toEqual([])
+  expect(normalizeCharacter(out)).toEqual(out)
+})
+
+test('normalizeCharacter: a stored Basic Attack is kept exactly as authored', () => {
+  const char = createDefaultCharacter()
+  // What the editor stores when the author unticks "Roll Dice on Activation":
+  // nothing at all. That must survive a reload — a read-time default would make
+  // switching the rolls off impossible.
+  const stored = omit(
+    char.basicAttack as unknown as Record<string, unknown>,
+    'activationRolls',
+  )
+  const out = normalizeCharacter(
+    asCharacter({ ...char, basicAttack: { ...stored, name: 'Ol’ Reliable' } }),
+  )
+
+  expect(out.basicAttack.name).toBe('Ol’ Reliable')
+  expect('activationRolls' in out.basicAttack).toBe(false)
+})
+
 // ---- normalizeScreen (GM Screens) -------------------------------------------
 
 /** Cast an object to GMScreen (bypassing TS for legacy-shape fixtures). */

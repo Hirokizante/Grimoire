@@ -1749,10 +1749,15 @@ test.describe('GM Screen', () => {
     // "Recharge (5)" text), not in a separate block under the card.
     const badge = panel.locator('.ability-card__trait .gm-recharge')
     await expect(badge).toHaveText('Recharge 5')
-    await panel.getByRole('button', { name: 'Activate' }).click()
+    // The panel's own Basic Attack card is activatable too (every NPC carries
+    // one), so the click is aimed at the authored ability's card.
+    const fireBreath = panel
+      .locator('.ability-activation')
+      .filter({ hasText: 'Fire Breath' })
+    await fireBreath.getByRole('button', { name: 'Activate' }).click()
     await expect(apMeter).toContainText('1')
     await expect(badge).toHaveText('On cooldown — Recharge 5')
-    await expect(panel.getByRole('button', { name: 'Activate' })).toBeDisabled()
+    await expect(fireBreath.getByRole('button', { name: 'Activate' })).toBeDisabled()
     // The collapsed-panel count rides with the AP meter.
     await expect(panel.locator('.gm-ap__cooling')).toHaveText('1 on cooldown')
 
@@ -1815,7 +1820,9 @@ test.describe('GM Screen', () => {
       .locator('.mode-toggle--floating')
       .getByRole('tab', { name: 'View' })
       .click()
-    const baseCard = page.locator('.npc-abilities-section .ability-card')
+    const baseCard = page
+      .locator('.npc-abilities-section .ability-card')
+      .filter({ hasText: 'Cleave' })
     await expect(
       baseCard.getByRole('img', { name: '3 of 3 uses remaining' }),
     ).toBeVisible()
@@ -1843,7 +1850,10 @@ test.describe('GM Screen', () => {
 
     // ---- Activating spends one use of the instance's own budget ----------
     const apMeter = first.locator('.gm-ap .gm-bar__value')
-    await first.getByRole('button', { name: 'Activate' }).click()
+    // Aimed at the authored ability: the panel's pinned Basic Attack activates
+    // as well, so a bare "Activate" would match two buttons.
+    const cleave = first.locator('.ability-activation').filter({ hasText: 'Cleave' })
+    await cleave.getByRole('button', { name: 'Activate' }).click()
     await expect(meter).toHaveAccessibleName('2 of 3 uses remaining')
     await expect(apMeter).toContainText('2')
     await expect(page.getByText(/Activated Cleave \(1 use spent\)/)).toBeVisible()
@@ -1889,7 +1899,9 @@ test.describe('GM Screen', () => {
     // ---- …and the base record never moved --------------------------------
     await page.getByRole('button', { name: 'NPCs' }).first().click()
     await page.locator('.card-main').filter({ hasText: 'Bandit' }).first().click()
-    const baseCardAfter = page.locator('.npc-abilities-section .ability-card')
+    const baseCardAfter = page
+      .locator('.npc-abilities-section .ability-card')
+      .filter({ hasText: 'Cleave' })
     await expect(
       baseCardAfter.getByRole('img', { name: '3 of 3 uses remaining' }),
     ).toBeVisible()
@@ -1923,7 +1935,11 @@ test.describe('GM Screen', () => {
       .locator('.mode-toggle--floating')
       .getByRole('tab', { name: 'View' })
       .click()
-    const baseCard = page.locator('.npc-abilities-section .ability-card')
+    // Scoped to the authored card: every NPC sheet also renders the pinned
+    // Basic Attack, which declares no modifiers.
+    const baseCard = page
+      .locator('.npc-abilities-section .ability-card')
+      .filter({ hasText: 'Rage' })
     await expect(baseCard.getByText('+2 Evasion')).toBeVisible()
     await expect(baseCard.getByRole('switch')).toBeDisabled()
     // Let the sheet's debounced autosave land before leaving the page.
@@ -1978,7 +1994,9 @@ test.describe('GM Screen', () => {
     // ---- …and the base record never moved --------------------------------
     await page.getByRole('button', { name: 'NPCs' }).first().click()
     await page.locator('.card-main').filter({ hasText: 'Bandit' }).first().click()
-    const baseCardAfter = page.locator('.npc-abilities-section .ability-card')
+    const baseCardAfter = page
+      .locator('.npc-abilities-section .ability-card')
+      .filter({ hasText: 'Rage' })
     const baseToggle = baseCardAfter.getByRole('switch')
     await expect(baseToggle).toBeDisabled()
     await expect(baseToggle).toHaveAttribute('aria-checked', 'false')

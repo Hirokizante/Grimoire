@@ -102,8 +102,9 @@ NPC instances follow one rule: **instances are deltas, not clones.**
   - the **player HP bar**, the **Action Points bar**, and the **Mortal Wounds track** — all
     live under the panel header, with their own steppers, chips and Damage dialog; printing
     them again inside the body would double every number the GM is watching.
-  - the **NPC Core Ability** section — NPCs have no core abilities; those fields only ever
-    hold the generated Basic Attack / Fatebreaker defaults.
+  - the **NPC Core Ability** section — an NPC has no Innate narrative and no Fatebreaker
+    (that field only ever holds the generated default). The Basic Attack it *does* have is the
+    pinned first card of its ability list, where a GM looks for it — live, at 1 AP.
   - **Description / Character Background** on both — reference material, not at-the-table
     information.
 - **The `saving…` indicator** — reserves its width permanently and toggles only
@@ -131,6 +132,11 @@ NPC instances follow one rule: **instances are deltas, not clones.**
   concept with no place on a live panel) or the NPC's *Abilities*, and is **always list view
   with no grid/list toggle** — a grid at panel width is unreadable, so grid is not offered
   at all.
+- **The NPC's Basic Attack rides with its ability list** — pinned as the first card, exactly as
+  on the NPC's own sheet. Its 1 AP cost makes it activatable on a panel like any other costed
+  ability, so a spawned instance always has a live fallback attack; and because every Basic Attack
+  arrives configured to roll on activation, pressing it rolls the accuracy check and the damage
+  together, against that instance's own stats and AP.
 - **Ability cards render against the panel's own entity** — on both kinds, so dice notation
   like `1d6+MAR` resolves against *that* sheet's stats and Activate deducts from *that*
   record (previously the cards fell back to `currentCharacter`, which is null on the GM

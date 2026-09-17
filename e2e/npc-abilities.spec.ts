@@ -77,9 +77,22 @@ async function addAbility(
   await expect(page.getByRole('dialog', { name: 'New Ability' })).toHaveCount(0)
 }
 
-/** The ability names, in the order the cards are rendered. */
+/**
+ * The authored abilities' names, in the order the list renders them.
+ *
+ * The **pinned Basic Attack** card every NPC carries is filtered out on purpose:
+ * it leads the list on every surface and in both sheet modes, while this spec is
+ * about the reorderable list (the pinned card has its own assertions below).
+ */
 function abilityNames(page: Page, scope: Locator) {
-  return scope.locator('.ability-card__name')
+  return scope
+    .locator('.ability-card__name')
+    .filter({ hasNotText: 'Basic Attack' })
+}
+
+/** The sortable cards — everything a drag can pick up. */
+function sortableCards(scope: Locator) {
+  return scope.locator('.sortable-ability[data-ability-id]')
 }
 
 /** Every card's drag grip — only edit mode renders one. */
@@ -188,7 +201,7 @@ async function readPreview(
       el.querySelector('.ability-card__name')?.textContent ?? ''
     const box = (el: Element | null): Rect | null =>
       el ? (el.getBoundingClientRect().toJSON() as Rect) : null
-    const cards = [...section.querySelectorAll<HTMLElement>('.ability-card-wrap')]
+    const cards = [...section.querySelectorAll<HTMLElement>('.sortable-ability[data-ability-id]')]
     /** The slots as laid out, which is what a preview translation lands on. */
     const slots = cards.map((el) => ({
       name: nameOf(el),
@@ -211,7 +224,7 @@ async function readPreview(
     const slot = line?.closest('[data-drop-target]') ?? null
     const markedId = slot?.getAttribute('data-drop-target')
     const marked = markedId
-      ? section.querySelector(`.ability-card-wrap[data-ability-id="${markedId}"]`)
+      ? section.querySelector(`.sortable-ability[data-ability-id="${markedId}"]`)
       : null
 
     return {
@@ -300,12 +313,26 @@ test('an NPC sheet reorders its abilities by dragging a card', async ({ page }) 
   await page.getByRole('tab', { name: 'Edit' }).click()
   const section = page.locator('.npc-abilities-section')
   await expect(section).toBeVisible()
+
+  // A brand-new NPC is never ability-less: its Basic Attack is pinned to the
+  // head of the list, in the same grid — with an Edit button and, unlike every
+  // authored ability beside it, no Remove (it is not a deletable block) and no
+  // grip (nothing drags it).
+  await expect(
+    section.locator('.ability-card-wrap--pinned .ability-card__name'),
+  ).toHaveText('Basic Attack')
+  await expect(
+    section.locator('.ability-card-wrap--pinned').getByRole('button', { name: 'Edit' }),
+  ).toBeVisible()
+
   for (const name of ['Claw', 'Bite', 'Howl']) {
     await addAbility(page, section, name)
   }
   await expect(abilityNames(page, section)).toHaveText(['Claw', 'Bite', 'Howl'])
-  // One grip per card: the list is draggable in edit mode.
+  // One grip per authored card: the list is draggable in edit mode.
   await expect(grips(section)).toHaveCount(3)
+  // One Remove per authored card — the pinned Basic Attack offers none.
+  await expect(section.getByRole('button', { name: 'Remove' })).toHaveCount(3)
   // Grid view — the layout the embedded section has to match, in the browser.
   await expect(section.locator('.ability-grid')).toHaveClass(/ability-grid--cards/)
   expect(
@@ -315,7 +342,7 @@ test('an NPC sheet reorders its abilities by dragging a card', async ({ page }) 
   ).toBe('3')
 
   // Drag the last card onto the first: "Howl" takes the top slot.
-  const cards = section.locator('.ability-card-wrap')
+  const cards = sortableCards(section)
   await beginCardDrag(page, cards.nth(2), cards.nth(0))
   // The drag is live and the list is drawing the drop: the ghost follows the
   // pointer, the source card is faded in its slot, the insertion line marks the
@@ -333,11 +360,14 @@ test('an NPC sheet reorders its abilities by dragging a card', async ({ page }) 
   await page.reload()
   await page.getByRole('button', { name: 'NPCs' }).first().click()
   await sheetCard(page, 'Bandit').click()
-  await expect(
-    abilityNames(page, page.locator('.npc-abilities-section')),
-  ).toHaveText(['Howl', 'Claw', 'Bite'])
+  const reloaded = page.locator('.npc-abilities-section')
+  await expect(abilityNames(page, reloaded)).toHaveText(['Howl', 'Claw', 'Bite'])
+  // The Basic Attack is still the list's first card in view mode too.
+  await expect(reloaded.locator('.ability-card__name').first()).toHaveText(
+    'Basic Attack',
+  )
   // View mode is a static reference: cards render, grips do not.
-  await expect(grips(page.locator('.npc-abilities-section'))).toHaveCount(0)
+  await expect(grips(reloaded)).toHaveCount(0)
 })
 
 test('an NPC embedded in a player sheet reorders its abilities the same way', async ({
@@ -363,10 +393,14 @@ test('an NPC embedded in a player sheet reorders its abilities the same way', as
   ).toBeVisible()
 
   // The embedded list offers the same controls as the standalone sheet: the
-  // grid/list toggle, the "+ Add Ability" button, and a grip per card.
+  // grid/list toggle, the "+ Add Ability" button, a grip per card — and the same
+  // pinned Basic Attack at the head of the list.
   await expect(
     section.getByRole('tablist', { name: 'Abilities view' }),
   ).toBeVisible()
+  await expect(
+    section.locator('.ability-card-wrap--pinned .ability-card__name'),
+  ).toHaveText('Basic Attack')
   for (const name of ['Claw', 'Bite', 'Howl']) {
     await addAbility(page, section, name)
   }
@@ -385,7 +419,7 @@ test('an NPC embedded in a player sheet reorders its abilities the same way', as
 
   // Drag the last card onto the first — the same gesture as the sheet page,
   // drawing the same preview.
-  const cards = section.locator('.ability-card-wrap')
+  const cards = sortableCards(section)
   await beginCardDrag(page, cards.nth(2), cards.nth(0))
   await expect(page.locator('.sortable-ability--overlay')).toHaveCount(1)
   await expect(section.locator('.ability-drop-indicator')).toHaveCount(1)
@@ -456,7 +490,7 @@ test('the NPC list draws the player sheet’s drag preview, card for card', asyn
   }
   await pool.scrollIntoViewIfNeeded()
 
-  const poolCards = pool.locator('.ability-card-wrap')
+  const poolCards = sortableCards(pool)
   await beginCardDrag(page, poolCards.nth(2), poolCards.nth(0))
   const playerPreview = await readPreview(page, '.sheet-section--pool')
   expectDropPreview(playerPreview, DRAG_LANDING)
@@ -473,7 +507,7 @@ test('the NPC list draws the player sheet’s drag preview, card for card', asyn
   }
   await section.scrollIntoViewIfNeeded()
 
-  const cards = section.locator('.ability-card-wrap')
+  const cards = sortableCards(section)
   await beginCardDrag(page, cards.nth(2), cards.nth(0))
   const npcPreview = await readPreview(page, '.npc-abilities-section')
 

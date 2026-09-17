@@ -1353,9 +1353,22 @@ function renderNpcPanel(base: Character, density: 'compact' | 'expanded' = 'expa
   )
 }
 
-/** The single Activate button on screen (there is one per activatable ability). */
+/**
+ * The Activate buttons of the abilities a test **authored**.
+ *
+ * Every NPC panel also carries the pinned **Basic Attack** card
+ * (`createDefaultBasicAttack`), which activates in its own right — its 1 AP
+ * cost makes it live on a panel exactly like any other costed ability, and it
+ * has its own test below. The tests here are about the authored ability list,
+ * so the pinned card is filtered out rather than counted in every assertion.
+ */
 function activateButtons(): HTMLElement[] {
-  return screen.queryAllByRole('button', { name: 'Activate' })
+  return screen.queryAllByRole('button', { name: 'Activate' }).filter((button) => {
+    const card = button.closest('.ability-activation')
+    return (
+      card?.querySelector('.ability-card__name')?.textContent !== 'Basic Attack'
+    )
+  })
 }
 
 /** Force the next Recharge Die to land on `value` (1–6). */
@@ -1963,6 +1976,40 @@ test('NPC panel: activating an ability with automatic rolls opens them together'
   expect(within(cards[2]).getByText('1d4 → 3 = 3')).toBeInTheDocument()
 })
 
+test('NPC panel: the pinned Basic Attack activates, spending the instance’s AP', () => {
+  // Every NPC record is born with a Basic Attack (createDefaultBasicAttack), and
+  // it is the pinned first card of its ability list on every surface — including
+  // a GM panel, where its 1 AP cost makes it a live button.
+  const base = makeBase()
+  renderNpcPanel(base)
+
+  const card = screen.getByText('Basic Attack').closest('.ability-card') as HTMLElement
+  expect(card).not.toBeNull()
+  const activate = within(card.closest('.ability-activation') as HTMLElement).getByRole(
+    'button',
+    { name: 'Activate' },
+  )
+
+  // d20 = 10 (accuracy, +MAR 0) and 1d6 = 4 (the default damage).
+  dieQueue.push(10, 4)
+  fireEvent.click(activate)
+
+  // The instance paid, the base record did not…
+  expect(panelState().currentAP).toBe(2)
+  expect(base.currentAP).toBe(0)
+  // …and the Basic Attack's default configuration rolled both halves of the
+  // attack in one window: the accuracy check, then its own damage.
+  const modal = screen.getByRole('dialog', { name: 'Basic Attack' })
+  const rolls = within(
+    within(modal).getByRole('status', { name: /activation rolls for/i }),
+  ).getAllByRole('article')
+  expect(rolls).toHaveLength(2)
+  expect(within(rolls[0]).getByText('Accuracy')).toBeInTheDocument()
+  expect(within(rolls[0]).getByText('d20+MAR → 10 + 0 = 10')).toBeInTheDocument()
+  expect(within(rolls[1]).getByText('Damage')).toBeInTheDocument()
+  expect(within(rolls[1]).getByText('1d6 + MAR → 4 + 0 = 4')).toBeInTheDocument()
+})
+
 test('NPC panel: the Activate button is automatic — showActivate does not gate it', () => {
   const base = makeBaseWith([
     makeAbility({ id: 'a1', name: 'Cleave', cost: { ap: 1 }, showActivate: false }),
@@ -2018,9 +2065,12 @@ test('NPC panel: the Recharge badge replaces the trait chip instead of duplicati
   const { container } = renderNpcPanel(base)
 
   // The authored chip is replaced in place: its slot now carries the live
-  // badge, under the ability name, with no second "Recharge 4" anywhere.
+  // badge, under the ability name, with no second "Recharge 4" anywhere. The
+  // read is scoped to the authored card — the panel's pinned Basic Attack
+  // carries trait chips of its own.
+  const authored = screen.getByText('High-Impact Rounds').closest('.ability-card')
   const chips = Array.from(
-    container.querySelectorAll('.ability-card__trait'),
+    authored?.querySelectorAll('.ability-card__trait') ?? [],
   ).map((chip) => chip.textContent)
   expect(chips).toEqual(['Action', 'Range (12)', 'Recharge 4'])
   expect(

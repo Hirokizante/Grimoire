@@ -8,7 +8,8 @@
  *
  * Layout order (top → bottom):
  *   1. Hero Section — portrait, name, Export button, Combat Stats, Attributes
- *   2. Abilities — AbilityBlockCards (Activate button always hidden)
+ *   2. Abilities — the pinned Basic Attack card plus the NPC's own ability
+ *      cards (Activate button always hidden)
  *   3. Skills — skill list (clickable to roll)
  *   4. Description — long-form text field
  *
@@ -140,6 +141,7 @@ export default function NPCSheet({
       {isNPC && (
         <NPCAbilitiesSection
           abilities={entity.slottedAbilities}
+          basicAttack={entity.basicAttack}
           ownerId={entity.id}
           owner={entity}
           mode={mode}

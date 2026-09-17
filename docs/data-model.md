@@ -26,7 +26,7 @@ single Divergence character sheet:
 | `mortalWounds` | Up to 2 active wounds (by name; `Pending Roll` while a slot awaits its D20 — a hand-picked wound is stored by its table name, so its entry's D20 comes back with it) |
 | `deathSaves` | Success/failure tracker |
 | `innateDescription`, `innateAbilities` | Core Ability narrative + mechanical innates |
-| `basicAttack`, `fatebreaker` | Fixed-shape core abilities |
+| `basicAttack`, `fatebreaker` | Fixed-shape core abilities. `basicAttack` is generated on every sheet and is **not removable** (a player sheet edits it in the Core Ability section; an NPC's is pinned to the head of its ability list). It is born with its activation rolls configured — accuracy `d20+MAR` plus its own damage. `normalizeCharacter` restores the default into a record that arrives **without** one; a stored one is never overwritten, so switching those rolls off sticks |
 | `slottedAbilities`, `abilityPool` | Active vs. inactive slotted abilities |
 | `portrait` | Base64 data URL |
 | `physicalDescription`, `backstory` | Bio fields |

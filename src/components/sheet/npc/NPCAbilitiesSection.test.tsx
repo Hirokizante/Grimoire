@@ -553,3 +553,210 @@ test('the view toggle is not rendered when the surface fixes its view mode', () 
   // A GM panel passes no `onViewModeChange`, so it keeps its fixed list view.
   expect(screen.queryByRole('tablist', { name: 'Abilities view' })).toBeNull()
 })
+
+// ---- The pinned Basic Attack ------------------------------------------------
+
+/**
+ * Every NPC record is born with a Basic Attack (`createDefaultBasicAttack`), and
+ * the section renders it itself — pinned to the head of the list on all three
+ * surfaces (the standalone sheet, an attached NPC, an expanded GM panel). The
+ * callers pass it in, so these tests do the same.
+ *
+ * The contract is the one a player sheet's Basic Attack follows: it is always
+ * there, it can be **modified**, and it can never be **deleted** — no Remove
+ * button, no drag handle, and no place in the list a reorder writes to.
+ */
+
+/** An NPC carrying the generated Basic Attack plus one authored ability. */
+function seedNpcWithBasicAttack(): Character {
+  const npc: Character = {
+    ...createDefaultNPC(),
+    id: 'npc-1',
+    name: 'Bandit',
+    slottedAbilities: [plainAbility('a1', 'Claw')],
+  }
+  dbMap.set(npc.id, npc)
+  useCharacterStore.setState({ currentCharacter: npc, characters: [npc] })
+  return npc
+}
+
+/** The card names on screen, in render order. */
+function cardNames(): string[] {
+  return Array.from(document.querySelectorAll('.ability-card__name')).map(
+    (el) => el.textContent ?? '',
+  )
+}
+
+test('the Basic Attack is the section’s card even with no authored abilities', () => {
+  const npc: Character = { ...createDefaultNPC(), id: 'npc-1', name: 'Bandit' }
+  dbMap.set(npc.id, npc)
+  useCharacterStore.setState({ currentCharacter: npc, characters: [npc] })
+
+  render(
+    <NPCAbilitiesSection
+      abilities={npc.slottedAbilities}
+      basicAttack={npc.basicAttack}
+      ownerId={npc.id}
+      owner={npc}
+    />,
+  )
+
+  // A brand-new NPC is never ability-less: its Basic Attack is the statblock's
+  // fallback action, and it reads like the player sheet's copy (1 AP, its own
+  // damage notation).
+  expect(cardNames()).toEqual(['Basic Attack'])
+  expect(screen.getByText('1d6 + MAR')).toBeInTheDocument()
+  expect(screen.getByText('1 AP')).toBeInTheDocument()
+  // …and nothing claims the section is empty beside a card that is plainly there.
+  expect(screen.queryByText(/abilities defined for this NPC/)).toBeNull()
+})
+
+test('the empty note appears only where there is nothing to show at all', () => {
+  const npc: Character = { ...createDefaultNPC(), id: 'npc-1', name: 'Bandit' }
+  dbMap.set(npc.id, npc)
+  useCharacterStore.setState({ currentCharacter: npc, characters: [npc] })
+
+  // No authored abilities *and* no Basic Attack passed in (a hand-built
+  // fixture): the note is the whole section, because the section is empty.
+  render(<NPCAbilitiesSection abilities={[]} ownerId={npc.id} owner={npc} />)
+
+  expect(
+    screen.getByText('No abilities defined for this NPC.'),
+  ).toBeInTheDocument()
+  expect(cardNames()).toEqual([])
+})
+
+test('the Basic Attack leads the list, ahead of the authored abilities', () => {
+  const npc = seedNpcWithBasicAttack()
+  render(
+    <NPCAbilitiesSection
+      abilities={npc.slottedAbilities}
+      basicAttack={npc.basicAttack}
+      ownerId={npc.id}
+      owner={npc}
+    />,
+  )
+
+  expect(cardNames()).toEqual(['Basic Attack', 'Claw'])
+})
+
+test('the Basic Attack is editable, and offers no way to delete it', () => {
+  const npc = seedNpcWithBasicAttack()
+  const { container } = render(
+    <NPCAbilitiesSection
+      abilities={npc.slottedAbilities}
+      basicAttack={npc.basicAttack}
+      ownerId={npc.id}
+      owner={npc}
+      mode="edit"
+    />,
+  )
+
+  const pinned = container.querySelector(
+    '.ability-card-wrap--pinned',
+  ) as HTMLElement
+  expect(pinned).not.toBeNull()
+  // Editable…
+  const edit = within(pinned).getByRole('button', { name: 'Edit' })
+  // …and not removable or movable: the pinned card carries no Remove and no
+  // grip, while the authored card beside it keeps both.
+  expect(within(pinned).queryByRole('button', { name: 'Remove' })).toBeNull()
+  expect(pinned.querySelector('.drag-handle')).toBeNull()
+  expect(container.querySelectorAll('.drag-handle')).toHaveLength(1)
+  expect(screen.getAllByRole('button', { name: 'Remove' })).toHaveLength(1)
+
+  fireEvent.click(edit)
+  const dialog = screen.getByRole('dialog', { name: 'Edit Ability' })
+  fireEvent.change(within(dialog).getByLabelText('Name'), {
+    target: { value: 'Ol’ Reliable' },
+  })
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }))
+
+  // The edit lands on the record's own `basicAttack` field, not on a list entry.
+  const stored = useCharacterStore.getState().characters[0]
+  expect(stored.basicAttack.name).toBe('Ol’ Reliable')
+  expect(stored.basicAttack.cost).toEqual({ ap: 1 })
+  expect(stored.slottedAbilities.map((a) => a.name)).toEqual(['Claw'])
+})
+
+test('an edit inside the Basic Attack’s own card writes the same field', () => {
+  // A sub-ability is edited through its parent, and the parent here is the
+  // Basic Attack — a scalar field, not a list entry. The section routes by id,
+  // so the write must not land on `slottedAbilities` (which would add the
+  // Basic Attack to the NPC's list as a second, removable copy).
+  const base = createDefaultNPC()
+  const npc: Character = {
+    ...base,
+    id: 'npc-1',
+    name: 'Bandit',
+    basicAttack: {
+      ...base.basicAttack,
+      subAbilitiesUnderDescription: [plainAbility('sub-1', 'Slam')],
+    },
+  }
+  dbMap.set(npc.id, npc)
+  useCharacterStore.setState({ currentCharacter: npc, characters: [npc] })
+
+  render(
+    <NPCAbilitiesSection
+      abilities={npc.slottedAbilities}
+      basicAttack={npc.basicAttack}
+      ownerId={npc.id}
+      owner={npc}
+      mode="edit"
+    />,
+  )
+
+  const sub = document.querySelector('.sub-ability-block') as HTMLElement
+  fireEvent.click(within(sub).getByRole('button', { name: 'Edit' }))
+  const dialog = screen.getByRole('dialog', { name: 'Edit Sub-Ability' })
+  fireEvent.change(within(dialog).getByLabelText('Name'), {
+    target: { value: 'Heavy Slam' },
+  })
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }))
+
+  const stored = useCharacterStore.getState().characters[0]
+  expect(
+    stored.basicAttack.subAbilitiesUnderDescription.map((s) => s.name),
+  ).toEqual(['Heavy Slam'])
+  expect(stored.slottedAbilities).toEqual([])
+})
+
+test('a reorder never moves or touches the Basic Attack', () => {
+  const base = createDefaultNPC()
+  const npc: Character = {
+    ...base,
+    id: 'npc-1',
+    name: 'Bandit',
+    slottedAbilities: [
+      plainAbility('a1', 'Claw'),
+      plainAbility('a2', 'Bite'),
+      plainAbility('a3', 'Howl'),
+    ],
+  }
+  dbMap.set(npc.id, npc)
+  useCharacterStore.setState({ currentCharacter: npc, characters: [npc] })
+
+  render(
+    <NPCAbilitiesSection
+      abilities={npc.slottedAbilities}
+      basicAttack={npc.basicAttack}
+      ownerId={npc.id}
+      owner={npc}
+      mode="edit"
+    />,
+  )
+
+  // The list's own drop resolver knows the authored abilities only — the pinned
+  // card is not a slot a drop can resolve against.
+  expect(npcRegistrations.current.map((r) => r.items.map((i) => i.id))).toEqual([
+    ['a1', 'a2', 'a3'],
+  ])
+
+  act(() => dragEndRef.current?.({ active: { id: 'a3' }, over: { id: 'a1' } }))
+
+  const stored = useCharacterStore.getState().characters[0]
+  expect(stored.slottedAbilities.map((a) => a.id)).toEqual(['a3', 'a1', 'a2'])
+  // The Basic Attack is still the one the record was born with, in its place.
+  expect(stored.basicAttack).toEqual(npc.basicAttack)
+})

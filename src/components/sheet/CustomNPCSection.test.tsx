@@ -387,7 +387,9 @@ test('an attached NPC list is not draggable in view mode', () => {
     <CustomNPCSection tabId="tab-1" section={section} mode="view" />,
   )
 
-  expect(container.querySelectorAll('.ability-card')).toHaveLength(3)
+  // The three authored abilities plus the pinned Basic Attack every NPC record
+  // carries — and not one of them is draggable outside edit mode.
+  expect(container.querySelectorAll('.ability-card')).toHaveLength(4)
   expect(container.querySelectorAll('.drag-handle')).toHaveLength(0)
 })
 

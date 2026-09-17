@@ -8,6 +8,7 @@
 
 import type {
   AbilityBlock,
+  ActivationRolls,
   AttributeKey,
   Character,
   MortalWound,
@@ -393,12 +394,40 @@ export function generateId(): string {
 }
 
 /**
+ * The automatic rolls a Basic Attack performs the moment it is activated.
+ *
+ * A Basic Attack is an attack, so its default configuration rolls both halves
+ * of one: an **accuracy** check (`d20 + MAR`, the Attribute the default
+ * `1d6 + MAR` damage already uses) and its own **damage** field. The damage
+ * entry is the boolean the ActivationRolls type defines — the ability's
+ * `damage` string IS the notation — so editing Damage retunes the roll with it
+ * (see lib/activationRolls.ts).
+ *
+ * This is a *default*, not a rule: the Basic Attack's editor is the ordinary
+ * ability editor, so a player/GM can retune the accuracy modifier, add custom
+ * rolls, or untick "Roll Dice on Activation" entirely — and unticking stores
+ * nothing, which is exactly why this is applied where a Basic Attack is born
+ * (and where a missing one is restored) rather than backfilled over every
+ * stored sheet.
+ */
+export function createDefaultBasicAttackRolls(): ActivationRolls {
+  return {
+    accuracy: { modifier: { kind: 'attribute', key: 'MAR' } },
+    damage: true,
+  }
+}
+
+/**
  * Build a fresh Basic Attack AbilityBlock.
  *
  * Per DESIGN.md, a Basic Attack is an AbilityBlock with certain fixed
  * properties: it costs 1 AP, deals 1d6 + POW/MAR, and carries the Action,
  * Melee/Range (8), Physical/Magic/Psychic, and Basic traits. We default to a
  * melee, Martial-based physical attack; the player re-flavors it freely.
+ *
+ * It is **not removable** on any surface: a player sheet's Basic Attack is a
+ * core ability with no Remove button, and an NPC's is the pinned card at the
+ * head of its ability list (see NPCAbilitiesSection).
  */
 export function createDefaultBasicAttack(): AbilityBlock {
   return {
@@ -413,6 +442,7 @@ export function createDefaultBasicAttack(): AbilityBlock {
     flavorText: '',
     isMinor: false,
     showActivate: true,
+    activationRolls: createDefaultBasicAttackRolls(),
     subAbilitiesUnderDescription: [],
     subAbilitiesUnderOvercharge: [],
   }

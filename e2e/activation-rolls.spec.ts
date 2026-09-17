@@ -195,7 +195,10 @@ test('an NPC ability rolls on the GM Screen under an instance, never on the base
   await expect(panel.locator('.gm-panel__sheet')).toBeVisible()
 
   // ---- The instance activates and rolls ---------------------------------
-  const activate = panel.locator('.ability-activation__btn')
+  // Every NPC panel also carries a pinned Basic Attack card, which activates on
+  // its own, so the click is aimed at the authored ability's card.
+  const cleave = panel.locator('.ability-activation').filter({ hasText: 'Cleave' })
+  const activate = cleave.locator('.ability-activation__btn')
   await expect(activate).toBeVisible()
   await activate.click()
 

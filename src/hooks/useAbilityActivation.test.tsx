@@ -131,6 +131,28 @@ test('activating a player ability rolls accuracy, damage and custom together', (
   expect(within(cards[2]).getByText('1d4 → 2 = 2')).toBeInTheDocument()
 })
 
+test('a fresh character’s Basic Attack rolls accuracy and damage on activation', () => {
+  // Every character — player and NPC alike — is born with a Basic Attack
+  // (`createDefaultBasicAttack`), and it ships configured to roll itself: the
+  // Core Ability card's Activate button opens the result window like any other
+  // authored attack, with the attack check and its damage together.
+  const character = makeCharacter()
+  useCharacterStore.setState({ characters: [character], currentCharacter: character })
+  // d20 = 18, 1d6 = 5.
+  rollQueue.push(18, 5)
+
+  renderActivation(character.basicAttack, character)
+  fireEvent.click(screen.getByRole('button', { name: 'Activate' }))
+
+  expect(useCharacterStore.getState().currentCharacter?.currentAP).toBe(2)
+  const cards = within(activationGroup()).getAllByRole('article')
+  expect(cards).toHaveLength(2)
+  expect(within(cards[0]).getByText('Accuracy')).toBeInTheDocument()
+  expect(within(cards[0]).getByText('d20+MAR → 18 + 4 = 22')).toBeInTheDocument()
+  expect(within(cards[1]).getByText('Damage')).toBeInTheDocument()
+  expect(within(cards[1]).getByText('1d6 + MAR → 5 + 4 = 9')).toBeInTheDocument()
+})
+
 test('a sub-ability activates and rolls on its own', () => {
   const character = makeCharacter()
   const sub = makeRolling({ id: 'sub-1', name: 'Riposte', cost: { ap: 1 } })

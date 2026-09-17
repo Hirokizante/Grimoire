@@ -394,6 +394,7 @@ export default function CustomNPCSection({
         <NPCAbilitiesSection
           variant="embedded"
           abilities={npc.slottedAbilities}
+          basicAttack={npc.basicAttack}
           ownerId={npc.id}
           owner={npc}
           mode={mode}

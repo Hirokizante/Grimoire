@@ -35,6 +35,17 @@
  * warning, and no "Move to Pool" button — an NPC's list is a stat block, not an
  * encounter loadout.
  *
+ * **The Basic Attack is pinned to the head of the list.** Every NPC record
+ * carries a generated Basic Attack (see `createDefaultBasicAttack`), and this
+ * section renders it as the list's first card — the fixed block a player sheet
+ * keeps in its Core Ability section, in the one ability surface an NPC has. It
+ * is part of the grid (same card, same columns, same view mode) but **not part
+ * of the list's order**: it carries no drag handle, no drop can land on it, and
+ * it renders Edit with **no Remove** — the same "editable, not deletable" rule
+ * a player's Basic Attack follows. The card is passed in as `basicAttack`, and
+ * edits to it (or to its sub-abilities) write the record's `basicAttack` field
+ * rather than a list entry.
+ *
  * **Activation follows the resolver rule.** On the sheet pages the Activate
  * button is never rendered — NPC sheets are static references, not active
  * participants in turn-based combat — because a section always supplies a
@@ -72,6 +83,16 @@ import type { SheetMode } from '@/pages/CharacterSheetPage'
 
 export interface NPCAbilitiesSectionProps {
   abilities: AbilityBlock[]
+  /**
+   * The NPC's Basic Attack — the fixed card pinned to the head of the list.
+   *
+   * Every caller passes the record's own `basicAttack` (the standalone sheet
+   * its `entity`, an attached NPC its `npc`, a GM panel the instance's
+   * projection, so an instance's own modifier switches and uses reach it like
+   * any other card). Omitted only by a caller with no Basic Attack to show —
+   * a hand-built fixture — in which case the section renders the plain list.
+   */
+  basicAttack?: AbilityBlock
   /**
    * The NPC these abilities belong to. Defaults to the store's
    * `currentCharacter`; an attached NPC section and the GM Screen pass the
@@ -134,6 +155,7 @@ export interface NPCAbilitiesSectionProps {
 
 export default function NPCAbilitiesSection({
   abilities,
+  basicAttack,
   ownerId,
   owner,
   mode = 'view',
@@ -171,12 +193,21 @@ export default function NPCAbilitiesSection({
 
   const handleUpdateParent = useCallback(
     (parent: AbilityBlock) => {
-      updateCurrentCharacter((char) => ({
-        ...char,
-        slottedAbilities: char.slottedAbilities.map((a) =>
-          a.id === parent.id ? parent : a,
-        ),
-      }))
+      updateCurrentCharacter((char) => {
+        // The Basic Attack is a scalar field on the record, not an entry in
+        // `slottedAbilities` — an edit that came from inside its card (a
+        // sub-ability) belongs there, and matching by id is what tells the two
+        // apart without a second piece of state.
+        if (char.basicAttack && char.basicAttack.id === parent.id) {
+          return { ...char, basicAttack: parent }
+        }
+        return {
+          ...char,
+          slottedAbilities: char.slottedAbilities.map((a) =>
+            a.id === parent.id ? parent : a,
+          ),
+        }
+      })
     },
     [updateCurrentCharacter],
   )
@@ -225,6 +256,13 @@ export default function NPCAbilitiesSection({
   }
   const handleSave = (ability: AbilityBlock) => {
     updateCurrentCharacter((char) => {
+      // Same rule as above: the Basic Attack's own edit writes its field, so
+      // the pinned card can be modified without ever becoming a list entry
+      // (which is also what keeps it under the editor instead of a Remove
+      // button).
+      if (char.basicAttack && char.basicAttack.id === ability.id) {
+        return { ...char, basicAttack: ability }
+      }
       const existing = char.slottedAbilities
       if (editing && existing.some((a) => a.id === editing.id)) {
         return {
@@ -261,51 +299,85 @@ export default function NPCAbilitiesSection({
   }
 
   /**
+   * One card in **view** mode: a GM panel's activatable wrapper when the
+   * resolver returns an override for it (anything with a cost, plus anything on
+   * Recharge cooldown), the plain reference card otherwise. Shared by the
+   * pinned Basic Attack and the list, so the two cannot drift.
+   */
+  const viewCard = (ability: AbilityBlock) => {
+    const override = activateOverride(ability)
+    if (override) {
+      // The same writer both branches get: a GM panel's limited abilities keep
+      // working ± steppers on an activatable card, and an NPC base sheet
+      // receives none (so its meter stays read-only).
+      return (
+        <AbilityActivation
+          key={ability.id}
+          ability={ability}
+          character={owner}
+          activateOverride={activateOverride}
+          onSetUses={onSetUses}
+          onToggleModifiers={onToggleModifiers}
+        />
+      )
+    }
+    return (
+      <AbilityBlockCard
+        key={ability.id}
+        ability={ability}
+        character={owner}
+        mode={mode}
+        onToggleModifiers={onToggleModifiers}
+        onSetUses={onSetUses}
+        // The parent is not activatable here, but its sub-abilities may be —
+        // the resolver travels with the card either way.
+        activateOverride={activateOverride}
+      />
+    )
+  }
+
+  /**
+   * The Basic Attack card — pinned to the head of the list, in both modes.
+   *
+   * Edit mode gives it exactly what a player sheet's Basic Attack gets: an Edit
+   * button and nothing else. There is deliberately no Remove button (the block
+   * is not removable), no drag handle and no sortable wrapper (nothing can move
+   * it out of the list, and the drop maths never sees it as a slot).
+   */
+  const basicAttackCard = basicAttack ? (
+    isEdit ? (
+      <div className="ability-card-wrap ability-card-wrap--pinned">
+        <AbilityBlockCard
+          ability={basicAttack}
+          mode={mode}
+          character={owner}
+          onToggleModifiers={onToggleModifiers}
+          onSetUses={onSetUses}
+          subAbilityActions={subAbilityActions}
+          activateOverride={activateOverride}
+          actions={
+            <button
+              type="button"
+              className="btn btn--ghost ability-card__action-btn"
+              onClick={() => openEdit(basicAttack)}
+            >
+              Edit
+            </button>
+          }
+        />
+      </div>
+    ) : (
+      viewCard(basicAttack)
+    )
+  ) : null
+
+  /**
    * The list itself. In edit mode the shared {@link AbilityBlockList} renders
    * the sortable cards (identical to the player sheet's ability sections); in
    * view mode the cards are resolved here, because a GM panel's ability may
    * activate while the rest stay static reference cards.
    */
-  const viewCards =
-    abilities.length === 0 ? (
-      <p className="sheet-section__empty muted">
-        No abilities defined for this NPC.
-      </p>
-    ) : (
-      abilities.map((ability) => {
-        // A GM panel resolves an override per ability: one with a cost (or on
-        // Recharge cooldown) activates, the rest stay reference cards.
-        const override = activateOverride(ability)
-        if (override) {
-          // The same writer both branches get: a GM panel's limited abilities
-          // keep working ± steppers on an activatable card, and an NPC base
-          // sheet receives none (so its meter stays read-only).
-          return (
-            <AbilityActivation
-              key={ability.id}
-              ability={ability}
-              character={owner}
-              activateOverride={activateOverride}
-              onSetUses={onSetUses}
-              onToggleModifiers={onToggleModifiers}
-            />
-          )
-        }
-        return (
-          <AbilityBlockCard
-            key={ability.id}
-            ability={ability}
-            character={owner}
-            mode={mode}
-            onToggleModifiers={onToggleModifiers}
-            onSetUses={onSetUses}
-            // The parent is not activatable here, but its sub-abilities may be —
-            // the resolver travels with the card either way.
-            activateOverride={activateOverride}
-          />
-        )
-      })
-    )
+  const viewCards = abilities.map((ability) => viewCard(ability))
 
   // The editable list is a **child** of the drag context, never a sibling of it:
   // the context publishes the drop hint store the list registers with, so the
@@ -318,6 +390,7 @@ export default function NPCAbilitiesSection({
     >
       <NpcAbilityList
         abilities={abilities}
+        pinnedCards={basicAttackCard}
         layout={isListView ? 'list' : 'cards'}
         character={owner}
         onToggleModifiers={onToggleModifiers}
@@ -346,8 +419,10 @@ export default function NPCAbilitiesSection({
         )}
       />
     </NpcAbilitiesDndContext>
-  ) : abilities.length === 0 ? (
-    viewCards
+  ) : abilities.length === 0 && !basicAttack ? (
+    <p className="sheet-section__empty muted">
+      No abilities defined for this NPC.
+    </p>
   ) : (
     <div
       className={
@@ -356,6 +431,11 @@ export default function NPCAbilitiesSection({
           : 'ability-grid ability-grid--cards'
       }
     >
+      {/* An NPC with no authored abilities shows the pinned Basic Attack alone:
+          the card is the list's own content, so a "no abilities" note beside it
+          would contradict what is on screen. (The note above still covers the
+          one case with nothing to show at all.) */}
+      {basicAttackCard}
       {viewCards}
     </div>
   )
@@ -438,6 +518,8 @@ export default function NPCAbilitiesSection({
 
 interface NpcAbilityListProps {
   abilities: AbilityBlock[]
+  /** The fixed Basic Attack card, rendered ahead of the sortable cards. */
+  pinnedCards?: React.ReactNode
   layout: 'cards' | 'list'
   /** Entity the cards belong to — the NPC, which is not the store's character. */
   character?: Character
@@ -470,6 +552,7 @@ interface NpcAbilityListProps {
  */
 function NpcAbilityList({
   abilities,
+  pinnedCards,
   layout,
   character,
   onToggleModifiers,
@@ -491,6 +574,7 @@ function NpcAbilityList({
     <AbilityBlockList
       section={NPC_ABILITIES_SECTION_ID}
       abilities={abilities}
+      pinnedCards={pinnedCards}
       layout={layout}
       droppableRef={setDroppableRef}
       isOver={isOver}

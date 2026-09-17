@@ -13,7 +13,7 @@
 import type { AbilityBlock, AbilityCost, Character, CharacterViewModes, GMScreen, MortalWoundRoll, NPCStats, NpcInstanceState, PanelStatus, ScreenPanel, SheetColors, SheetLabel, StatusCondition, VersionSnapshot } from '@/types'
 import { createDefaultStatuses } from '@/constants/statuses'
 import { MAX_PANEL_STATUS_STACKS, isPanelStatusDuration } from '@/constants/statusDurations'
-import { DEFAULT_SHEET_COLORS, MAX_AP, generateId } from '@/constants/gameData'
+import { DEFAULT_SHEET_COLORS, MAX_AP, createDefaultBasicAttack, generateId } from '@/constants/gameData'
 import {
   normalizeInstanceAbilityModifiers,
   normalizeModifiers,
@@ -558,6 +558,18 @@ export function normalizeCharacter(raw: Character): Character {
   result.config = {
     ...result.config,
     colors: { ...DEFAULT_SHEET_COLORS, ...(storedColors ?? {}) },
+  }
+
+  // A Basic Attack is **not removable** — a player sheet's core ability offers
+  // Edit and no Remove, and an NPC's is the pinned card at the head of its
+  // ability list — so a record that reaches us without one (a hand-edited or
+  // truncated export, a partially-applied restore) is given the default back
+  // rather than rendering a sheet with a hole where its fallback action is.
+  // A record that HAS one keeps it exactly as stored: the activation-roll
+  // configuration the editor writes is never overwritten here, which is what
+  // lets "Roll Dice on Activation" be switched off again.
+  if (!result.basicAttack || typeof result.basicAttack !== 'object') {
+    result.basicAttack = createDefaultBasicAttack()
   }
 
   // Ensure scalar AbilityBlock shapes (basicAttack, fatebreaker) carry

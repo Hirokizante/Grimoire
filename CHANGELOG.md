@@ -6,6 +6,62 @@ characters regularly.
 
 ## Unreleased
 
+### An NPC's Basic Attack, and Basic Attacks that roll themselves
+
+- **An NPC now shows the Basic Attack it has always carried.** Every NPC record
+  has held a generated Basic Attack since the NPC feature shipped, but no NPC
+  surface ever rendered it — the fields were invisible, so a statblock read as
+  if it had no fallback action at all. `NPCAbilitiesSection` now pins the block
+  to the **head of the ability list** on all three of its surfaces (the
+  standalone NPC sheet, an NPC bundled into a player's custom tab, and an
+  expanded GM panel), inside the same `.ability-grid` the authored abilities
+  use, in whichever of the grid/list view modes the surface is showing.
+- **It can be modified and cannot be deleted.** The pinned card is the same
+  `AbilityBlockCard` every other ability renders, wired to the ordinary ability
+  editor through the section's existing write path — so it can be renamed,
+  re-flavoured, re-costed, given sub-abilities (its sub-abilities' edits route
+  back to the same field) and rolled by hand like anything else. What it does
+  **not** get is the Remove button the authored cards beside it carry: the block
+  is part of the statblock the way a player's Basic Attack is part of their Core
+  Ability. It is also deliberately **not sortable** — `AbilityBlockList` gained
+  a `pinnedCards` slot that renders inside the grid but outside the
+  `SortableContext`, so the drop maths (which measures
+  `:scope > .sortable-ability[data-ability-id]`) never sees it as a slot: no
+  drag can lift it, drop onto it, or move it out of the section.
+- **Every Basic Attack is born rolling its whole attack.** `createDefaultBasicAttack`
+  now carries an activation-roll config — accuracy on `MAR` (`d20+MAR`) plus its
+  own damage (`1d6 + MAR`, the Damage field itself) — so a **player's** Core
+  Ability card and an **NPC's** pinned card both open the result window with the
+  attack check and the damage together, resolved against whoever activated it
+  (an NPC instance rolls with its own stats and spends the instance's own AP).
+  It is ordinary authored configuration: the ability editor shows it in **Roll
+  Dice on Activation**, and the attribute, the damage and the custom rolls can
+  all be retuned or the whole thing unticked.
+- **A switched-off Basic Attack stays switched off.** The change is applied
+  where a Basic Attack is *born*, not backfilled over stored sheets. The editor
+  stores nothing when the box is unticked, so a read-time default would have
+  silently re-enabled the rolls on every load and made "off" impossible to
+  express; existing sheets keep their stored Basic Attack exactly as authored.
+  The one thing `normalizeCharacter` does backfill is a Basic Attack that is
+  **missing entirely** (a hand-edited or truncated export) — the block is not
+  removable, so a record without one gets the generated default back.
+- **Testing.** `NPCAbilitiesSection.test.tsx` drives the section directly: the
+  pinned card is the list's first card with no authored abilities and ahead of
+  them once they exist, it renders Edit and no Remove, editing it writes the
+  record's `basicAttack` (and an edit inside its own card — a sub-ability —
+  writes the same field rather than appending the Basic Attack to the list), and
+  a reorder still lands on `slottedAbilities` with the drop resolver registered
+  for the authored abilities alone. `activationRolls.test.ts` pins the generated
+  config, the plan it builds, and that it resolves against the activating entity;
+  `useAbilityActivation.test.tsx` presses Activate on a fresh character's Basic
+  Attack and reads both rolls out of the result window; `GMScreenPanels.test.tsx`
+  activates an NPC instance's pinned card for its own AP;
+  `CustomNPCSection.test.tsx`/`db.test.ts` cover the attached-NPC surface and the
+  missing-block backfill. `e2e/npc-abilities.spec.ts` pins the pinned card's
+  Edit/no-Remove/no-grip shape in the real app on both NPC surfaces,
+  `e2e/activation-rolls.spec.ts` and `e2e/gm-screen.spec.ts` aim their Activate
+  clicks at the authored card now that a panel carries two live buttons.
+
 ### Ability card drag — a preview that shows the landing slot, undeformed
 
 - **The drag preview squashed and stretched the cards it moved.** Every ability
