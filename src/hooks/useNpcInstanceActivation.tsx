@@ -18,10 +18,11 @@
  * Recharge Die, which the GM is told about through a toast and which lands in
  * the persistent roll log.
  *
- * **Which abilities activate?** Any ability with a cost (`hasAbilityCost`) and
- * any ability carrying a Recharge value — the GM panel does not consult the
+ * **Which abilities activate?** Any ability with a cost (`hasAbilityCost`), any
+ * ability carrying a Recharge value, and any ability authored to roll on
+ * activation (`hasActivationRolls`) — the GM panel does not consult the
  * ability's `showActivate` flag, which the NPC editor never even offers. An
- * ability with neither stays a plain reference card.
+ * ability with none of the three stays a plain reference card.
  *
  * **Limited uses and modifier switches belong to the instance.** Activating a
  * limited ability spends one of *this panel's* uses
@@ -47,6 +48,7 @@ import {
   abilityRechargeValue,
   rechargeRollResult,
 } from '@/lib/abilityRecharge'
+import { hasActivationRolls } from '@/lib/activationRolls'
 import { useGMScreenStore } from '@/store/gmScreenStore'
 import { useRollLogStore } from '@/store/rollLogStore'
 import type {
@@ -157,7 +159,12 @@ export function useNpcInstanceActivation(
   const activation = useCallback<AbilityActivationOverrideResolver>(
     (ability: AbilityBlock) => {
       const recharge = abilityRechargeValue(ability)
-      if (recharge == null && !hasAbilityCost(ability.cost)) return null
+      if (
+        recharge == null &&
+        !hasAbilityCost(ability.cost) &&
+        !hasActivationRolls(ability)
+      )
+        return null
 
       const onCooldown = cooldownIds.has(ability.id)
       return {

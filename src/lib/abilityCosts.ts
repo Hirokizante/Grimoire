@@ -20,10 +20,11 @@ import type {
 /**
  * Whether an ability declares **any** cost at all (AP, END, FP, or a positive
  * custom amount). This is the cheap "does activating this spend something?"
- * question the GM Screen asks before giving an ability an Activate button; it
- * deliberately does not resolve custom bar ids, so an ability whose bar no
- * longer exists still counts as costing something (see
- * {@link resolveCustomAbilityCosts} for the render-time resolution).
+ * question the GM Screen asks — alongside Recharge and activation rolls —
+ * before giving an ability an Activate button. It deliberately does not
+ * resolve custom bar ids, so an ability whose bar no longer exists still counts
+ * as costing something (see {@link resolveCustomAbilityCosts} for the
+ * render-time resolution).
  */
 export function hasAbilityCost(cost: AbilityCost | undefined): boolean {
   if (!cost) return false

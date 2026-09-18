@@ -2037,6 +2037,35 @@ test('NPC panel: a cost-free Recharge ability still activates (it can cool down)
   expect(screen.getByText('On cooldown — Recharge 3')).toBeInTheDocument()
 })
 
+test('NPC panel: a cost-free ability that rolls on activation gets an Activate button', () => {
+  const base = makeBaseWith([
+    makeAbility({
+      id: 'a1',
+      name: 'Menacing Growl',
+      cost: {},
+      damage: '1d4',
+      activationRolls: { damage: true },
+    }),
+  ])
+  renderNpcPanel(base)
+
+  // No cost and no Recharge — the authored rolls are why the button exists.
+  expect(activateButtons()).toHaveLength(1)
+
+  dieQueue.push(3)
+  fireEvent.click(activateButtons()[0])
+
+  // Nothing to spend: the rolls are the point.
+  expect(panelState().currentAP).toBe(3)
+  const modal = screen.getByRole('dialog', { name: 'Menacing Growl' })
+  const rolls = within(
+    within(modal).getByRole('status', { name: /activation rolls for/i }),
+  ).getAllByRole('article')
+  expect(rolls).toHaveLength(1)
+  expect(within(rolls[0]).getByText('Damage')).toBeInTheDocument()
+  expect(within(rolls[0]).getByText('1d4 → 3 = 3')).toBeInTheDocument()
+})
+
 test('NPC panel: the collapsed panel shows how many abilities are cooling', () => {
   const base = makeBaseWith([
     makeAbility({ id: 'a1', name: 'Fire Breath', traits: ['Recharge (5)'] }),

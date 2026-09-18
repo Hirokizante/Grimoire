@@ -43,8 +43,9 @@ export interface AbilityActivationProps {
    * Per-ability override for entities the character store does not own (GM
    * Screen NPC instances). It is also what gives an ability an Activate button
    * while its own `showActivate` flag is off: a GM panel activates every
-   * ability that has a cost, and the flag is not even offered in the NPC
-   * editor. Omitted everywhere else, where `showActivate` keeps deciding.
+   * ability that has a cost or rolls on activation, and the flag is not even
+   * offered in the NPC editor. Omitted everywhere else, where `showActivate`
+   * keeps deciding.
    */
   activateOverride?: AbilityActivationOverrideResolver
   /**
@@ -126,10 +127,10 @@ export default function AbilityActivation({
 
   // A resolver, when present, is the last word on what activates here: it
   // returns an override for every ability that should have a button (a GM panel
-  // activates anything with a cost) and null for the rest, so the per-ability
-  // `showActivate` flag — which the NPC editor does not even offer — cannot
-  // re-enable a button the panel decided against. Without a resolver the flag
-  // keeps deciding, exactly as it always has on the sheets.
+  // activates anything with a cost or activation rolls) and null for the rest,
+  // so the per-ability `showActivate` flag — which the NPC editor does not even
+  // offer — cannot re-enable a button the panel decided against. Without a
+  // resolver the flag keeps deciding, exactly as it always has on the sheets.
   const activatable = activateOverride ? override != null : ability.showActivate
 
   if (!activatable) {

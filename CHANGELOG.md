@@ -62,6 +62,21 @@ characters regularly.
   `e2e/activation-rolls.spec.ts` and `e2e/gm-screen.spec.ts` aim their Activate
   clicks at the authored card now that a panel carries two live buttons.
 
+### A cost-free NPC ability that rolls on activation gets its Activate button
+
+- **An NPC ability authored to roll on activation had no way to be activated
+  when it cost nothing.** A GM panel gave an Activate button to any ability
+  with a cost or a Recharge value, so an ability whose whole point was its
+  automatic rolls — a growl with a damage roll, a free maneuver that still
+  rolls accuracy — rendered as a static reference card and its rolls could
+  never be triggered from the screen. `useNpcInstanceActivation` now also
+  consults `hasActivationRolls`, so the button appears and everything behind it
+  (the toast, the shared result window, the ability's own uses or Recharge
+  cooldown) runs down the same activation path as any other panel ability.
+- **Testing.** `GMScreenPanels.test.tsx` activates a cost-free ability with
+  `activationRolls: { damage: true }`, asserts the instance's AP is untouched,
+  and reads the damage roll out of the result window.
+
 ### Ability card drag — a preview that shows the landing slot, undeformed
 
 - **The drag preview squashed and stretched the cards it moved.** Every ability

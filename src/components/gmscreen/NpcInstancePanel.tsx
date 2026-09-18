@@ -21,11 +21,12 @@
  *   the label.
  * - **Expanded**: the shared condensed `PanelSheet` for the base record, with
  *   the instance HP bar and AP meter kept above it. Its abilities are live:
- *   every ability with a cost activates against the instance's AP, a limited
- *   ability spends one of the instance's own uses (with ± steppers to move the
- *   count by hand), an ability's stat/attribute switch flips this instance's
- *   effective stats, Recharge abilities go on cooldown when used, and "Start
- *   new turn" (offered once AP hits 0) refills AP and rolls the Recharge Die.
+ *   every ability with a cost (or activation rolls) activates against the
+ *   instance's AP, a limited ability spends one of the instance's own uses
+ *   (with ± steppers to move the count by hand), an ability's stat/attribute
+ *   switch flips this instance's effective stats, Recharge abilities go on
+ *   cooldown when used, and "Start new turn" (offered once AP hits 0) refills
+ *   AP and rolls the Recharge Die.
  *   Edits inside the panel edit the **base**, which is shared by every
  *   instance — the intended semantic, flagged by an inline hint.
  */

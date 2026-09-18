@@ -51,8 +51,8 @@
  * participants in turn-based combat — because a section always supplies a
  * resolver (`NO_ACTIVATION` unless the GM Screen passes its own). The GM Screen
  * passes `activation`, and only the abilities it returns an override for (any
- * ability with a cost, plus anything on Recharge cooldown) get a working
- * Activate button backed by the panel's own AP. See
+ * ability with a cost or activation rolls, plus anything on Recharge cooldown)
+ * get a working Activate button backed by the panel's own AP. See
  * hooks/useNpcInstanceActivation.
  *
  * In edit mode, an "Add Ability" button opens the AbilityEditorModal, and each

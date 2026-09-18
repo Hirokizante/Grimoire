@@ -103,8 +103,9 @@ Grimoire is built to support that freedom:
   stores nothing when it is off, so a switched-off Basic Attack stays switched off).
 - **NPCs** — authored on the ability in the NPC editor like any other field, and rolled on the **GM
   Screen** under an NPC instance, where it spends that instance's own AP and takes that instance's
-  own Recharge cooldown. An NPC's base sheet still activates nothing: it is a static reference, so no
-  Activate button appears there.
+  own Recharge cooldown. A cost-free ability whose only job is to roll still gets an Activate button
+  there, so the rolls can be triggered. An NPC's base sheet still activates nothing: it is a static
+  reference, so no Activate button appears there.
 - **Graceful edges** — a custom attribute the sheet no longer defines rolls as a plain `d20` (an
   unknown variable is `+0` in dice notation), and an expression the parser cannot read is skipped
   rather than rolled as zero.

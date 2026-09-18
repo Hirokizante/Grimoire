@@ -165,9 +165,10 @@ NPC instances follow one rule: **instances are deltas, not clones.**
   deduction the player sheets use (`useAbilityActivation` with the panel's own resource
   adapter), not a second implementation. The ability's own *Show Activate* flag does not gate
   it: NPC abilities are authored in a mode that never offers the flag, and the panel's rule
-  is "a cost means a button". Ability cards with no cost stay static reference cards; a
-  cost-free ability that carries **Recharge** still gets one, because the cooldown is the
-  thing being tracked.
+  is "a cost means a button". Ability cards with no cost, no **Recharge** and no **activation
+  rolls** stay static reference cards: a cost-free ability that carries Recharge still gets
+  one, because the cooldown is the thing being tracked, and a cost-free ability authored to
+  roll on activation gets one because pressing it is what produces the rolls.
 - **Limited uses are the instance's own** — an ability flagged as limited shows its remaining
   uses on the panel and spends one per Activate when the ability is set to (an instance never
   spends a use for an ability whose *Expend on activate* is off, and a limited ability at 0
