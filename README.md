@@ -39,9 +39,12 @@ tracking resources and rolling dice.
 - **Dice roller** — inline notation (`d20`, `2d6+4`, `1d6+POW`, `2d6+POW/MAR`,
   a custom attribute like `2d6+SAN`, or a whole calculation such as
   `(1d6+POW)*2/2d6+MAR`) that becomes clickable in view mode, with a per-die
-  breakdown, critical and fumble badges, and a persistent roll
+  breakdown, critical and fumble badges, **Advantage/Disadvantage** (roll the
+  net d6s and add or subtract the highest), and a persistent roll
   log. An ability can also **roll its own dice on activation** — accuracy,
-  damage, and any custom rolls you add — shown together in one result window.
+  damage, and any custom rolls you add — shown together in one result window;
+  an attack roll of 20+ is a **critical hit**, rolling the damage twice and
+  keeping the higher result, and a damage roll can be marked critical by hand.
 - **GM Screen** — a saved surface holding one panel per sheet you are running:
   live references to player characters, or NPC instances with their own HP,
   turns, Recharge cooldowns, Mortal Wounds, limited uses, and tracked statuses.

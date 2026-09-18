@@ -19,9 +19,11 @@ import { createDefaultCharacter, createDefaultNPC } from '@/constants/gameData'
 import { DEFAULT_SHEET_COLORS } from '@/constants/gameData'
 import type { Character } from '@/types'
 
-const { dbMap, logged } = vi.hoisted(() => ({
+const { dbMap, logged, updated, nextId } = vi.hoisted(() => ({
   dbMap: new Map<string, unknown>(),
   logged: [] as unknown[],
+  updated: [] as { id: string; result: unknown }[],
+  nextId: { value: 1 },
 }))
 
 vi.mock('@/lib/db', () => ({
@@ -40,11 +42,25 @@ vi.mock('@/lib/db', () => ({
 vi.mock('@/store/rollLogStore', () => ({
   useRollLogStore: {
     getState: () => ({
-      logRoll: (entry: unknown) => {
-        logged.push(entry)
+      logRoll: (entry: Record<string, unknown>) => {
+        const created: Record<string, unknown> = {
+          ...entry,
+          id: `log-${nextId.value++}`,
+        }
+        logged.push(created)
+        return created
+      },
+      updateEntryResult: (id: string, result: unknown) => {
+        updated.push({ id, result })
       },
     }),
   },
+}))
+
+/** Deterministic d6s for advantage rolls, consumed in roll order. */
+const rollQueue: number[] = []
+vi.mock('@/lib/dice', () => ({
+  rollDie: () => rollQueue.shift() ?? 1,
 }))
 
 // The app-theme store reads localStorage at import time; seed it so the
@@ -77,6 +93,9 @@ function makeNPC(): Character {
 beforeEach(() => {
   dbMap.clear()
   logged.length = 0
+  updated.length = 0
+  nextId.value = 1
+  rollQueue.length = 0
   useAppThemeStore.setState({ theme: 'parchment' })
   useDiceRollStore.setState({
     isVisible: false,
@@ -86,6 +105,7 @@ beforeEach(() => {
     ability: null,
     rollCharacter: null,
     activation: null,
+    rollLogEntryId: null,
   })
 })
 
@@ -268,4 +288,167 @@ test('a single roll replaces an open activation', () => {
   const state = useDiceRollStore.getState()
   expect(state.activation).toBeNull()
   expect(state.result?.notation).toBe('1d20')
+})
+
+// ---- Advantage / Disadvantage -----------------------------------------------
+
+test('applying advantage updates the open result and rewrites its log entry', () => {
+  const bandit = makeNPC()
+  useDiceRollStore.getState().roll({ notation: '1d20', character: bandit })
+  const baseTotal = useDiceRollStore.getState().result!.total
+  const entryId = useDiceRollStore.getState().rollLogEntryId
+  expect(entryId).toBe('log-1')
+
+  rollQueue.push(3, 6)
+  useDiceRollStore.getState().applyAdvantage(2, 0)
+
+  const after = useDiceRollStore.getState()
+  expect(after.result?.total).toBe(baseTotal + 6)
+  expect(after.result?.advantage).toMatchObject({
+    kind: 'advantage',
+    dice: 2,
+    rolls: [3, 6],
+    modifier: 6,
+    baseTotal,
+  })
+  // One entry, rewritten in place — not a second advantage entry.
+  expect(logged).toHaveLength(1)
+  expect(updated).toEqual([{ id: entryId, result: after.result }])
+})
+
+test('clearing advantage restores the base total', () => {
+  const bandit = makeNPC()
+  useDiceRollStore.getState().roll({ notation: '1d20', character: bandit })
+  const baseTotal = useDiceRollStore.getState().result!.total
+
+  rollQueue.push(6)
+  useDiceRollStore.getState().applyAdvantage(1, 0)
+  expect(useDiceRollStore.getState().result?.total).toBe(baseTotal + 6)
+
+  useDiceRollStore.getState().applyAdvantage(0, 0)
+  const cleared = useDiceRollStore.getState().result!
+  expect(cleared.total).toBe(baseTotal)
+  expect(cleared.advantage).toBeUndefined()
+})
+
+test('a no-op advantage change does not rewrite the log', () => {
+  const bandit = makeNPC()
+  useDiceRollStore.getState().roll({ notation: '1d20', character: bandit })
+  useDiceRollStore.getState().applyAdvantage(0, 0)
+  expect(updated).toHaveLength(0)
+})
+
+test('applying disadvantage to an activation roll updates only that roll', () => {
+  const bandit = makeNPC()
+  activate(bandit, [
+    activationRoll('accuracy', 'd20+POW', bandit),
+    activationRoll('damage', '2d6', bandit),
+  ])
+  const before = useDiceRollStore.getState().activation!
+  const accuracyTotal = before.rolls[0].result.total
+  const damageResult = before.rolls[1].result
+
+  rollQueue.push(5)
+  useDiceRollStore.getState().applyActivationAdvantage(0, 0, 1)
+
+  const after = useDiceRollStore.getState().activation!
+  expect(after.rolls[0].result.total).toBe(accuracyTotal - 5)
+  expect(after.rolls[0].result.advantage).toMatchObject({
+    kind: 'disadvantage',
+    dice: 1,
+    modifier: -5,
+    baseTotal: accuracyTotal,
+  })
+  expect(after.rolls[0].advantage).toBe(0)
+  expect(after.rolls[0].disadvantage).toBe(1)
+  // The other roll is untouched.
+  expect(after.rolls[1].result).toBe(damageResult)
+  expect(updated).toEqual([
+    { id: after.rolls[0].logEntryId, result: after.rolls[0].result },
+  ])
+})
+
+test('an out-of-range activation index is ignored', () => {
+  const bandit = makeNPC()
+  activate(bandit, [activationRoll('accuracy', 'd20+POW', bandit)])
+  const before = useDiceRollStore.getState().activation
+
+  useDiceRollStore.getState().applyActivationAdvantage(9, 1, 0)
+
+  expect(useDiceRollStore.getState().activation).toBe(before)
+  expect(updated).toHaveLength(0)
+})
+
+// ---- Critical hits -----------------------------------------------------------
+
+test('toggling a critical re-rolls the damage and updates the log entry', () => {
+  const bandit = makeNPC()
+  useDiceRollStore.getState().roll({
+    notation: '2d6',
+    character: bandit,
+    source: { type: 'ability-damage', abilityName: 'Cleave' },
+  })
+  const baseTotal = useDiceRollStore.getState().result!.total
+  const entryId = useDiceRollStore.getState().rollLogEntryId
+  expect(entryId).toBe('log-1')
+
+  // 2d6 (6, 6) = 12 beats the base 2d6 (1, 1) = 2.
+  rollQueue.push(6, 6)
+  useDiceRollStore.getState().toggleCritical()
+
+  const crit = useDiceRollStore.getState().result!
+  expect(crit.total).toBe(12)
+  expect(crit.critical).toMatchObject({
+    chosen: 1,
+    rolls: [{ total: baseTotal }, { total: 12 }],
+  })
+  expect(updated).toEqual([{ id: entryId, result: crit }])
+
+  // Toggling again restores the first roll and rewrites the same entry.
+  useDiceRollStore.getState().toggleCritical()
+  const restored = useDiceRollStore.getState().result!
+  expect(restored.total).toBe(baseTotal)
+  expect(restored.critical).toBeUndefined()
+  expect(updated).toEqual([
+    { id: entryId, result: crit },
+    { id: entryId, result: restored },
+  ])
+})
+
+test('toggling a critical on an activation damage roll updates only that roll', () => {
+  const bandit = makeNPC()
+  activate(bandit, [
+    activationRoll('damage', '2d6', bandit),
+    activationRoll('custom', '1d6', bandit, 'Burn'),
+  ])
+  const before = useDiceRollStore.getState().activation!
+  const damageTotal = before.rolls[0].result.total
+  const customResult = before.rolls[1].result
+
+  rollQueue.push(5, 6)
+  useDiceRollStore.getState().toggleActivationCritical(0)
+
+  const after = useDiceRollStore.getState().activation!
+  expect(after.rolls[0].result.total).toBe(11)
+  expect(after.rolls[0].result.critical).toMatchObject({ chosen: 1 })
+  expect(damageTotal).toBeLessThan(11)
+  // The other roll is untouched.
+  expect(after.rolls[1].result).toBe(customResult)
+  expect(updated).toEqual([
+    { id: after.rolls[0].logEntryId, result: after.rolls[0].result },
+  ])
+})
+
+test('toggling a critical on a non-damage single roll still works from the store', () => {
+  // The modal only offers the control for damage rolls; the store itself is
+  // generic so a table rule ("that check crits") can drive it.
+  const bandit = makeNPC()
+  useDiceRollStore.getState().roll({ notation: '2d6', character: bandit })
+  const baseTotal = useDiceRollStore.getState().result!.total
+
+  rollQueue.push(4, 4)
+  useDiceRollStore.getState().toggleCritical()
+  expect(useDiceRollStore.getState().result?.total).toBe(8)
+  expect(useDiceRollStore.getState().result?.critical).toMatchObject({ chosen: 1 })
+  expect(useDiceRollStore.getState().result?.total).toBeGreaterThanOrEqual(baseTotal)
 })

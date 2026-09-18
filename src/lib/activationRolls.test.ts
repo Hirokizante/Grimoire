@@ -32,6 +32,7 @@ import {
   createDefaultNPC,
   generateId,
 } from '@/constants/gameData'
+import { MAX_ADVANTAGE_VALUE } from '@/lib/diceAdvantage'
 import type { AbilityBlock, Character } from '@/types'
 
 // The store modules read IndexedDB at import time; this test only exercises the
@@ -380,7 +381,8 @@ test('a fresh Basic Attack rolls against whoever activates it', () => {
 // ---- execution --------------------------------------------------------------
 
 test('execution groups the rolls the way the modal renders them', () => {
-  rollQueue.push(17, 3, 4, 6)
+  // Accuracy stays below the critical threshold so the damage is one roll.
+  rollQueue.push(15, 3, 4, 6)
   const character = makeCharacter()
   const group = rollAbilityActivation(
     makeAbility(
@@ -394,8 +396,8 @@ test('execution groups the rolls the way the modal renders them', () => {
     character,
   )
 
-  // d20 (17) + MAR (4); 2d6 (3, 4); 1d6 (6) — rolled in that order.
-  expect(group.accuracy?.result.total).toBe(21)
+  // d20 (15) + MAR (4); 2d6 (3, 4); 1d6 (6) — rolled in that order.
+  expect(group.accuracy?.result.total).toBe(19)
   expect(group.accuracy?.notation).toBe('d20+MAR')
   expect(group.damage?.result.total).toBe(7)
   expect(group.custom).toHaveLength(1)
@@ -430,8 +432,22 @@ test('an unparseable custom expression is skipped, not rolled as zero', () => {
   rollQueue.push(5)
   const group = runActivationRollPlan(
     [
-      { kind: 'custom', groupLabel: 'Custom', notation: '+++', hidden: false },
-      { kind: 'custom', groupLabel: 'Custom', notation: '1d6', hidden: false },
+      {
+        kind: 'custom',
+        groupLabel: 'Custom',
+        notation: '+++',
+        hidden: false,
+        advantage: 0,
+        disadvantage: 0,
+      },
+      {
+        kind: 'custom',
+        groupLabel: 'Custom',
+        notation: '1d6',
+        hidden: false,
+        advantage: 0,
+        disadvantage: 0,
+      },
     ],
     makeCharacter(),
   )
@@ -475,4 +491,171 @@ test('custom attributes list is optional on imported characters', () => {
       legacy,
     ),
   ).toBe('d20')
+})
+
+// ---- advantage / disadvantage -----------------------------------------------
+
+test('normalization keeps Advantage/Disadvantage on accuracy and custom rolls', () => {
+  expect(
+    normalizeActivationRolls({
+      accuracy: {
+        modifier: { kind: 'attribute', key: 'MAR' },
+        advantage: 2,
+        disadvantage: 1,
+      },
+      damage: { advantage: 1 },
+      custom: [{ notation: '1d6', disadvantage: 2 }],
+    }),
+  ).toEqual({
+    accuracy: {
+      modifier: { kind: 'attribute', key: 'MAR' },
+      advantage: 2,
+      disadvantage: 1,
+    },
+    // Damage carries no Advantage/Disadvantage any more: a legacy object form
+    // loads as a plain "roll damage".
+    damage: true,
+    custom: [{ notation: '1d6', disadvantage: 2 }],
+  })
+})
+
+test('normalization prunes zero/invalid values and clamps the rest', () => {
+  expect(
+    normalizeActivationRolls({
+      accuracy: {
+        modifier: { kind: 'attribute', key: 'MAR' },
+        advantage: 0,
+        disadvantage: -3,
+      },
+      damage: { advantage: 0, disadvantage: 0 },
+      custom: [{ notation: '1d6', advantage: MAX_ADVANTAGE_VALUE + 100 }],
+    }),
+  ).toEqual({
+    accuracy: { modifier: { kind: 'attribute', key: 'MAR' } },
+    damage: true,
+    custom: [{ notation: '1d6', advantage: MAX_ADVANTAGE_VALUE }],
+  })
+})
+
+test('the plan carries each roll’s authored Advantage/Disadvantage', () => {
+  const plan = buildActivationRollPlan(
+    makeAbility(
+      {
+        accuracy: { modifier: { kind: 'attribute', key: 'MAR' }, advantage: 2 },
+        damage: true,
+        custom: [{ notation: '1d6', advantage: 3, disadvantage: 1 }],
+      },
+      { damage: '2d6' },
+    ),
+    makeCharacter(),
+  )
+
+  expect(plan.map((s) => [s.advantage, s.disadvantage])).toEqual([
+    [2, 0],
+    // Damage is adjusted by critical hits instead, decided at execution.
+    [0, 0],
+    [3, 1],
+  ])
+})
+
+test('authored Advantage rolls its d6s after the initial roll and folds them in', () => {
+  // d20 (12) + MAR (4) = 16, then the 2d6 Advantage (3, 6) adds the highest.
+  rollQueue.push(12, 3, 6)
+  const group = rollAbilityActivation(
+    makeAbility({
+      accuracy: { modifier: { kind: 'attribute', key: 'MAR' }, advantage: 2 },
+    }),
+    makeCharacter(),
+  )
+
+  expect(group.accuracy?.result.total).toBe(22)
+  expect(group.accuracy?.result.advantage).toMatchObject({
+    kind: 'advantage',
+    dice: 2,
+    rolls: [3, 6],
+    modifier: 6,
+    baseTotal: 16,
+  })
+  // The outcome keeps the authored values, which pre-fill the modal's inputs.
+  expect(group.accuracy?.advantage).toBe(2)
+  expect(group.accuracy?.disadvantage).toBe(0)
+})
+
+// ---- critical hits -----------------------------------------------------------
+
+test('a damage roll crits when its accuracy total reaches 20', () => {
+  // Accuracy: d20 (16) + MAR (4) = 20 — exactly the threshold. Damage 2d6 is
+  // then rolled twice: (3, 4) = 7 and (5, 6) = 11, and the higher is kept.
+  rollQueue.push(16, 3, 4, 5, 6)
+  const group = rollAbilityActivation(
+    makeAbility(
+      {
+        accuracy: { modifier: { kind: 'attribute', key: 'MAR' } },
+        damage: true,
+      },
+      { damage: '2d6' },
+    ),
+    makeCharacter(),
+  )
+
+  expect(group.accuracy?.result.total).toBe(20)
+  expect(group.damage?.result.total).toBe(11)
+  expect(group.damage?.result.critical).toMatchObject({
+    chosen: 1,
+    rolls: [
+      { total: 7 },
+      { total: 11 },
+    ],
+  })
+})
+
+test('an accuracy total below 20 leaves the damage a single roll', () => {
+  // d20 (9) + MAR (4) = 13 — no critical, so the 2d6 damage is rolled once.
+  rollQueue.push(9, 5, 6)
+  const group = rollAbilityActivation(
+    makeAbility(
+      {
+        accuracy: { modifier: { kind: 'attribute', key: 'MAR' } },
+        damage: true,
+      },
+      { damage: '2d6' },
+    ),
+    makeCharacter(),
+  )
+
+  expect(group.accuracy?.result.total).toBe(13)
+  expect(group.damage?.result.total).toBe(11)
+  expect(group.damage?.result.critical).toBeUndefined()
+})
+
+test('a tie on the critical re-roll keeps the first damage result', () => {
+  rollQueue.push(20, 3, 4, 1, 6)
+  const group = rollAbilityActivation(
+    makeAbility(
+      {
+        accuracy: { modifier: { kind: 'attribute', key: 'MAR' } },
+        damage: true,
+      },
+      { damage: '2d6' },
+    ),
+    makeCharacter(),
+  )
+
+  expect(group.accuracy?.result.total).toBe(24)
+  // Both evaluations total 7, so the first (chosen 0) is kept.
+  expect(group.damage?.result.total).toBe(7)
+  expect(group.damage?.result.critical).toMatchObject({ chosen: 0 })
+})
+
+test('an activation with no accuracy roll has no attack roll to crit on', () => {
+  // Damage only: the 2d6 is rolled once, however high it lands.
+  rollQueue.push(6, 6)
+  const group = rollAbilityActivation(
+    makeAbility({ damage: true }, { damage: '2d6' }),
+    makeCharacter(),
+  )
+
+  expect(group.accuracy).toBeUndefined()
+  expect(group.damage?.result.total).toBe(12)
+  expect(group.damage?.result.critical).toBeUndefined()
 })

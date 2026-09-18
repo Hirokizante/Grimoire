@@ -100,10 +100,28 @@ export type ActivationAccuracySource =
   | { kind: 'custom'; id: string; token: string }
 
 /**
+ * Advantage/Disadvantage carried by an automatic activation roll.
+ *
+ * Values are dice counts (`advantage: 2` is "+2 Advantage", rolls 2d6 and adds
+ * the highest). They cancel, so an entry may carry both and the roller nets
+ * them. Both keys are omitted when zero, keeping stored shapes lean.
+ *
+ * Accuracy and custom rolls support this; the damage roll does not — an
+ * accuracy total of 20+ is a critical hit that rolls the damage twice instead
+ * (see lib/diceCrit.ts).
+ */
+export interface ActivationAdvantage {
+  /** d6s of Advantage added to the roll (highest die). */
+  advantage?: number
+  /** d6s of Disadvantage subtracted from the roll (highest die). */
+  disadvantage?: number
+}
+
+/**
  * One automatically-rolled dice expression on activation: what to roll, what to
  * call it in the result modal, and whether its result starts hidden.
  */
-export interface ActivationRoll {
+export interface ActivationRoll extends ActivationAdvantage {
   /** Dice notation (e.g. `2d6+POW`, `1d8+2`). */
   notation: string
   /** Short description shown on the result ("Fire damage", "Bleed"). */
@@ -114,6 +132,17 @@ export interface ActivationRoll {
    * the roll still happens and still lands in the roll log.
    */
   hidden?: boolean
+}
+
+/**
+ * The automatic accuracy roll: `d20 + <attribute>`, an optional extra bonus,
+ * and optional Advantage/Disadvantage.
+ */
+export interface ActivationAccuracyRoll extends ActivationAdvantage {
+  /** The d20's flat modifier — an Attribute or a custom attribute. */
+  modifier: ActivationAccuracySource
+  /** Optional extra notation appended to the d20 (e.g. `+2`, `+1d4`). */
+  bonus?: string
 }
 
 /**
@@ -131,15 +160,12 @@ export interface ActivationRoll {
  */
 export interface ActivationRolls {
   /** Roll `d20 + <attribute>` as the attack/accuracy check. */
-  accuracy?: {
-    /** The d20's flat modifier — an Attribute or a custom attribute. */
-    modifier: ActivationAccuracySource
-    /** Optional extra notation appended to the d20 (e.g. `+2`, `+1d4`). */
-    bonus?: string
-  }
+  accuracy?: ActivationAccuracyRoll
   /**
    * Roll the Ability's own `damage` field. The field itself is the notation, so
-   * editing the damage updates the activation roll with it.
+   * editing the damage updates the activation roll with it. An accuracy check
+   * that reaches a critical hit rolls this damage twice and keeps the higher
+   * result (see lib/diceCrit.ts).
    */
   damage?: boolean
   /** Extra rolls the author wants on activation, in order. */

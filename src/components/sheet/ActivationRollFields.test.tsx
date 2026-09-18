@@ -432,3 +432,110 @@ test('the hint explains what an activation rolls and in what order', () => {
     screen.getByRole('button', { name: /add custom roll/i }),
   ).toBeInTheDocument()
 })
+
+// ---- Advantage / Disadvantage -----------------------------------------------
+
+test('an accuracy roll can carry Advantage and Disadvantage', () => {
+  const onSave = renderEditor()
+  fireEvent.click(featureToggle())
+
+  fireEvent.change(
+    screen.getByRole('spinbutton', { name: 'Accuracy advantage' }),
+    { target: { value: '2' } },
+  )
+  fireEvent.change(
+    screen.getByRole('spinbutton', { name: 'Accuracy disadvantage' }),
+    { target: { value: '1' } },
+  )
+
+  expect(save(onSave).activationRolls).toEqual({
+    accuracy: {
+      modifier: { kind: 'attribute', key: 'MAR' },
+      advantage: 2,
+      disadvantage: 1,
+    },
+  })
+})
+
+test('an accuracy roll with cleared advantage drops the fields again', () => {
+  const onSave = renderEditor({
+    ...blankAbility(),
+    activationRolls: {
+      accuracy: {
+        modifier: { kind: 'attribute', key: 'MAR' },
+        advantage: 3,
+        disadvantage: 1,
+      },
+    },
+  })
+
+  expect(
+    screen.getByRole('spinbutton', { name: 'Accuracy advantage' }),
+  ).toHaveValue(3)
+
+  fireEvent.change(
+    screen.getByRole('spinbutton', { name: 'Accuracy advantage' }),
+    { target: { value: '' } },
+  )
+  fireEvent.change(
+    screen.getByRole('spinbutton', { name: 'Accuracy disadvantage' }),
+    { target: { value: '' } },
+  )
+
+  expect(save(onSave).activationRolls).toEqual({
+    accuracy: { modifier: { kind: 'attribute', key: 'MAR' } },
+  })
+})
+
+test('the damage roll offers no Advantage/Disadvantage', () => {
+  const onSave = renderEditor({ ...blankAbility(), damage: '2d6' })
+  fireEvent.click(featureToggle())
+  fireEvent.click(damageToggle())
+
+  expect(screen.queryByRole('spinbutton', { name: 'Damage advantage' })).toBeNull()
+  expect(screen.queryByRole('spinbutton', { name: 'Damage disadvantage' })).toBeNull()
+
+  expect(save(onSave).activationRolls?.damage).toBe(true)
+})
+
+test('a custom roll can carry Disadvantage', () => {
+  const onSave = renderEditor()
+  fireEvent.click(featureToggle())
+  fireEvent.click(screen.getByRole('button', { name: /add custom roll/i }))
+
+  fireEvent.change(
+    screen.getByRole('spinbutton', { name: 'Custom roll 1 disadvantage' }),
+    { target: { value: '2' } },
+  )
+
+  expect(save(onSave).activationRolls?.custom).toEqual([
+    { notation: '1d20', disadvantage: 2 },
+  ])
+})
+
+test('a saved advantage config re-opens with its values intact', () => {
+  renderEditor({
+    ...blankAbility(),
+    damage: '1d6',
+    activationRolls: {
+      accuracy: {
+        modifier: { kind: 'attribute', key: 'MAR' },
+        advantage: 2,
+        disadvantage: 1,
+      },
+      damage: true,
+      custom: [{ notation: '1d4', advantage: 1 }],
+    },
+  })
+
+  expect(
+    screen.getByRole('spinbutton', { name: 'Accuracy advantage' }),
+  ).toHaveValue(2)
+  expect(
+    screen.getByRole('spinbutton', { name: 'Accuracy disadvantage' }),
+  ).toHaveValue(1)
+  expect(damageToggle()).toBeChecked()
+  expect(
+    screen.getByRole('spinbutton', { name: 'Custom roll 1 advantage' }),
+  ).toHaveValue(1)
+})

@@ -325,6 +325,8 @@ export function useAbilityActivation(
           label: outcome.label,
           hidden: outcome.hidden,
           result: outcome.result,
+          advantage: outcome.advantage,
+          disadvantage: outcome.disadvantage,
         })),
       })
     }

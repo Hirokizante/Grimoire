@@ -6,6 +6,69 @@ characters regularly.
 
 ## Unreleased
 
+### Critical hits
+
+- **An attack roll of 20+ is a critical hit.** During an ability activation the
+  accuracy roll runs first; when its total reaches `CRITICAL_HIT_THRESHOLD`
+  (20) the damage spec is evaluated a second time and the higher result is kept
+  (`lib/diceCrit.ts`). The damage card opens already marked, with a `✦ CRIT`
+  badge, the two totals side by side (`7 vs 11 → keeps 11`), and the dice
+  breakdown of the roll that was kept. An accuracy total below 20, or an
+  activation with no accuracy roll of its own, leaves the damage as a single
+  roll.
+- **The same control marks a manual damage roll.** Clicking the dice notation in
+  an Ability Block's Damage field opens the single-roll window with a
+  **Critical Hit** button instead of Advantage/Disadvantage: pressing it rolls
+  the damage again and keeps the higher result, pressing **Remove Critical**
+  restores the first roll exactly. Either way the roll's existing log entry is
+  rewritten in place and reads back as
+  `Critical hit: 7 / 11 → keeps 11`.
+- **Damage replaced Advantage/Disadvantage.** Damage activation config carries
+  no `advantage`/`disadvantage` any more — the editor's Damage block offers no
+  Adv/Dis pair, and the modal never offers Adv/Dis on a damage roll (accuracy
+  and custom rolls keep theirs). Legacy object-form damage configs load as a
+  plain `damage: true` via `normalizeActivationRolls`.
+- **Testing.** `lib/diceCrit.test.ts` pins the threshold, the two evaluations,
+  keeping the higher, tie handling, removal, and that natural-20 detection still
+  reads a die face rather than a total; `activationRolls.test.ts` covers the
+  auto-crit (exact threshold, below it, ties, no-accuracy); `useAbilityActivation.test.tsx`
+  and `diceRollStore.test.ts` cover the activation path and the in-place log
+  rewrite; `DiceResultModal.test.tsx` drives the control; and
+  `e2e/activation-rolls.spec.ts` drives both the hand-marked and the automatic
+  critical in a real browser.
+
+### Advantage & Disadvantage
+
+- **Every non-damage roll can carry it.** The dice-result window has an
+  **Advantage** / **Disadvantage** pair on each result — the single-roll modal
+  and every accuracy/custom card of an activation. (Damage rolls carry the
+  critical-hit control instead; see above.) Enter the dice of each and press the
+  button: the two cancel, the net count is rolled as that many d6s *after* the
+  initial roll, and the highest die is added for Advantage or subtracted for
+  Disadvantage. The adjusted total, the d6s, and the signed modifier all show in
+  the window. Setting both back to 0 and pressing again clears the adjustment
+  and restores the base total, and changing a value re-rolls it from the base
+  total rather than stacking a second bonus.
+- **The roll log follows the new total.** The roll was logged the moment it
+  happened, so applying Advantage/Disadvantage rewrites that entry in place
+  (`rollLogStore.updateEntryResult`) instead of adding a second entry; expanding
+  the entry shows the adjustment (`Advantage +2: 6, 3 → +6`).
+- **Abilities author it on activation rolls.** Accuracy and each custom roll in
+  an ability's "Roll Dice on Activation" configuration gained an **Adv** / **Dis**
+  pair in the editor, stored as lean optional `advantage` / `disadvantage`
+  counts. On activation the dice roll automatically, after the part's own
+  expression, and the result window opens with the adjusted total and the inputs
+  pre-filled so a situational correction can be re-rolled.
+  Hand-edited/imported configs are sanitized on read by
+  `normalizeActivationRolls` (values clamped to `0..20`, zeros dropped).
+- **Testing.** `lib/diceAdvantage.test.ts` pins the arithmetic (add/subtract,
+  cancellation, clearing, re-roll-from-base); `activationRolls.test.ts` covers
+  normalization, the plan, and authored rolls folding their d6s in;
+  `diceRollStore.test.ts` pins the in-place log rewrite for both modal shapes;
+  `DiceResultModal.test.tsx` drives the controls; `ActivationRollFields.test.tsx`
+  covers authoring and re-opening; and `rollLogStore.test.ts` pins
+  `updateEntryResult`.
+
 ### A round tracker, and New Round for the whole screen
 
 - **A round counter on the GM Screen toolbar** — every screen now carries its own

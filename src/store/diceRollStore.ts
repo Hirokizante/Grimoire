@@ -22,6 +22,8 @@ import { create } from 'zustand'
 
 import { parseDiceNotation } from '@/lib/diceParser'
 import { evaluateExpression, type RollResult } from '@/lib/diceRoller'
+import { applyRollAdvantage } from '@/lib/diceAdvantage'
+import { applyCriticalHit, removeCriticalHit } from '@/lib/diceCrit'
 import { useCharacterStore } from '@/store/characterStore'
 import { useAppThemeStore } from '@/store/appThemeStore'
 import { appThemeSheetColors } from '@/lib/themeUtils'
@@ -55,6 +57,12 @@ export interface ActivationRollRequest {
   hidden: boolean
   /** The evaluated result (see lib/activationRolls.ts). */
   result: RollResult
+  /** Authored Advantage the result carries, for the modal's pre-fill. */
+  advantage?: number
+  /** Authored Disadvantage the result carries, for the modal's pre-fill. */
+  disadvantage?: number
+  /** Roll-log entry this roll was logged as, so it can be updated in place. */
+  logEntryId?: string
 }
 
 export interface ActivationRollRequestGroup {
@@ -79,6 +87,8 @@ export interface DiceRollState {
   rollCharacter: Character | null
   /** The activation whose results are open, when one was rolled. */
   activation: ActivationRollRequestGroup | null
+  /** Roll-log entry the single roll was logged as, so it can be updated. */
+  rollLogEntryId: string | null
 }
 
 export interface DiceRollActions {
@@ -90,6 +100,33 @@ export interface DiceRollActions {
    * or unfinished config can never open an empty result modal.
    */
   rollActivation: (req: ActivationRollRequestGroup) => void
+  /**
+   * Apply Advantage/Disadvantage to the open single roll. The d6s are rolled
+   * here, the result's total and `advantage` are rewritten, and the roll-log
+   * entry that was created when the roll happened is updated in place.
+   */
+  applyAdvantage: (advantage: number, disadvantage: number) => void
+  /**
+   * Apply Advantage/Disadvantage to one roll inside the open activation, by
+   * index, with the same roll-and-update behaviour as {@link applyAdvantage}.
+   */
+  applyActivationAdvantage: (
+    rollIndex: number,
+    advantage: number,
+    disadvantage: number,
+  ) => void
+  /**
+   * Toggle the critical hit on the open single roll: mark it (rolling the
+   * damage expression a second time and keeping the higher result) or remove
+   * the critical, restoring the first roll. The roll-log entry is updated in
+   * place either way. Only offered for damage rolls by the modal.
+   */
+  toggleCritical: () => void
+  /**
+   * Toggle the critical hit on one roll inside the open activation, by index —
+   * the same second-roll-and-keep-higher behaviour as {@link toggleCritical}.
+   */
+  toggleActivationCritical: (rollIndex: number) => void
   dismiss: () => void
 }
 
@@ -122,7 +159,7 @@ export function themeEntity(): Character | null {
   }
 }
 
-export const useDiceRollStore = create<DiceRollStore>()((set) => ({
+export const useDiceRollStore = create<DiceRollStore>()((set, get) => ({
   isVisible: false,
   result: null,
   notation: '',
@@ -130,6 +167,7 @@ export const useDiceRollStore = create<DiceRollStore>()((set) => ({
   ability: null,
   rollCharacter: null,
   activation: null,
+  rollLogEntryId: null,
 
   roll: (req) => {
     const { notation, character, source, ability, note } = req
@@ -140,7 +178,8 @@ export const useDiceRollStore = create<DiceRollStore>()((set) => ({
       ? { type: 'ability-damage', abilityName: ability.name, abilityId: ability.id }
       : { type: 'manual', note })
 
-    // Persist to roll-log.
+    // Persist to roll-log. The entry id is kept so Advantage applied later in
+    // the modal updates this same entry rather than adding a second one.
     const logEntry: NewRollLogEntry = {
       notation,
       characterId: character.id,
@@ -148,7 +187,7 @@ export const useDiceRollStore = create<DiceRollStore>()((set) => ({
       source: resolvedSource,
       result: finalResult,
     }
-    useRollLogStore.getState().logRoll(logEntry)
+    const logged = useRollLogStore.getState().logRoll(logEntry)
 
     set({
       isVisible: true,
@@ -160,6 +199,7 @@ export const useDiceRollStore = create<DiceRollStore>()((set) => ({
       // A single roll always replaces whatever modal was open, activation or
       // not — the modal shows one thing at a time.
       activation: null,
+      rollLogEntryId: logged?.id ?? null,
     })
   },
 
@@ -169,9 +209,10 @@ export const useDiceRollStore = create<DiceRollStore>()((set) => ({
 
     // Each part of the activation is its own roll-log entry: the log is a
     // roll-by-roll history, and a GM scanning it should see the damage roll
-    // next to the accuracy roll that produced it.
-    for (const roll of rolls) {
-      useRollLogStore.getState().logRoll({
+    // next to the accuracy roll that produced it. The ids are carried onto the
+    // modal's rolls so Advantage applied there updates the same entries.
+    const loggedRolls = rolls.map((roll) => {
+      const logged = useRollLogStore.getState().logRoll({
         notation: roll.notation,
         characterId: character.id,
         characterName: character.name,
@@ -184,7 +225,8 @@ export const useDiceRollStore = create<DiceRollStore>()((set) => ({
         },
         result: roll.result,
       })
-    }
+      return { ...roll, logEntryId: logged?.id }
+    })
 
     set({
       isVisible: true,
@@ -193,8 +235,81 @@ export const useDiceRollStore = create<DiceRollStore>()((set) => ({
       source: null,
       ability: null,
       rollCharacter: character,
-      activation: { abilityName, abilityId, character, rolls },
+      rollLogEntryId: null,
+      activation: { abilityName, abilityId, character, rolls: loggedRolls },
     })
+  },
+
+  applyAdvantage: (advantage, disadvantage) => {
+    const { result, rollLogEntryId } = get()
+    if (!result) return
+    const next = applyRollAdvantage(result, advantage, disadvantage)
+    if (next === result) return
+    if (rollLogEntryId) {
+      useRollLogStore.getState().updateEntryResult(rollLogEntryId, next)
+    }
+    set({ result: next })
+  },
+
+  applyActivationAdvantage: (rollIndex, advantage, disadvantage) => {
+    const { activation } = get()
+    const roll = activation?.rolls[rollIndex]
+    if (!activation || !roll) return
+    const next = applyRollAdvantage(roll.result, advantage, disadvantage)
+    if (next === roll.result) return
+
+    const rolls = activation.rolls.map((current, i) =>
+      i === rollIndex
+        ? { ...current, result: next, advantage, disadvantage }
+        : current,
+    )
+    if (roll.logEntryId) {
+      useRollLogStore.getState().updateEntryResult(roll.logEntryId, next)
+    }
+    set({ activation: { ...activation, rolls } })
+  },
+
+  toggleCritical: () => {
+    const { result, notation, rollCharacter, rollLogEntryId } = get()
+    if (!result || !rollCharacter) return
+
+    // Removing restores the first roll exactly; marking evaluates the damage
+    // expression once more and keeps the higher of the two.
+    const next = result.critical
+      ? removeCriticalHit(result)
+      : applyCriticalHit(result, () =>
+          evaluateExpression(parseDiceNotation(notation), rollCharacter),
+        )
+    if (next === result) return
+
+    if (rollLogEntryId) {
+      useRollLogStore.getState().updateEntryResult(rollLogEntryId, next)
+    }
+    set({ result: next })
+  },
+
+  toggleActivationCritical: (rollIndex) => {
+    const { activation } = get()
+    const roll = activation?.rolls[rollIndex]
+    if (!activation || !roll) return
+
+    const next = roll.result.critical
+      ? removeCriticalHit(roll.result)
+      : applyCriticalHit(roll.result, () =>
+          evaluateExpression(
+            parseDiceNotation(roll.notation),
+            activation.character,
+          ),
+        )
+    if (next === roll.result) return
+
+    const rolls = activation.rolls.map((current, i) =>
+      i === rollIndex ? { ...current, result: next } : current,
+    )
+    if (roll.logEntryId) {
+      useRollLogStore.getState().updateEntryResult(roll.logEntryId, next)
+    }
+    set({ activation: { ...activation, rolls } })
   },
 
   dismiss: () => {
@@ -206,6 +321,7 @@ export const useDiceRollStore = create<DiceRollStore>()((set) => ({
       ability: null,
       rollCharacter: null,
       activation: null,
+      rollLogEntryId: null,
     })
   },
 }))

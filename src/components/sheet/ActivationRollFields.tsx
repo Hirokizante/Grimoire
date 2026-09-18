@@ -30,8 +30,13 @@ import {
   accuracyModifierValue,
 } from '@/lib/activationRolls'
 import { customAttributeToken, findCustomAttributeById } from '@/lib/customAttributes'
+import {
+  MAX_ADVANTAGE_VALUE,
+  normalizeAdvantageValue,
+} from '@/lib/diceAdvantage'
 import type {
   ActivationAccuracySource,
+  ActivationAdvantage,
   ActivationRoll,
   ActivationRolls,
   AttributeKey,
@@ -69,6 +74,76 @@ function newCustomRoll(): ActivationRoll {
 function modifierButtonLabel(source: ActivationAccuracySource): string {
   if (source.kind === 'custom') return source.token || 'Custom…'
   return ATTRIBUTE_LIST.find((a) => a.key === source.key)?.abbreviation ?? source.key
+}
+
+/**
+ * Copy only non-zero Advantage/Disadvantage counts onto a config entry, so
+ * stored shapes stay lean and a cleared field really disappears.
+ */
+function withAdvantage<T extends ActivationAdvantage>(
+  base: T,
+  advantage: number,
+  disadvantage: number,
+): T {
+  const next = { ...base }
+  if (advantage > 0) next.advantage = advantage
+  else delete next.advantage
+  if (disadvantage > 0) next.disadvantage = disadvantage
+  else delete next.disadvantage
+  return next
+}
+
+/** The Advantage/Disadvantage pair on one authored roll. */
+function AdvantageFields({
+  advantage,
+  disadvantage,
+  name,
+  onChange,
+}: {
+  advantage: number
+  disadvantage: number
+  name: string
+  onChange: (advantage: number, disadvantage: number) => void
+}) {
+  const parse = (raw: string) =>
+    raw.trim() === '' ? 0 : normalizeAdvantageValue(Number(raw))
+
+  return (
+    <div className="ability-editor__activation-advantage">
+      <label
+        className="ability-editor__activation-advantage-field"
+        title="Dice of Advantage — the highest d6 is added to the roll"
+      >
+        <span className="ability-editor__activation-advantage-label">Adv</span>
+        <input
+          type="number"
+          min={0}
+          max={MAX_ADVANTAGE_VALUE}
+          className="sheet-input ability-editor__activation-advantage-input"
+          value={advantage || ''}
+          placeholder="0"
+          aria-label={`${name} advantage`}
+          onChange={(e) => onChange(parse(e.target.value), disadvantage)}
+        />
+      </label>
+      <label
+        className="ability-editor__activation-advantage-field"
+        title="Dice of Disadvantage — the highest d6 is subtracted from the roll"
+      >
+        <span className="ability-editor__activation-advantage-label">Dis</span>
+        <input
+          type="number"
+          min={0}
+          max={MAX_ADVANTAGE_VALUE}
+          className="sheet-input ability-editor__activation-advantage-input"
+          value={disadvantage || ''}
+          placeholder="0"
+          aria-label={`${name} disadvantage`}
+          onChange={(e) => onChange(advantage, parse(e.target.value))}
+        />
+      </label>
+    </div>
+  )
 }
 
 export default function ActivationRollFields({
@@ -123,6 +198,21 @@ export default function ActivationRollFields({
     })
   }
 
+  const setAccuracyAdvantage = (advantage: number, disadvantage: number) => {
+    if (!rolls?.accuracy) return
+    patch({
+      ...rolls,
+      accuracy: withAdvantage(rolls.accuracy, advantage, disadvantage),
+    })
+  }
+
+  /**
+   * The Damage roll has no Advantage/Disadvantage: an accuracy check that
+   * reaches a critical hit rolls the damage twice and keeps the higher result
+   * (see lib/diceCrit.ts), so it is simply on or off.
+   */
+  const damageEnabled = rolls?.damage === true
+
   const setDamage = (on: boolean) => {
     if (!rolls) return
     const next: ActivationRolls = { ...rolls }
@@ -142,6 +232,18 @@ export default function ActivationRollFields({
   const updateCustomRoll = (index: number, changes: Partial<ActivationRoll>) => {
     setCustomRolls(
       customRolls.map((roll, i) => (i === index ? { ...roll, ...changes } : roll)),
+    )
+  }
+
+  const setCustomRollAdvantage = (
+    index: number,
+    advantage: number,
+    disadvantage: number,
+  ) => {
+    setCustomRolls(
+      customRolls.map((roll, i) =>
+        i === index ? withAdvantage(roll, advantage, disadvantage) : roll,
+      ),
     )
   }
 
@@ -277,6 +379,13 @@ export default function ActivationRollFields({
                   aria-label="Extra accuracy bonus"
                 />
 
+                <AdvantageFields
+                  advantage={accuracy.advantage ?? 0}
+                  disadvantage={accuracy.disadvantage ?? 0}
+                  name="Accuracy"
+                  onChange={setAccuracyAdvantage}
+                />
+
                 <span className="ability-editor__activation-roll-hint">
                   {accuracyHint}
                 </span>
@@ -320,9 +429,9 @@ export default function ActivationRollFields({
             <label className="ability-editor__field ability-editor__field--inline">
               <input
                 type="checkbox"
-                checked={rolls.damage === true}
+                checked={damageEnabled}
                 onChange={(e) => setDamage(e.target.checked)}
-                disabled={!damageText && rolls.damage !== true}
+                disabled={!damageText && !damageEnabled}
               />
               <span className="ability-editor__label">Roll damage</span>
             </label>
@@ -364,6 +473,14 @@ export default function ActivationRollFields({
                       maxLength={MAX_ACTIVATION_ROLL_LABEL}
                       placeholder="Name (optional)"
                       aria-label={`Custom roll ${index + 1} name`}
+                    />
+                    <AdvantageFields
+                      advantage={roll.advantage ?? 0}
+                      disadvantage={roll.disadvantage ?? 0}
+                      name={`Custom roll ${index + 1}`}
+                      onChange={(advantage, disadvantage) =>
+                        setCustomRollAdvantage(index, advantage, disadvantage)
+                      }
                     />
                     <label
                       className="ability-editor__field ability-editor__field--inline ability-editor__activation-roll-hidden"

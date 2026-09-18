@@ -80,6 +80,17 @@ Grimoire is built to support that freedom:
   - **Custom rolls** — **+ Add Custom Roll** appends any number of extra expressions, each with an
     optional name ("Bleed") and an optional **Hide result**, for rolls the table only occasionally
     needs to read.
+  - **Advantage / Disadvantage** — accuracy and each custom roll carries an **Adv** / **Dis** pair.
+    An authored value rolls with the activation: the net count is rolled as that many d6s after the
+    part's own expression, the highest die is added for Advantage or subtracted for Disadvantage, and
+    the result window opens with the adjusted total already in place (with the inputs pre-filled, so
+    a situational correction can be re-rolled on the spot). The damage roll has no Adv/Dis — see the
+    critical-hit rule below.
+  - **Critical hits** — an accuracy result of **20 or more** is a critical hit: the damage is rolled
+    **twice and the higher result is kept**, and the damage card arrives marked (`✦ CRIT`) with both
+    totals shown. The control can remove the critical (restoring the first roll) or mark one by hand
+    when the table rules a hit critical. A damage-only activation — no accuracy roll of its own — is
+    never auto-crit; mark it by hand instead.
 - **What Activate does** — every configured roll happens in a fixed order: **accuracy, then damage,
   then the custom rolls as authored**. All of them appear **together in one result window** headed by
   the ability's name, each card outlined in its part's colour and showing its notation, its dice, its
@@ -313,13 +324,28 @@ Grimoire is built to support that freedom:
 - **Roll breakdown** — full per-term breakdown showing each die, each substituted variable, and the
   total (e.g. `2d6+POW → 4 + 3 + 4 = 11`). A compound roll keeps its shape too, operators and
   parentheses included (`(1d6+POW)*2/2d6+MAR → (3 + 4) × 2 ÷ (3 + 3) + 3 = 5`).
+- **Advantage & Disadvantage** — the result window carries an **Advantage** / **Disadvantage** pair
+  on a roll. Enter the dice of each and press the button: the net count (the two cancel) is rolled as
+  that many d6s *after* the initial roll, the highest die is added for Advantage or subtracted for
+  Disadvantage, and the new total is shown with the dice. Entering 0/0 clears an applied adjustment,
+  and changing a value re-rolls it from the roll's base total. Applying one updates the roll's
+  existing entry in the roll log in place — no duplicate entry.
+- **Critical hits** — a damage roll (an Ability Block's Damage field, or the damage part of an
+  activation) carries a **Critical Hit** control instead of Advantage/Disadvantage. An attack roll
+  totaling **20 or more** makes the damage critical automatically during an activation: the damage
+  expression is rolled twice and the higher result is kept, shown as `7 vs 11 → keeps 11` with a
+  `✦ CRIT` badge. The same control marks a manual damage roll critical (or removes the critical,
+  restoring the first roll), and the roll log's existing entry is updated in place with a
+  `Critical hit: 7 / 11 → keeps 11` line.
 - **Activation rolls** — one Activate press can perform several rolls at once (accuracy, damage, and
   hand-authored extras — see [Roll dice on activation](#roll-dice-on-activation)). They are shown
-  stacked in one result window in the order they were rolled, each with its own breakdown, and each
-  is logged separately.
+  stacked in one result window in the order they were rolled, each with its own breakdown; accuracy
+  and custom rolls keep their Advantage/Disadvantage controls, damage carries the critical control,
+  and each roll is logged separately.
 - **Critical / fumble detection** — nat 20 and nat 1 badges on d20 rolls.
 - **Roll log** — persistent, per-character roll history in a slide-out drawer; entries are saved to
-  IndexedDB and survive reloads.
+  IndexedDB and survive reloads. Expanding an entry shows its breakdown and, when one was applied,
+  its Advantage/Disadvantage reading (`Advantage +2: 6, 3 → +6`).
 
 ---
 

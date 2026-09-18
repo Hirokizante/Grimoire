@@ -22,6 +22,8 @@ import {
 } from '@/lib/diceParser'
 import { effectiveAttributes } from '@/lib/abilityModifiers'
 import { findCustomAttribute } from '@/lib/customAttributes'
+import type { RollAdvantage } from '@/lib/diceAdvantage'
+import type { RollCritical } from '@/lib/diceCrit'
 import type { Character } from '@/types'
 import { SKILL_LIST, ATTRIBUTE_LIST } from '@/constants/gameData'
 
@@ -57,6 +59,19 @@ export interface RollResult {
   terms: TermResult[]
   /** Human-readable breakdown string, e.g. "2d6+POW → 4 + 3 + 4 = 11". */
   breakdown: string
+  /**
+   * Advantage/Disadvantage applied on top of the roll, when one was. The base
+   * `total`/`terms`/`breakdown` always read as rolled; this holds the d6s and
+   * the signed modifier, and `total` already includes it. See
+   * lib/diceAdvantage.ts.
+   */
+  advantage?: RollAdvantage
+  /**
+   * Critical-hit re-roll of a damage expression, when one was. `total`/`terms`/
+   * `breakdown` carry the kept (higher) evaluation; this holds both. See
+   * lib/diceCrit.ts.
+   */
+  critical?: RollCritical
 }
 
 /**

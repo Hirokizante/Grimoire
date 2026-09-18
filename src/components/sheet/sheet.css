@@ -2629,6 +2629,34 @@
   width: 7rem;
 }
 
+/* [Adv n] [Dis n] — the Advantage/Disadvantage pair on one authored roll. */
+.ability-editor__activation-advantage {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex: 0 0 auto;
+}
+
+.ability-editor__activation-advantage-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.ability-editor__activation-advantage-label {
+  font-family: var(--sheet-label-font, inherit);
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.ability-editor__activation-advantage-input {
+  width: 3.2rem;
+  padding: 0.3rem 0.35rem;
+  font-size: 0.8rem;
+  text-align: center;
+}
+
 .ability-editor__activation-roll-hint {
   font-family: var(--sheet-helper-font, inherit);
   font-size: 0.72rem;

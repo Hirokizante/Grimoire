@@ -138,7 +138,8 @@ test('a fresh character’s Basic Attack rolls accuracy and damage on activation
   // authored attack, with the attack check and its damage together.
   const character = makeCharacter()
   useCharacterStore.setState({ characters: [character], currentCharacter: character })
-  // d20 = 18, 1d6 = 5.
+  // d20 = 18 → 22, a critical hit; the damage 1d6 is rolled twice — 5 and the
+  // mock's empty-queue max face (6) — and the higher 6 + MAR(4) = 10 is kept.
   rollQueue.push(18, 5)
 
   renderActivation(character.basicAttack, character)
@@ -150,7 +151,8 @@ test('a fresh character’s Basic Attack rolls accuracy and damage on activation
   expect(within(cards[0]).getByText('Accuracy')).toBeInTheDocument()
   expect(within(cards[0]).getByText('d20+MAR → 18 + 4 = 22')).toBeInTheDocument()
   expect(within(cards[1]).getByText('Damage')).toBeInTheDocument()
-  expect(within(cards[1]).getByText('1d6 + MAR → 5 + 4 = 9')).toBeInTheDocument()
+  expect(within(cards[1]).getByText('✦ CRIT')).toBeInTheDocument()
+  expect(within(cards[1]).getByText('1d6 + MAR → 6 + 4 = 10')).toBeInTheDocument()
 })
 
 test('a sub-ability activates and rolls on its own', () => {

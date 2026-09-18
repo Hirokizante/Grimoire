@@ -8,6 +8,8 @@ import { useRollLogStore } from '@/store/rollLogStore'
 import { useCharacterStore } from '@/store/characterStore'
 import { useAppThemeStore } from '@/store/appThemeStore'
 import { colorVars, appThemeColorVars } from '@/lib/themeUtils'
+import { advantageSummary } from '@/lib/diceAdvantage'
+import { criticalSummary } from '@/lib/diceCrit'
 import { rollLogSourceLabel } from '@/lib/rollSourceUtils'
 import type { RollLogEntry } from '@/types'
 
@@ -201,6 +203,16 @@ function RollLogItem({
           <p className="roll-log-item__breakdown">
             {entry.result.breakdown}
           </p>
+          {entry.result.advantage && (
+            <p className="roll-log-item__advantage">
+              {advantageSummary(entry.result.advantage)}
+            </p>
+          )}
+          {entry.result.critical && (
+            <p className="roll-log-item__critical">
+              {criticalSummary(entry.result.critical)}
+            </p>
+          )}
           <button
             type="button"
             className="roll-log-item__delete"

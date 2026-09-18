@@ -175,6 +175,200 @@
   width: 100%;
 }
 
+/* ---- Advantage / Disadvantage controls (on every result) ------------------- */
+
+.dice-advantage {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1.1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border-soft);
+}
+
+.dice-advantage__controls {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.dice-advantage__field {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+}
+
+.dice-advantage__field-label {
+  font-family: var(--sheet-label-font, inherit);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.dice-advantage__input {
+  width: 4.2rem;
+  padding: 0.35rem 0.45rem;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  background: var(--bg-surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.dice-advantage__roll {
+  font-size: 0.78rem;
+  padding: 0.4rem 0.7rem;
+}
+
+.dice-advantage__result {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.dice-advantage__kind {
+  font-family: var(--sheet-label-font, inherit);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-success, #4ade80);
+}
+
+.dice-advantage__kind--disadvantage {
+  color: var(--danger, #ef4444);
+}
+
+.dice-advantage__rolls {
+  display: inline-flex;
+  gap: 0.3rem;
+  flex-wrap: wrap;
+}
+
+.dice-advantage__modifier {
+  font-family: var(--sheet-heading-font, inherit);
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+/* Inside an activation card the controls sit tighter and lose the section's
+ * own top rule — the card is already the boundary. */
+.dice-activation__roll .dice-advantage {
+  margin-bottom: 0.6rem;
+  padding-top: 0.55rem;
+}
+
+.dice-activation__roll .dice-advantage__controls {
+  justify-content: flex-start;
+}
+
+.dice-activation__roll .dice-advantage__result {
+  justify-content: flex-start;
+}
+
+/* ---- Critical hit controls (damage rolls) ---------------------------------- */
+
+.dice-critical {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1.1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border-soft);
+}
+
+.dice-critical__toggle {
+  font-size: 0.78rem;
+  padding: 0.4rem 0.7rem;
+}
+
+.dice-critical__toggle--active {
+  color: var(--color-success, #4ade80);
+  border-color: color-mix(
+    in srgb,
+    var(--color-success, #4ade80) 50%,
+    var(--border-soft)
+  );
+}
+
+.dice-critical__result {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.dice-critical__kind {
+  font-family: var(--sheet-label-font, inherit);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-success, #4ade80);
+}
+
+.dice-critical__compare {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.dice-critical__roll {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.8rem;
+  height: 1.8rem;
+  padding: 0 0.35rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  background: var(--bg-surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+}
+
+.dice-critical__roll--kept {
+  color: var(--text-primary);
+  border-color: var(--color-success, #4ade80);
+  box-shadow: 0 0 6px rgba(74, 222, 128, 0.3);
+}
+
+.dice-critical__vs {
+  font-family: var(--sheet-label-font, inherit);
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.dice-critical__kept {
+  font-family: var(--sheet-heading-font, inherit);
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+/* Inside an activation card the control sits tighter and aligns left. */
+.dice-activation__roll .dice-critical {
+  align-items: flex-start;
+  margin-bottom: 0.6rem;
+  padding-top: 0.55rem;
+}
+
+.dice-activation__roll .dice-critical__result {
+  justify-content: flex-start;
+}
+
 /* ---- Activation results (one Activate press, several rolls) ----------------- */
 
 /* Wider than the single-roll modal because it stacks a whole action's rolls,
@@ -647,6 +841,20 @@ body:has(.modal-overlay) .mode-toggle--floating .mode-toggle__btn--active {
 .roll-log-item__breakdown {
   font-size: 0.75rem;
   color: var(--text-muted);
+  margin: 0;
+  word-break: break-word;
+}
+
+.roll-log-item__advantage {
+  font-size: 0.75rem;
+  color: var(--accent-violet-soft);
+  margin: 0;
+  word-break: break-word;
+}
+
+.roll-log-item__critical {
+  font-size: 0.75rem;
+  color: var(--color-success, #4ade80);
   margin: 0;
   word-break: break-word;
 }

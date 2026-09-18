@@ -220,3 +220,98 @@ test('an NPC ability rolls on the GM Screen under an instance, never on the base
   await expect(panel.locator('.gm-recharge--cooling')).toBeVisible()
   await expect(panel.getByText(/1 on cooldown/)).toBeVisible()
 })
+
+test('a damage-only activation can be marked as a critical hit by hand', async ({
+  page,
+}) => {
+  await gotoHome(page)
+  await createPlayer(page, 'Vex')
+
+  await page.getByRole('tab', { name: 'Edit', exact: true }).click()
+  const slotted = page.locator('.sheet-section--slotted')
+  await slotted.getByRole('button', { name: '+ Add Ability' }).click()
+
+  // Damage only, so there is no attack roll to auto-crit from.
+  await page.getByPlaceholder('Ability name').fill('Heavy Swing')
+  await page.getByLabel('Damage').fill('2d6')
+  await page.getByRole('checkbox', { name: 'Roll Dice on Activation' }).check()
+  await page.getByRole('checkbox', { name: 'Roll accuracy' }).uncheck()
+  await page.getByRole('checkbox', { name: 'Roll damage' }).check()
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
+  await page.getByRole('tab', { name: 'View', exact: true }).click()
+
+  const card = page.locator('.ability-activation').filter({ hasText: 'Heavy Swing' })
+  await card.getByRole('button', { name: 'Activate' }).click()
+
+  const modal = page.getByRole('dialog', { name: 'Heavy Swing' })
+  await expect(modal).toBeVisible()
+
+  const roll = activationRolls(page).nth(0)
+  await expect(roll).toContainText('Damage')
+  await expect(roll).toContainText('2d6')
+
+  // Damage carries the Critical control — never Advantage/Disadvantage.
+  const critToggle = roll.getByRole('button', { name: 'Critical Hit' })
+  await expect(critToggle).toBeVisible()
+  await expect(roll.getByRole('spinbutton')).toHaveCount(0)
+
+  await critToggle.click()
+
+  // The damage was rolled a second time: both totals show, the higher is kept,
+  // and the card's big total is that higher number.
+  const chips = roll.locator('.dice-critical__roll')
+  await expect(chips).toHaveCount(2)
+  const first = Number(await chips.nth(0).textContent())
+  const second = Number(await chips.nth(1).textContent())
+  await expect(roll.locator('.dice-critical__kept')).toHaveText(
+    `keeps ${Math.max(first, second)}`,
+  )
+  await expect(roll.locator('.dice-activation__roll-total')).toHaveText(
+    String(Math.max(first, second)),
+  )
+  await expect(roll.getByText('✦ CRIT')).toBeVisible()
+
+  // Removing it restores the first roll exactly.
+  await roll.getByRole('button', { name: 'Remove Critical' }).click()
+  await expect(roll.locator('.dice-activation__roll-total')).toHaveText(
+    String(first),
+  )
+  await expect(roll.locator('.dice-critical__result')).toHaveCount(0)
+})
+
+test('an accuracy total of 20+ crits the activation damage automatically', async ({
+  page,
+}) => {
+  await gotoHome(page)
+  await createPlayer(page, 'Vex')
+
+  await page.getByRole('tab', { name: 'Edit', exact: true }).click()
+  const slotted = page.locator('.sheet-section--slotted')
+  await slotted.getByRole('button', { name: '+ Add Ability' }).click()
+
+  // The +20 accuracy bonus makes any d20 roll reach the critical threshold,
+  // so the auto-crit does not depend on the dice landing a certain way.
+  await page.getByPlaceholder('Ability name').fill('Executioner')
+  await page.getByLabel('Damage').fill('2d6')
+  await page.getByRole('checkbox', { name: 'Roll Dice on Activation' }).check()
+  await page.getByLabel('Extra accuracy bonus').fill('+20')
+  await page.getByRole('checkbox', { name: 'Roll damage' }).check()
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
+  await page.getByRole('tab', { name: 'View', exact: true }).click()
+
+  const card = page.locator('.ability-activation').filter({ hasText: 'Executioner' })
+  await card.getByRole('button', { name: 'Activate' }).click()
+
+  const modal = page.getByRole('dialog', { name: 'Executioner' })
+  await expect(modal).toBeVisible()
+
+  // Accuracy 20+, so the damage arrives already critical: two evaluations on
+  // screen, the higher kept, and the control offering to remove it.
+  const damage = activationRolls(page).nth(1)
+  await expect(damage).toContainText('Damage')
+  await expect(damage.getByText('✦ CRIT')).toBeVisible()
+  await expect(damage.locator('.dice-critical__roll')).toHaveCount(2)
+  await expect(
+    damage.getByRole('button', { name: 'Remove Critical' }),
+  ).toBeVisible()
+})

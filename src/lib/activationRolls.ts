@@ -28,11 +28,14 @@
 import { ATTRIBUTE_LIST } from '@/constants/gameData'
 import { effectiveAttributes } from '@/lib/abilityModifiers'
 import { findCustomAttribute } from '@/lib/customAttributes'
+import { normalizeAdvantageValue, applyRollAdvantage } from '@/lib/diceAdvantage'
+import { applyCriticalHit, isCriticalHit } from '@/lib/diceCrit'
 import { parseDiceNotation, type ParsedExpression } from '@/lib/diceParser'
 import { evaluateExpression, type RollResult } from '@/lib/diceRoller'
 import type {
   AbilityBlock,
   ActivationAccuracySource,
+  ActivationAdvantage,
   ActivationRoll,
   ActivationRolls,
   AttributeKey,
@@ -67,6 +70,10 @@ export interface ActivationRollSpec {
   notation: string
   /** Start the result collapsed behind a "Show result" toggle. */
   hidden: boolean
+  /** d6s of Advantage authored on this roll (0 when none). */
+  advantage: number
+  /** d6s of Disadvantage authored on this roll (0 when none). */
+  disadvantage: number
 }
 
 /**
@@ -93,6 +100,22 @@ function cleanLabel(raw: unknown): string | undefined {
   return label.length > 0 ? label : undefined
 }
 
+/**
+ * Copy sanitized Advantage/Disadvantage counts onto a config entry. Zero and
+ * invalid values are dropped so the stored shape carries only what was
+ * authored.
+ */
+function assignAdvantage<T extends ActivationAdvantage>(
+  target: T,
+  raw: Record<string, unknown>,
+): T {
+  const advantage = normalizeAdvantageValue(raw.advantage)
+  const disadvantage = normalizeAdvantageValue(raw.disadvantage)
+  if (advantage > 0) target.advantage = advantage
+  if (disadvantage > 0) target.disadvantage = disadvantage
+  return target
+}
+
 /** Validate/repair one untrusted custom roll entry. */
 function normalizeActivationRoll(raw: unknown): ActivationRoll | undefined {
   if (!raw || typeof raw !== 'object') return undefined
@@ -100,11 +123,23 @@ function normalizeActivationRoll(raw: unknown): ActivationRoll | undefined {
   const notation = typeof e.notation === 'string' ? e.notation.trim() : ''
   // A roll with no expression is not a roll — drop it rather than rolling 0.
   if (!notation) return undefined
-  const roll: ActivationRoll = { notation }
+  const roll = assignAdvantage<ActivationRoll>({ notation }, e)
   const label = cleanLabel(e.label)
   if (label) roll.label = label
   if (e.hidden === true) roll.hidden = true
   return roll
+}
+
+/**
+ * Validate/repair the Damage roll config: `true` (roll as written) or undefined
+ * (not rolled). The damage roll deliberately carries no Advantage/Disadvantage
+ * — a hit at 20+ is a critical hit that rolls damage twice instead (see
+ * lib/diceCrit.ts) — so a legacy object form loads as a plain "roll damage".
+ */
+function normalizeDamageRoll(raw: unknown): ActivationRolls['damage'] {
+  if (raw === true) return true
+  if (raw && typeof raw === 'object') return true
+  return undefined
 }
 
 /** Validate/repair one untrusted accuracy modifier reference. */
@@ -151,7 +186,10 @@ export function normalizeActivationRolls(
     const a = accuracyRaw as Record<string, unknown>
     const modifier = normalizeAccuracyModifier(a.modifier)
     if (modifier) {
-      const accuracy: NonNullable<ActivationRolls['accuracy']> = { modifier }
+      const accuracy = assignAdvantage<NonNullable<ActivationRolls['accuracy']>>(
+        { modifier },
+        a,
+      )
       // The extra bonus is free-form notation (`+2`, `+1d4`), so it is kept
       // verbatim — the parser is the only thing that needs to understand it.
       if (typeof a.bonus === 'string' && a.bonus.trim()) {
@@ -161,7 +199,8 @@ export function normalizeActivationRolls(
     }
   }
 
-  if (e.damage === true) result.damage = true
+  const damage = normalizeDamageRoll(e.damage)
+  if (damage) result.damage = damage
 
   if (Array.isArray(e.custom)) {
     const custom: ActivationRoll[] = []
@@ -184,7 +223,11 @@ export function activationRolls(ability: AbilityBlock): ActivationRolls {
 /** Whether the ability rolls anything when activated. */
 export function hasActivationRolls(ability: AbilityBlock): boolean {
   const rolls = activationRolls(ability)
-  return rolls.accuracy != null || rolls.damage === true || (rolls.custom?.length ?? 0) > 0
+  return (
+    rolls.accuracy != null ||
+    rolls.damage === true ||
+    (rolls.custom?.length ?? 0) > 0
+  )
 }
 
 /** The accuracy modifier's display token ("MAR", "SAN", or the full name). */
@@ -264,6 +307,8 @@ export function buildActivationRollPlan(
       groupLabel: 'Accuracy',
       notation: accuracyNotation(rolls.accuracy, character),
       hidden: false,
+      advantage: rolls.accuracy.advantage ?? 0,
+      disadvantage: rolls.accuracy.disadvantage ?? 0,
     })
   }
 
@@ -275,6 +320,10 @@ export function buildActivationRollPlan(
       // updates the activation roll with it — no second copy to keep in sync.
       notation: ability.damage.trim(),
       hidden: false,
+      // Damage carries no Advantage/Disadvantage: a critical hit is decided by
+      // the accuracy total at execution and rolls the damage twice instead.
+      advantage: 0,
+      disadvantage: 0,
     })
   }
 
@@ -285,6 +334,8 @@ export function buildActivationRollPlan(
       label: cleanLabel(roll.label),
       notation: roll.notation,
       hidden: roll.hidden === true,
+      advantage: roll.advantage ?? 0,
+      disadvantage: roll.disadvantage ?? 0,
     })
   }
 
@@ -307,7 +358,15 @@ function parseSpec(spec: ActivationRollSpec): ParsedExpression | null {
  *
  * An expression the parser cannot make anything of is skipped rather than
  * rolled as zero — a malformed custom roll should cost the player a line in the
- * modal, not a wrong number.
+ * modal, not a wrong number. A roll's authored Advantage/Disadvantage is rolled
+ * here, after its expression, so the opening result already includes it (the
+ * modal can still re-roll it — see lib/diceAdvantage.ts).
+ *
+ * Accuracy runs before damage (the plan's fixed order), so a damage spec can
+ * see the attack roll it follows: an accuracy total at or above
+ * {@link isCriticalHit}'s threshold makes the damage a **critical hit**, rolled
+ * twice with the higher result kept (lib/diceCrit.ts). An activation with no
+ * accuracy roll of its own has no attack roll to crit on.
  */
 export function runActivationRollPlan(
   plan: readonly ActivationRollSpec[],
@@ -318,11 +377,17 @@ export function runActivationRollPlan(
   for (const spec of plan) {
     const expression = parseSpec(spec)
     if (!expression) continue
-    const outcome: ActivationRollOutcome = {
-      ...spec,
-      character,
-      result: evaluateExpression(expression, character),
+    let result = applyRollAdvantage(
+      evaluateExpression(expression, character),
+      spec.advantage,
+      spec.disadvantage,
+    )
+    if (spec.kind === 'damage' && isCriticalHit(group.accuracy?.result)) {
+      result = applyCriticalHit(result, () =>
+        evaluateExpression(expression, character),
+      )
     }
+    const outcome: ActivationRollOutcome = { ...spec, character, result }
     if (spec.kind === 'accuracy') group.accuracy = outcome
     else if (spec.kind === 'damage') group.damage = outcome
     else group.custom.push(outcome)

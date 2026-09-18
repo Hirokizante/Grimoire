@@ -20,6 +20,7 @@ import {
   putRollLogEntry,
 } from '@/lib/db'
 import { generateId } from '@/constants/gameData'
+import type { RollResult } from '@/lib/diceRoller'
 import type { RollLogEntry, NewRollLogEntry } from '@/types'
 
 /** How many entries to keep in the rolling "recent" window in the drawer. */
@@ -44,6 +45,12 @@ export interface RollLogActions {
    * Automatically tags the entry with our own rolled timestamps/crit flags.
    */
   logRoll: (input: NewRollLogEntry) => RollLogEntry
+  /**
+   * Replace one entry's result in place and persist it — used when
+   * Advantage/Disadvantage is applied to a roll after it was logged (the base
+   * roll happens first, so the entry already exists).
+   */
+  updateEntryResult: (id: string, result: RollResult) => void
   /** Toggle the roll-log drawer visibility. */
   toggleDrawer: () => void
   /** Open the roll-log drawer. */
@@ -66,6 +73,26 @@ export interface RollLogActions {
 
 export type RollLogStore = RollLogState & RollLogActions
 
+/**
+ * The natural-20 / natural-1 tags for a result: the primary (first) dice term's
+ * sides decide what "natural" means, matching how the modal badges it.
+ */
+function critFlags(result: RollResult): {
+  isNaturalTwenty: boolean
+  isNaturalOne: boolean
+} {
+  const diceTerms = result.terms.filter((t) => t.term.type === 'dice')
+  const allDiceRolls = diceTerms.flatMap((t) => t.rolls ?? [])
+  const sides =
+    diceTerms.length > 0 && diceTerms[0].term.type === 'dice'
+      ? diceTerms[0].term.sides
+      : 20
+  return {
+    isNaturalTwenty: sides === 20 && allDiceRolls.some((r) => r === 20),
+    isNaturalOne: sides === 20 && allDiceRolls.some((r) => r === 1),
+  }
+}
+
 export const useRollLogStore = create<RollLogStore>()((set, get) => ({
   entries: [],
   drawerOpen: false,
@@ -83,12 +110,6 @@ export const useRollLogStore = create<RollLogStore>()((set, get) => ({
   },
 
   logRoll: (input) => {
-    const diceTerms = input.result.terms.filter((t) => t.term.type === 'dice')
-    const allDiceRolls = diceTerms.flatMap((t) => t.rolls ?? [])
-    const sides = diceTerms.length > 0 && diceTerms[0].term.type === 'dice' ? diceTerms[0].term.sides : 20
-    const isNaturalTwenty = sides === 20 && allDiceRolls.some((r) => r === 20)
-    const isNaturalOne = sides === 20 && allDiceRolls.some((r) => r === 1)
-
     const entry: RollLogEntry = {
       id: generateId(),
       notation: input.notation,
@@ -97,8 +118,7 @@ export const useRollLogStore = create<RollLogStore>()((set, get) => ({
       source: input.source,
       result: input.result,
       rolledAt: new Date().toISOString(),
-      isNaturalTwenty,
-      isNaturalOne,
+      ...critFlags(input.result),
     }
 
     set((state) => ({
@@ -108,6 +128,16 @@ export const useRollLogStore = create<RollLogStore>()((set, get) => ({
     void putRollLogEntry(entry)
 
     return entry
+  },
+
+  updateEntryResult: (id, result) => {
+    const entry = get().entries.find((e) => e.id === id)
+    if (!entry) return
+    const updated: RollLogEntry = { ...entry, result }
+    set((state) => ({
+      entries: state.entries.map((e) => (e.id === id ? updated : e)),
+    }))
+    void putRollLogEntry(updated)
   },
 
   toggleDrawer: () => {
