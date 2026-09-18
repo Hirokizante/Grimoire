@@ -28,7 +28,7 @@
 import { ATTRIBUTE_LIST } from '@/constants/gameData'
 import { effectiveAttributes } from '@/lib/abilityModifiers'
 import { findCustomAttribute } from '@/lib/customAttributes'
-import { parseDiceNotation } from '@/lib/diceParser'
+import { parseDiceNotation, type ParsedExpression } from '@/lib/diceParser'
 import { evaluateExpression, type RollResult } from '@/lib/diceRoller'
 import type {
   AbilityBlock,
@@ -292,6 +292,16 @@ export function buildActivationRollPlan(
 }
 
 /**
+ * Parse a spec's notation, or null when the parser can make nothing of it. The
+ * one definition of "this roll can run", shared by the runner and
+ * {@link willRollOnActivation}.
+ */
+function parseSpec(spec: ActivationRollSpec): ParsedExpression | null {
+  const expression = parseDiceNotation(spec.notation)
+  return expression.root ? expression : null
+}
+
+/**
  * Execute an activation plan: parse and evaluate every roll against the acting
  * entity, keeping the authored order and the part each roll belongs to.
  *
@@ -306,8 +316,8 @@ export function runActivationRollPlan(
   const group: ActivationRollGroup = { custom: [] }
 
   for (const spec of plan) {
-    const expression = parseDiceNotation(spec.notation)
-    if (!expression.root) continue
+    const expression = parseSpec(spec)
+    if (!expression) continue
     const outcome: ActivationRollOutcome = {
       ...spec,
       character,
@@ -319,6 +329,28 @@ export function runActivationRollPlan(
   }
 
   return group
+}
+
+/**
+ * Whether activating the ability will really open a result window for this
+ * entity.
+ *
+ * {@link hasActivationRolls} reports what the author configured; this reports
+ * what would run. The two differ for a half-configured ability (damage switched
+ * on with an empty Damage field, which builds no spec) and for one whose only
+ * expression the parser cannot read (the plan holds it, but
+ * {@link runActivationRollPlan} would skip it). A surface whose only reason to
+ * offer an Activate button is the rolls asks this question, not the authored
+ * one, so no button opens an empty result window (see
+ * `useNpcInstanceActivation`).
+ */
+export function willRollOnActivation(
+  ability: AbilityBlock,
+  character: Character,
+): boolean {
+  return buildActivationRollPlan(ability, character).some(
+    (spec) => parseSpec(spec) != null,
+  )
 }
 
 /** Whether an executed group actually holds any roll. */

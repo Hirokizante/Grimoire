@@ -196,8 +196,9 @@ export default function SubAbilityBlock({
   // in useAbilityActivation so a Sub-Ability behaves exactly like a regular
   // ability card. A GM NPC panel supplies a resolver, and then the resolver is
   // the last word: it returns an override only for the sub-abilities that
-  // should activate (anything with a cost), so the `showActivate` flag — which
-  // the NPC editor does not offer — cannot re-enable one the panel skipped.
+  // should activate (a cost, a Recharge value, or activation rolls that will
+  // really run), so the `showActivate` flag — which the NPC editor does not
+  // offer — cannot re-enable one the panel skipped.
   // The same contract silences a Sub-Ability whose parent is *not* in play: a
   // pooled ability and an NPC sheet outside the GM Screen both pass a resolver
   // that answers "no", so the parent's slot state — not this block's own flag —

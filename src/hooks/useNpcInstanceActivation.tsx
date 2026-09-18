@@ -19,10 +19,13 @@
  * the persistent roll log.
  *
  * **Which abilities activate?** Any ability with a cost (`hasAbilityCost`), any
- * ability carrying a Recharge value, and any ability authored to roll on
- * activation (`hasActivationRolls`) — the GM panel does not consult the
- * ability's `showActivate` flag, which the NPC editor never even offers. An
- * ability with none of the three stays a plain reference card.
+ * ability carrying a Recharge value, and any ability whose activation rolls
+ * would really run (`willRollOnActivation`) — the GM panel does not consult
+ * the ability's `showActivate` flag, which the NPC editor never even offers. An
+ * ability with none of the three stays a plain reference card, as does one
+ * whose rolls are only half-configured (damage switched on with an empty Damage
+ * field, see `ActivationRollFields`): the plan would open no result window, so
+ * the card grows no button that pretends otherwise.
  *
  * **Limited uses and modifier switches belong to the instance.** Activating a
  * limited ability spends one of *this panel's* uses
@@ -48,7 +51,8 @@ import {
   abilityRechargeValue,
   rechargeRollResult,
 } from '@/lib/abilityRecharge'
-import { hasActivationRolls } from '@/lib/activationRolls'
+import { willRollOnActivation } from '@/lib/activationRolls'
+import { withInstanceState } from '@/lib/gmScreenUtils'
 import { useGMScreenStore } from '@/store/gmScreenStore'
 import { useRollLogStore } from '@/store/rollLogStore'
 import type {
@@ -111,6 +115,18 @@ export function useNpcInstanceActivation(
   const cooldownIds = useMemo(() => new Set(cooldowns), [cooldowns])
 
   /**
+   * The entity this instance activates as: the base record with the panel's own
+   * uses and modifier switches applied — the same projection the panel body
+   * renders (`withInstanceState`). The activation gate resolves the roll plan
+   * against it, so the roll-only reason for a button matches what
+   * `useAbilityActivation` will really run.
+   */
+  const entity = useMemo(
+    () => withInstanceState(base, panel.state),
+    [base, panel.state],
+  )
+
+  /**
    * The instance's resource adapter. END and FP are `null` — an NPC panel does
    * not track them, so those costs are neither deducted nor allowed to block an
    * activation (the ability cards still show the authored cost badges).
@@ -159,10 +175,13 @@ export function useNpcInstanceActivation(
   const activation = useCallback<AbilityActivationOverrideResolver>(
     (ability: AbilityBlock) => {
       const recharge = abilityRechargeValue(ability)
+      // The roll-only reason for a button is a plan that will really run: an
+      // authored damage toggle with an empty Damage field builds an empty plan
+      // and would open no result window, so it stays a reference card.
       if (
         recharge == null &&
         !hasAbilityCost(ability.cost) &&
-        !hasActivationRolls(ability)
+        !willRollOnActivation(ability, entity)
       )
         return null
 
@@ -192,7 +211,7 @@ export function useNpcInstanceActivation(
                 ) : null,
       } satisfies AbilityActivationOverride
     },
-    [cooldownIds, resources, label, screenId, panelId, markAbilityCooldown],
+    [cooldownIds, resources, label, screenId, panelId, markAbilityCooldown, entity],
   )
 
   const startTurn = useCallback(() => {

@@ -24,6 +24,7 @@ import {
   normalizeActivationRolls,
   rollAbilityActivation,
   runActivationRollPlan,
+  willRollOnActivation,
 } from '@/lib/activationRolls'
 import {
   createDefaultBasicAttack,
@@ -310,6 +311,37 @@ test('damage switched on with an empty damage field rolls nothing', () => {
 
 test('an ability with no config builds an empty plan', () => {
   expect(buildActivationRollPlan(blankAbility(), makeCharacter())).toEqual([])
+})
+
+test('willRollOnActivation reports what would run, not what was authored', () => {
+  const character = makeCharacter()
+  const halfConfigured = makeAbility({ damage: true })
+  const unreadable = makeAbility({ custom: [{ notation: '+++' }] })
+
+  // Both are "authored to roll"…
+  expect(hasActivationRolls(halfConfigured)).toBe(true)
+  expect(hasActivationRolls(unreadable)).toBe(true)
+  // …but neither would open a result window.
+  expect(willRollOnActivation(halfConfigured, character)).toBe(false)
+  expect(willRollOnActivation(unreadable, character)).toBe(false)
+
+  // One runnable roll is what makes the difference — alone or beside a
+  // malformed one.
+  expect(
+    willRollOnActivation(
+      makeAbility({ damage: true }, { damage: '1d6' }),
+      character,
+    ),
+  ).toBe(true)
+  expect(
+    willRollOnActivation(
+      makeAbility(
+        { damage: true, custom: [{ notation: '+++' }] },
+        { damage: '1d6' },
+      ),
+      character,
+    ),
+  ).toBe(true)
 })
 
 test('a fresh Basic Attack is born rolling its whole attack', () => {

@@ -2066,6 +2066,25 @@ test('NPC panel: a cost-free ability that rolls on activation gets an Activate b
   expect(within(rolls[0]).getByText('1d4 → 3 = 3')).toBeInTheDocument()
 })
 
+test('NPC panel: a half-configured roll grows no Activate button', () => {
+  const base = makeBaseWith([
+    makeAbility({
+      id: 'a1',
+      name: 'Menacing Growl',
+      cost: {},
+      // The editor leaves `damage: true` ticked when the Damage field is
+      // cleared, but the plan then holds nothing to roll: a button would open
+      // no result window, so the card stays a reference card.
+      damage: '',
+      activationRolls: { damage: true },
+    }),
+  ])
+  renderNpcPanel(base)
+
+  // No cost, no Recharge, and no runnable roll — nothing for a button to do.
+  expect(activateButtons()).toHaveLength(0)
+})
+
 test('NPC panel: the collapsed panel shows how many abilities are cooling', () => {
   const base = makeBaseWith([
     makeAbility({ id: 'a1', name: 'Fire Breath', traits: ['Recharge (5)'] }),

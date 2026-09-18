@@ -51,8 +51,8 @@
  * participants in turn-based combat — because a section always supplies a
  * resolver (`NO_ACTIVATION` unless the GM Screen passes its own). The GM Screen
  * passes `activation`, and only the abilities it returns an override for (any
- * ability with a cost or activation rolls, plus anything on Recharge cooldown)
- * get a working Activate button backed by the panel's own AP. See
+ * ability with a cost, a Recharge value, or activation rolls that will really
+ * run) get a working Activate button backed by the panel's own AP. See
  * hooks/useNpcInstanceActivation.
  *
  * In edit mode, an "Add Ability" button opens the AbilityEditorModal, and each
@@ -300,9 +300,10 @@ export default function NPCAbilitiesSection({
 
   /**
    * One card in **view** mode: a GM panel's activatable wrapper when the
-   * resolver returns an override for it (anything with a cost, plus anything on
-   * Recharge cooldown), the plain reference card otherwise. Shared by the
-   * pinned Basic Attack and the list, so the two cannot drift.
+   * resolver returns an override for it (anything with a cost, a Recharge
+   * value, or activation rolls that will really run), the plain reference card
+   * otherwise. Shared by the pinned Basic Attack and the list, so the two
+   * cannot drift.
    */
   const viewCard = (ability: AbilityBlock) => {
     const override = activateOverride(ability)

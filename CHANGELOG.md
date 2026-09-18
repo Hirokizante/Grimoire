@@ -70,12 +70,19 @@ characters regularly.
   automatic rolls — a growl with a damage roll, a free maneuver that still
   rolls accuracy — rendered as a static reference card and its rolls could
   never be triggered from the screen. `useNpcInstanceActivation` now also
-  consults `hasActivationRolls`, so the button appears and everything behind it
-  (the toast, the shared result window, the ability's own uses or Recharge
-  cooldown) runs down the same activation path as any other panel ability.
+  consults the activation-roll plan itself (`willRollOnActivation`), so the
+  button appears only when activation will really roll something and everything
+  behind it (the toast, the shared result window, the ability's own uses or
+  Recharge cooldown) runs down the same activation path as any other panel
+  ability.
+- **A half-configured roll grows no button.** Damage switched on with an empty
+  Damage field builds an empty plan and would open no result window, so the
+  ability stays a reference card rather than offering an Activate button that
+  only toasts and spends.
 - **Testing.** `GMScreenPanels.test.tsx` activates a cost-free ability with
   `activationRolls: { damage: true }`, asserts the instance's AP is untouched,
-  and reads the damage roll out of the result window.
+  and reads the damage roll out of the result window — and pins that the same
+  configuration with no Damage expression renders no Activate button at all.
 
 ### Ability card drag — a preview that shows the landing slot, undeformed
 

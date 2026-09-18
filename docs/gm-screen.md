@@ -161,14 +161,17 @@ NPC instances follow one rule: **instances are deltas, not clones.**
   sheet body — so a glance down the screen shows who has already acted. The AP block stays at
   full strength (it holds both ways back: the manual `+` and Start new turn), nothing is
   disabled or made un-clickable, and the panel returns to normal the instant AP does.
-- **Every NPC ability with a cost gets an Activate button** — the same button, plan, and cost
-  deduction the player sheets use (`useAbilityActivation` with the panel's own resource
-  adapter), not a second implementation. The ability's own *Show Activate* flag does not gate
-  it: NPC abilities are authored in a mode that never offers the flag, and the panel's rule
-  is "a cost means a button". Ability cards with no cost, no **Recharge** and no **activation
-  rolls** stay static reference cards: a cost-free ability that carries Recharge still gets
-  one, because the cooldown is the thing being tracked, and a cost-free ability authored to
-  roll on activation gets one because pressing it is what produces the rolls.
+- **Every NPC ability with a cost, a Recharge value or activation rolls gets an Activate
+  button** — the same button, plan, and cost deduction the player sheets use
+  (`useAbilityActivation` with the panel's own resource adapter), not a second implementation.
+  The ability's own *Show Activate* flag does not gate it: NPC abilities are authored in a mode
+  that never offers the flag, and the panel's rule is "a cost means a button". Ability cards
+  with no cost, no **Recharge** and no **activation rolls** stay static reference cards: a
+  cost-free ability that carries Recharge still gets one, because the cooldown is the thing
+  being tracked, and a cost-free ability authored to roll on activation gets one because
+  pressing it is what produces the rolls. An ability whose roll configuration is half-finished
+  — damage switched on with an empty Damage field — rolls nothing, so it stays a reference card
+  rather than growing a button that would open no result window.
 - **Limited uses are the instance's own** — an ability flagged as limited shows its remaining
   uses on the panel and spends one per Activate when the ability is set to (an instance never
   spends a use for an ability whose *Expend on activate* is off, and a limited ability at 0
