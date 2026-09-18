@@ -224,6 +224,11 @@ NPC instances follow one rule: **instances are deltas, not clones.**
   `⧗ Recharge X` in place of the authored `Recharge (X)` text and switches to
   `⧗ On cooldown — Recharge X` with a tinted chip while cooling, so the state is never printed
   twice.
+- **The GM can override the die** — a cooling badge carries a small `↻` beside "On cooldown"
+  that takes **that** ability off cooldown immediately, without rolling the Recharge Die: a
+  table ruling, a turn that never happened, or an ability the GM wants back early. It clears
+  one ability on one instance (`gmScreenStore.clearAbilityCooldown`) — everything else keeps
+  cooling — and the button exists only while cooling, so an idle badge stays a pure read-out.
 - **`2 on cooldown`** — a collapsed panel shows that count next to the AP meter so the state
   is visible without expanding.
 - **Start new turn appears as a button the moment AP hits 0** — on both panel kinds, and

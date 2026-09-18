@@ -1201,6 +1201,33 @@ test('markAbilityCooldown: tracks an ability once, per instance', async () => {
   expect(instanceState(1).cooldowns).toEqual([])
 })
 
+test('clearAbilityCooldown: takes one ability off cooldown, per instance', async () => {
+  const screen = await useGMScreenStore.getState().createScreen('S')
+  seedCharacters(
+    npcWithAbilities([
+      { id: 'a1', name: 'Fire Breath', traits: ['Recharge (5)'] },
+      { id: 'a2', name: 'Bite', traits: ['Recharge (3)'] },
+    ]),
+  )
+  const firstId = useGMScreenStore.getState().addNpcInstancePanel(screen.id, 'n1')
+  useGMScreenStore.getState().addNpcInstancePanel(screen.id, 'n1')
+  const store = useGMScreenStore.getState()
+  store.markAbilityCooldown(screen.id, firstId, 'a1')
+  store.markAbilityCooldown(screen.id, firstId, 'a2')
+
+  useGMScreenStore.getState().clearAbilityCooldown(screen.id, firstId, 'a1')
+
+  // Only the named ability comes back, and only on the first instance.
+  expect(instanceState(0).cooldowns).toEqual(['a2'])
+  expect(instanceState(1).cooldowns).toEqual([])
+
+  // Clearing an ability that is not cooling (or an unknown panel) is a no-op.
+  useGMScreenStore.getState().clearAbilityCooldown(screen.id, firstId, 'a1')
+  useGMScreenStore.getState().clearAbilityCooldown(screen.id, firstId, 'nope')
+  useGMScreenStore.getState().clearAbilityCooldown('nope', firstId, 'a2')
+  expect(instanceState(0).cooldowns).toEqual(['a2'])
+})
+
 test('startInstanceTurn: refills AP and recharges everything at or below the roll', async () => {
   const screen = await useGMScreenStore.getState().createScreen('S')
   seedCharacters(

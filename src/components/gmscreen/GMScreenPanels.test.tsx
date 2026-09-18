@@ -2142,6 +2142,41 @@ test('NPC panel: the Recharge badge replaces the trait chip instead of duplicati
   expect(cooling?.textContent).toBe('On cooldown — Recharge 4')
 })
 
+test('NPC panel: a cooling badge takes its ability off cooldown by hand', () => {
+  const base = makeBaseWith([
+    makeAbility({ id: 'a1', name: 'Fire Breath', traits: ['Recharge (5)'] }),
+    makeAbility({ id: 'a2', name: 'Bite', traits: ['Recharge (2)'] }),
+  ])
+  renderNpcPanel(base)
+
+  // A usable ability is a plain read-out: no override button anywhere yet.
+  expect(screen.queryByRole('button', { name: /off cooldown/ })).toBeNull()
+
+  fireEvent.click(activateButtons()[0])
+  expect(panelState().cooldowns).toEqual(['a1'])
+
+  // Only the cooling ability grows the button — the idle Bite does not — and
+  // clicking it puts Fire Breath back online without the Recharge Die.
+  expect(
+    screen.queryByRole('button', { name: 'Take Bite off cooldown' }),
+  ).toBeNull()
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Take Fire Breath off cooldown' }),
+  )
+
+  expect(panelState().cooldowns).toEqual([])
+  const chip = screen
+    .getByText('Fire Breath')
+    .closest('.ability-card')
+    ?.querySelector('.ability-card__trait .gm-recharge')
+  expect(chip).not.toHaveClass('gm-recharge--cooling')
+  expect(chip?.textContent).toBe('Recharge 5')
+  expect(
+    screen.queryByRole('button', { name: 'Take Fire Breath off cooldown' }),
+  ).toBeNull()
+  expect(activateButtons()[0]).toBeEnabled()
+})
+
 test('NPC panel: a Recharge sub-ability badges its own trait chip', () => {
   const base = makeBaseWith([
     makeAbility({

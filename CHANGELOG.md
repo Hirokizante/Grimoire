@@ -4,6 +4,25 @@ All notable changes to Grimoire are documented here. This project is in alpha:
 storage format may change between pre-1.0 releases, so export (or back up) your
 characters regularly.
 
+## Unreleased
+
+### GM Screen — a Recharge ability can be taken off cooldown by hand
+
+- **The Recharge Die has a manual override.** A cooling ability's trait chip read
+  `⧗ On cooldown — Recharge X` with no way back before the next turn's roll, so a
+  table ruling, a forgotten turn, or an ability the GM wanted back early had no
+  control at all. The cooling badge now carries a small `↻` beside the text:
+  clicking it takes **that** ability off cooldown immediately, without rolling
+  the Recharge Die. `gmScreenStore.clearAbilityCooldown` clears one ability on
+  one instance (everything else keeps cooling, the base record is never touched),
+  the button renders only while cooling, and the badge is unchanged when no
+  override is wired (a read-only surface stays a plain badge).
+- **Testing.** `gmScreenStore.test.ts` pins the per-ability/per-instance clear
+  and its no-ops (not cooling, unknown panel), `GMScreenPanels.test.tsx` pins the
+  button appearing only on the cooling chip and the Activate button re-enabling
+  after the click, and the `e2e/gm-screen.spec.ts` Recharge flow drives it in a
+  real browser.
+
 ## v0.11.0-alpha — 2026-09-19
 
 The table-work release. Seven commits since `v0.10.0-alpha`, and the dice do

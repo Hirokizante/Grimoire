@@ -1781,6 +1781,21 @@ test.describe('GM Screen', () => {
       page.getByText("Bandit's turn — Recharge Die: 6 · recharged: Fire Breath"),
     ).toBeVisible()
 
+    // ---- The GM can also take one ability off cooldown by hand -------------
+    // Same chip, same state: a cooling badge carries a ↻ that recharges that
+    // ability immediately, without rolling the Recharge Die.
+    await fireBreath.getByRole('button', { name: 'Activate' }).click()
+    await expect(badge).toHaveText('On cooldown — Recharge 5')
+    await fireBreath
+      .getByRole('button', { name: 'Take Fire Breath off cooldown' })
+      .click()
+    await expect(badge).toHaveText('Recharge 5')
+    await expect(panel.locator('.gm-ap__cooling')).toHaveCount(0)
+    // The cooldown gate is gone — only the AP the second activation left behind
+    // is missing, so one +1 makes the button live again.
+    await panel.getByRole('button', { name: 'Restore Action Points' }).click()
+    await expect(fireBreath.getByRole('button', { name: 'Activate' })).toBeEnabled()
+
     // ---- …and stored in the roll log --------------------------------------
     await page.locator('.roll-log-tab').click()
     const entry = page.locator('.roll-log-item').first()

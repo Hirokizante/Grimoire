@@ -344,6 +344,18 @@ export interface GMScreenActions {
     abilityId: string,
   ) => void
   /**
+   * Take one of the base record's abilities off Recharge cooldown for this
+   * instance **without rolling the Recharge Die** — the GM's manual override,
+   * for a table ruling or a turn that never happened. No-op when the ability is
+   * not cooling, and moves only the instance's own list: the base record is
+   * never written to.
+   */
+  clearAbilityCooldown: (
+    screenId: string,
+    panelId: string,
+    abilityId: string,
+  ) => void
+  /**
    * Set how many uses this instance has left of one of the base record's
    * limited abilities. Clamped to the ability's authored `max` (read from the
    * base — the panel never trusts the number the caller saw), and moves only
@@ -1142,6 +1154,16 @@ export const useGMScreenStore = create<GMScreenStore>()((set, get) => {
       get().updateInstanceState(screenId, panelId, (state) => ({
         ...state,
         cooldowns: [...state.cooldowns, abilityId],
+      }))
+    },
+
+    clearAbilityCooldown: (screenId, panelId, abilityId) => {
+      const found = findInstance(screenId, panelId)
+      if (!found || !abilityId) return
+      if (!found.panel.state.cooldowns.includes(abilityId)) return
+      get().updateInstanceState(screenId, panelId, (state) => ({
+        ...state,
+        cooldowns: state.cooldowns.filter((id) => id !== abilityId),
       }))
     },
 

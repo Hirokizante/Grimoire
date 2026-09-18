@@ -12,7 +12,8 @@
  *     and its own remaining ability uses,
  *   - `blockedReason` → "On cooldown — Recharge N" while cooling,
  *   - `onActivated` → marks the ability's Recharge cooldown,
- *   - `status`     → the {@link RechargeBadge} under the card.
+ *   - `renderTrait` → the {@link RechargeBadge} in the Recharge trait's own
+ *     chip, which also carries the GM's manual take-off-cooldown button.
  *
  * It also owns the instance's turn: "Start new turn" refills AP and rolls the
  * Recharge Die, which the GM is told about through a toast and which lands in
@@ -96,6 +97,7 @@ export function useNpcInstanceActivation(
 ): NpcInstanceActivation {
   const spendInstanceAP = useGMScreenStore((s) => s.spendInstanceAP)
   const markAbilityCooldown = useGMScreenStore((s) => s.markAbilityCooldown)
+  const clearAbilityCooldown = useGMScreenStore((s) => s.clearAbilityCooldown)
   const setInstanceAbilityUses = useGMScreenStore((s) => s.setInstanceAbilityUses)
   const spendInstanceAbilityUse = useGMScreenStore((s) => s.spendInstanceAbilityUse)
   const setInstanceAbilityModifiersActive = useGMScreenStore(
@@ -199,16 +201,34 @@ export function useNpcInstanceActivation(
         // The Recharge trait IS the cooldown, so its chip becomes the live
         // badge (idle value → on cooldown) instead of a second copy of the same
         // information below the card. Every other trait renders as authored.
+        // While cooling the badge also carries the GM's manual override: a
+        // small ↻ that takes this one ability off cooldown without the roll.
         renderTrait:
           recharge == null
             ? undefined
             : (trait: string) =>
                 hasAbilityTrait([trait], ABILITY_TRAITS.recharge.key) ? (
-                  <RechargeBadge value={recharge} onCooldown={onCooldown} />
+                  <RechargeBadge
+                    value={recharge}
+                    onCooldown={onCooldown}
+                    abilityName={ability.name || 'Untitled Ability'}
+                    onClearCooldown={() =>
+                      clearAbilityCooldown(screenId, panelId, ability.id)
+                    }
+                  />
                 ) : null,
       } satisfies AbilityActivationOverride
     },
-    [cooldownIds, resources, label, screenId, panelId, markAbilityCooldown, entity],
+    [
+      cooldownIds,
+      resources,
+      label,
+      screenId,
+      panelId,
+      markAbilityCooldown,
+      clearAbilityCooldown,
+      entity,
+    ],
   )
 
   const startTurn = useCallback(() => {
