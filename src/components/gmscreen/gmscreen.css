@@ -115,6 +115,60 @@
   gap: 0.5rem;
 }
 
+/* ---- Round tracker ------------------------------------------------------- */
+
+/* The round tracker is deliberately part of the toolbar row: `margin-left:
+   auto` pushes it to the right end, where the encounter-level control reads
+   apart from the two Add actions that put sheets on the screen. The field is
+   a pill around a label + number so the tracker reads as one unit with the
+   New Round button beside it. */
+.gm-round {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-left: auto;
+}
+
+.gm-round__field {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0.5rem 0.25rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-surface);
+}
+
+.gm-round__label {
+  font-size: 0.72rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.gm-round__input {
+  /* Overrides `.sheet-input`'s full width: the tracker is a compact token, not
+     a form field, and the number is the anchor of the control. */
+  width: 3.25rem;
+  padding: 0.15rem 0.3rem;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+/* The native number spinners are a second control the app theme cannot reach;
+   typing the value and pressing New Round are the two intended gestures. */
+.gm-round__input::-webkit-outer-spin-button,
+.gm-round__input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.gm-round__input[type='number'] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
 .gm-screen__empty {
   display: flex;
   flex-direction: column;
@@ -1581,6 +1635,18 @@ button.gm-status-pill__main:hover {
   .gm-screen__toolbar .btn {
     pointer-events: auto;
     border-radius: 999px;
+    box-shadow: 0 6px 18px rgb(0 0 0 / 45%);
+  }
+
+  /* The tracker rides in the sticky group too, so its field takes the same
+     shadow and stays interactive while the page scrolls under it. */
+  .gm-screen__toolbar .gm-round {
+    margin-left: 0;
+    pointer-events: auto;
+  }
+
+  .gm-screen__toolbar .gm-round__field {
+    background: var(--bg-surface-raised);
     box-shadow: 0 6px 18px rgb(0 0 0 / 45%);
   }
 

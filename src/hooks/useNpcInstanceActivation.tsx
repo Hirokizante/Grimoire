@@ -46,13 +46,10 @@ import RechargeBadge from '@/components/gmscreen/RechargeBadge'
 import { useNotification } from '@/context/NotificationContext'
 import { ABILITY_TRAITS, hasAbilityTrait } from '@/lib/abilityTraits'
 import { hasAbilityCost } from '@/lib/abilityCosts'
-import {
-  RECHARGE_ROLL_NOTATION,
-  abilityRechargeValue,
-  rechargeRollResult,
-} from '@/lib/abilityRecharge'
+import { abilityRechargeValue } from '@/lib/abilityRecharge'
 import { willRollOnActivation } from '@/lib/activationRolls'
 import { withInstanceState } from '@/lib/gmScreenUtils'
+import { instanceTurnMessage, logInstanceTurnRoll } from '@/lib/gmScreenTurns'
 import { useGMScreenStore } from '@/store/gmScreenStore'
 import { useRollLogStore } from '@/store/rollLogStore'
 import type {
@@ -217,23 +214,15 @@ export function useNpcInstanceActivation(
   const startTurn = useCallback(() => {
     const outcome = startInstanceTurn(screenId, panelId)
     if (!outcome) return
-    const names = outcome.recharged.map((entry) => entry.name)
     notify(
-      names.length
-        ? `${label}'s turn — Recharge Die: ${outcome.roll} · recharged: ${names.join(', ')}`
-        : `${label}'s turn — Recharge Die: ${outcome.roll} · nothing recharged`,
-      names.length ? 'success' : 'info',
+      instanceTurnMessage(label, outcome),
+      outcome.recharged.length ? 'success' : 'info',
       5000,
     )
     // The roll log keeps the turn's context, not just the number: instance
-    // label, the die, and what it brought back.
-    logRoll({
-      notation: RECHARGE_ROLL_NOTATION,
-      characterId: base.id,
-      characterName: label,
-      source: { type: 'recharge', npcName: label, recharged: names },
-      result: rechargeRollResult(outcome.roll),
-    })
+    // label, the die, and what it brought back. Shared with the toolbar's
+    // New Round, so both paths leave the same entry.
+    logInstanceTurnRoll(logRoll, base.id, label, outcome)
   }, [base.id, label, logRoll, notify, panelId, screenId, startInstanceTurn])
 
   return {

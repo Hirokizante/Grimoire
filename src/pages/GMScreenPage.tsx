@@ -41,6 +41,7 @@ import {
 import ConfirmModal from '@/components/sheet/ConfirmModal'
 import AddCharacterModal from '@/components/gmscreen/AddCharacterModal'
 import AddNpcModal from '@/components/gmscreen/AddNpcModal'
+import RoundTracker from '@/components/gmscreen/RoundTracker'
 import SortablePanel from '@/components/gmscreen/SortablePanel'
 import CharacterPanel from '@/components/gmscreen/CharacterPanel'
 import NpcInstancePanel from '@/components/gmscreen/NpcInstancePanel'
@@ -48,8 +49,10 @@ import MissingPanel from '@/components/gmscreen/MissingPanel'
 
 import { useCharacterStore } from '@/store/characterStore'
 import { useGMScreenStore } from '@/store/gmScreenStore'
+import { useRollLogStore } from '@/store/rollLogStore'
 import { useNotification } from '@/context/NotificationContext'
 import { distributeIntoColumns, resolvePanels } from '@/lib/gmScreenUtils'
+import { logInstanceTurnRoll } from '@/lib/gmScreenTurns'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 
 import '@/components/gmscreen/gmscreen.css'
@@ -67,6 +70,9 @@ export default function GMScreenPage() {
   const deleteScreen = useGMScreenStore((s) => s.deleteScreen)
   const movePanel = useGMScreenStore((s) => s.movePanel)
   const removePanel = useGMScreenStore((s) => s.removePanel)
+  const setScreenRound = useGMScreenStore((s) => s.setScreenRound)
+  const startNewRound = useGMScreenStore((s) => s.startNewRound)
+  const logRoll = useRollLogStore((s) => s.logRoll)
   const selectCharacter = useCharacterStore((s) => s.selectCharacter)
   const characters = useCharacterStore((s) => s.characters)
   const { notify } = useNotification()
@@ -120,6 +126,38 @@ export default function GMScreenPage() {
   /** Open a player character's normal sheet page (same live state). */
   const openCharacterSheet = (characterId: string) => {
     selectCharacter(characterId)
+  }
+
+  /**
+   * Start the next round: every panel's turn begins at once — an NPC instance
+   * refills AP and rolls its own Recharge Die, a player character runs the
+   * sheet's End Turn (unspent AP → END, END Recovery, AP refilled). One toast
+   * summarizes the click; each instance's Recharge Die still lands in the
+   * persistent roll log through the same helper the panel's own turn uses.
+   */
+  const handleNewRound = () => {
+    if (!screen) return
+    const summary = startNewRound(screen.id)
+    if (!summary) return
+    for (const turn of summary.instanceTurns) {
+      logInstanceTurnRoll(logRoll, turn.baseNpcId, turn.label, turn.outcome)
+    }
+    const panelCount = summary.characterTurns.length + summary.instanceTurns.length
+    if (panelCount === 0) {
+      notify(`Round ${summary.round}.`, 'info')
+      return
+    }
+    const recharged = summary.instanceTurns.reduce(
+      (count, turn) => count + turn.outcome.recharged.length,
+      0,
+    )
+    notify(
+      `Round ${summary.round} — new turns for ${panelCount} ` +
+        `${panelCount === 1 ? 'panel' : 'panels'}` +
+        (recharged > 0 ? ` · ${recharged} recharged` : ''),
+      'success',
+      5000,
+    )
   }
 
   const handleCreateScreen = async () => {
@@ -318,6 +356,14 @@ export default function GMScreenPage() {
               <Swords size={14} />
               Add NPC
             </button>
+            {/* The round tracker rides the same row as the Add actions, pushed
+                to the right: it is the encounter-level control, not another
+                panel source. */}
+            <RoundTracker
+              round={screen.round}
+              onRoundChange={(round) => setScreenRound(screen.id, round)}
+              onNewRound={handleNewRound}
+            />
           </div>
 
           {panels.length === 0 ? (

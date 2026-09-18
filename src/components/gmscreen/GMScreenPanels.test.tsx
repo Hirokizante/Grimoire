@@ -103,6 +103,7 @@ function seedScreenFor(
       {
         id: SCREEN_ID,
         name: 'Session 4',
+        round: 1,
         panels: [
           {
             kind: 'npc-instance',
@@ -631,6 +632,7 @@ test('CharacterPanel: stat tokens use the app theme, never the sheet palette', (
       {
         id: SCREEN_ID,
         name: 'Session 4',
+        round: 1,
         panels: [
           {
             kind: 'character',
@@ -751,6 +753,7 @@ test('shared stats read the same color on both panel types', () => {
       {
         id: SCREEN_ID,
         name: 'Session 4',
+        round: 1,
         panels: [
           {
             kind: 'character',
@@ -847,6 +850,7 @@ function renderExpandedPlayerPanel(pc: Character): HTMLElement {
       {
         id: SCREEN_ID,
         name: 'Session 4',
+        round: 1,
         panels: [
           {
             kind: 'character',
@@ -1137,6 +1141,7 @@ function expandedHeadings(kind: 'character' | 'npc') {
       {
         id: SCREEN_ID,
         name: 'Session 4',
+        round: 1,
         panels: [
           kind === 'character'
             ? {
@@ -1435,6 +1440,7 @@ function renderPlayerPanel(
       {
         id: SCREEN_ID,
         name: 'Session 4',
+        round: 1,
         panels: [
           {
             kind: 'character',

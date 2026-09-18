@@ -212,6 +212,7 @@ test('an expanded GM panel body renders the shorthand too', () => {
       {
         id: SCREEN_ID,
         name: 'Session 4',
+        round: 1,
         panels: [
           {
             kind: 'character',

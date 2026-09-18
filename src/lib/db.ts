@@ -13,7 +13,7 @@
 import type { AbilityBlock, AbilityCost, Character, CharacterViewModes, GMScreen, MortalWoundRoll, NPCStats, NpcInstanceState, PanelStatus, ScreenPanel, SheetColors, SheetLabel, StatusCondition, VersionSnapshot } from '@/types'
 import { createDefaultStatuses } from '@/constants/statuses'
 import { MAX_PANEL_STATUS_STACKS, isPanelStatusDuration } from '@/constants/statusDurations'
-import { DEFAULT_SHEET_COLORS, MAX_AP, createDefaultBasicAttack, generateId } from '@/constants/gameData'
+import { DEFAULT_SHEET_COLORS, MAX_AP, MIN_SCREEN_ROUND, createDefaultBasicAttack, generateId } from '@/constants/gameData'
 import {
   normalizeInstanceAbilityModifiers,
   normalizeModifiers,
@@ -888,6 +888,13 @@ export function normalizeScreen(raw: GMScreen): GMScreen {
   const now = new Date().toISOString()
   const createdAt = typeof o.createdAt === 'string' ? o.createdAt : now
   const rawPanels = Array.isArray(o.panels) ? o.panels : []
+  // The round tracker, added after screens already existed. A screen written
+  // before it loads on Round 1 — the round a fresh screen opens on — and a
+  // hand-edited fraction or value below the floor is repaired the same way.
+  const round =
+    typeof o.round === 'number' && Number.isFinite(o.round)
+      ? Math.max(MIN_SCREEN_ROUND, Math.floor(o.round))
+      : MIN_SCREEN_ROUND
 
   const panels: ScreenPanel[] = []
   for (const rawPanel of rawPanels) {
@@ -980,6 +987,7 @@ export function normalizeScreen(raw: GMScreen): GMScreen {
   return {
     id: typeof o.id === 'string' ? o.id : generateId(),
     name: typeof o.name === 'string' && o.name ? o.name : 'Untitled Screen',
+    round,
     panels,
     createdAt,
     updatedAt: typeof o.updatedAt === 'string' ? o.updatedAt : createdAt,

@@ -142,6 +142,25 @@ NPC instances follow one rule: **instances are deltas, not clones.**
   record (previously the cards fell back to `currentCharacter`, which is null on the GM
   Screen).
 
+### Rounds
+
+- **New Round** — sits on the toolbar row beside Add Character / Add NPC, and is the
+  encounter-level action: one click advances the round counter and starts **every**
+  panel's turn — each NPC instance refills its AP and rolls its own Recharge Die, each
+  player character runs the sheet's own End Turn (unspent AP → END, END Recovery
+  applied, AP refilled). Panels whose referenced record was deleted are skipped.
+- **One click, one toast** — the action is confirmed with a summary ("Round 2 — new
+  turns for 3 panels · 1 recharged"). Each instance's Recharge Die is still written to
+  the persistent roll log through the same helper the panel's own Start new turn uses,
+  so a round's turns read back like a journal.
+- **The counter is a label, not a timer** — nothing advances it on its own, and the
+  number can be typed over directly in the toolbar (the field keeps a local draft, so a
+  mid-edit value is never clamped per keystroke). A manual edit moves the label only:
+  only **New Round** starts turns. Values are floored at 1.
+- **Persistence** — the round lives on the screen record (`GMScreen.round`), so it
+  survives a reload with the panels, and a screen written before the tracker existed
+  loads on Round 1.
+
 ### Turns: Action Points and Recharge
 
 - **`PanelApBar` on every panel** — every panel shows AP under its HP bar, player and NPC
@@ -405,13 +424,17 @@ NPC instances follow one rule: **instances are deltas, not clones.**
 
 ## Data model
 
-A `GMScreen` is `{ id, name, panels, createdAt, updatedAt }`, where `ScreenPanel` is a
-discriminated union:
+A `GMScreen` is `{ id, name, round, panels, createdAt, updatedAt }`, where `ScreenPanel`
+is a discriminated union:
 
 | Variant | Shape |
 | --- | --- |
 | `kind: 'character'` | `{ id, characterId, density, statuses }` — a reference to a player `Character` |
 | `kind: 'npc-instance'` | `{ id, baseNpcId, label, density, statuses, state }` — a spawned instance of an NPC base record |
+
+- **`round`** — the encounter's current round, 1-based. **New Round** advances it and
+  starts every panel's turn in the same write; the toolbar's field edits it directly.
+  Untouched by anything else, and normalized to a whole number of at least 1 on read.
 
 - **`state`** — the instance's state object:
   `{ currentHP, tempHP, condition, currentAP, cooldowns, mortalWounds, abilityUses,
@@ -502,6 +525,8 @@ discriminated union:
 | Action | Notes |
 | --- | --- |
 | `loadScreens`, `createScreen`, `renameScreen`, `deleteScreen`, `selectScreen`, `saveScreen` | Screen CRUD; the open screen id is mirrored to `localStorage` |
+| `setScreenRound` | Manual edit of the round counter (whole number, floored at 1); writes the label only — it never starts a turn |
+| `startNewRound` | Advances the round and starts **every** panel's turn: each instance refills AP and rolls its own Recharge Die, each character runs the sheet's End Turn. Returns `{ round, instanceTurns, characterTurns }` for the caller's toast and roll-log writes; skips panels whose record is gone |
 | `addCharacterPanel` | Returns `false` (no state change) for a character already on the screen |
 | `addNpcInstancePanel` | Spawns at full HP, a full turn (3 AP, nothing cooling), full ability budgets and the base's own switch state, with an auto-numbered label ("Bandit", "Bandit 2", …) |
 | `duplicatePanel` | NPC instances only — spawns a *fresh* instance, never a copy of its HP, AP, cooldowns, ability uses or modifier switches |

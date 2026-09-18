@@ -472,6 +472,9 @@ their own:
   (spent on Activate and steppable by hand), its own stat/attribute modifier switches, and Recharge
   cooldowns resolved by a Recharge Die roll. An ability authored to roll on activation rolls against
   the **instance's** stats and shows its results in the same window the player sheets use.
+- **Rounds** — a **New Round** button on the toolbar starts every panel's turn at once and advances
+  the round counter, which can also be typed over by hand. Each instance still rolls its own Recharge
+  Die, logged like a turn's.
 - **Mortal Wounds on both panel kinds** — the same wound track sits under the HP bar and the panel
   resolves the D20 for the GM: an NPC instance uses the base's own **Mortal Wounds** stat as its
   allowance, and a player character's two slots are rolled as the panel deals the damage instead of

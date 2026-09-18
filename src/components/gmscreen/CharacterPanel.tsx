@@ -57,6 +57,7 @@ import { useNotification } from '@/context/NotificationContext'
 import { useGMScreenStore } from '@/store/gmScreenStore'
 import { effectiveCombatStats } from '@/lib/abilityModifiers'
 import { panelDamageOutcome } from '@/lib/gmScreenUtils'
+import { characterTurnMessage } from '@/lib/gmScreenTurns'
 import {
   PENDING_MORTAL_WOUND,
   characterMortalWounds,
@@ -159,9 +160,7 @@ export default function CharacterPanel({
   const startTurn = () => {
     const gained = endTurn(character.id)
     notify(
-      gained > 0
-        ? `${character.name}'s turn — AP restored · +${gained} END`
-        : `${character.name}'s turn — AP replenished`,
+      characterTurnMessage(character.name, gained),
       gained > 0 ? 'success' : 'info',
     )
   }

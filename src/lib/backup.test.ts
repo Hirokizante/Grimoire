@@ -68,6 +68,7 @@ function makeScreen(id: string): GMScreen {
   return {
     id,
     name: 'Session 4',
+    round: 1,
     panels: [
       {
         kind: 'character',

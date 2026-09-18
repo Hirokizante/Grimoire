@@ -10,7 +10,7 @@
 import { test, expect, beforeEach, afterEach, vi } from 'vitest'
 import { useGMScreenStore, npcMortalWoundAllowance } from '@/store/gmScreenStore'
 import { useCharacterStore } from '@/store/characterStore'
-import { createDefaultCharacter, createDefaultNPC } from '@/constants/gameData'
+import { createDefaultCharacter, createDefaultNPC, MAX_AP } from '@/constants/gameData'
 import type { AbilityBlock, Character, GMScreen } from '@/types'
 
 // ---- Mock IndexedDB -------------------------------------------------------
@@ -1283,6 +1283,170 @@ test('startInstanceTurn: resolving a deleted base record is safe', async () => {
 
   expect(outcome).toMatchObject({ roll: 4, recharged: [], stillCooling: [] })
   expect(instanceState().currentAP).toBe(3)
+})
+
+// ---- The round tracker ------------------------------------------------------
+
+test('createScreen: a fresh screen opens on Round 1', async () => {
+  const screen = await useGMScreenStore.getState().createScreen('S')
+  expect(screen.round).toBe(1)
+})
+
+test('setScreenRound: floors fractions and clamps a manual value at 1', async () => {
+  const screen = await useGMScreenStore.getState().createScreen('S')
+  const store = useGMScreenStore.getState()
+  const round = () => useGMScreenStore.getState().screens[0].round
+
+  store.setScreenRound(screen.id, 4)
+  expect(round()).toBe(4)
+
+  store.setScreenRound(screen.id, 2.7)
+  expect(round()).toBe(2)
+
+  // The tracker is 1-based: zero and negatives are pulled up to the floor.
+  store.setScreenRound(screen.id, 0)
+  expect(round()).toBe(1)
+  store.setScreenRound(screen.id, -5)
+  expect(round()).toBe(1)
+
+  // A mid-edit field can read as NaN/Infinity — ignored, never written.
+  store.setScreenRound(screen.id, Number.NaN)
+  expect(round()).toBe(1)
+  store.setScreenRound(screen.id, Number.POSITIVE_INFINITY)
+  expect(round()).toBe(1)
+
+  // An unknown screen is a no-op, not a crash.
+  store.setScreenRound('nope', 9)
+  expect(round()).toBe(1)
+})
+
+test('setScreenRound: moving the round by hand starts no turns', async () => {
+  const screen = await useGMScreenStore.getState().createScreen('S')
+  seedCharacters(makePlayer({ id: 'c1', currentAP: 1 }))
+  useGMScreenStore.getState().addCharacterPanel(screen.id, 'c1')
+
+  useGMScreenStore.getState().setScreenRound(screen.id, 7)
+
+  const character = useCharacterStore.getState().characters[0]
+  expect(character.currentAP).toBe(1)
+  expect(useGMScreenStore.getState().screens[0].round).toBe(7)
+})
+
+/** A player with low, predictable END so a turn's gain is easy to read. */
+function makePlayer(overrides: Partial<Character> = {}): Character {
+  return makeCharacter({
+    id: 'c1',
+    name: 'Vex',
+    // GRT 0 → END Recovery 1, so one turn is +AP spent +1.
+    attributes: { MAR: 0, POW: 0, AGI: 0, VIT: 0, GRT: 0 },
+    currentAP: 2,
+    currentEND: 4,
+    ...overrides,
+  })
+}
+
+test('startNewRound: advances the round and starts every panel’s turn', async () => {
+  const screen = await useGMScreenStore.getState().createScreen('S')
+  seedCharacters(
+    makePlayer({ id: 'c1' }),
+    npcWithAbilities([
+      { id: 'a1', name: 'Fire Breath', traits: ['Recharge (5)'] },
+      { id: 'a2', name: 'Bite', traits: ['Recharge (2)'] },
+    ]),
+  )
+  const store = useGMScreenStore.getState()
+  store.addCharacterPanel(screen.id, 'c1')
+  const npcPanelId = store.addNpcInstancePanel(screen.id, 'n1')
+  // Both entities have spent their turn: the player has AP left to convert,
+  // the NPC is out of AP with both abilities cooling.
+  store.spendInstanceAP(screen.id, npcPanelId, 3)
+  store.markAbilityCooldown(screen.id, npcPanelId, 'a1')
+  store.markAbilityCooldown(screen.id, npcPanelId, 'a2')
+
+  mockRechargeRoll(3)
+  const summary = useGMScreenStore.getState().startNewRound(screen.id)
+
+  expect(summary?.round).toBe(2)
+  expect(useGMScreenStore.getState().screens[0].round).toBe(2)
+
+  // The player ran the sheet's End Turn: 2 unspent AP → END, plus 1 Recovery.
+  const player = useCharacterStore.getState().characters.find((c) => c.id === 'c1')!
+  expect(player.currentAP).toBe(MAX_AP)
+  expect(player.currentEND).toBe(7)
+  expect(summary?.characterTurns).toEqual([
+    { panelId: expect.any(String), characterId: 'c1', name: 'Vex', gainedEND: 3 },
+  ])
+
+  // The instance refilled AP and its own die brought back only Bite (2 ≤ 3);
+  // Fire Breath (5) rolled short and stays cooling.
+  expect(instanceState(1)).toMatchObject({ currentAP: 3, cooldowns: ['a1'] })
+  expect(summary?.instanceTurns).toHaveLength(1)
+  expect(summary?.instanceTurns[0]).toMatchObject({
+    panelId: npcPanelId,
+    label: 'Bandit',
+    baseNpcId: 'n1',
+  })
+  expect(summary?.instanceTurns[0].outcome.roll).toBe(3)
+  expect(summary?.instanceTurns[0].outcome.recharged.map((r) => r.name)).toEqual([
+    'Bite',
+  ])
+  expect(summary?.instanceTurns[0].outcome.stillCooling.map((r) => r.name)).toEqual([
+    'Fire Breath',
+  ])
+})
+
+test('startNewRound: each instance rolls its own Recharge Die', async () => {
+  const screen = await useGMScreenStore.getState().createScreen('S')
+  seedCharacters(
+    npcWithAbilities([{ id: 'a1', name: 'Fire Breath', traits: ['Recharge (5)'] }]),
+  )
+  const store = useGMScreenStore.getState()
+  const firstId = store.addNpcInstancePanel(screen.id, 'n1')
+  const secondId = store.addNpcInstancePanel(screen.id, 'n1')
+  store.markAbilityCooldown(screen.id, firstId, 'a1')
+  store.markAbilityCooldown(screen.id, secondId, 'a1')
+
+  // First die 6 (recharges), second die 1 (stays cooling).
+  vi.spyOn(Math, 'random')
+    .mockReturnValueOnce((6 - 0.5) / 6)
+    .mockReturnValueOnce((1 - 0.5) / 6)
+  const summary = useGMScreenStore.getState().startNewRound(screen.id)
+
+  expect(summary?.instanceTurns.map((t) => t.outcome.roll)).toEqual([6, 1])
+  expect(instanceState(0).cooldowns).toEqual([])
+  expect(instanceState(1).cooldowns).toEqual(['a1'])
+})
+
+test('startNewRound: panels whose record is gone are skipped, the round still advances', async () => {
+  const screen = await useGMScreenStore.getState().createScreen('S')
+  const store = useGMScreenStore.getState()
+  // Both panels reference records that no longer exist: a deleted character
+  // and a deleted NPC base (the MissingPanel placeholders).
+  store.addCharacterPanel(screen.id, 'gone-character')
+  store.addNpcInstancePanel(screen.id, 'gone-base')
+
+  const summary = useGMScreenStore.getState().startNewRound(screen.id)
+
+  expect(summary?.round).toBe(2)
+  expect(summary?.characterTurns).toEqual([])
+  expect(summary?.instanceTurns).toEqual([])
+  // A missing instance panel is untouched rather than turned over.
+  expect(instanceState(1).currentAP).toBe(MAX_AP)
+})
+
+test('startNewRound: an unknown screen returns null and changes nothing', async () => {
+  expect(useGMScreenStore.getState().startNewRound('nope')).toBeNull()
+})
+
+test('startNewRound: the new round autosaves with the screen', async () => {
+  vi.useFakeTimers()
+  const screen = await useGMScreenStore.getState().createScreen('S')
+  dbMap.clear()
+
+  useGMScreenStore.getState().startNewRound(screen.id)
+
+  await vi.advanceTimersByTimeAsync(600)
+  expect((dbMap.get(screen.id) as GMScreen).round).toBe(2)
 })
 
 

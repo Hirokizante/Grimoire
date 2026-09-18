@@ -25,6 +25,8 @@ export const MAX_AP = 3
 export const MAX_END = 10
 /** Maximum Mortal Wounds a character can sustain. */
 export const MAX_MORTAL_WOUNDS = 2
+/** The GM Screen's round tracker is 1-based: a fresh screen opens on Round 1. */
+export const MIN_SCREEN_ROUND = 1
 /** Death Save DC (DESIGN.md "Death Saves"). */
 export const DEATH_SAVE_DC = 10
 /** Hard limit on the number of user-created custom tabs. */

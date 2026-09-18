@@ -6,6 +6,37 @@ characters regularly.
 
 ## Unreleased
 
+### A round tracker, and New Round for the whole screen
+
+- **A round counter on the GM Screen toolbar** — every screen now carries its own
+  round (`GMScreen.round`), shown on the same row as Add Character / Add NPC. It is a
+  label the GM tracks, not a timer: the number is directly editable (floored at 1) and
+  nothing advances it on its own. Screens written before it existed load on Round 1 —
+  `normalizeScreen` backfills the field and repairs hand-edited values — and it
+  persists with the screen record.
+- **New Round starts every panel's turn in one click** — each NPC instance refills
+  its AP and rolls its own Recharge Die; each player character runs the sheet's own
+  End Turn (unspent AP → END, END Recovery, AP refilled). Panels whose referenced
+  record is gone (the MissingPanel placeholders) are skipped.
+  `gmScreenStore.startNewRound` returns what happened, in panel order, so the page can
+  confirm the click with one summary toast ("Round 2 — new turns for 3 panels · 1
+  recharged").
+- **The turns keep their journal** — each instance's Recharge Die is written to the
+  persistent roll log through `lib/gmScreenTurns.ts`, the shared helper the panel's
+  own Start new turn now uses too, so a round started from the toolbar leaves exactly
+  the same entry as a turn started from the panel.
+- **A manual round edit starts nothing** — typing a new round (committed on
+  blur/Enter, so a mid-edit field is never clamped per keystroke) moves the label
+  only; `setScreenRound` never rolls or refills anything.
+- **Testing.** `gmScreenStore.test.ts` covers the counter's clamping, the round
+  advancing with turns for both panel kinds (a player's AP → END conversion, an
+  instance's per-instance Recharge rolls and cooldowns), missing-record skips and
+  autosave; `RoundTracker.test.tsx` pins commit-on-blur/Enter and the New
+  Round/manual-edit split; `db.test.ts` covers the round backfill/repair; and
+  `e2e/gm-screen.spec.ts` drives the whole flow — spend both panels' turns, click New
+  Round, read the toast and roll-log entry, and see the typed-over round survive a
+  reload.
+
 ### An NPC's Basic Attack, and Basic Attacks that roll themselves
 
 - **An NPC now shows the Basic Attack it has always carried.** Every NPC record

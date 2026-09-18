@@ -19,7 +19,7 @@ import {
   getAllScreens,
   putScreen,
 } from '@/lib/db'
-import { MAX_AP, generateId } from '@/constants/gameData'
+import { MAX_AP, MIN_SCREEN_ROUND, generateId } from '@/constants/gameData'
 import { MAX_PANEL_STATUS_STACKS } from '@/constants/statusDurations'
 import {
   effectiveNPCStats,
@@ -130,6 +130,38 @@ export interface InstanceDamageOptions {
   ignoreTempHP?: boolean
 }
 
+/** One NPC instance whose turn a new round started. */
+export interface RoundInstanceTurn {
+  /** Panel id on the screen. */
+  panelId: string
+  /** Panel label (falling back to the base name), for toasts and the roll log. */
+  label: string
+  /** The base record the instance was spawned from. */
+  baseNpcId: string
+  /** The Recharge Die roll and what it brought back. */
+  outcome: RechargeOutcome
+}
+
+/** One player character whose turn a new round started (the sheet's End Turn). */
+export interface RoundCharacterTurn {
+  /** Panel id on the screen. */
+  panelId: string
+  characterId: string
+  name: string
+  /** END gained by the End Turn conversion + recovery, for the caller's toast. */
+  gainedEND: number
+}
+
+/** What one {@link GMScreenActions.startNewRound} call did, in panel order. */
+export interface RoundStartSummary {
+  /** The round the screen is on now. */
+  round: number
+  /** Every NPC instance whose turn was started, in panel order. */
+  instanceTurns: RoundInstanceTurn[]
+  /** Every player character whose turn was started, in panel order. */
+  characterTurns: RoundCharacterTurn[]
+}
+
 export interface GMScreenState {
   /** All saved screens, oldest first. */
   screens: GMScreen[]
@@ -163,6 +195,21 @@ export interface GMScreenActions {
   deleteScreen: (id: string) => Promise<void>
   /** Open a screen by id (persisted across reloads). */
   selectScreen: (id: string | null) => void
+  /**
+   * Set the round tracker to a specific value (the manual edit), clamped to a
+   * whole number no lower than {@link MIN_SCREEN_ROUND}. Moving the round by
+   * hand never starts a turn — only {@link GMScreenActions.startNewRound} does.
+   */
+  setScreenRound: (screenId: string, round: number) => void
+  /**
+   * Advance to the next round and start **every** panel's turn: an NPC
+   * instance refills its AP and rolls its own Recharge Die, while a player
+   * character runs the sheet's own End Turn (unspent AP converts to END, END
+   * Recovery applies, AP refills). Returns what happened, in panel order, so
+   * the caller can notify and write the Recharge rolls to the log, or null for
+   * an unknown screen. Panels whose referenced record is gone are skipped.
+   */
+  startNewRound: (screenId: string) => RoundStartSummary | null
   /** The screen object currently open, or null. */
   currentScreen: () => GMScreen | null
   /**
@@ -401,6 +448,35 @@ function instanceArmor(entity: Character | null): number {
 }
 
 /**
+ * Resolve one NPC instance's next turn: refill AP and roll one Recharge Die.
+ *
+ * One roll decides everything, and it is rolled here (not by the caller) so the
+ * number the GM is told, the number in the roll log, and the set of abilities
+ * that come back can never disagree. Pure, so the panel's own turn button and a
+ * whole-round start ({@link GMScreenActions.startNewRound}) run the exact same
+ * rule — and each instance still rolls its own die.
+ */
+function nextInstanceTurnState(
+  base: Character | null,
+  state: NpcInstanceState,
+): { state: NpcInstanceState; outcome: RechargeOutcome } {
+  const roll = rollRechargeDie()
+  const outcome: RechargeOutcome = base
+    ? resolveRecharge(base, state.cooldowns, roll)
+    : // The base record is gone (the panel renders MissingPanel, so this is
+      // unreachable from the UI) — nothing can be resolved against it.
+      { roll, recharged: [], stillCooling: [] }
+  return {
+    state: {
+      ...state,
+      currentAP: MAX_AP,
+      cooldowns: outcome.stillCooling.map((entry) => entry.id),
+    },
+    outcome,
+  }
+}
+
+/**
  * How many Mortal Wounds an NPC instance may sustain before 0 HP downs it.
  *
  * This is the base's `npcStats.mortalWounds` — the GM-entered stat on the NPC
@@ -537,6 +613,7 @@ export const useGMScreenStore = create<GMScreenStore>()((set, get) => {
       const screen: GMScreen = {
         id: generateId(),
         name: name?.trim() || `Untitled Screen`,
+        round: MIN_SCREEN_ROUND,
         panels: [],
         createdAt: now,
         updatedAt: now,
@@ -597,6 +674,60 @@ export const useGMScreenStore = create<GMScreenStore>()((set, get) => {
       const { screens, currentScreenId } = get()
       if (!currentScreenId) return null
       return screens.find((s) => s.id === currentScreenId) ?? null
+    },
+
+    setScreenRound: (screenId, round) => {
+      const screen = get().screens.find((s) => s.id === screenId)
+      if (!screen) return
+      // A mid-edit input can momentarily read as NaN/Infinity: ignore those
+      // instead of writing nonsense. The floor keeps the tracker 1-based.
+      const next = Math.max(MIN_SCREEN_ROUND, Math.floor(round))
+      if (!Number.isFinite(next) || next === screen.round) return
+      commit({ ...screen, round: next })
+    },
+
+    startNewRound: (screenId) => {
+      const screen = get().screens.find((s) => s.id === screenId)
+      if (!screen) return null
+      const characterStore = useCharacterStore.getState()
+      const instanceTurns: RoundInstanceTurn[] = []
+      const characterTurns: RoundCharacterTurn[] = []
+      const panels = screen.panels.map((panel): ScreenPanel => {
+        if (panel.kind === 'npc-instance') {
+          const base =
+            characterStore.characters.find((c) => c.id === panel.baseNpcId) ?? null
+          // A panel whose base record is gone (the MissingPanel placeholder)
+          // has no turn to start — it is skipped, like a deleted character.
+          if (!base) return panel
+          const next = nextInstanceTurnState(base, panel.state)
+          instanceTurns.push({
+            panelId: panel.id,
+            label: panel.label || base.name,
+            baseNpcId: panel.baseNpcId,
+            outcome: next.outcome,
+          })
+          return { ...panel, state: next.state }
+        }
+        // A player panel's turn IS the character's own End Turn — the same
+        // id-targeted store action the sheet's button runs, writing the
+        // character's real AP/END. A panel whose record was deleted (the
+        // MissingPanel placeholder) has no turn to start and is skipped.
+        const character = characterStore.characters.find(
+          (c) => c.id === panel.characterId,
+        )
+        if (!character) return panel
+        const gainedEND = characterStore.endTurn(character.id)
+        characterTurns.push({
+          panelId: panel.id,
+          characterId: character.id,
+          name: character.name,
+          gainedEND,
+        })
+        return panel
+      })
+      const round = screen.round + 1
+      commit({ ...screen, round, panels })
+      return { round, instanceTurns, characterTurns }
     },
 
     addCharacterPanel: (screenId, characterId) => {
@@ -1106,24 +1237,13 @@ export const useGMScreenStore = create<GMScreenStore>()((set, get) => {
     startInstanceTurn: (screenId, panelId) => {
       const found = findInstance(screenId, panelId)
       if (!found) return null
-      const base = useCharacterStore
-        .getState()
-        .characters.find((c) => c.id === found.panel.baseNpcId)
-      // One roll decides everything: the die is rolled here (not by the caller)
-      // so the number the GM is told, the number in the roll log, and the set
-      // of abilities that come back can never disagree.
-      const roll = rollRechargeDie()
-      const outcome: RechargeOutcome = base
-        ? resolveRecharge(base, found.panel.state.cooldowns, roll)
-        : // The base record is gone (the panel renders MissingPanel, so this is
-          // unreachable from the UI) — nothing can be resolved against it.
-          { roll, recharged: [], stillCooling: [] }
-      get().updateInstanceState(screenId, panelId, (state) => ({
-        ...state,
-        currentAP: MAX_AP,
-        cooldowns: outcome.stillCooling.map((entry) => entry.id),
-      }))
-      return outcome
+      const base =
+        useCharacterStore
+          .getState()
+          .characters.find((c) => c.id === found.panel.baseNpcId) ?? null
+      const next = nextInstanceTurnState(base, found.panel.state)
+      get().updateInstanceState(screenId, panelId, () => next.state)
+      return next.outcome
     },
 
     createNpcBaseAndInstance: async (screenId, name) => {

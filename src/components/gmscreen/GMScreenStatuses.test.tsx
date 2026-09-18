@@ -105,6 +105,7 @@ function seed(kind: 'character' | 'npc') {
       {
         id: SCREEN_ID,
         name: 'Session 4',
+        round: 1,
         panels: [
           kind === 'character'
             ? {

@@ -174,6 +174,13 @@ export type ScreenPanel =
 export interface GMScreen {
   id: string
   name: string
+  /**
+   * The encounter's current round, 1-based. It is a label the GM tracks by
+   * hand — the GM Screen runs no timers — so it can be typed over directly;
+   * **New Round** is the one action that advances it, and it starts every
+   * panel's turn as it does (see `gmScreenStore.startNewRound`).
+   */
+  round: number
   /** Display order of the panels = array order. */
   panels: ScreenPanel[]
   createdAt: string

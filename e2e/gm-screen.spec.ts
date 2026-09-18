@@ -95,7 +95,7 @@ async function createNpc(page: Page, name: string) {
 async function applyLethalDamage(page: Page, panelIndex: number) {
   const panel = page.locator('.gm-panel--npc').nth(panelIndex)
   await panel.getByRole('button', { name: 'Damage…' }).click()
-  await page.getByRole('spinbutton').fill('999')
+  await page.locator('.damage-dialog input[type=number]').fill('999')
   await page.getByLabel(/Apply Armor/).uncheck()
   await page.getByRole('button', { name: 'Apply Damage' }).click()
   await page.getByRole('button', { name: '✕' }).click()
@@ -108,7 +108,7 @@ async function applyLethalDamage(page: Page, panelIndex: number) {
  */
 async function damageFor(page: Page, panel: Locator, amount: number) {
   await panel.getByRole('button', { name: 'Damage…' }).click()
-  await page.getByRole('spinbutton').fill(String(amount))
+  await page.locator('.damage-dialog input[type=number]').fill(String(amount))
   await page.getByLabel(/Apply Armor/).uncheck()
   await page.getByRole('button', { name: 'Apply Damage' }).click()
 }
@@ -893,7 +893,7 @@ test.describe('GM Screen', () => {
     // The sheet's own HP block opens the same Damage dialog without the panel's
     // auto-roll, so the slot lands on "Pending Roll" with the card's button.
     await page.locator('.resource-bar__head--clickable').click()
-    await page.getByRole('spinbutton').fill('15')
+    await page.locator('.damage-dialog input[type=number]').fill('15')
     await page.getByLabel(/Apply Armor/).uncheck()
     await page.getByRole('button', { name: 'Apply Damage' }).click()
     await page.getByRole('button', { name: '✕' }).click()
@@ -1227,7 +1227,7 @@ test.describe('GM Screen', () => {
 
     // Damage 6 from the GM screen…
     await panel.getByRole('button', { name: 'Damage…' }).click()
-    await page.getByRole('spinbutton').fill('6')
+    await page.locator('.damage-dialog input[type=number]').fill('6')
     await page.getByLabel(/Apply Armor/).uncheck()
     await page.getByRole('button', { name: 'Apply Damage' }).click()
     await page.getByRole('button', { name: '✕' }).click()
@@ -1789,6 +1789,106 @@ test.describe('GM Screen', () => {
       'Recharge Die: Bandit',
     )
     await expect(entry.locator('.roll-log-item__character')).toHaveText('Bandit')
+    await expect(entry.locator('.roll-log-item__total')).toHaveText('6')
+  })
+
+  test('the round tracker counts rounds and New Round turns every panel over', async ({
+    page,
+  }) => {
+    // Deterministic Recharge Die: ids come from crypto.randomUUID(), so pinning
+    // Math.random fixes the d6 (always 6) without touching anything else.
+    await page.addInitScript(() => {
+      Math.random = () => 0.9
+    })
+
+    await gotoHome(page)
+    await createPlayerCharacter(page, 'Vex')
+    await createNpc(page, 'Bandit')
+
+    // ---- Author a Recharge ability on the base through the real editor ----
+    await page.locator('.card-main').filter({ hasText: 'Bandit' }).first().click()
+    await page
+      .locator('.mode-toggle--floating')
+      .getByRole('tab', { name: 'Edit' })
+      .click()
+    await page.getByRole('button', { name: '+ Add Ability' }).click()
+    const editor = page.getByRole('dialog', { name: 'New Ability' })
+    await editor.getByLabel('Name').fill('Fire Breath')
+    await editor
+      .getByLabel('Traits (comma-separated)')
+      .fill('Action, Recharge (5)')
+    await editor.getByLabel('AP Cost').fill('2')
+    await editor.getByRole('button', { name: 'Save', exact: true }).click()
+    // Let the sheet's debounced autosave land before leaving the page.
+    await page.waitForTimeout(700)
+
+    // ---- One player panel + one NPC instance on a fresh screen ------------
+    await gotoGmScreen(page)
+    await page.getByRole('button', { name: 'New Screen' }).first().click()
+    await page.getByRole('button', { name: 'Create' }).click()
+    await page.getByRole('button', { name: 'Add Character' }).first().click()
+    await page.getByRole('button', { name: /Vex/ }).click()
+    await page.getByRole('button', { name: 'Add NPC' }).first().click()
+    await page
+      .locator('.gm-picker__list .gm-picker__item')
+      .filter({ hasText: 'Bandit' })
+      .click()
+    await page.getByRole('button', { name: 'Done' }).click()
+
+    // A fresh screen opens on Round 1.
+    const round = page.getByLabel('Round', { exact: true })
+    await expect(round).toHaveValue('1')
+
+    // ---- Spend both panels' turns ----------------------------------------
+    const player = page.locator('.gm-panel--character')
+    const npc = page.locator('.gm-panel--npc')
+    for (let i = 0; i < 3; i += 1) {
+      await player.getByRole('button', { name: 'Spend Action Points' }).click()
+    }
+    await npc.getByRole('button', { name: /Expand/ }).click()
+    const fireBreath = npc
+      .locator('.ability-activation')
+      .filter({ hasText: 'Fire Breath' })
+    await fireBreath.getByRole('button', { name: 'Activate' }).click()
+    await npc.getByRole('button', { name: 'Spend Action Points' }).click()
+    await expect(npc.locator('.gm-ap .gm-bar__value')).toContainText('0')
+    await expect(npc.locator('.gm-ap__cooling')).toHaveText('1 on cooldown')
+
+    // ---- New Round: the counter advances and every panel turns over -------
+    await page.getByRole('button', { name: 'New Round' }).click()
+
+    await expect(round).toHaveValue('2')
+    await expect(player.locator('.gm-ap .gm-bar__value')).toContainText('3')
+    await expect(npc.locator('.gm-ap .gm-bar__value')).toContainText('3')
+    // The Recharge Die (6) brought Fire Breath back off cooldown.
+    await expect(npc.locator('.gm-ap__cooling')).toHaveCount(0)
+    await expect(npc.locator('.ability-card__trait .gm-recharge')).toHaveText(
+      'Recharge 5',
+    )
+    await expect(
+      page.getByText('Round 2 — new turns for 2 panels · 1 recharged'),
+    ).toBeVisible()
+
+    // ---- The counter is a label the GM can type over ----------------------
+    await round.fill('7')
+    await round.press('Enter')
+    await expect(round).toHaveValue('7')
+
+    // ---- …and both the round and the turn's roll survive a reload ---------
+    await page.waitForTimeout(700)
+    await page.reload()
+    await expect(page.getByRole('heading', { name: 'GRIMOIRE' })).toBeVisible()
+    await gotoGmScreen(page)
+    await expect(page.getByLabel('Round', { exact: true })).toHaveValue('7')
+
+    // The round's Recharge Die was written to the persistent roll log through
+    // the same path the panel's own turn uses.
+    await page.locator('.roll-log-tab').click()
+    const entry = page.locator('.roll-log-item').first()
+    await expect(entry.locator('.roll-log-item__notation')).toHaveText('1d6')
+    await expect(entry.locator('.roll-log-item__src')).toHaveText(
+      'Recharge Die: Bandit',
+    )
     await expect(entry.locator('.roll-log-item__total')).toHaveText('6')
   })
 

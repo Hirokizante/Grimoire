@@ -123,6 +123,7 @@ src/
 │   │   ├── AddCharacterModal.tsx  #   Player-character picker
 │   │   ├── AddNpcModal.tsx        #   NPC spawner + quick-create
 │   │   ├── AddStatusModal.tsx     #   Compendium status + duration picker
+│   │   ├── RoundTracker.tsx       #   Round counter + New Round action
 │   │   ├── gmscreen.css
 │   │   └── *.test.tsx             #   Panels, pickers and statuses
 │   ├── home/                      # Home page ambient animation

@@ -559,6 +559,7 @@ test('normalizeScreen: a well-formed screen is unchanged and idempotent', () => 
   const screen: GMScreen = {
     id: 's1',
     name: 'Session 4',
+    round: 3,
     panels: [
       {
         kind: 'character',
@@ -600,6 +601,16 @@ test('normalizeScreen: backfills an empty panel list and timestamps', () => {
   expect(out.name).toBe('Fresh')
   expect(typeof out.createdAt).toBe('string')
   expect(out.updatedAt).toBe(out.createdAt)
+})
+
+test('normalizeScreen: backfills the round tracker and repairs unusable values', () => {
+  // Screens written before the round tracker existed open on Round 1…
+  expect(normalizeScreen(asScreen({ id: 's1', name: 'Legacy' })).round).toBe(1)
+  // …and a hand-edited value is repaired to a whole number, never below 1.
+  expect(normalizeScreen(asScreen({ id: 's1', name: 'Zero', round: 0 })).round).toBe(1)
+  expect(normalizeScreen(asScreen({ id: 's1', name: 'Fraction', round: 2.7 })).round).toBe(2)
+  expect(normalizeScreen(asScreen({ id: 's1', name: 'Junk', round: 'nope' })).round).toBe(1)
+  expect(normalizeScreen(asScreen({ id: 's1', name: 'NaN', round: NaN })).round).toBe(1)
 })
 
 test('normalizeScreen: guarantees density and panel id on every panel', () => {
@@ -865,6 +876,7 @@ test('normalizeScreen: keeps valid tracked statuses untouched (idempotent)', () 
   const screen: GMScreen = {
     id: 's1',
     name: 'Session 4',
+    round: 2,
     panels: [
       {
         kind: 'character',
