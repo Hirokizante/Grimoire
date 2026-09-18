@@ -4,7 +4,29 @@ All notable changes to Grimoire are documented here. This project is in alpha:
 storage format may change between pre-1.0 releases, so export (or back up) your
 characters regularly.
 
-## Unreleased
+## v0.11.0-alpha — 2026-09-19
+
+The table-work release. Seven commits since `v0.10.0-alpha`, and the dice do
+more of their own arithmetic at the table: an accuracy roll of 20+ makes the
+damage a **critical hit** (evaluated twice, keeping the higher, with the same
+control available on a hand-rolled damage), and every non-damage roll can
+carry **Advantage / Disadvantage** that adjusts it after the fact and
+rewrites its log entry in place. The GM Screen gained a **round counter**
+whose **New Round** starts every panel's turn in one click, every NPC now
+shows the **Basic Attack** it always carried — born rolling its whole attack
+on activation — and a cost-free NPC ability that rolls on activation finally
+gets its Activate button. The rest is drag friction: the ability-card preview
+translates cards onto the slot they will land in instead of scaling them, the
+insertion line spans that slot, and the NPC's own list draws a preview it
+never drew.
+
+**No migration to run** — the IndexedDB schema stays at version 5, and
+everything new is additive and backfilled on read: a screen written before
+this release loads on Round 1 via `normalizeScreen`, a legacy damage config
+carrying `advantage`/`disadvantage` loads as a plain `damage: true` via
+`normalizeActivationRolls`, and a stored Basic Attack stays exactly as
+authored — only a record missing one entirely gets the generated default
+back.
 
 ### Critical hits
 
