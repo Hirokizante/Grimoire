@@ -377,8 +377,9 @@ Grimoire is built to support that freedom:
   "grappled" reaches ⛓️), any of RPG-Awesome's 496 fantasy icons, or an uploaded SVG/PNG. Pasting an
   emoji into the search box still works, and statuses saved with the older Lucide pack keep
   rendering their icon.
-- **Referencing sheets** — the compendium shows which characters reference each condition, and
-  character exports bundle every status the sheet references.
+- **Referencing sheets** — each compendium card previews the characters that reference a condition
+  in a single row; opening the card's status modal lists the full set, and character exports bundle
+  every status the sheet references.
 
 ---
 

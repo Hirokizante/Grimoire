@@ -3,18 +3,22 @@
  *
  * Opened either from a card in the Status Compendium or from an inline
  * `[StatusName]` reference in a sheet description, both of which drive the
- * store's `modal` state. In view mode it shows the full information; an Edit
- * button switches to an inline editor (name, icon, description) mirroring the
- * AbilityBlockEditor flow. Closing with unsaved changes prompts to discard.
+ * store's `modal` state. In view mode it shows the full information — including
+ * every sheet that references the status (the card previews only one row of
+ * them); an Edit button switches to an inline editor (name, icon, description)
+ * mirroring the AbilityBlockEditor flow. Closing with unsaved changes prompts
+ * to discard.
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import ConfirmModal from '@/components/sheet/ConfirmModal'
 import MarkdownText from '@/components/ui/MarkdownText'
 import StatusIcon from '@/components/status/StatusIcon'
 import StatusIconPicker from '@/components/status/StatusIconPicker'
 import { useModalDialog } from '@/hooks/useModalDialog'
+import { referencingCharacters } from '@/lib/statusReference'
+import { useCharacterStore } from '@/store/characterStore'
 import { useStatusStore } from '@/store/statusStore'
 import { DEFAULT_STATUS_TAG } from '@/types/status'
 import type { StatusCondition } from '@/types'
@@ -24,10 +28,19 @@ export default function StatusModal() {
   const statuses = useStatusStore((s) => s.statuses)
   const updateStatus = useStatusStore((s) => s.updateStatus)
   const closeStatus = useStatusStore((s) => s.closeStatus)
+  const characters = useCharacterStore((s) => s.characters)
 
   const status = modal.statusId
     ? (statuses.find((s) => s.id === modal.statusId) ?? null)
     : null
+
+  // The card previews references in a single row; the full list lives here.
+  const referencingSheets = useMemo(() => {
+    if (!status) return []
+    return referencingCharacters(status.name, characters).sort((a, b) =>
+      a.name.localeCompare(b.name),
+    )
+  }, [status, characters])
 
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState<StatusCondition | null>(null)
@@ -161,6 +174,20 @@ export default function StatusModal() {
             {status.tags.includes(DEFAULT_STATUS_TAG) && (
               <div className="status-modal__tags">
                 <span className="status-tag">Default</span>
+              </div>
+            )}
+            {referencingSheets.length > 0 && (
+              <div className="status-modal__field">
+                <span className="status-modal__label">
+                  Referenced in sheets
+                </span>
+                <div className="status-modal__tags">
+                  {referencingSheets.map((character) => (
+                    <span key={character.id} className="status-tag">
+                      {character.name}
+                    </span>
+                  ))}
+                </div>
               </div>
             )}
             {status.description ? (

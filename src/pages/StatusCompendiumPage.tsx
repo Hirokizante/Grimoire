@@ -2,9 +2,10 @@
  * StatusCompendiumPage — the reference gallery of Divergence status conditions.
  *
  * Shows a scrolling three-column grid of status cards (icon, name, truncated
- * description, and reference tags), a "create new status" button, and sorting
- * by name / date created / date modified. Clicking a card opens the global
- * StatusModal for details and editing.
+ * description, and a one-row preview of reference tags), a "create new status"
+ * button, and sorting by name / date created / date modified. Clicking a card
+ * opens the global StatusModal for details and editing, including the full list
+ * of sheets that reference the status.
  */
 
 import { useMemo, useState } from 'react'

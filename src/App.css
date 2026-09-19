@@ -1494,8 +1494,27 @@ body:has(.modal-overlay) .app-header__nav {
 
 .status-card__tags {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 4px;
+  overflow: hidden;
+  /* One row of reference tags only — the full list lives in the status modal
+     (see StatusModal). The fade marks tags clipped off the right edge. */
+  -webkit-mask-image: linear-gradient(
+    to right,
+    #000 calc(100% - 1.5rem),
+    transparent
+  );
+  mask-image: linear-gradient(
+    to right,
+    #000 calc(100% - 1.5rem),
+    transparent
+  );
+}
+
+/* Tags keep their natural width and clip at the card edge instead of being
+   squeezed into unreadable slivers by the nowrap row. */
+.status-card__tags .status-tag {
+  flex-shrink: 0;
 }
 
 .status-tag {
