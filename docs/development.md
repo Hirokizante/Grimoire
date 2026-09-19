@@ -246,7 +246,7 @@ src/
 │   ├── NPCListPage.tsx / NPCSheetPage.tsx
 │   ├── GMScreenPage.tsx           # Multi-sheet GM view
 │   ├── StatusCompendiumPage.tsx   # Status compendium browser
-│   ├── SettingsPage.tsx           # Theme, GM panels, animation, backup
+│   ├── SettingsPage.tsx           # Theme, dice ranges, GM panels, animation, backup
 │   └── PlaceholderPage.tsx        # "Coming soon" screen for unbuilt sections
 ├── store/                         # Zustand stores (most with a *.test.ts)
 │   ├── characterStore.ts          # Characters + id-targeted live play
@@ -257,6 +257,7 @@ src/
 │   ├── appThemeStore.ts           # App theme (localStorage)
 │   ├── homeAnimationStore.ts      # Home animation choice (localStorage)
 │   ├── gmPanelThemeStore.ts       # GM panel sheet theming (localStorage)
+│   ├── diceDisplayStore.ts        # Min-max dice badges (localStorage)
 │   └── listPrefsStore.ts          # List sort/filter prefs (localStorage)
 ├── types/
 │   ├── index.ts                   # Barrel re-exports

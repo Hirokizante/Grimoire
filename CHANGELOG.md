@@ -4,6 +4,30 @@ All notable changes to Grimoire are documented here. This project is in alpha:
 storage format may change between pre-1.0 releases, so export (or back up) your
 characters regularly.
 
+## Unreleased
+
+### Dice badges can read as min-max ranges
+
+- **A new display preference, off by default.** Settings → Dice → *Display dice
+  notation as min-max values* relabels every highlighted notation badge as the
+  range it can roll with the character's current stats — `1d6+3` reads `4-9` —
+  instead of the notation as written. Off, badges are exactly as before.
+- **Display only.** Clicking a badge still rolls the original notation, and the
+  result breakdown is unchanged; no sheet data, export, or backup is touched. A
+  badge without a character to resolve stats against keeps the notation, since a
+  range over an unresolved name would lie.
+- **The range comes from the tree, not a second parser.** `diceRoller.notationRange`
+  walks the same parsed expression the roller evaluates, with every die fixed at
+  its own ends; variables resolve through `resolveVariable`, unknown names count
+  0, floor division follows the roller's semantics, and `POW/MAR` ranges over the
+  primary name just as it rolls.
+- **Testing.** `diceRoller.test.ts` pins ranges for dice, constants, variables,
+  groups, negation, multiplication and floor division; `diceDisplayStore.test.ts`
+  pins the default-off flag, the localStorage round-trip and storage failures;
+  `DiceHighlighter.test.tsx` pins the relabel, that the click still rolls the
+  notation, and the no-character fallback; `e2e/dice-notation.spec.ts` toggles the
+  setting in Settings, reloads, and pins the badge plus the unchanged roll.
+
 ## v0.12.0-alpha — 2026-09-19
 
 The sharing release. Six commits since `v0.11.0-alpha`, and the table's things

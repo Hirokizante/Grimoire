@@ -13,7 +13,9 @@
  *   - the documented `POW/MAR` alternative form still highlights as one term
  *     beside it, rather than being read as division, and
  *   - Advantage/Disadvantage is rolled after the initial roll and the new total
- *     replaces the same roll-log entry.
+ *     replaces the same roll-log entry,
+ *   - the min-max display preference (Settings → Dice) relabels a badge without
+ *     changing what clicking it rolls, and survives a reload.
  *
  * Runs against the production build via `vite preview` (see playwright.config.ts)
  * in a fresh browser context, driving the app's real controls.
@@ -131,4 +133,46 @@ test('advantage rolls d6s after the initial roll and updates the log entry', asy
   await expect(entries.first().locator('.roll-log-item__advantage')).toContainText(
     /^Advantage \+2:/,
   )
+})
+
+test('the min-max preference relabels badges without changing the roll', async ({
+  page,
+}) => {
+  await gotoHome(page)
+  await createPlayer(page, 'Vex')
+
+  await page.getByRole('tab', { name: 'Edit', exact: true }).click()
+  await page
+    .getByPlaceholder(/Describe the character's innate nature/)
+    .fill('Overload deals 1d6+3 damage.')
+  // Give the debounced autosave time to flush before leaving the page.
+  await page.waitForTimeout(800)
+  await page.getByRole('tab', { name: 'View', exact: true }).click()
+
+  // Default display: the notation exactly as written.
+  await expect(page.getByRole('button', { name: '1d6+3' })).toBeVisible()
+
+  // Turn the preference on in Settings, then reload to pin that it persists.
+  // The switch's visible track is the click target — the checkbox itself is a
+  // clipped, 1px input under the sticky header.
+  await page.getByRole('button', { name: 'Settings' }).click()
+  const diceRow = page.locator('.settings-toggle-row', {
+    hasText: 'Display dice notation as min-max values',
+  })
+  await diceRow.locator('.settings-toggle__track').click()
+  await expect(diceRow.getByRole('checkbox')).toBeChecked()
+  await page.reload()
+  await page.getByRole('button', { name: 'Characters' }).first().click()
+  await page.getByRole('button', { name: /^Vex\b/ }).click()
+
+  // The badge now shows the range (1+3 … 6+3), but clicking it still rolls the
+  // original notation — the result modal is the same one the notation opens.
+  const badge = page.getByRole('button', { name: 'Roll 1d6+3' })
+  await expect(badge).toHaveText('4-9')
+  await badge.click()
+  await expect(page.locator('.dice-modal__breakdown')).toHaveText(
+    /^1d6\+3 → .+ = \d+$/,
+  )
+  await expect(page.locator('.dice-modal__terms')).toContainText('+3')
+  await page.getByRole('button', { name: 'Done' }).click()
 })

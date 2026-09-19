@@ -11,11 +11,19 @@
  * shorthands and full names are matched exactly (see
  * `customAttributeVariableNames`), so a homebrew stat rolls like a built-in one.
  *
+ * Badge label: Settings → Dice → "Display dice notation as min-max values"
+ * makes each badge read as the range its expression can roll with the
+ * character's current stats (`1d6+3` → `4-9`). Display only — the click always
+ * rolls the original notation, and without a character to resolve stat names
+ * against the notation itself is shown.
+ *
  * In edit mode, highlighting is disabled (the text is just shown plainly).
  */
 
 import { findDiceNotation } from '@/lib/diceParser'
+import { notationRange } from '@/lib/diceRoller'
 import { customAttributeVariableNames } from '@/lib/customAttributes'
+import { useDiceDisplayStore } from '@/store/diceDisplayStore'
 import { useDiceRollStore } from '@/store/diceRollStore'
 import { useCharacterStore } from '@/store/characterStore'
 import type { Character } from '@/types/character'
@@ -51,6 +59,7 @@ export default function DiceHighlighter({
   source,
 }: DiceHighlighterProps) {
   const roll = useDiceRollStore((s) => s.roll)
+  const showRanges = useDiceDisplayStore((s) => s.showRanges)
   const currentCharacter = useCharacterStore((s) => s.currentCharacter)
   const character = explicitCharacter ?? currentCharacter
 
@@ -84,6 +93,14 @@ export default function DiceHighlighter({
     }
 
     // The dice notation match (clickable in view mode).
+    // The badge shows the notation, or the range it can roll when the display
+    // preference is on. A range needs a character to resolve stat names (an
+    // unknown name would read 0 and lie about e.g. `1d6+POW`), so without one
+    // the notation stays — exactly the badge a disabled click would offer.
+    const range =
+      isView && showRanges && character
+        ? notationRange(match.match, character)
+        : null
     segments.push(
       <button
         key={`dice-${i}`}
@@ -95,9 +112,12 @@ export default function DiceHighlighter({
           }
         }}
         title={isView ? `Roll ${match.match}` : undefined}
+        // A range label hides the notation, so the button keeps naming the
+        // roll it performs for assistive tech (and for stable test queries).
+        aria-label={range ? `Roll ${match.match}` : undefined}
         disabled={!isView || !character}
       >
-        {match.match}
+        {range ? `${range.min}-${range.max}` : match.match}
       </button>,
     )
 

@@ -394,3 +394,113 @@ export function rollNotation(
   const expr = parseDiceNotation(notation)
   return evaluateExpression(expr, character)
 }
+
+// ---- Roll ranges -------------------------------------------------------------
+
+/** The lowest and highest total an expression can roll. */
+export interface DiceRange {
+  min: number
+  max: number
+}
+
+/**
+ * One node's span of possible values, computed with every die at one end.
+ *
+ * The two ends are read off the same expression tree the roller evaluates, so
+ * groups and precedence mean what they say. A variable resolves through
+ * {@link resolveVariable} exactly as it would when rolled — including an
+ * unknown name counting 0 — which is what lets `1d6+POW` read its real range.
+ */
+function termRange(term: ParsedTerm, character: Character): DiceRange {
+  switch (term.type) {
+    case 'dice':
+      return { min: term.count, max: term.count * term.sides }
+    case 'constant': {
+      const value = term.value * term.sign
+      return { min: value, max: value }
+    }
+    case 'variable': {
+      const value = (resolveVariable(term.name, character) ?? 0) * term.sign
+      return { min: value, max: value }
+    }
+  }
+}
+
+/**
+ * The extremes of `left / right` under the roller's floor semantics.
+ *
+ * For a fixed integer numerator, floor division is monotone on each side of
+ * zero as the denominator moves away from it, so the extremes over a
+ * denominator interval sit at its endpoints and at -1, 1 and 0 whenever the
+ * interval covers them (dividing by zero contributes 0, see `divide`). The
+ * numerator's own endpoints complete the candidates.
+ */
+function divideRange(left: DiceRange, right: DiceRange): DiceRange {
+  const denominators = [right.min, right.max]
+  for (const candidate of [-1, 0, 1]) {
+    if (candidate >= right.min && candidate <= right.max) {
+      denominators.push(candidate)
+    }
+  }
+  let min = Infinity
+  let max = -Infinity
+  for (const numerator of [left.min, left.max]) {
+    for (const denominator of denominators) {
+      const value = divide(numerator, denominator)
+      if (value < min) min = value
+      if (value > max) max = value
+    }
+  }
+  return { min, max }
+}
+
+/** Evaluate a node to the span of totals it can produce. */
+function rangeNode(node: ExprNode, character: Character): DiceRange {
+  switch (node.kind) {
+    case 'term':
+      return termRange(node.term, character)
+    case 'negate': {
+      const inner = rangeNode(node.operand, character)
+      return { min: -inner.max, max: -inner.min }
+    }
+    case 'binary': {
+      const left = rangeNode(node.left, character)
+      const right = rangeNode(node.right, character)
+      if (node.op === '+') {
+        return { min: left.min + right.min, max: left.max + right.max }
+      }
+      if (node.op === '/') return divideRange(left, right)
+      const products = [
+        left.min * right.min,
+        left.min * right.max,
+        left.max * right.min,
+        left.max * right.max,
+      ]
+      return { min: Math.min(...products), max: Math.max(...products) }
+    }
+  }
+}
+
+/**
+ * The lowest and highest totals a parsed expression can roll, with the
+ * character's stats substituted exactly as a real roll would substitute them.
+ *
+ * This is display-only: the ends are computed without rolling anything.
+ */
+export function evaluateRange(
+  expr: ParsedExpression,
+  character: Character,
+): DiceRange {
+  if (!expr.root) return { min: 0, max: 0 }
+  return rangeNode(expr.root, character)
+}
+
+/**
+ * Convenience: parse + range in one step, mirroring {@link rollNotation}.
+ */
+export function notationRange(
+  notation: string,
+  character: Character,
+): DiceRange {
+  return evaluateRange(parseDiceNotation(notation), character)
+}

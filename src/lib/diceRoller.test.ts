@@ -1,5 +1,5 @@
 import { test, expect, vi } from 'vitest'
-import { resolveVariable } from '@/lib/diceRoller'
+import { notationRange, resolveVariable } from '@/lib/diceRoller'
 import { parseDiceNotation } from '@/lib/diceParser'
 import type { Character } from '@/types'
 import { createDefaultCharacter } from '@/constants/gameData'
@@ -319,4 +319,46 @@ test('evaluateExpression: an unreadable expression totals zero', async () => {
   expect(result.total).toBe(0)
   expect(result.terms).toHaveLength(0)
   expect(result.breakdown).toBe('+++ → 0')
+})
+
+// ---- Roll ranges -------------------------------------------------------------
+
+test('notationRange: dice and constants span their own ends', () => {
+  const char = makeTestChar()
+  expect(notationRange('1d6+3', char)).toEqual({ min: 4, max: 9 })
+  expect(notationRange('2d6', char)).toEqual({ min: 2, max: 12 })
+  expect(notationRange('d20-2', char)).toEqual({ min: -1, max: 18 })
+  expect(notationRange('1d6*1d6', char)).toEqual({ min: 1, max: 36 })
+})
+
+test('notationRange: variables resolve exactly as they roll', () => {
+  const char = makeTestChar() // POW = 4, MAR = 3, VIT = 0
+  expect(notationRange('1d6+POW', char)).toEqual({ min: 5, max: 10 })
+  // `POW/MAR` rolls its primary name, so its range is POW's too.
+  expect(notationRange('1d6+POW/MAR', char)).toEqual({ min: 5, max: 10 })
+  expect(notationRange('1d6+VIT', char)).toEqual({ min: 1, max: 6 })
+  // An unknown name counts 0, exactly as it does in a roll.
+  expect(notationRange('d6+Unknown', char)).toEqual({ min: 1, max: 6 })
+})
+
+test('notationRange: groups, precedence, and negation follow the tree', () => {
+  const char = makeTestChar() // POW = 4
+  expect(notationRange('(1d6+POW)*2', char)).toEqual({ min: 10, max: 20 })
+  expect(notationRange('1d6-2*3', char)).toEqual({ min: -5, max: 0 })
+  expect(notationRange('-(1d6+2)', char)).toEqual({ min: -8, max: -3 })
+})
+
+test('notationRange: division floors at the denominator extremes', () => {
+  const char = makeTestChar() // POW = 4, MAR = 3, VIT = 0
+  expect(notationRange('1d6/2', char)).toEqual({ min: 0, max: 3 })
+  expect(notationRange('(1d6+POW)*2/2d6+MAR', char)).toEqual({
+    min: 3,
+    max: 13,
+  })
+  // Dividing by a stat that is 0 contributes 0, the roller's own rule.
+  expect(notationRange('d20/VIT', char)).toEqual({ min: 0, max: 0 })
+})
+
+test('notationRange: an unreadable expression spans zero', () => {
+  expect(notationRange('+++', makeTestChar())).toEqual({ min: 0, max: 0 })
 })

@@ -15,6 +15,7 @@ import { beforeEach, expect, test, vi } from 'vitest'
 import DiceHighlighter from '@/components/dice/DiceHighlighter'
 import { createDefaultCharacter } from '@/constants/gameData'
 import { useCharacterStore } from '@/store/characterStore'
+import { useDiceDisplayStore } from '@/store/diceDisplayStore'
 import { useDiceRollStore } from '@/store/diceRollStore'
 import type { Character, CustomAttribute } from '@/types'
 
@@ -43,6 +44,7 @@ vi.mock('@/lib/db', () => ({
 
 beforeEach(() => {
   useCharacterStore.setState({ characters: [], currentCharacter: null })
+  useDiceDisplayStore.setState({ showRanges: false })
   useDiceRollStore.setState({
     isVisible: false,
     result: null,
@@ -181,4 +183,51 @@ test('a compound expression highlights as one token and rolls whole', () => {
   ])
   // The trailing word stayed prose.
   expect(screen.getByText(/damage/)).toBeInTheDocument()
+})
+
+// ---- Min-max display preference ---------------------------------------------
+
+test('with ranges on, the badge reads min-max but still rolls the notation', () => {
+  useDiceDisplayStore.setState({ showRanges: true })
+  render(
+    <DiceHighlighter
+      text="Deal 1d6+3 damage"
+      mode="view"
+      character={makeCharacter([SANITY])}
+    />,
+  )
+
+  // The visible label is the range the click can produce (1+3 … 6+3), while
+  // the accessible name keeps naming the roll itself.
+  const token = screen.getByRole('button', { name: 'Roll 1d6+3' })
+  expect(token).toHaveTextContent('4-9')
+
+  fireEvent.click(token)
+  const roll = useDiceRollStore.getState()
+  expect(roll.notation).toBe('1d6+3')
+  expect(roll.result!.total).toBe(roll.result!.terms[0].value + 3)
+})
+
+test('with ranges on, a stat resolves to its current value', () => {
+  useDiceDisplayStore.setState({ showRanges: true })
+  const character = makeCharacter([]) // default POW = 2
+  render(
+    <DiceHighlighter text="Deal 1d6+POW damage" mode="view" character={character} />,
+  )
+
+  const token = screen.getByRole('button', { name: 'Roll 1d6+POW' })
+  expect(token).toHaveTextContent('3-8')
+  fireEvent.click(token)
+  expect(useDiceRollStore.getState().result!.terms[1].value).toBe(2)
+})
+
+test('with ranges on, a badge without a character stays as written', () => {
+  useDiceDisplayStore.setState({ showRanges: true })
+  render(<DiceHighlighter text="Deal 1d6+POW damage" mode="view" />)
+
+  // No sheet to resolve `POW` against, so a range would lie — and the button
+  // is disabled anyway.
+  expect(screen.getByRole('button', { name: '1d6+POW' })).toHaveTextContent(
+    '1d6+POW',
+  )
 })

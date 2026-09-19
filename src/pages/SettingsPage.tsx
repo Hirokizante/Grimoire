@@ -2,12 +2,13 @@
  * SettingsPage — app-level preferences.
  *
  * Hosts the app color theme picker (themes the app chrome around the sheets —
- * header, list pages, modals, dice UI), the GM Screen display options (whether
- * a player panel's expanded sheet body keeps its own customization or follows
- * the app theme like an NPC panel), the home page animation picker (on/off +
- * which ambient effect plays behind the title), and the full-app Backup &
- * Restore section. Per-sheet color themes live in each sheet's Customization
- * panel and are stored on the character.
+ * header, list pages, modals, dice UI), the dice-badge display option (whether
+ * highlighted notation reads as written or as the min–max range it can roll),
+ * the GM Screen display options (whether a player panel's expanded sheet body
+ * keeps its own customization or follows the app theme like an NPC panel), the
+ * home page animation picker (on/off + which ambient effect plays behind the
+ * title), and the full-app Backup & Restore section. Per-sheet color themes
+ * live in each sheet's Customization panel and are stored on the character.
  *
  * Backup & Restore: downloads EVERYTHING (characters, NPCs, statuses, version
  * history, roll log) as a single JSON file; restoring replaces all current
@@ -32,6 +33,7 @@ import { downloadJson } from '@/lib/exportImport'
 import { useAppThemeStore } from '@/store/appThemeStore'
 import type { AppTheme } from '@/store/appThemeStore'
 import { useCharacterStore } from '@/store/characterStore'
+import { useDiceDisplayStore } from '@/store/diceDisplayStore'
 import { useGMScreenStore } from '@/store/gmScreenStore'
 import { useGmPanelThemeStore } from '@/store/gmPanelThemeStore'
 import { useHomeAnimationStore } from '@/store/homeAnimationStore'
@@ -128,6 +130,8 @@ function backupSheetSummary(counts: FullBackup['counts']): string {
 export default function SettingsPage() {
   const theme = useAppThemeStore((s) => s.theme)
   const setTheme = useAppThemeStore((s) => s.setTheme)
+  const diceShowRanges = useDiceDisplayStore((s) => s.showRanges)
+  const setDiceShowRanges = useDiceDisplayStore((s) => s.setShowRanges)
   const gmPanelMatchAppTheme = useGmPanelThemeStore((s) => s.matchAppTheme)
   const setGmPanelMatchAppTheme = useGmPanelThemeStore((s) => s.setMatchAppTheme)
   const homeAnimation = useHomeAnimationStore((s) => s.animation)
@@ -270,6 +274,46 @@ export default function SettingsPage() {
             )
           })}
         </div>
+      </section>
+
+      <section
+        className="settings-section"
+        aria-labelledby="settings-dice-heading"
+      >
+        <h2 className="settings-section__title" id="settings-dice-heading">
+          Dice
+        </h2>
+        <p className="muted settings-section__hint">
+          How highlighted dice notation reads on your sheets. This is display
+          only — clicking a badge always rolls the notation it was written as.
+        </p>
+
+        <div className="settings-toggle-row">
+          <span
+            className="settings-toggle-row__label"
+            id="dice-ranges-toggle-label"
+          >
+            Display dice notation as min-max values
+          </span>
+          <label className="settings-toggle">
+            <input
+              type="checkbox"
+              checked={diceShowRanges}
+              onChange={(e) => setDiceShowRanges(e.target.checked)}
+              aria-labelledby="dice-ranges-toggle-label"
+              aria-describedby="dice-ranges-toggle-hint"
+            />
+            <span className="settings-toggle__track" aria-hidden="true" />
+          </label>
+        </div>
+
+        <p className="muted settings-section__hint" id="dice-ranges-toggle-hint">
+          A highlighted expression shows the range it can roll — 1d6+3 reads
+          "4-9" — with your current attribute and skill values substituted.
+          Clicking still rolls the original notation, so the dice come up as
+          they will. A badge with no sheet to resolve its stats against stays
+          as written.
+        </p>
       </section>
 
       <section

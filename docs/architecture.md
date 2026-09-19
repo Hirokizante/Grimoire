@@ -47,10 +47,11 @@ Zustand stores manage all application state:
 - **`listPrefsStore`** — remembered list-page display prefs (sort key + filter selections for the
   character list, NPC list, and status compendium). Persisted to localStorage so choices survive
   page switches and reloads.
-- **`appThemeStore` / `homeAnimationStore` / `gmPanelThemeStore`** — app-level UI preferences
-  persisted to localStorage (synchronously available before first paint): the app chrome theme,
-  the home page ambient animation, and whether a GM panel's expanded sheet body follows the app
-  theme instead of the character's own palette. Preferences only — no sheet data is stored here.
+- **`appThemeStore` / `homeAnimationStore` / `gmPanelThemeStore` / `diceDisplayStore`** — app-level
+  UI preferences persisted to localStorage (synchronously available before first paint): the app
+  chrome theme, the home page ambient animation, whether a GM panel's expanded sheet body follows
+  the app theme instead of the character's own palette, and whether highlighted dice notation reads
+  as written or as its min–max range. Preferences only — no sheet data is stored here.
 
 Three conventions apply across the stores:
 

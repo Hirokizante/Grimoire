@@ -320,7 +320,9 @@ Grimoire is built to support that freedom:
 ## Dice roller
 
 - **Inline dice notation** — `d20`, `2d6+4`, `1d6+POW`, `2d6+POW/MAR` are auto-detected in any text
-  field and become clickable in view mode.
+  field and become clickable in view mode. A badge can read as the notation itself or, with
+  **Settings → Dice → *Display dice notation as min-max values*** on, as the range it can roll
+  (`1d6+3` → `4-9`); the click is unchanged either way.
 - **Compound notation** — `+`, `-`, `*`, `/` and parentheses all work with the usual precedence, so
   `(1d6+POW)*2/2d6+MAR` is one clickable token that does exactly what it reads: double the d6 plus
   POW, divide by a fresh 2d6, add MAR. Division rounds down, and an unknown name counts 0 wherever it
@@ -440,6 +442,17 @@ for them:
   and muted teal, from Ghostty).
 - **Persistence** — the choice persists in `localStorage` and applies before first paint.
 - **Sheet color themes are unaffected** — those stay per-character in the Customization panel.
+
+### Dice notation display
+
+- **Settings → Dice → *Display dice notation as min-max values*** makes every highlighted badge read
+  as the range it can roll with the character's current stats — `1d6+3` reads `4-9`, `1d6+POW` reads
+  `3-8` while POW is 2 — instead of the notation as written.
+- **Off by default**, so badges keep the notation as written until asked otherwise.
+- **Display only** — clicking a badge still rolls the original notation, and the roll breakdown
+  shows it exactly as before. A badge with no sheet to resolve its stats against keeps the notation
+  as written, since a range over an unresolved name would be wrong.
+- **Persistence** — the choice persists in `localStorage`.
 
 ### Home page animation
 
