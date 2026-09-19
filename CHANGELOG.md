@@ -4,7 +4,26 @@ All notable changes to Grimoire are documented here. This project is in alpha:
 storage format may change between pre-1.0 releases, so export (or back up) your
 characters regularly.
 
-## Unreleased
+## v0.12.0-alpha — 2026-09-19
+
+The sharing release. Six commits since `v0.11.0-alpha`, and the table's things
+finally leave the app and come back: a status condition exports from its own
+modal as `Status - {Name}.json`, the whole compendium exports from the Statuses
+page, and one Import button takes either shape — merging a single condition by
+name, replacing the compendium wholesale behind a danger confirmation. An
+Ability Block, a roll result and a status modal each copy themselves to the
+device clipboard as a PNG, rasterized off-screen so a dimmed GM panel, a dead
+panel or a card mid-drag cannot fade the shot. The GM Screen gains a manual way
+off cooldown — the cooling badge's `↻` clears that ability without rolling the
+Recharge Die — its panels' ⋯ menus portal out of the panel's `opacity` so a
+spent or downed panel opens them at full strength, and the Status Compendium
+previews a condition's referencing sheets in one clipped row while the modal
+lists them all.
+
+**No migration to run** — the IndexedDB schema stays at version 5 and no
+stored record changed shape: statuses are still references resolved at render
+time, the capture path only reads the DOM, and the compendium import replaces
+records wholesale rather than converting them.
 
 ### Status conditions can be exported and imported
 
@@ -31,6 +50,23 @@ characters regularly.
   closing the modal); `StatusModal.test.tsx` pins the export payload and that
   the button is view-only; `StatusCompendiumPage.test.tsx` pins the one-button
   import flow, the confirmation, its cancel, and the compendium export.
+
+### A status card previews its referencing sheets in one row, the modal lists them all
+
+- **The card's reference tags wrapped into a ragged block.** A condition
+  referenced by several sheets grew a card taller than its neighbours in the
+  compendium grid, and the tag row reflowed with every sheet created or
+  renamed. The tags are now one non-wrapping line that clips at the card edge
+  behind a short fade, each tag keeping its natural width instead of being
+  squeezed into a sliver.
+- **The full list lives in the status modal.** View mode gained a "Referenced
+  in sheets" block listing every sheet that references the status — the same
+  case-insensitive match the inline `[Name]` references use — sorted by name,
+  so a clipped tag can be read in full. Like the rest of the view, it is
+  absent from the edit form: the reference list is information, not authoring
+  chrome.
+- **Testing.** `StatusModal.test.tsx` pins the full list, its absence when no
+  sheet references the status, and that the edit form never shows it.
 
 ### Ability Blocks, roll results and status modals can be copied as images
 
@@ -91,6 +127,21 @@ characters regularly.
   button appearing only on the cooling chip and the Activate button re-enabling
   after the click, and the `e2e/gm-screen.spec.ts` Recharge flow drives it in a
   real browser.
+
+### A GM panel's ⋯ menu stays sharp when the panel itself is dimmed
+
+- **The menu faded with the panel because it lived inside it.** A panel dims
+  its regions with ancestor `opacity` — 0.55 at 0 AP, 0.75 dead, 0.4 mid-drag
+  — and no descendant can undo an inherited fade, so opening the ⋯ menu on a
+  spent or downed panel showed a translucent menu. It now portals to
+  `document.body` like the pickers, positioned from the kebab's own measured
+  rect and clamped into the viewport (flipping above the button when the panel
+  sits low, scrolling internally when taller than the viewport), and re-places
+  on scroll and resize so it stays on its kebab.
+- **Testing.** `GMScreenPanels.test.tsx` pins that a dimmed panel never dims
+  the menu it opens, and `e2e/gm-screen.spec.ts` opens it from an out-of-AP
+  panel of both kinds and from a dead panel, asserting the menu's *effective*
+  opacity (every ancestor multiplied down the tree) is 1.
 
 ## v0.11.0-alpha — 2026-09-19
 
