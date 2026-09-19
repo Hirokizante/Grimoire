@@ -549,6 +549,47 @@ test('the manual-add picker portals out of the dead panel that opened it', () =>
   expect(document.querySelector('.gm-panel--dead')?.contains(dialog)).toBe(false)
 })
 
+test('a dimmed panel never dims the menu it opens', () => {
+  // The panel's dims are ancestor `opacity` (`--no-ap` 0.55, `--dead` 0.75),
+  // which multiplies into every descendant — a menu left in the header painted
+  // translucent with the panel. It portals to `document.body` instead, the same
+  // rule the pickers follow. jsdom applies no stylesheets, so what this pins is
+  // the structure that produces the fade; the browser suite measures the
+  // painted result on both panel kinds.
+  const pc = makePlayer()
+  const player = renderPlayerPanel(pc)
+  act(() => {
+    useCharacterStore.getState().spendAP(pc.id, 3)
+  })
+  const playerPanel = player.container.querySelector('.gm-panel')!
+  expect(playerPanel).toHaveClass('gm-panel--no-ap')
+
+  fireEvent.click(screen.getByRole('button', { name: 'Vex options' }))
+  const playerMenu = screen.getByRole('menu')
+  expect(playerPanel.contains(playerMenu)).toBe(false)
+  expect(playerMenu.parentElement).toBe(document.body)
+  player.unmount()
+
+  // Same rule on an NPC instance panel in BOTH of its dim states at once: no AP
+  // left and dead. The menu must still work from its portal, too.
+  const npc = renderNpcPanel(makeBase(), 'compact')
+  act(() => {
+    useGMScreenStore.getState().spendInstanceAP(SCREEN_ID, PANEL_ID, 3)
+    useGMScreenStore.getState().setInstanceCondition(SCREEN_ID, PANEL_ID, 'dead')
+  })
+  const npcPanel = npc.container.querySelector('.gm-panel')!
+  expect(npcPanel).toHaveClass('gm-panel--no-ap')
+  expect(npcPanel).toHaveClass('gm-panel--dead')
+
+  fireEvent.click(screen.getByRole('button', { name: 'Bandit options' }))
+  const npcMenu = screen.getByRole('menu')
+  expect(npcPanel.contains(npcMenu)).toBe(false)
+  expect(npcMenu.parentElement).toBe(document.body)
+
+  fireEvent.click(within(npcMenu).getByRole('menuitem', { name: 'Mark alive' }))
+  expect(panelState().condition).toBe('active')
+})
+
 test('NpcInstancePanel: expanded renders the condensed shared body, not the full NPC sheet', () => {
   const { container } = renderPanel('expanded')
 

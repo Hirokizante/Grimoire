@@ -179,7 +179,10 @@ NPC instances follow one rule: **instances are deltas, not clones.**
 - **A panel whose entity is out of AP dims itself** — header, HP bar, tokens and the expanded
   sheet body — so a glance down the screen shows who has already acted. The AP block stays at
   full strength (it holds both ways back: the manual `+` and Start new turn), nothing is
-  disabled or made un-clickable, and the panel returns to normal the instant AP does.
+  disabled or made un-clickable, and the panel returns to normal the instant AP does. The ⋯
+  panel menu is exempt too: it portals to `document.body` (like the pickers), because an
+  ancestor's `opacity` multiplies into every descendant and a menu left in the header faded
+  with the panel — so it stays full-strength at 0 AP, on a dead panel, and mid-drag alike.
 - **Every NPC ability with a cost, a Recharge value or activation rolls gets an Activate
   button** — the same button, plan, and cost deduction the player sheets use
   (`useAbilityActivation` with the panel's own resource adapter), not a second implementation.

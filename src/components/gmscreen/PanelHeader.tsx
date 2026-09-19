@@ -7,7 +7,8 @@
  * and stays reachable in every density.
  */
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Maximize2, Minimize2, MoreVertical } from 'lucide-react'
 
 import type { ScreenPanelDensity } from '@/types'
@@ -33,6 +34,11 @@ export interface PanelHeaderProps {
   dimmed?: boolean
 }
 
+/** Gap between the kebab and its menu, matching the old in-panel placement. */
+const MENU_GAP = 4
+/** Closest the menu may come to a viewport edge. */
+const MENU_EDGE = 8
+
 export default function PanelHeader({
   portrait,
   name,
@@ -44,14 +50,21 @@ export default function PanelHeader({
   dimmed = false,
 }: PanelHeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false)
+  const [menuPlacement, setMenuPlacement] = useState({ top: 0, left: 0 })
+  const menuWrapRef = useRef<HTMLDivElement>(null)
+  const menuBtnRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
 
   // Close the menu on outside click. The menu is deliberately click-to-toggle
-  // only (never hover), matching the drawer conventions in .hermes.md.
+  // only (never hover), matching the drawer conventions in .hermes.md. The menu
+  // is portalled, so "inside" means either the wrap (the kebab) or the menu
+  // itself — checking the wrap alone would close on every menu click.
   useEffect(() => {
     if (!menuOpen) return
     function onPointerDown(e: MouseEvent) {
-      if (!menuRef.current?.contains(e.target as Node)) setMenuOpen(false)
+      const target = e.target as Node
+      if (menuWrapRef.current?.contains(target) || menuRef.current?.contains(target)) return
+      setMenuOpen(false)
     }
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') setMenuOpen(false)
@@ -61,6 +74,50 @@ export default function PanelHeader({
     return () => {
       document.removeEventListener('mousedown', onPointerDown)
       window.removeEventListener('keydown', onKey)
+    }
+  }, [menuOpen])
+
+  // The menu lives in `document.body`, not in the header. A panel dims itself
+  // with ancestor `opacity` (0.55 at 0 AP, 0.75 dead, 0.4 mid-drag), and no
+  // descendant can undo an inherited fade — so a menu left in the header went
+  // translucent with the panel. Portalling keeps it at full strength in every
+  // panel state (the same reason the pickers portal). Placement is measured
+  // from the kebab's own rect; running in a layout effect means the first
+  // painted frame is already positioned.
+  useLayoutEffect(() => {
+    if (!menuOpen) return
+    const place = () => {
+      const menu = menuRef.current
+      const anchor = menuBtnRef.current
+      if (!menu || !anchor) return
+      const rect = anchor.getBoundingClientRect()
+      const { offsetWidth: width, offsetHeight: height } = menu
+      // Right edges line up (the old `right: 0`), clamped into the viewport.
+      const left = Math.min(
+        Math.max(MENU_EDGE, rect.right - width),
+        Math.max(MENU_EDGE, window.innerWidth - MENU_EDGE - width),
+      )
+      const below = rect.bottom + MENU_GAP
+      const above = rect.top - MENU_GAP - height
+      // Below the kebab by default; above it when the panel sits too low in
+      // the viewport. A menu taller than the viewport clamps to the top edge
+      // and scrolls internally (see `.gm-panel__menu--portal`).
+      const top =
+        below + height > window.innerHeight - MENU_EDGE && above >= MENU_EDGE
+          ? above
+          : Math.min(
+              below,
+              Math.max(MENU_EDGE, window.innerHeight - MENU_EDGE - height),
+            )
+      setMenuPlacement({ top, left })
+    }
+    place()
+    // The page scrolls under the menu; re-place it so it stays on its kebab.
+    window.addEventListener('scroll', place, true)
+    window.addEventListener('resize', place)
+    return () => {
+      window.removeEventListener('scroll', place, true)
+      window.removeEventListener('resize', place)
     }
   }, [menuOpen])
 
@@ -97,8 +154,9 @@ export default function PanelHeader({
           {expanded ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
         </button>
 
-        <div className="gm-panel__menu-wrap" ref={menuRef}>
+        <div className="gm-panel__menu-wrap" ref={menuWrapRef}>
           <button
+            ref={menuBtnRef}
             type="button"
             className="btn btn--icon gm-panel__menu-btn"
             onClick={() => setMenuOpen((v) => !v)}
@@ -109,26 +167,34 @@ export default function PanelHeader({
           >
             <MoreVertical size={16} />
           </button>
-          {menuOpen && (
-            <div className="gm-panel__menu" role="menu">
-              {menuItems.map((item) => (
-                <button
-                  key={item.label}
-                  type="button"
-                  role="menuitem"
-                  className={
-                    'gm-panel__menu-item' + (item.danger ? ' gm-panel__menu-item--danger' : '')
-                  }
-                  onClick={() => {
-                    setMenuOpen(false)
-                    item.onSelect()
-                  }}
-                >
-                  {item.label}
-                </button>
-              ))}
-            </div>
-          )}
+          {menuOpen &&
+            createPortal(
+              <div
+                ref={menuRef}
+                className="gm-panel__menu gm-panel__menu--portal"
+                role="menu"
+                style={{ top: menuPlacement.top, left: menuPlacement.left }}
+              >
+                {menuItems.map((item) => (
+                  <button
+                    key={item.label}
+                    type="button"
+                    role="menuitem"
+                    className={
+                      'gm-panel__menu-item' +
+                      (item.danger ? ' gm-panel__menu-item--danger' : '')
+                    }
+                    onClick={() => {
+                      setMenuOpen(false)
+                      item.onSelect()
+                    }}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>,
+              document.body,
+            )}
         </div>
       </div>
     </header>

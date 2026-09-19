@@ -114,6 +114,26 @@ async function damageFor(page: Page, panel: Locator, amount: number) {
 }
 
 /**
+ * What the eye actually sees: every ancestor's `opacity` multiplies down the
+ * tree, so an element renders translucent even when its own opacity is 1 — a
+ * dimmed panel fades everything mounted inside it. A selector matching nothing
+ * returns null.
+ */
+async function effectiveOpacity(page: Page, selector: string) {
+  return page.evaluate((sel) => {
+    const el = document.querySelector(sel)
+    if (!el) return null
+    let node: Element | null = el
+    let opacity = 1
+    while (node) {
+      opacity *= parseFloat(getComputedStyle(node).opacity)
+      node = node.parentElement
+    }
+    return opacity
+  }, selector)
+}
+
+/**
  * Track a compendium status on a panel through the Add Status picker: open the
  * panel's ＋ button, pick the duration chip on that status's row, then dismiss
  * the dialog (it stays open by design so several conditions can be applied).
@@ -1258,6 +1278,15 @@ test.describe('GM Screen', () => {
     await panel.getByRole('button', { name: 'Spend Action Points' }).click()
     await expect(hpBlock).toHaveCSS('opacity', '0.55')
 
+    // A menu spawned from the dimmed panel is NOT dimmed: it portals to
+    // `document.body`, so the panel's 0.55 cannot multiply into it.
+    await panel.getByRole('button', { name: 'Vex options' }).click()
+    const panelMenu = page.locator('.gm-panel__menu')
+    await expect(panelMenu).toBeVisible()
+    expect(await effectiveOpacity(page, '.gm-panel__menu')).toBe(1)
+    await page.keyboard.press('Escape')
+    await expect(panelMenu).toHaveCount(0)
+
     // …and so does the turn button, which is the sheet's End Turn: AP is
     // refilled on the same record the player owns.
     await panel.getByRole('button', { name: 'Start new turn' }).click()
@@ -1767,6 +1796,14 @@ test.describe('GM Screen', () => {
     // An NPC panel takes the same out-of-AP dim, AP block exempt.
     await expect(panel.locator('.gm-hp')).toHaveCSS('opacity', '0.55')
     await expect(panel.locator('.gm-ap')).toHaveCSS('opacity', '1')
+    // Its ⋯ menu is exempt too — it portals to `document.body`, exactly like
+    // the player panel's menu above.
+    await panel.getByRole('button', { name: 'Bandit options' }).click()
+    const panelMenu = page.locator('.gm-panel__menu')
+    await expect(panelMenu).toBeVisible()
+    expect(await effectiveOpacity(page, '.gm-panel__menu')).toBe(1)
+    await page.keyboard.press('Escape')
+    await expect(panelMenu).toHaveCount(0)
     const turn = panel.getByRole('button', { name: 'Start new turn' })
     await expect(turn).toBeVisible()
     await turn.click()
@@ -2173,6 +2210,14 @@ test.describe('GM Screen', () => {
       await panel.evaluate((el) => parseFloat(getComputedStyle(el).opacity)),
     ).toBeLessThan(1)
 
+    // Its ⋯ menu is not part of that dim either: it portals to `document.body`.
+    await panel.getByRole('button', { name: 'Bandit options' }).click()
+    const panelMenu = page.locator('.gm-panel__menu')
+    await expect(panelMenu).toBeVisible()
+    expect(await effectiveOpacity(page, '.gm-panel__menu')).toBe(1)
+    await page.keyboard.press('Escape')
+    await expect(panelMenu).toHaveCount(0)
+
     // ---- Open the picker from that panel ---------------------------------
     await panel.getByRole('button', { name: 'Add status to Bandit' }).click()
     const overlay = page.locator('.modal-overlay')
@@ -2184,21 +2229,10 @@ test.describe('GM Screen', () => {
 
     const placement = await page.evaluate(() => {
       const overlay = document.querySelector('.modal-overlay')!
-      const dialog = overlay.querySelector('.modal-content')!
-      // What the eye actually sees: every ancestor's opacity multiplies down
-      // the tree, so the panel's dim used to make the whole dialog 75%
-      // transparent even though its own opacity was 1.
-      let node: Element | null = dialog
-      let effectiveOpacity = 1
-      while (node) {
-        effectiveOpacity *= parseFloat(getComputedStyle(node).opacity)
-        node = node.parentElement
-      }
       const rect = overlay.getBoundingClientRect()
       return {
         onBody: overlay.parentElement === document.body,
         insidePanel: overlay.closest('.gm-panel') !== null,
-        effectiveOpacity,
         rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
       }
     })
@@ -2206,7 +2240,9 @@ test.describe('GM Screen', () => {
     // The dialog is a viewport overlay again, not a child of the panel…
     expect(placement.onBody).toBe(true)
     expect(placement.insidePanel).toBe(false)
-    expect(placement.effectiveOpacity).toBe(1)
+    // …and no ancestor's dim reaches it: the panel's 0.75 used to make the
+    // whole dialog 75% transparent even though its own opacity was 1.
+    expect(await effectiveOpacity(page, '.modal-overlay .modal-content')).toBe(1)
     // …so its backdrop dims the whole viewport instead of the panel's box.
     const viewport = page.viewportSize()!
     expect(placement.rect).toEqual({

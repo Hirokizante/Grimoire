@@ -495,6 +495,22 @@
   box-shadow: 0 8px 20px rgb(0 0 0 / 45%);
 }
 
+/* The menu mounts on `document.body` (React portal), not in the header: the
+   panel's dims are ancestor `opacity` (0.55 at 0 AP, 0.75 dead), which a
+   descendant cannot undo, so an in-header menu rendered at 55–75% strength.
+   Off-panel means it also keeps full strength mid-drag. `right: auto` matters —
+   with the inline `left` and the base rule's `right: 0` both applying, the
+   absolutely-positioned box would stretch across the viewport. Top/left come
+   from the kebab's measured rect (PanelHeader), which is why they are not set
+   here. */
+.gm-panel__menu--portal {
+  position: fixed;
+  right: auto;
+  max-width: calc(100vw - 1rem);
+  max-height: calc(100dvh - 1rem);
+  overflow-y: auto;
+}
+
 .gm-panel__menu-item {
   text-align: left;
   padding: 0.45rem 0.6rem;
