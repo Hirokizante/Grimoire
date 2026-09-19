@@ -1,5 +1,5 @@
 /**
- * E2E: the capture buttons on Ability Blocks and roll results.
+ * E2E: the capture buttons on Ability Blocks, roll results and status modals.
  *
  * The unit tests pin the clone's rules (off-screen, un-clamped, controls
  * hidden) and the component tests pin the button's wiring. What only a real
@@ -142,6 +142,31 @@ test('a roll result modal is copied whole, cropped to the dialog', async ({
   await modal.getByRole('button', { name: 'Copy roll result image' }).click()
   await expect(
     page.getByText('Copied the roll result image to the clipboard.'),
+  ).toBeVisible()
+
+  expectCroppedTo(await clipboardPng(page), box)
+})
+
+test('a status modal is copied whole, cropped to the dialog', async ({
+  page,
+}) => {
+  await gotoHome(page)
+  await page.getByText('Statuses', { exact: true }).click()
+  await expect(page.locator('.status-grid')).toBeVisible()
+
+  // Open the seeded "Blinded" condition's detail modal.
+  await page.getByRole('button', { name: /^Blinded/ }).click()
+  const modal = page.locator('.status-modal')
+  await expect(modal).toBeVisible()
+  // The dialog pops in; measure it only once that animation has settled.
+  await modal.evaluate((el) =>
+    Promise.all(el.getAnimations().map((animation) => animation.finished)),
+  )
+  const box = (await modal.boundingBox())!
+
+  await modal.getByRole('button', { name: 'Copy status image' }).click()
+  await expect(
+    page.getByText('Copied the status image to the clipboard.'),
   ).toBeVisible()
 
   expectCroppedTo(await clipboardPng(page), box)

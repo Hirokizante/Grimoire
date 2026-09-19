@@ -315,10 +315,10 @@ body:has(.modal-overlay) .app-header__nav {
   color: var(--text-primary);
 }
 
-/* Capture buttons (Ability Blocks, roll results): a small square ghost icon
-   that sits in a corner of the thing it snapshots. Quiet at rest — discoverable
-   without competing with the card — and it recolors in place while working
-   (spinner), when done (check) and on failure (warning). */
+/* Capture buttons (Ability Blocks, roll results, status modals): a small
+   square ghost icon that sits in a corner of the thing it snapshots. Quiet at
+   rest — discoverable without competing with the card — and it recolors in
+   place while working (spinner), when done (check) and on failure (warning). */
 .capture-btn {
   width: 1.6rem;
   height: 1.6rem;
@@ -2151,6 +2151,14 @@ body:has(.modal-overlay) .app-header__nav {
 
 .status-modal {
   max-width: 460px;
+}
+
+/* Capture control in the view-mode header, left of the close button. It must
+   never shrink; the auto margin keeps it off the title. */
+.status-modal__capture {
+  flex: 0 0 auto;
+  margin-left: auto;
+  margin-right: 0.5rem;
 }
 
 .status-modal__body {

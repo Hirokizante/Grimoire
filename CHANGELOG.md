@@ -32,7 +32,7 @@ characters regularly.
   the button is view-only; `StatusCompendiumPage.test.tsx` pins the one-button
   import flow, the confirmation, its cancel, and the compendium export.
 
-### Ability Blocks and roll results can be copied as images
+### Ability Blocks, roll results and status modals can be copied as images
 
 - **A capture button on every Ability Block and roll result window.** A small,
   quiet camera icon in a card's corner — and in the result window's header —
@@ -55,6 +55,11 @@ characters regularly.
   captured whole; the capture control hides itself; live form values (the roll
   window's Advantage inputs) come along; and the image is cropped to the
   element's own box, composited over its backdrop, at 2× density.
+- **A status modal can be captured too.** The status modal's view mode carries
+  the same capture button in its header, snapshotting the whole dialog — icon,
+  name, tags, referencing sheets and description — to the clipboard, or a
+  download. Like an ability card, it is view mode only: the edit form is
+  authoring chrome, not part of the condition.
 - **Clipboard first, download second.** `navigator.clipboard.write` receives
   the PNG as a promise, which keeps the write inside the click's user gesture
   for Safari; where the API is missing or blocked the image downloads instead,
@@ -65,9 +70,10 @@ characters regularly.
   un-clamped, capture controls hidden, form values copied) and the
   clipboard/download contract; `CaptureButton.test.tsx` pins target resolution,
   in-place status, and toasts with and without a provider;
-  `AbilityBlockCard.test.tsx` and `DiceResultModal.test.tsx` pin placement; and
-  `e2e/capture.spec.ts` reads real PNGs back out of the clipboard, including a
-  GM panel card at 0 AP compared pixel-for-pixel against its full-AP capture.
+  `AbilityBlockCard.test.tsx`, `DiceResultModal.test.tsx` and
+  `StatusModal.test.tsx` pin placement; and `e2e/capture.spec.ts` reads real
+  PNGs back out of the clipboard, including a GM panel card at 0 AP compared
+  pixel-for-pixel against its full-AP capture.
 
 ### GM Screen — a Recharge ability can be taken off cooldown by hand
 

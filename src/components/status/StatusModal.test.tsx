@@ -5,7 +5,8 @@
  * truncated row; the modal is where the full set lives. These tests pin that
  * view mode lists every referencing sheet (matching is case-insensitive, like
  * inline `[Name]` references), hides the section when nothing references the
- * status, keeps it out of the edit form, and offers the JSON export there.
+ * status, keeps it out of the edit form, and offers the JSON export and the
+ * capture button there.
  */
 
 import { test, expect, beforeEach, vi } from 'vitest'
@@ -174,5 +175,32 @@ test('the export button is view-only, not part of the edit form', () => {
 
   expect(
     screen.queryByRole('button', { name: 'Export' }),
+  ).not.toBeInTheDocument()
+})
+
+test('view mode offers a capture button for the whole status modal', () => {
+  const poisoned = makeStatus('st-poisoned', 'Poisoned')
+  useStatusStore.setState({ statuses: [poisoned] })
+  useStatusStore.getState().openStatus(poisoned.id)
+
+  renderModal()
+
+  const button = screen.getByRole('button', { name: 'Copy status image' })
+  // The snapshot target is the dialog itself, and the control keeps itself
+  // out of the shot.
+  expect(button.closest('.status-modal')).not.toBeNull()
+  expect(button).toHaveAttribute('data-capture-hide')
+})
+
+test('the capture button is view-only, not part of the edit form', () => {
+  const poisoned = makeStatus('st-poisoned', 'Poisoned')
+  useStatusStore.setState({ statuses: [poisoned] })
+  useStatusStore.getState().openStatus(poisoned.id)
+
+  renderModal()
+  fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
+
+  expect(
+    screen.queryByRole('button', { name: 'Copy status image' }),
   ).not.toBeInTheDocument()
 })

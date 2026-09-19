@@ -14,11 +14,13 @@ import { useEffect, useMemo, useState } from 'react'
 import { ArrowUpFromLine } from 'lucide-react'
 
 import ConfirmModal from '@/components/sheet/ConfirmModal'
+import CaptureButton from '@/components/ui/CaptureButton'
 import MarkdownText from '@/components/ui/MarkdownText'
 import StatusIcon from '@/components/status/StatusIcon'
 import StatusIconPicker from '@/components/status/StatusIconPicker'
 import { useNotification } from '@/context/NotificationContext'
 import { useModalDialog } from '@/hooks/useModalDialog'
+import { captureFileName } from '@/lib/elementCapture'
 import { downloadJson } from '@/lib/exportImport'
 import { referencingCharacters } from '@/lib/statusReference'
 import { buildStatusFile, statusFilename } from '@/lib/statusTransfer'
@@ -124,6 +126,16 @@ export default function StatusModal() {
       >
         <div className="modal-header">
           <h3>{editing ? 'Edit Status' : 'Status'}</h3>
+          {/* View mode only: the edit form is authoring chrome, not part of
+              the condition. */}
+          {!editing && (
+            <CaptureButton
+              className="status-modal__capture"
+              targetSelector=".status-modal"
+              target="status"
+              fileName={captureFileName('status', status.name)}
+            />
+          )}
           <button
             type="button"
             className="btn btn--icon modal-close"

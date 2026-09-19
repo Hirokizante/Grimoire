@@ -5,7 +5,8 @@
  * It finds its target with a CSS selector resolved against itself, so a card
  * can drop it anywhere inside its own markup without threading a ref: an
  * Ability Block asks for `.ability-card`, a Sub-Ability for
- * `.sub-ability-block`, the roll result for `.dice-modal`.
+ * `.sub-ability-block`, the roll result for `.dice-modal`, the status modal for
+ * `.status-modal`.
  *
  * The button hides itself for the shot (see {@link CAPTURE_HIDE_ATTRIBUTE}),
  * reports progress in place (spinner → check → idle; warning triangle on

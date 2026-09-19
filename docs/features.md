@@ -382,6 +382,10 @@ Grimoire is built to support that freedom:
   every status the sheet references.
 - **Export a single status** — the status modal's Export button downloads the condition as
   `Status - {Name}.json`, ready to hand to another table.
+- **Copy a status as an image** — the status modal's header carries the capture button: it copies a
+  clean, cropped PNG of the view-mode modal — icon, name, tags, referencing sheets, and description
+  — to the device clipboard, or downloads it where the clipboard is unavailable. View mode only, so
+  the edit form stays out of the image.
 - **Export the compendium** — the compendium page's Export downloads every condition (built-in +
   custom) as `Grimoire Status Compendium YYYY-MM-DD.json`.
 - **Import** — the compendium page's Import accepts either file (or a hand-written status object /
