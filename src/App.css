@@ -315,6 +315,57 @@ body:has(.modal-overlay) .app-header__nav {
   color: var(--text-primary);
 }
 
+/* Capture buttons (Ability Blocks, roll results): a small square ghost icon
+   that sits in a corner of the thing it snapshots. Quiet at rest — discoverable
+   without competing with the card — and it recolors in place while working
+   (spinner), when done (check) and on failure (warning). */
+.capture-btn {
+  width: 1.6rem;
+  height: 1.6rem;
+  padding: 0;
+  /* .btn is a flex row centred by its own padding; a padding-free icon box
+     needs an explicit centre or the glyph hugs the left edge. */
+  justify-content: center;
+  color: var(--text-muted);
+  opacity: 0.65;
+  transition: opacity 0.15s ease, background-color 0.15s ease, color 0.15s ease;
+}
+
+.capture-btn:hover:not(:disabled),
+.capture-btn:focus-visible {
+  opacity: 1;
+}
+
+.capture-btn--capturing {
+  opacity: 1;
+}
+
+.capture-btn--copied {
+  color: var(--color-success, #4ade80);
+  opacity: 1;
+}
+
+.capture-btn--error {
+  color: var(--danger, #ef4444);
+  opacity: 1;
+}
+
+.capture-btn__spin {
+  animation: capture-btn-spin 0.8s linear infinite;
+}
+
+@keyframes capture-btn-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .capture-btn__spin {
+    animation: none;
+  }
+}
+
 .btn--danger {
   background: color-mix(in srgb, var(--danger) 15%, transparent);
   color: var(--danger);

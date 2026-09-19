@@ -6,6 +6,43 @@ characters regularly.
 
 ## Unreleased
 
+### Ability Blocks and roll results can be copied as images
+
+- **A capture button on every Ability Block and roll result window.** A small,
+  quiet camera icon in a card's corner — and in the result window's header —
+  snapshots the block or the whole result and copies the PNG straight to the
+  device clipboard, ready to paste into chat, a VTT handout, or anywhere else.
+  Sub-abilities carry their own button, so a nested block is captured on its
+  own rather than as part of its parent. The button appears in view mode only:
+  an edit-mode card's authoring chrome (grip, Edit / Remove) is not part of the
+  ability. On pointer devices it is **hover-reveal** — the card shows it while
+  the cursor is over it (or the button has keyboard focus) and otherwise stays
+  clean, while the in-progress spinner and result check remain visible if the
+  pointer leaves; touch devices keep it visible at all times, since there is no
+  hover to reveal it with.
+- **The shot is clean by construction.** The element is rasterized from an
+  off-screen stand-in (`lib/elementCapture.ts`, via `html-to-image`), which is
+  what keeps an ancestor's fade out of the image — a GM panel at 0 AP dims its
+  expanded sheet to 0.55 on screen, but the copied card is full strength, and
+  the same holds for a dead panel or a card mid-drag. Scrolling bodies are
+  un-clamped before the shot, so an activation taller than its 78vh body is
+  captured whole; the capture control hides itself; live form values (the roll
+  window's Advantage inputs) come along; and the image is cropped to the
+  element's own box, composited over its backdrop, at 2× density.
+- **Clipboard first, download second.** `navigator.clipboard.write` receives
+  the PNG as a promise, which keeps the write inside the click's user gesture
+  for Safari; where the API is missing or blocked the image downloads instead,
+  and a toast says which happened. The button reports progress in place
+  (spinner → check, warning triangle on failure) and only asks a notification
+  provider for a toast if one is mounted.
+- **Testing.** `lib/elementCapture.test.ts` pins the clone's rules (off-screen,
+  un-clamped, capture controls hidden, form values copied) and the
+  clipboard/download contract; `CaptureButton.test.tsx` pins target resolution,
+  in-place status, and toasts with and without a provider;
+  `AbilityBlockCard.test.tsx` and `DiceResultModal.test.tsx` pin placement; and
+  `e2e/capture.spec.ts` reads real PNGs back out of the clipboard, including a
+  GM panel card at 0 AP compared pixel-for-pixel against its full-AP capture.
+
 ### GM Screen — a Recharge ability can be taken off cooldown by hand
 
 - **The Recharge Die has a manual override.** A cooling ability's trait chip read

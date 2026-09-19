@@ -21,6 +21,7 @@
     "@dnd-kit/modifiers": "^9.0.0",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
+    "html-to-image": "^1.11.13",
     "lucide-react": "^1.24.0",
     "react": "^19.2.7",
     "react-colorful": "^5.7.0",

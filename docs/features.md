@@ -55,6 +55,15 @@ Grimoire is built to support that freedom:
 - **Minor Abilities** — flagged abilities that occupy half a slot instead of a full one.
 - **Ability templates** — pre-filled starting points for common ability types (melee, ranged, buff,
   debuff) that remain fully editable.
+- **Copy an ability as an image** — every card, sub-ability blocks included, carries a small capture
+  button in its corner that copies a clean, cropped PNG of the block to the device clipboard (or
+  downloads it where the clipboard is unavailable). The shot is cropped to the card, hides the
+  button itself, and never inherits a dim — a GM panel card at 0 AP copies at full strength. View
+  mode only: an edit-mode card's grip and Edit / Remove buttons are not part of the ability.
+  On pointer devices the button is **hover-reveal**: it fades in while the cursor is over the card
+  (or when the button itself has keyboard focus) so the sheet stays uncluttered, and stays put
+  through the capture (spinner / check) even if the pointer leaves. Touch devices, which have no
+  hover, keep it visible at all times.
 
 ### Ability Block editor
 
@@ -343,6 +352,10 @@ Grimoire is built to support that freedom:
   and custom rolls keep their Advantage/Disadvantage controls, damage carries the critical control,
   and each roll is logged separately.
 - **Critical / fumble detection** — nat 20 and nat 1 badges on d20 rolls.
+- **Copy a result as an image** — the result window's header carries the same capture button as an
+  ability card: it copies a clean, cropped PNG of the whole window (header, totals, breakdown and
+  every stacked activation roll, including any part the window had to scroll to) to the device
+  clipboard, or downloads it where the clipboard is unavailable.
 - **Roll log** — persistent, per-character roll history in a slide-out drawer; entries are saved to
   IndexedDB and survive reloads. Expanding an entry shows its breakdown and, when one was applied,
   its Advantage/Disadvantage reading (`Advantage +2: 6, 3 → +6`).

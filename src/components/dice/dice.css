@@ -38,6 +38,12 @@
   text-align: center;
 }
 
+/* Capture control in the result modal's header, opposite the title. It must
+   never shrink when the ability name is long — the title wraps instead. */
+.dice-modal__capture {
+  flex: 0 0 auto;
+}
+
 .dice-modal__body {
   padding: 1.5rem 2rem;
 }

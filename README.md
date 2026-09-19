@@ -45,6 +45,11 @@ tracking resources and rolling dice.
   damage, and any custom rolls you add — shown together in one result window;
   an attack roll of 20+ is a **critical hit**, rolling the damage twice and
   keeping the higher result, and a damage roll can be marked critical by hand.
+- **Copy as image** — a small capture button on every Ability Block and roll
+  result window copies a clean, cropped PNG of it straight to the clipboard
+  (falling back to a download), ready to paste into chat or a VTT. The shot is
+  cropped to the block and never inherits a dim — a GM panel card at 0 AP
+  captures at full strength.
 - **GM Screen** — a saved surface holding one panel per sheet you are running:
   live references to player characters, or NPC instances with their own HP,
   turns, Recharge cooldowns, Mortal Wounds, limited uses, and tracked statuses.

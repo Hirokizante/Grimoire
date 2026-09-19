@@ -1656,6 +1656,41 @@
   border-radius: 10px;
   border: 1px solid var(--border-soft);
   background: var(--bg-surface-raised);
+  /* Anchor for the capture button, which lives in the card's top-right. */
+  position: relative;
+}
+
+/* The corner capture control. The name row below reserves the space it
+   occupies, so a long name wraps before it instead of running under it. */
+.ability-card__capture {
+  position: absolute;
+  top: 0.3rem;
+  right: 0.3rem;
+}
+
+/* Ability-block capture controls are hover-reveal on pointer devices: the card
+   stays uncluttered until the cursor is over it, and the button fades in (its
+   own `transition: opacity` in App.css animates it).
+
+   Only the `--idle` state hides. While capturing and after a result the button
+   is not idle, so the spinner / check stays put even if the pointer leaves —
+   and a keyboard user tabbing to it reveals it through `:focus-visible`.
+
+   All of it is scoped to `(hover: hover)`: a touch device has no hover to
+   reveal the control with, so there it keeps the always-visible behavior. */
+@media (hover: hover) {
+  .ability-card__capture.capture-btn--idle,
+  .sub-ability-block__capture.capture-btn--idle {
+    opacity: 0;
+  }
+
+  /* Listed after the hide rule so the equal-specificity `:focus-visible`
+     case wins on source order too. */
+  .ability-card:hover .ability-card__capture.capture-btn--idle,
+  .sub-ability-block:hover .sub-ability-block__capture.capture-btn--idle,
+  .capture-btn--idle:focus-visible {
+    opacity: 0.65;
+  }
 }
 
 .ability-card--minor {
@@ -1680,6 +1715,10 @@
   align-items: center;
   gap: 0.45rem;
   flex-wrap: wrap;
+  /* Keeps the name clear of the capture button in the card's corner. Only the
+     name row reserves the space — the traits below it should use the full
+     width rather than wrap early to clear a control that sits above them. */
+  padding-right: 1.35rem;
 }
 
 .ability-card__minor-badge {
@@ -2759,6 +2798,14 @@
   background: var(--bg-surface-raised);
   border-radius: 0.5rem;
   border: 1px solid var(--border-soft);
+  /* Anchor for the capture button, which lives in the block's top-right. */
+  position: relative;
+}
+
+.sub-ability-block__capture {
+  position: absolute;
+  top: 0.2rem;
+  right: 0.25rem;
 }
 
 .sub-ability-block__head {
@@ -2766,6 +2813,8 @@
   align-items: center;
   gap: 0.5rem;
   margin-bottom: 0.25rem;
+  /* Keeps the name clear of the capture button in the block's corner. */
+  padding-right: 1.35rem;
 }
 
 .sub-ability-block__label {

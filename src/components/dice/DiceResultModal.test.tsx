@@ -198,6 +198,18 @@ test('Done closes the modal', () => {
   expect(onClose).toHaveBeenCalledTimes(1)
 })
 
+test('the modal offers a capture button for the whole roll result', () => {
+  openActivation([part('accuracy', 'd20+MAR')])
+
+  render(<DiceResultModal onClose={vi.fn()} />)
+
+  const button = screen.getByRole('button', { name: 'Copy roll result image' })
+  // The snapshot target is the dialog itself, and the control keeps itself
+  // out of the shot.
+  expect(button.closest('.dice-modal')).not.toBeNull()
+  expect(button).toHaveAttribute('data-capture-hide')
+})
+
 test('a single roll still renders as one big total', () => {
   useDiceRollStore.setState({
     isVisible: true,

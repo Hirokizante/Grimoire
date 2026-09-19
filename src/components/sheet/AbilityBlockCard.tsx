@@ -12,12 +12,14 @@
 
 import DiceHighlighter from '@/components/dice/DiceHighlighter'
 import MarkdownText from '@/components/ui/MarkdownText'
+import CaptureButton from '@/components/ui/CaptureButton'
 import AbilityModifierToggle from '@/components/sheet/AbilityModifierToggle'
 import AbilityUsesMeter from '@/components/sheet/AbilityUsesMeter'
 import SubAbilityBlock from '@/components/sheet/SubAbilityBlock'
 import { useCharacterStore } from '@/store/characterStore'
 import { resolveCustomAbilityCosts } from '@/lib/abilityCosts'
 import { isLimitedAbility } from '@/lib/abilityUses'
+import { captureFileName } from '@/lib/elementCapture'
 import type { AbilityActivationOverrideResolver } from '@/hooks/useAbilityActivation'
 import type { AbilityBlock, Character } from '@/types'
 import type { RollSource } from '@/types/rollLog'
@@ -196,6 +198,17 @@ export default function AbilityBlockCard({
 
   return (
     <article className={'ability-card' + (isMinor ? ' ability-card--minor' : '')}>
+      {/* View mode only: an edit-mode card's own footer (drag handle, Edit /
+          Remove) is authoring chrome, not part of the ability. */}
+      {mode === 'view' && (
+        <CaptureButton
+          className="ability-card__capture"
+          targetSelector=".ability-card"
+          target="ability"
+          fileName={captureFileName('ability', abilityName)}
+        />
+      )}
+
       <header className="ability-card__head">
         <h4 className="ability-card__name">
           {name || 'Untitled Ability'}

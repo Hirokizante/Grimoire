@@ -14,8 +14,10 @@
 
 import DiceHighlighter from '@/components/dice/DiceHighlighter'
 import MarkdownText from '@/components/ui/MarkdownText'
+import CaptureButton from '@/components/ui/CaptureButton'
 import AbilityModifierToggle from '@/components/sheet/AbilityModifierToggle'
 import AbilityUsesMeter from '@/components/sheet/AbilityUsesMeter'
+import { captureFileName } from '@/lib/elementCapture'
 import { useCharacterStore } from '@/store/characterStore'
 import {
   useAbilityActivation,
@@ -219,6 +221,15 @@ export default function SubAbilityBlock({
 
   return (
     <article className="sub-ability-block" style={blockStyle}>
+      {isView && (
+        <CaptureButton
+          className="sub-ability-block__capture"
+          targetSelector=".sub-ability-block"
+          target="sub-ability"
+          fileName={captureFileName('sub-ability', subAbilityName)}
+        />
+      )}
+
       <header className="sub-ability-block__head">
         <span className="sub-ability-block__label">Sub-Ability</span>
         <h5 className="sub-ability-block__name">

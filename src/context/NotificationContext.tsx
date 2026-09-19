@@ -88,3 +88,13 @@ export function useNotification(): NotificationContextValue {
   }
   return ctx
 }
+
+/**
+ * The same context as {@link useNotification}, but `null` outside a provider —
+ * for leaf controls that render on surfaces the app and its tests mount
+ * without one (ability cards, for instance). A toast is nice-to-have there,
+ * never a reason to crash the card.
+ */
+export function useOptionalNotification(): NotificationContextValue | null {
+  return useContext(NotificationContext)
+}

@@ -183,6 +183,8 @@ NPC instances follow one rule: **instances are deltas, not clones.**
   panel menu is exempt too: it portals to `document.body` (like the pickers), because an
   ancestor's `opacity` multiplies into every descendant and a menu left in the header faded
   with the panel — so it stays full-strength at 0 AP, on a dead panel, and mid-drag alike.
+  An ability card's **capture button** is exempt by construction: it snapshots the card from
+  an off-screen copy, so a faded panel still copies a full-strength image.
 - **Every NPC ability with a cost, a Recharge value or activation rolls gets an Activate
   button** — the same button, plan, and cost deduction the player sheets use
   (`useAbilityActivation` with the panel's own resource adapter), not a second implementation.

@@ -30,7 +30,9 @@
 
 import { useState } from 'react'
 
+import CaptureButton from '@/components/ui/CaptureButton'
 import DiceTermBreakdown from '@/components/dice/DiceTermBreakdown'
+import { captureFileName } from '@/lib/elementCapture'
 import { useModalDialog } from '@/hooks/useModalDialog'
 import {
   useDiceRollStore,
@@ -362,6 +364,12 @@ export default function DiceResultModal({ onClose, style }: DiceResultModalProps
       >
         <div className="modal-header">
           <h3>{label}</h3>
+          <CaptureButton
+            className="dice-modal__capture"
+            targetSelector=".dice-modal"
+            target="roll result"
+            fileName={captureFileName('roll', label)}
+          />
         </div>
 
         <div className="dice-modal__body">
