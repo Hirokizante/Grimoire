@@ -5,19 +5,28 @@
  * description, and a one-row preview of reference tags), a "create new status"
  * button, and sorting by name / date created / date modified. Clicking a card
  * opens the global StatusModal for details and editing, including the full list
- * of sheets that reference the status.
+ * of sheets that reference the status. The page head also imports status files
+ * (a single condition, or a whole compendium that OVERWRITES the current one)
+ * and exports the entire compendium.
  */
 
-import { useMemo, useState } from 'react'
-import { Plus } from 'lucide-react'
+import { useCallback, useMemo, useRef, useState } from 'react'
+import { ArrowDownFromLine, ArrowUpFromLine, Plus } from 'lucide-react'
 
 import ConfirmModal from '@/components/sheet/ConfirmModal'
 import CreateStatusModal from '@/components/status/CreateStatusModal'
 import StatusIcon from '@/components/status/StatusIcon'
 import FilterDropdown, { type FilterGroup } from '@/components/ui/FilterDropdown'
 import SortDropdown, { type SortOption } from '@/components/ui/SortDropdown'
+import { useNotification } from '@/context/NotificationContext'
+import { downloadJson } from '@/lib/exportImport'
 import { plainTextFromMarkdown } from '@/lib/markdown'
 import { collectCharacterStatusNames, referencingCharacters } from '@/lib/statusReference'
+import {
+  buildStatusCompendiumFile,
+  parseStatusImport,
+  statusCompendiumFilename,
+} from '@/lib/statusTransfer'
 import { useCharacterStore } from '@/store/characterStore'
 import {
   matchesFacet,
@@ -41,7 +50,11 @@ export default function StatusCompendiumPage() {
   const openStatus = useStatusStore((s) => s.openStatus)
   const deleteStatus = useStatusStore((s) => s.deleteStatus)
   const createStatus = useStatusStore((s) => s.createStatus)
+  const importStatus = useStatusStore((s) => s.importStatus)
+  const replaceStatuses = useStatusStore((s) => s.replaceStatuses)
   const characters = useCharacterStore((s) => s.characters)
+  const { notify } = useNotification()
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   /** Sort + filter prefs live in listPrefsStore (persisted to localStorage). */
   const sortKey = useListPrefsStore((s) => s.statusSortKey)
@@ -53,6 +66,67 @@ export default function StatusCompendiumPage() {
   const [showCreate, setShowCreate] = useState(false)
   const [statusToDelete, setStatusToDelete] =
     useState<StatusCondition | null>(null)
+  /** Parsed compendium awaiting confirmation — importing it replaces everything. */
+  const [pendingCompendium, setPendingCompendium] = useState<
+    StatusCondition[] | null
+  >(null)
+
+  /**
+   * Read a picked JSON file. Single conditions merge (a same-named condition
+   * is updated in place); a compendium is staged behind a confirmation,
+   * because importing it overwrites the whole compendium.
+   */
+  const handleImportFile = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0]
+      // Reset so re-selecting the same file still fires change.
+      e.target.value = ''
+      if (!file) return
+      const reader = new FileReader()
+      reader.onload = () => {
+        if (typeof reader.result !== 'string') return
+        try {
+          const parsed = parseStatusImport(reader.result)
+          if (parsed.kind === 'compendium') {
+            setPendingCompendium(parsed.statuses)
+            return
+          }
+          void importStatus(parsed.status)
+            .then((outcome) => {
+              const name = parsed.status.name.trim() || 'Untitled'
+              notify(
+                outcome === 'updated'
+                  ? `✓ Updated “${name}”.`
+                  : `✓ Imported “${name}”.`,
+                'success',
+              )
+            })
+            .catch(() => notify('Could not save the imported status.', 'error'))
+        } catch (err) {
+          notify(
+            err instanceof Error ? err.message : 'Could not read status file.',
+            'error',
+            5000,
+          )
+        }
+      }
+      reader.onerror = () => notify('Could not read status file.', 'error')
+      reader.readAsText(file)
+    },
+    [importStatus, notify],
+  )
+
+  /** Download every condition in the compendium as one JSON file. */
+  const handleExportCompendium = useCallback(() => {
+    downloadJson(
+      buildStatusCompendiumFile(statuses),
+      statusCompendiumFilename(),
+    )
+    notify(
+      `✓ Exported ${statuses.length} status${statuses.length === 1 ? '' : 'es'}.`,
+      'success',
+    )
+  }, [statuses, notify])
 
   /**
    * Build filter groups:
@@ -166,6 +240,26 @@ export default function StatusCompendiumPage() {
           <button
             className="btn btn--primary page-head__btn"
             type="button"
+            onClick={() => fileInputRef.current?.click()}
+            title="Import a status or a whole status compendium"
+          >
+            <ArrowDownFromLine size={14} />
+            <span className="page-head__btn-label">Import</span>
+          </button>
+          {statuses.length > 0 && (
+            <button
+              className="btn btn--primary page-head__btn"
+              type="button"
+              onClick={handleExportCompendium}
+              title="Export the entire status compendium as JSON"
+            >
+              <ArrowUpFromLine size={14} />
+              <span className="page-head__btn-label">Export</span>
+            </button>
+          )}
+          <button
+            className="btn btn--primary page-head__btn"
+            type="button"
             onClick={() => setShowCreate(true)}
           >
             <Plus size={14} />
@@ -174,19 +268,38 @@ export default function StatusCompendiumPage() {
         </div>
       </div>
 
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="application/json,.json"
+        className="visually-hidden"
+        onChange={handleImportFile}
+      />
+
       {statuses.length === 0 ? (
         <div className="empty-state">
           <h2 className="empty-title">No statuses yet</h2>
           <p className="muted">
-            Create your first status condition to reference in your sheets.
+            Create your first status condition to reference in your sheets, or
+            import a status compendium file.
           </p>
-          <button
-            className="btn btn--primary"
-            type="button"
-            onClick={() => setShowCreate(true)}
-          >
-            Create New Status
-          </button>
+          <div className="empty-state__actions">
+            <button
+              className="btn btn--primary page-head__btn"
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <ArrowDownFromLine size={14} />
+              Import Statuses
+            </button>
+            <button
+              className="btn btn--primary"
+              type="button"
+              onClick={() => setShowCreate(true)}
+            >
+              Create New Status
+            </button>
+          </div>
         </div>
       ) : (
         <ul className="status-grid" role="list">
@@ -275,6 +388,42 @@ export default function StatusCompendiumPage() {
             setStatusToDelete(null)
           }}
           onClose={() => setStatusToDelete(null)}
+        />
+      )}
+
+      {pendingCompendium && (
+        <ConfirmModal
+          title="Import Status Compendium?"
+          message={
+            <span>
+              Importing <strong>{pendingCompendium.length}</strong> status
+              {pendingCompendium.length === 1 ? '' : 'es'} will{' '}
+              <strong>replace your entire compendium</strong> (currently{' '}
+              {statuses.length}). Sheets that reference statuses not in the file
+              will show the name as plain text. This can’t be undone.
+            </span>
+          }
+          confirmLabel="Replace Compendium"
+          cancelLabel="Cancel"
+          variant="danger"
+          onConfirm={() => {
+            const incoming = pendingCompendium
+            setPendingCompendium(null)
+            void replaceStatuses(incoming)
+              .then(() =>
+                notify(
+                  `✓ Imported ${incoming.length} status${incoming.length === 1 ? '' : 'es'}.`,
+                  'success',
+                ),
+              )
+              .catch(() =>
+                notify(
+                  'Import failed — your compendium was left unchanged.',
+                  'error',
+                ),
+              )
+          }}
+          onClose={() => setPendingCompendium(null)}
         />
       )}
     </div>

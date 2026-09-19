@@ -18,6 +18,7 @@ import {
   deleteStatus as dbDeleteStatus,
   getAllStatuses,
   putStatus,
+  replaceAllStatuses,
 } from '@/lib/db'
 import type { StatusCondition } from '@/types'
 
@@ -57,6 +58,19 @@ export interface StatusStoreActions {
    * bundle carries attached statuses.
    */
   importStatuses: (incoming: StatusCondition[]) => Promise<void>
+  /**
+   * Import a single status condition. A same-named condition (case-insensitive)
+   * is updated in place — its id is preserved so GM-screen references keep
+   * resolving, and the imported fields replace the local ones. Otherwise the
+   * status is added with a fresh id. Returns which of the two happened.
+   */
+  importStatus: (incoming: StatusCondition) => Promise<'added' | 'updated'>
+  /**
+   * Replace the ENTIRE status compendium with the given conditions, persist it,
+   * and close the status modal. Used when importing a compendium file, which
+   * overwrites rather than merges.
+   */
+  replaceStatuses: (incoming: StatusCondition[]) => Promise<void>
   /** Open the global modal on a status id (optionally in edit mode). */
   openStatus: (id: string, startInEdit?: boolean) => void
   /** Close the global modal. */
@@ -129,6 +143,45 @@ export const useStatusStore = create<StatusStore>()((set, get) => ({
       await putStatus(status)
     }
     set((state) => ({ statuses: [...state.statuses, ...toAdd] }))
+  },
+
+  importStatus: async (incoming: StatusCondition) => {
+    const name = incoming.name.trim()
+    const key = name.toLowerCase()
+    const existing = get().statuses.find(
+      (s) => s.name.trim().toLowerCase() === key,
+    )
+    if (existing) {
+      const updated: StatusCondition = {
+        ...incoming,
+        id: existing.id,
+        name,
+        createdAt: existing.createdAt,
+        updatedAt: new Date().toISOString(),
+      }
+      await putStatus(updated)
+      set((state) => ({
+        statuses: state.statuses.map((s) =>
+          s.id === existing.id ? updated : s,
+        ),
+      }))
+      return 'updated'
+    }
+    const added: StatusCondition = {
+      ...incoming,
+      id: generateId(),
+      name,
+      updatedAt: new Date().toISOString(),
+    }
+    await putStatus(added)
+    set((state) => ({ statuses: [...state.statuses, added] }))
+    return 'added'
+  },
+
+  replaceStatuses: async (incoming: StatusCondition[]) => {
+    await replaceAllStatuses(incoming)
+    // The compendium may no longer contain the status the modal was showing.
+    set({ statuses: incoming, modal: { statusId: null, startInEdit: false } })
   },
 
   openStatus: (id: string, startInEdit = false) => {

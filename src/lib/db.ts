@@ -872,6 +872,30 @@ export async function deleteStatus(id: string): Promise<void> {
   })
 }
 
+/**
+ * Replace the ENTIRE statuses store with the provided records — the import
+ * half of the status-compendium transfer flow.
+ *
+ * The clear and puts share one readwrite transaction, so a failed import can
+ * never leave the compendium half-old / half-new.
+ */
+export async function replaceAllStatuses(
+  statuses: StatusCondition[],
+): Promise<void> {
+  return withConnection(async (db) => {
+    const tx = db.transaction(STATUS_STORE, 'readwrite')
+    const store = tx.objectStore(STATUS_STORE)
+    store.clear()
+    for (const status of statuses) store.put(status)
+    await new Promise<void>((resolve, reject) => {
+      tx.oncomplete = () => resolve()
+      tx.onabort = () =>
+        reject(tx.error ?? new Error('Status import transaction aborted'))
+      tx.onerror = () => reject(tx.error)
+    })
+  })
+}
+
 // ---- GM Screens ---------------------------------------------------------------
 
 /**

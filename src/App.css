@@ -2194,6 +2194,11 @@ body:has(.modal-overlay) .app-header__nav {
   gap: 4px;
 }
 
+/* Export sits on the footer's opposite side from Close / Edit. */
+.status-modal__export {
+  margin-right: auto;
+}
+
 /* Two-class selector out-specifies the global `.md` rule (sheet.css loads
    after App.css) so the modal keeps its slightly larger body text. */
 .status-modal .status-modal__description {

@@ -15,6 +15,10 @@ vi.mock('@/lib/db', () => ({
   deleteStatus: vi.fn(async (id: string) => {
     dbMap.delete(id)
   }),
+  replaceAllStatuses: vi.fn(async (statuses: StatusCondition[]) => {
+    dbMap.clear()
+    for (const status of statuses) dbMap.set(status.id, status)
+  }),
   normalizeStatus: (status: StatusCondition) => status,
 }))
 
@@ -115,4 +119,69 @@ test('importStatuses: skips blank names and no-ops on empty input', async () => 
     .getState()
     .importStatuses([makeStatus({ id: 'blank', name: '   ' })])
   expect(useStatusStore.getState().statuses).toHaveLength(1)
+})
+
+test('importStatus: adds a new condition with a fresh id', async () => {
+  const outcome = await useStatusStore
+    .getState()
+    .importStatus(makeStatus({ id: 'imp-1', name: 'Cursed' }))
+
+  expect(outcome).toBe('added')
+  const statuses = useStatusStore.getState().statuses
+  expect(statuses).toHaveLength(1)
+  expect(statuses[0].name).toBe('Cursed')
+  expect(statuses[0].id).not.toBe('imp-1')
+  expect(dbMap.size).toBe(1)
+})
+
+test('importStatus: a same-named condition is updated in place, keeping its id', async () => {
+  useStatusStore.setState({
+    statuses: [
+      makeStatus({
+        id: 'local',
+        name: 'Poisoned',
+        description: 'local text',
+        createdAt: '2020-01-01T00:00:00.000Z',
+      }),
+    ],
+  })
+
+  const outcome = await useStatusStore.getState().importStatus(
+    makeStatus({
+      id: 'imp-1',
+      name: '  poisoned  ',
+      description: 'imported text',
+      icon: '🐍',
+    }),
+  )
+
+  expect(outcome).toBe('updated')
+  const statuses = useStatusStore.getState().statuses
+  expect(statuses).toHaveLength(1)
+  expect(statuses[0].id).toBe('local')
+  expect(statuses[0].name).toBe('poisoned')
+  expect(statuses[0].description).toBe('imported text')
+  expect(statuses[0].icon).toBe('🐍')
+  // The record existed locally, so its creation time is preserved.
+  expect(statuses[0].createdAt).toBe('2020-01-01T00:00:00.000Z')
+  expect(statuses[0].updatedAt).not.toBe('2020-01-01T00:00:00.000Z')
+})
+
+test('replaceStatuses: swaps the whole compendium and closes the modal', async () => {
+  useStatusStore.setState({
+    statuses: [makeStatus({ id: 'old', name: 'Old' })],
+    modal: { statusId: 'old', startInEdit: false },
+  })
+
+  const incoming = [
+    makeStatus({ id: 'new-1', name: 'Poisoned' }),
+    makeStatus({ id: 'new-2', name: 'Hidden' }),
+  ]
+  await useStatusStore.getState().replaceStatuses(incoming)
+
+  const state = useStatusStore.getState()
+  expect(state.statuses).toEqual(incoming)
+  expect(state.modal).toEqual({ statusId: null, startInEdit: false })
+  expect(dbMap.size).toBe(2)
+  expect(dbMap.has('old')).toBe(false)
 })

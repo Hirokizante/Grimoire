@@ -6,6 +6,32 @@ characters regularly.
 
 ## Unreleased
 
+### Status conditions can be exported and imported
+
+- **Export one condition from its modal.** The status modal's view mode now
+  carries an Export button (opposite side from Close / Edit) that downloads the
+  condition as `Status - {Name}.json` — icon, description, and tags included —
+  so a status is a file you can send to another table.
+- **Export the whole compendium from the compendium page.** The Statuses page
+  head gained Export, which downloads every condition (built-in + custom) as
+  `Grimoire Status Compendium YYYY-MM-DD.json`, dated like the full backup.
+- **One Import button handles both files.** Import accepts either shape, plus a
+  bare status object or array for hand-authored files (missing fields are
+  back-filled; a missing id is assigned). A single condition **merges**: a
+  same-named condition is updated in place — keeping its id so GM-screen pills
+  keep resolving — and a new name is added. A compendium file **replaces the
+  entire compendium**, so it is staged behind a danger confirmation that spells
+  out the overwrite; cancelling changes nothing. Files that are another
+  Grimoire export (a character sheet, a full backup) are recognized and
+  rejected with a pointer at the right importer, and a compendium with a
+  malformed entry fails as a whole rather than importing a partial list.
+- **Testing.** `lib/statusTransfer.test.ts` pins both round-trips,
+  hand-authored shapes, filename sanitizing, and every rejection;
+  `statusStore.test.ts` pins merge-vs-add and the wholesale replace (including
+  closing the modal); `StatusModal.test.tsx` pins the export payload and that
+  the button is view-only; `StatusCompendiumPage.test.tsx` pins the one-button
+  import flow, the confirmation, its cancel, and the compendium export.
+
 ### Ability Blocks and roll results can be copied as images
 
 - **A capture button on every Ability Block and roll result window.** A small,

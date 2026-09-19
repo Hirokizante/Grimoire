@@ -380,6 +380,16 @@ Grimoire is built to support that freedom:
 - **Referencing sheets** — each compendium card previews the characters that reference a condition
   in a single row; opening the card's status modal lists the full set, and character exports bundle
   every status the sheet references.
+- **Export a single status** — the status modal's Export button downloads the condition as
+  `Status - {Name}.json`, ready to hand to another table.
+- **Export the compendium** — the compendium page's Export downloads every condition (built-in +
+  custom) as `Grimoire Status Compendium YYYY-MM-DD.json`.
+- **Import** — the compendium page's Import accepts either file (or a hand-written status object /
+  array). A single status merges: a same-named condition is updated in place — its id is kept, so
+  GM-screen pills keep resolving — a new name is added. A compendium file **replaces the entire
+  compendium** after a confirmation that spells out the overwrite. Character-sheet and full-backup
+  files are recognized and pointed at their own importers; a compendium with a malformed entry is
+  rejected as a whole rather than partially imported.
 
 ---
 

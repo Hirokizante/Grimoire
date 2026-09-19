@@ -236,6 +236,7 @@ src/
 │   ├── emojiCatalog.ts            # Unicode emoji catalog + alias search
 │   ├── slotLogic.ts               # Minor/regular slot counting
 │   ├── statusReference.ts         # [Name] reference parsing + mapping
+│   ├── statusTransfer.ts          # Status / compendium JSON export & import
 │   ├── themeUtils.ts              # SheetColors → CSS vars, stat accents
 │   ├── rollSourceUtils.ts         # Human-readable roll source labels
 │   └── *.test.ts                  # Unit tests (colocated)
@@ -297,7 +298,8 @@ What they cover:
 
 - **Pure logic** — `calculations`, `diceParser`, `diceRoller`, `slotLogic`,
   `exportImport`, `db`, `backup`, `themeUtils`, `statusReference`,
-  `abilityTraits`, `abilityRecharge`, `abilityModifiers`, `abilityUses`,
+  `statusTransfer`, `abilityTraits`, `abilityRecharge`, `abilityModifiers`,
+  `abilityUses`,
   `abilityCosts`, `markdown`, `emojiCatalog`, and `nacht` (the reference
   character's calculated fields).
 - **`mortalWounds`** — the table resolved face by face, the slot rules, the
@@ -360,6 +362,7 @@ downloading one. The specs live in `e2e/`:
 | --- | --- |
 | `gm-screen.spec.ts` | Screen creation; a character mixed with two NPC instances; damaging one instance to 0 HP while its sibling is unaffected; an instance's Mortal Wound track end to end (auto-rolled wound with its D20, spill-over refill, the full-track warning, going down on the next 0 HP, a cleared wound surviving a reload, and the row staying one line without overflow at 360px); a specific wound recorded by hand on the sheet and on both panel kinds; a character walked 20 → 15 → 10 → 1 → 0 HP to pin when the knock-out is announced; persistence across a reload; player/panel state parity; delete-reference placeholders; status tracking (per-panel pills, durations, stacks, a pill's hover card asserted to render un-clipped outside the pill, click-through to its description, and a panel that stays exactly as tall with five statuses as with one, on desktop and at 360px) |
 | `status-icons.spec.ts` | The icon picker in a real browser — search the emoji tab, pick, search the RPG-Awesome pack, pick, save, reload — asserting the pack's `@font-face` actually resolved (`document.fonts.check('16px RPGAwesome')`), the one thing jsdom can never cover |
+| `status-transfer.spec.ts` | Status import/export against real IndexedDB — a seeded condition exported from its modal and re-imported back in place (the exported file itself is read off disk), a hand-authored condition imported and surviving a reload, and a compendium file replacing the entire store after its confirmation (also surviving a reload), the half component tests cannot see because they mock the database |
 | `npc-abilities.spec.ts` | A real pointer drag on both NPC surfaces — the NPC's own sheet page and an NPC bundled into a character's custom tab — asserting the drop reorders the record, survives a reload, and that the two surfaces lay the list out identically |
 | `custom-sections.spec.ts` | Reordering a custom tab holding one section of each kind (ability, text, bundled NPC) with the heading arrows: every section receives its real position (a section handed the defaults has both arrows disabled, so a missing prop reads as a dead control), the pair sits in the heading row's upper-right corner, a boundary-disabled arrow does nothing, sections shift up and down, and the order survives a reload while view mode renders no arrows at all. Plus two real pointer drags between ability sections: a card dropped on a sibling card reorders, and one dropped on another section's card — or on an empty section's drop zone — moves there, with the layout read back after a reload and no grips in view mode. The drop preview is measured mid-drag, including the line's own geometry and the card settling where the preview drew it |
 | `ability-card-drag.spec.ts` | The feel of an ability-card drag: the whole card is grabbable except its own buttons (which still click); a card dragged past a *taller* neighbour deforms nothing (every card's drawn box is compared against its laid-out size, which a scaled card fails); the line is a full-width bar on the landing slot's leading edge; the card settles exactly where the preview drew it; a full Slotted Abilities section refuses a pooled card with a red line and an end-of-list drop marks the gap under the last card; and a keyboard user can pick a card up and cancel |

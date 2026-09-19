@@ -5,19 +5,23 @@
  * `[StatusName]` reference in a sheet description, both of which drive the
  * store's `modal` state. In view mode it shows the full information — including
  * every sheet that references the status (the card previews only one row of
- * them); an Edit button switches to an inline editor (name, icon, description)
- * mirroring the AbilityBlockEditor flow. Closing with unsaved changes prompts
- * to discard.
+ * them), and an Export button downloads the condition as a JSON file; an Edit
+ * button switches to an inline editor (name, icon, description) mirroring the
+ * AbilityBlockEditor flow. Closing with unsaved changes prompts to discard.
  */
 
 import { useEffect, useMemo, useState } from 'react'
+import { ArrowUpFromLine } from 'lucide-react'
 
 import ConfirmModal from '@/components/sheet/ConfirmModal'
 import MarkdownText from '@/components/ui/MarkdownText'
 import StatusIcon from '@/components/status/StatusIcon'
 import StatusIconPicker from '@/components/status/StatusIconPicker'
+import { useNotification } from '@/context/NotificationContext'
 import { useModalDialog } from '@/hooks/useModalDialog'
+import { downloadJson } from '@/lib/exportImport'
 import { referencingCharacters } from '@/lib/statusReference'
+import { buildStatusFile, statusFilename } from '@/lib/statusTransfer'
 import { useCharacterStore } from '@/store/characterStore'
 import { useStatusStore } from '@/store/statusStore'
 import { DEFAULT_STATUS_TAG } from '@/types/status'
@@ -29,6 +33,7 @@ export default function StatusModal() {
   const updateStatus = useStatusStore((s) => s.updateStatus)
   const closeStatus = useStatusStore((s) => s.closeStatus)
   const characters = useCharacterStore((s) => s.characters)
+  const { notify } = useNotification()
 
   const status = modal.statusId
     ? (statuses.find((s) => s.id === modal.statusId) ?? null)
@@ -93,6 +98,13 @@ export default function StatusModal() {
     if (!name) return
     void updateStatus({ ...draft, name })
     setEditing(false)
+  }
+
+  /** Download this condition as a JSON file other installations can import. */
+  const handleExport = () => {
+    if (!status) return
+    downloadJson(buildStatusFile(status), statusFilename(status))
+    notify(`✓ Exported “${status.name || 'Untitled'}”.`, 'success')
   }
 
   const dialogRef = useModalDialog(handleClose, open && !showDiscard)
@@ -221,6 +233,15 @@ export default function StatusModal() {
             </>
           ) : (
             <>
+              <button
+                type="button"
+                className="btn btn--ghost status-modal__export"
+                onClick={handleExport}
+                title="Download this status as JSON"
+              >
+                <ArrowUpFromLine size={14} />
+                Export
+              </button>
               <button
                 type="button"
                 className="btn btn--ghost"

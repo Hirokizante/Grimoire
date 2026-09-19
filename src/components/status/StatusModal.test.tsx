@@ -5,7 +5,7 @@
  * truncated row; the modal is where the full set lives. These tests pin that
  * view mode lists every referencing sheet (matching is case-insensitive, like
  * inline `[Name]` references), hides the section when nothing references the
- * status, and keeps it out of the edit form.
+ * status, keeps it out of the edit form, and offers the JSON export there.
  */
 
 import { test, expect, beforeEach, vi } from 'vitest'
@@ -13,6 +13,7 @@ import { render, screen, fireEvent, within } from '@testing-library/react'
 
 import StatusModal from '@/components/status/StatusModal'
 import { NotificationProvider } from '@/context/NotificationContext'
+import { downloadJson } from '@/lib/exportImport'
 import { createDefaultCharacter } from '@/constants/gameData'
 import { useCharacterStore } from '@/store/characterStore'
 import { useStatusStore } from '@/store/statusStore'
@@ -45,7 +46,16 @@ vi.mock('@/lib/db', () => ({
   normalizeStatus: (s: unknown) => s,
   getAllVersionSnapshots: vi.fn(async () => []),
   replaceAllData: vi.fn(async () => {}),
+  replaceAllStatuses: vi.fn(async () => {}),
 }))
+
+// Keep the browser download out of jsdom — the payload itself is asserted.
+vi.mock('@/lib/exportImport', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/exportImport')>()),
+  downloadJson: vi.fn(),
+}))
+
+const downloadJsonMock = vi.mocked(downloadJson)
 
 function makeStatus(id: string, name: string): StatusCondition {
   return {
@@ -80,6 +90,7 @@ function renderModal() {
 }
 
 beforeEach(() => {
+  vi.clearAllMocks()
   useCharacterStore.setState({ characters: [], currentCharacter: null })
   useStatusStore.setState({
     statuses: [],
@@ -137,4 +148,31 @@ test('the reference list is view-only, not part of the edit form', () => {
   const dialog = screen.getByRole('dialog', { name: 'Edit status' })
   expect(within(dialog).queryByText('Referenced in sheets')).not.toBeInTheDocument()
   expect(within(dialog).queryByText('Vex')).not.toBeInTheDocument()
+})
+
+test('view mode exports the status as a JSON file', () => {
+  const poisoned = makeStatus('st-poisoned', 'Poisoned')
+  useStatusStore.setState({ statuses: [poisoned] })
+  useStatusStore.getState().openStatus(poisoned.id)
+
+  renderModal()
+  fireEvent.click(screen.getByRole('button', { name: 'Export' }))
+
+  expect(downloadJsonMock).toHaveBeenCalledTimes(1)
+  const [payload, filename] = downloadJsonMock.mock.calls[0]
+  expect(filename).toBe('Status - Poisoned.json')
+  expect(payload).toMatchObject({ kind: 'status', status: poisoned })
+})
+
+test('the export button is view-only, not part of the edit form', () => {
+  const poisoned = makeStatus('st-poisoned', 'Poisoned')
+  useStatusStore.setState({ statuses: [poisoned] })
+  useStatusStore.getState().openStatus(poisoned.id)
+
+  renderModal()
+  fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
+
+  expect(
+    screen.queryByRole('button', { name: 'Export' }),
+  ).not.toBeInTheDocument()
 })
