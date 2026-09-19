@@ -231,10 +231,6 @@ export default function SettingsPage() {
         <h2 className="settings-section__title" id="settings-appearance-heading">
           Appearance
         </h2>
-        <p className="muted settings-section__hint">
-          Colors for the app around your sheets. Character sheet themes are
-          set per sheet in the Customization panel.
-        </p>
 
         <div className="theme-picker" role="radiogroup" aria-label="App theme">
           {THEME_OPTIONS.map((option) => {
@@ -283,10 +279,6 @@ export default function SettingsPage() {
         <h2 className="settings-section__title" id="settings-dice-heading">
           Dice
         </h2>
-        <p className="muted settings-section__hint">
-          How highlighted dice notation reads on your sheets. This is display
-          only — clicking a badge always rolls the notation it was written as.
-        </p>
 
         <div className="settings-toggle-row">
           <span
@@ -301,19 +293,10 @@ export default function SettingsPage() {
               checked={diceShowRanges}
               onChange={(e) => setDiceShowRanges(e.target.checked)}
               aria-labelledby="dice-ranges-toggle-label"
-              aria-describedby="dice-ranges-toggle-hint"
             />
             <span className="settings-toggle__track" aria-hidden="true" />
           </label>
         </div>
-
-        <p className="muted settings-section__hint" id="dice-ranges-toggle-hint">
-          A highlighted expression shows the range it can roll — 1d6+3 reads
-          "4-9" — with your current attribute and skill values substituted.
-          Clicking still rolls the original notation, so the dice come up as
-          they will. A badge with no sheet to resolve its stats against stays
-          as written.
-        </p>
       </section>
 
       <section
@@ -323,11 +306,6 @@ export default function SettingsPage() {
         <h2 className="settings-section__title" id="settings-gm-screen-heading">
           GM Screen
         </h2>
-        <p className="muted settings-section__hint">
-          How sheets look inside the GM Screen's expanded panels. The panel
-          chrome — header, HP/AP bars, stat tokens, status pills — always
-          follows the app theme.
-        </p>
 
         <div className="settings-toggle-row">
           <span
@@ -342,22 +320,10 @@ export default function SettingsPage() {
               checked={gmPanelMatchAppTheme}
               onChange={(e) => setGmPanelMatchAppTheme(e.target.checked)}
               aria-labelledby="gm-panel-match-theme-label"
-              aria-describedby="gm-panel-match-theme-hint"
             />
             <span className="settings-toggle__track" aria-hidden="true" />
           </label>
         </div>
-
-        <p
-          className="muted settings-section__hint"
-          id="gm-panel-match-theme-hint"
-        >
-          On, a player's sheet panel drops its custom colors, background, and
-          fonts and uses the app theme instead — exactly like an NPC panel, so
-          a screen full of sheets reads with one voice. Off, each panel keeps
-          the character's own customization. This is display only: the
-          character sheet itself, and everything you export, is never changed.
-        </p>
       </section>
 
       <section
@@ -370,10 +336,6 @@ export default function SettingsPage() {
         >
           Home Page Animation
         </h2>
-        <p className="muted settings-section__hint">
-          The ambient effect behind the title on the home page. Turning it off
-          leaves a plain, static page.
-        </p>
 
         <div className="settings-toggle-row">
           <span

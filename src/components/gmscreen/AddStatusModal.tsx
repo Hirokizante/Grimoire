@@ -123,11 +123,6 @@ export default function AddStatusModal({
             />
           </label>
 
-          <p className="gm-status-picker__hint">
-            Pick a duration to apply the status. Statuses already on this panel
-            show it selected — pick another to change it.
-          </p>
-
           {visible.length === 0 ? (
             <p className="muted gm-picker__empty">
               {statuses.length === 0

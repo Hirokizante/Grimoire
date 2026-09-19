@@ -82,8 +82,7 @@ export default function EditLabelsModal({
 
         <div className="edit-labels-modal__body">
           <p className="edit-labels-modal__hint">
-            Labels help you organize sheets. They stay on this device — they
-            are never included in exports. A value is optional.
+            Labels stay on this device and are never included in exports.
           </p>
 
           {draft.length === 0 ? (

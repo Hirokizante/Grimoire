@@ -71,9 +71,6 @@ export default function UpdateCharacterModal({
             </strong>{' '}
             ({isSame ? 'same version' : `${directionLabel} version`} — existing v{existingVersion}, imported v{importedVersion}).
           </p>
-          <p className="update-character-modal__hint">
-            Would you like to update the existing character, or import it as a new sheet?
-          </p>
         </div>
 
         <div className="modal-footer">

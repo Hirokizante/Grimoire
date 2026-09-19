@@ -75,13 +75,6 @@ export default function CustomAttributeModal({
   const trimmedName = name.trim()
   const trimmedShorthand = shorthand.trim()
 
-  /**
-   * The token the strip will print on top and dice notation will accept. The
-   * full name stands in when no shorthand was given, so the preview always
-   * shows what a roll would look like.
-   */
-  const notationToken = trimmedShorthand || trimmedName || 'FOO'
-
   const parsedValue = Number(valueStr)
   const value = Number.isFinite(parsedValue) ? Math.round(parsedValue) : 0
 
@@ -155,13 +148,6 @@ export default function CustomAttributeModal({
               maxLength={12}
             />
           </label>
-
-          <p className="custom-attribute-modal__hint">
-            Roll it by name in any dice notation —{' '}
-            <code>2d6+{notationToken}</code> adds this attribute's value to the
-            roll. The shorthand is the short form (Martial → MAR) and is used
-            wherever the name fits too.
-          </p>
 
           <label className="ability-editor__field ability-editor__field--inline">
             <input

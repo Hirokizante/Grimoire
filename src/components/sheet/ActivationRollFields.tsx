@@ -260,8 +260,7 @@ export default function ActivationRollFields({
    * bottom as an escape hatch for a sheet that defined none, and all it could do
    * there was look like a choice and change nothing: there was no attribute to
    * pick. A custom attribute is a real thing on a real sheet (see
-   * lib/customAttributes.ts), so the picker lists the real ones — and when there
-   * are none, a line under the picker says how to get one.
+   * lib/customAttributes.ts), so the picker lists the real ones.
    */
   const accuracyOptions = [
     ...ATTRIBUTE_LIST.map((attr) => ({
@@ -341,13 +340,6 @@ export default function ActivationRollFields({
 
       {enabled && rolls && (
         <>
-          <p className="ability-editor__hint">
-            Rolled automatically every time this ability is activated, in this
-            order — accuracy, damage, then the custom rolls — and shown together
-            in one result window. Works on the GM screen too, where an NPC
-            instance rolls with its own stats.
-          </p>
-
           {/* Accuracy ------------------------------------------------------ */}
           <div className="ability-editor__activation-roll-block">
             <label className="ability-editor__field ability-editor__field--inline">
@@ -390,18 +382,6 @@ export default function ActivationRollFields({
                   {accuracyHint}
                 </span>
               </div>
-            )}
-
-            {/* A player sheet with no custom attributes: the picker lists the
-                five Attributes and nothing else, so say where the rest come
-                from rather than offering an option that could never resolve
-                (this line also covers an ability that still *references* a
-                custom attribute the sheet no longer has). */}
-            {!npcMode && customAttributes.length === 0 && (
-              <p className="ability-editor__hint">
-                This sheet has no custom attributes — add one in the hero section
-                (edit mode) and it appears in this list.
-              </p>
             )}
 
             {accuracy?.modifier.kind === 'custom' &&
@@ -514,7 +494,7 @@ export default function ActivationRollFields({
               </ul>
             )}
 
-            {customRolls.length < MAX_ACTIVATION_CUSTOM_ROLLS ? (
+            {customRolls.length < MAX_ACTIVATION_CUSTOM_ROLLS && (
               <button
                 type="button"
                 className="btn btn--ghost ability-editor__add-sub-btn"
@@ -522,11 +502,6 @@ export default function ActivationRollFields({
               >
                 + Add Custom Roll
               </button>
-            ) : (
-              <p className="ability-editor__hint">
-                {MAX_ACTIVATION_CUSTOM_ROLLS} custom rolls is the limit — that is
-                already a lot to read at the table.
-              </p>
             )}
           </div>
         </>

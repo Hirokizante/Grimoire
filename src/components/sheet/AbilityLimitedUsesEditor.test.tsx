@@ -166,11 +166,3 @@ test('toggling Limited uses back off drops the budget', () => {
   expect(saved.uses).toBeUndefined()
   expect('uses' in saved).toBe(false)
 })
-
-test('the hint explains that uses return on a rest', () => {
-  renderEditor()
-
-  fireEvent.click(limitedToggle())
-
-  expect(screen.getByText(/come back on a rest/i)).toBeInTheDocument()
-})

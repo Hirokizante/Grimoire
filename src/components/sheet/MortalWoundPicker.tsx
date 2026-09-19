@@ -124,11 +124,12 @@ export default function MortalWoundPicker({
             />
           </label>
 
-          <p className="mw-picker__hint">
-            {canAdd
-              ? `Pick the wound that applies — no D20 is rolled. ${entityName}’s track takes it as the table entry it is.`
-              : `No Mortal Wound slots left on ${entityName} — clear one from the track first.`}
-          </p>
+          {!canAdd && (
+            <p className="mw-picker__hint">
+              No Mortal Wound slots left on {entityName} — clear one from the
+              track first.
+            </p>
+          )}
 
           {visible.length === 0 ? (
             <p className="muted mw-picker__empty">No wounds match that search.</p>

@@ -93,12 +93,6 @@ export default function AbilityModifierFields({
 
       {enabled && (
         <>
-          <p className="ability-editor__hint">
-            Applied to your sheet while this ability&rsquo;s modifier switch is
-            on (view mode). Toggling it costs nothing and works alongside
-            Activate.
-          </p>
-
           <ul className="ability-editor__modifier-list" role="list">
             {modifiers.map((mod, index) => (
               <li key={index} className="ability-editor__modifier-row">

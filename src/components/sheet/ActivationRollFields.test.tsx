@@ -176,8 +176,6 @@ test('a sheet with no custom attributes offers only the five Attributes', () => 
   expect(
     within(panel).queryByRole('button', { name: 'Custom attribute…' }),
   ).toBeNull()
-  // …and the sheet says where custom attributes would come from.
-  expect(screen.getByText(/add one in the hero section/i)).toBeInTheDocument()
 
   fireEvent.click(within(panel).getByRole('button', { name: 'Agility (AGI)' }))
   expect(save(onSave).activationRolls?.accuracy?.modifier).toEqual({
@@ -408,16 +406,11 @@ test('an NPC ability editor offers the rolls too, and never mentions custom attr
   })
 })
 
-test('the hint explains what an activation rolls and in what order', () => {
+test('the roll rows are offered in the order they roll', () => {
   renderEditor()
   fireEvent.click(featureToggle())
 
-  expect(
-    screen.getByText(/accuracy, damage, then the custom rolls/i),
-  ).toBeInTheDocument()
-
-  // The rows are offered in the order they roll: accuracy first, damage second,
-  // then the author's own list.
+  // Accuracy first, damage second, then the author's own list.
   const order = screen
     .getAllByRole('checkbox')
     .map((box) => box.closest('label')?.textContent ?? '')

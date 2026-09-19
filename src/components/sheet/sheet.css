@@ -1109,18 +1109,6 @@
   text-transform: uppercase;
 }
 
-.custom-attribute-modal__hint {
-  margin: 0;
-  font-size: 0.78rem;
-  line-height: 1.45;
-  color: var(--text-muted);
-}
-
-.custom-attribute-modal__hint code {
-  font-size: 0.78rem;
-  color: var(--accent-violet-soft);
-}
-
 /* Edit mode: pin the Delete button to the left of the footer so Cancel/Save
    group on the right (the resource-bar modal's shape). */
 .custom-attribute-modal__delete {
@@ -4107,13 +4095,6 @@
   color: var(--accent-violet-soft);
 }
 
-.update-character-modal__hint {
-  font-size: 0.9rem;
-  color: var(--text-secondary);
-  margin: 0;
-  line-height: 1.5;
-}
-
 /* ---- Generic modal footer (shared by create/delete modals) ---- */
 .modal-footer {
   display: flex;
@@ -4337,13 +4318,6 @@
   letter-spacing: 0.06em;
   color: var(--text-muted);
   margin: 0;
-}
-
-.customize__section-blurb {
-  font-size: 0.72rem;
-  color: var(--text-muted);
-  margin: 0;
-  font-style: italic;
 }
 
 /* Swatch grid within a section */
@@ -5897,12 +5871,6 @@ body:has(.modal-overlay) .customize-drawer {
   display: flex;
   flex-direction: column;
   gap: 0.85rem;
-}
-
-.add-section-choice-modal__hint {
-  font-size: 0.9rem;
-  color: var(--text-secondary);
-  margin: 0;
 }
 
 .add-section-choice-modal__options {

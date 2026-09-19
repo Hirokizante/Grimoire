@@ -49,18 +49,15 @@ interface ConfigColorField {
 /** Grouped list of every configurable color. */
 const COLOR_GROUPS: {
   title: string
-  blurb?: string
   fields?: ColorField[]
   configFields?: ConfigColorField[]
 }[] = [
   {
     title: 'Sheet',
-    blurb: 'Sheet card background — the surface behind the character sheet content.',
     configFields: [{ key: 'backgroundColor', label: 'Card' }],
   },
   {
     title: 'Surfaces',
-    blurb: 'Card, and hover backgrounds.',
     fields: [
       { key: 'bgSurface', label: 'Card' },
       { key: 'bgSurfaceRaised', label: 'Raised' },
@@ -69,7 +66,6 @@ const COLOR_GROUPS: {
   },
   {
     title: 'Text',
-    blurb: 'Body, labels, and muted copy.',
     fields: [
       { key: 'textPrimary', label: 'Primary' },
       { key: 'textSecondary', label: 'Secondary' },
@@ -78,7 +74,6 @@ const COLOR_GROUPS: {
   },
   {
     title: 'Borders',
-    blurb: 'Lines and separators.',
     fields: [
       { key: 'border', label: 'Hard' },
       { key: 'borderSoft', label: 'Soft' },
@@ -86,7 +81,6 @@ const COLOR_GROUPS: {
   },
   {
     title: 'Accents',
-    blurb: 'The brand colors used across headings, buttons, and highlights.',
     fields: [
       { key: 'accent', label: 'Main' },
       { key: 'accentSoft', label: 'Soft' },
@@ -97,7 +91,6 @@ const COLOR_GROUPS: {
   },
   {
     title: 'Resource Bars',
-    blurb: 'HP, FP, AP, END bar colors.',
     fields: [
       { key: 'hpBar', label: 'HP' },
       { key: 'fpBar', label: 'FP' },
@@ -107,7 +100,6 @@ const COLOR_GROUPS: {
   },
   {
     title: 'Stat Tokens',
-    blurb: 'Combat stat token accents.',
     fields: [
       { key: 'tokenMilestone', label: 'Milestones' },
       { key: 'tokenMovement', label: 'Movement' },
@@ -478,18 +470,15 @@ const PRESETS: PresetTheme[] = [
 /** Small reusable section within the panel. */
 function Section({
   title,
-  blurb,
   children,
 }: {
   title: string
-  blurb?: string
   children: React.ReactNode
 }) {
   return (
     <div className="customize__section">
       <div className="customize__section-head">
         <h4 className="customize__section-title">{title}</h4>
-        {blurb && <p className="customize__section-blurb">{blurb}</p>}
       </div>
       <div className="customize__grid">{children}</div>
     </div>
@@ -666,10 +655,7 @@ function BackgroundImageSection() {
   }
 
   return (
-    <Section
-      title="Background"
-      blurb="Choose a background color or image for the page behind the character sheet. If a background image is set, it takes priority and covers the color."
-    >
+    <Section title="Background">
       <ColorSwatch
         label="Page Color"
         value={config.pageBackgroundColor}
@@ -859,7 +845,7 @@ export default function CustomizationPanel({
 
         {/* Color groups */}
         {COLOR_GROUPS.map((group) => (
-          <Section key={group.title} title={group.title} blurb={group.blurb}>
+          <Section key={group.title} title={group.title}>
             {group.configFields?.map((f) => (
               <ColorSwatch
                 key={f.key}

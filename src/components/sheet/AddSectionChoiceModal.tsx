@@ -84,9 +84,6 @@ export default function AddSectionChoiceModal({
         </div>
 
         <div className="add-section-choice-modal__body">
-          <p className="add-section-choice-modal__hint">
-            What kind of section do you want to add?
-          </p>
           <div className="add-section-choice-modal__options">
             {OPTIONS.map((opt) => {
               const Icon = opt.icon

@@ -346,23 +346,6 @@ test('the Add Attribute modal captures name, value, shorthand and steppers', () 
   expect(attributes[0].id).toBeTruthy()
 })
 
-test('the modal previews the notation token a roll will use', () => {
-  renderStats(makePc(), 'edit')
-
-  fireEvent.click(screen.getByRole('button', { name: '+ Add Attribute' }))
-  const dialog = screen.getByRole('dialog', { name: 'Add Attribute' })
-
-  fireEvent.change(within(dialog).getByLabelText('Name'), {
-    target: { value: 'Sanity' },
-  })
-  expect(dialog.textContent).toContain('2d6+Sanity')
-
-  fireEvent.change(within(dialog).getByLabelText(/Shorthand/), {
-    target: { value: 'SAN' },
-  })
-  expect(dialog.textContent).toContain('2d6+SAN')
-})
-
 test('a nameless attribute cannot be saved', () => {
   renderStats(makePc(), 'edit')
 

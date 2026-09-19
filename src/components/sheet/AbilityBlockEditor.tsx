@@ -704,13 +704,7 @@ export default function AbilityBlockEditor({
                     Spends one use when activated
                   </span>
                 </label>
-
-                <p className="ability-editor__hint">
-                  {uses.current} of {uses.max} uses left. Activating spends a
-                  use when the box above is ticked
-                  {draft.showActivate ? '' : ' — this ability has no Activate button right now'}.
-                  Spent uses come back on a rest (full restore).
-                </p>              </>
+              </>
             )}
           </div>
 

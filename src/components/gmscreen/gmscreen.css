@@ -1526,12 +1526,6 @@ button.gm-status-pill__main:hover {
   max-width: 560px;
 }
 
-.gm-status-picker__hint {
-  margin: 0;
-  font-size: 0.74rem;
-  color: var(--text-muted);
-}
-
 .gm-status-picker__list {
   list-style: none;
   margin: 0;
