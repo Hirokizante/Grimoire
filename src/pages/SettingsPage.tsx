@@ -2,13 +2,15 @@
  * SettingsPage — app-level preferences.
  *
  * Hosts the app color theme picker (themes the app chrome around the sheets —
- * header, list pages, modals, dice UI), the dice-badge display option (whether
- * highlighted notation reads as written or as the min–max range it can roll),
- * the GM Screen display options (whether a player panel's expanded sheet body
- * keeps its own customization or follows the app theme like an NPC panel), the
- * home page animation picker (on/off + which ambient effect plays behind the
- * title), and the full-app Backup & Restore section. Per-sheet color themes
- * live in each sheet's Customization panel and are stored on the character.
+ * header, list pages, modals, dice UI), the UI style picker (the shape and
+ * motion language: the original look or the retrofuturistic Terminal reskin),
+ * the dice-badge display option (whether highlighted notation reads as written
+ * or as the min–max range it can roll), the GM Screen display options (whether
+ * a player panel's expanded sheet body keeps its own customization or follows
+ * the app theme like an NPC panel), the home page animation picker (on/off +
+ * which ambient effect plays behind the title), and the full-app Backup &
+ * Restore section. Per-sheet color themes live in each sheet's Customization
+ * panel and are stored on the character.
  *
  * Backup & Restore: downloads EVERYTHING (characters, NPCs, statuses, version
  * history, roll log) as a single JSON file; restoring replaces all current
@@ -40,6 +42,8 @@ import { useHomeAnimationStore } from '@/store/homeAnimationStore'
 import type { HomeAnimation } from '@/store/homeAnimationStore'
 import { useRollLogStore } from '@/store/rollLogStore'
 import { useStatusStore } from '@/store/statusStore'
+import { useUiStyleStore } from '@/store/uiStyleStore'
+import type { UiStyle } from '@/store/uiStyleStore'
 
 interface ThemeOption {
   id: AppTheme
@@ -54,6 +58,14 @@ interface AnimationOption {
   name: string
   description: string
   /** Tiny inline preview of the effect. */
+  preview: React.ReactNode
+}
+
+interface UiStyleOption {
+  id: UiStyle
+  name: string
+  description: string
+  /** Tiny inline preview of the style's shape language. */
   preview: React.ReactNode
 }
 
@@ -82,6 +94,37 @@ const ANIMATION_OPTIONS: AnimationOption[] = [
       <span className="animation-preview__term" aria-hidden="true">
         <span>$ grimoire launch</span>
         <span>[ ok ] ready.</span>
+      </span>
+    ),
+  },
+]
+
+const UI_STYLE_OPTIONS: UiStyleOption[] = [
+  {
+    id: 'default',
+    name: 'Default',
+    description: 'The standard Grimoire look — soft corners and gentle motion.',
+    preview: (
+      <span className="style-preview" aria-hidden="true">
+        <span className="style-preview__card">
+          <span className="style-preview__line" />
+          <span className="style-preview__line style-preview__line--short" />
+        </span>
+        <span className="style-preview__pill" />
+      </span>
+    ),
+  },
+  {
+    id: 'terminal',
+    name: 'Terminal',
+    description: 'Retrofuturistic terminal — hard edges, monospace, CRT glow.',
+    preview: (
+      <span
+        className="style-preview style-preview--terminal"
+        aria-hidden="true"
+      >
+        <span>ui --style=terminal</span>
+        <span className="style-preview__cursor" />
       </span>
     ),
   },
@@ -138,6 +181,8 @@ export default function SettingsPage() {
   const setHomeAnimation = useHomeAnimationStore((s) => s.setAnimation)
   const homeAnimationEnabled = useHomeAnimationStore((s) => s.enabled)
   const setHomeAnimationEnabled = useHomeAnimationStore((s) => s.setEnabled)
+  const uiStyle = useUiStyleStore((s) => s.style)
+  const setUiStyle = useUiStyleStore((s) => s.setStyle)
   const { notify } = useNotification()
 
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -254,6 +299,51 @@ export default function SettingsPage() {
                       style={{ background: color }}
                     />
                   ))}
+                </span>
+                <span className="theme-option__label">
+                  <span className="theme-option__name">{option.name}</span>
+                  {isActive && (
+                    <span className="theme-option__check" aria-hidden="true">
+                      <Check size={14} />
+                    </span>
+                  )}
+                </span>
+                <span className="theme-option__desc">
+                  {option.description}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      </section>
+
+      <section
+        className="settings-section"
+        aria-labelledby="settings-interface-heading"
+      >
+        <h2
+          className="settings-section__title"
+          id="settings-interface-heading"
+        >
+          Interface
+        </h2>
+
+        <div className="theme-picker" role="radiogroup" aria-label="UI style">
+          {UI_STYLE_OPTIONS.map((option) => {
+            const isActive = uiStyle === option.id
+            return (
+              <button
+                key={option.id}
+                type="button"
+                role="radio"
+                aria-checked={isActive}
+                className={
+                  'theme-option' + (isActive ? ' theme-option--active' : '')
+                }
+                onClick={() => setUiStyle(option.id)}
+              >
+                <span className="animation-preview" aria-hidden="true">
+                  {option.preview}
                 </span>
                 <span className="theme-option__label">
                   <span className="theme-option__name">{option.name}</span>

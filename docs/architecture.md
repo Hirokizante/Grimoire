@@ -47,11 +47,12 @@ Zustand stores manage all application state:
 - **`listPrefsStore`** — remembered list-page display prefs (sort key + filter selections for the
   character list, NPC list, and status compendium). Persisted to localStorage so choices survive
   page switches and reloads.
-- **`appThemeStore` / `homeAnimationStore` / `gmPanelThemeStore` / `diceDisplayStore`** — app-level
-  UI preferences persisted to localStorage (synchronously available before first paint): the app
-  chrome theme, the home page ambient animation, whether a GM panel's expanded sheet body follows
-  the app theme instead of the character's own palette, and whether highlighted dice notation reads
-  as written or as its min–max range. Preferences only — no sheet data is stored here.
+- **`appThemeStore` / `uiStyleStore` / `homeAnimationStore` / `gmPanelThemeStore` / `diceDisplayStore`** —
+  app-level UI preferences persisted to localStorage (synchronously available before first paint):
+  the app chrome theme, the UI style (the original look or the Terminal reskin), the home page
+  ambient animation, whether a GM panel's expanded sheet body follows the app theme instead of the
+  character's own palette, and whether highlighted dice notation reads as written or as its min–max
+  range. Preferences only — no sheet data is stored here.
 
 Three conventions apply across the stores:
 
@@ -141,6 +142,16 @@ properties, which the entire sheet reads from.
   Accents, Resource Bars, Stat Tokens).
 - **Live, per-character changes** — the sheet stays visible and interactive while the drawer is
   open, so changes apply live via CSS variables and persist per-character.
+
+### UI styles
+
+The color theme is orthogonal to the **UI style** (`uiStyleStore`, Settings → Interface): `default`
+is the original look, `terminal` is a retrofuturistic reskin — hard edges, monospace chrome,
+phosphor glow, a CRT scanline overlay over the home page, and stepped motion. It is applied as
+`data-ui-style` on `<html>`; the whole override sheet is `src/terminal-ui.css`, imported last in
+`main.tsx` so its scoped rules win cascade ties against every component stylesheet. The style is
+deliberately color-agnostic (glows derive from the active theme's `--accent-violet-soft`), and
+per-character sheet fonts stay untouched — only the app chrome turns monospace.
 
 ---
 

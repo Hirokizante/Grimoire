@@ -2766,6 +2766,72 @@ body:has(.modal-overlay) .app-header__nav {
   opacity: 0.8;
 }
 
+/* ---- Settings: UI style --------------------------------------------------- */
+
+/* Thumbnails for the Interface section. The Default card sketches the soft
+   corners and pill button of the standard look; the Terminal card is a mono
+   prompt line with the same block cursor the style uses everywhere. */
+.style-preview {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  height: 2.2rem;
+  overflow: hidden;
+}
+
+.style-preview__card {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.28rem;
+  width: 3.2rem;
+  height: 2rem;
+  padding: 0 0.45rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-surface-raised);
+}
+
+.style-preview__line {
+  height: 0.22rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text-muted) 55%, transparent);
+}
+
+.style-preview__line--short {
+  width: 55%;
+}
+
+.style-preview__pill {
+  width: 2.4rem;
+  height: 0.95rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent-violet) 55%, transparent);
+}
+
+.style-preview--terminal {
+  gap: 0.32rem;
+  font-family: 'SFMono-Regular', ui-monospace, Menlo, Consolas,
+    'Liberation Mono', monospace;
+  font-size: 0.62rem;
+  line-height: 1.4;
+  color: var(--accent-violet-soft);
+}
+
+.style-preview--terminal::before {
+  content: '$';
+  opacity: 0.7;
+}
+
+.style-preview__cursor {
+  display: inline-block;
+  width: 0.45rem;
+  height: 0.8rem;
+  background: var(--accent-violet-soft);
+  animation: terminalCursorBlink 1s steps(1) infinite;
+}
+
 /* ---- Settings: backup & restore ------------------------------------------ */
 
 .backup-actions {

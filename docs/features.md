@@ -443,6 +443,19 @@ for them:
 - **Persistence** — the choice persists in `localStorage` and applies before first paint.
 - **Sheet color themes are unaffected** — those stay per-character in the Customization panel.
 
+### UI style
+
+- **Settings → Interface** switches the app between two shape-and-motion languages, independent of
+  the color theme (every theme pairs with every style):
+  - **Default** — the original look: soft corners, system sans, gentle easing.
+  - **Terminal** — a retrofuturistic terminal reskin: square corners everywhere, monospace chrome
+    (sheet content keeps each character's own fonts), phosphor glow on headings and active
+    controls, a CRT scanline/sweep overlay on the home page, and stepped "frame-by-frame" motion.
+    Built to pair with the **Terminal Boot** home page animation, but works with either.
+- **A display-only reskin** — no character, NPC, screen, or status data changes; switching back to
+  Default restores the original UI exactly.
+- **Persistence** — the choice persists in `localStorage` and applies before first paint.
+
 ### Dice notation display
 
 - **Settings → Dice → *Display dice notation as min-max values*** makes every highlighted badge read

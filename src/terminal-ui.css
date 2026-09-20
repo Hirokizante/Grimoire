@@ -1,0 +1,453 @@
+/**
+ * terminal-ui.css — the "Terminal" UI style (Settings → Interface).
+ *
+ * A retrofuturistic terminal reskin layered over the whole app: hard edges,
+ * monospace chrome, phosphor glow, a CRT scanline/sweep overlay on the home
+ * page, and stepped ("frame-by-frame") motion. It is deliberately
+ * color-agnostic — every effect is derived from the active app theme's custom
+ * properties, so Terminal pairs with Midnight, Parchment, Mikami, or Pitch
+ * Black.
+ *
+ * Scoping: every rule keys off `data-ui-style` on <html> (see
+ * store/uiStyleStore.ts); the default style is the absence of any override.
+ *
+ * Cascade position: imported LAST in main.tsx so its scoped rules win ties
+ * against App.css / sheet.css / dice.css / gmscreen.css. The one `!important`
+ * is the border-radius reset — 160+ radius declarations live across those
+ * files with varying specificity, and a style switch must be authoritative.
+ *
+ * Motion honors `prefers-reduced-motion` at the bottom of the file.
+ */
+
+:root[data-ui-style='terminal'] {
+  --terminal-font: 'SFMono-Regular', ui-monospace, Menlo, Consolas,
+    'Liberation Mono', monospace;
+  --terminal-glow: color-mix(in srgb, var(--accent-violet-soft) 55%, transparent);
+  --terminal-glow-soft: color-mix(
+    in srgb,
+    var(--accent-violet-soft) 22%,
+    transparent
+  );
+}
+
+/* ---- Shape: hard edges everywhere ---------------------------------------- */
+
+/* Hard edges ARE the style: pills, circles, avatars, knobs, and panels all
+ * square off. `!important` because the radius declarations it replaces are
+ * spread over four stylesheets, many at equal-or-higher specificity than this
+ * scoped universal selector. */
+:root[data-ui-style='terminal'] *,
+:root[data-ui-style='terminal'] *::before,
+:root[data-ui-style='terminal'] *::after {
+  border-radius: 0 !important;
+}
+
+/* ---- Typography: one monospace voice ------------------------------------- */
+
+/* Sheet content keeps the per-character font choices (they are inline custom
+ * properties on `.character-sheet` and are part of the user's content); the
+ * app chrome around it turns monospace. */
+:root[data-ui-style='terminal'] body {
+  font-family: var(--terminal-font);
+}
+
+/* Chrome labels read as terminal keys/caps. */
+:root[data-ui-style='terminal'] .btn,
+:root[data-ui-style='terminal'] .app-header__nav-btn,
+:root[data-ui-style='terminal'] .home-nav__label,
+:root[data-ui-style='terminal'] .settings-section__title,
+:root[data-ui-style='terminal'] .theme-option__name,
+:root[data-ui-style='terminal'] .modal-header h3,
+:root[data-ui-style='terminal'] .filter-dropdown__btn,
+:root[data-ui-style='terminal'] .sort-dropdown__btn {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* Phosphor glow on the display surfaces. */
+:root[data-ui-style='terminal'] .app-title,
+:root[data-ui-style='terminal'] .settings-section__title,
+:root[data-ui-style='terminal'] .empty-title,
+:root[data-ui-style='terminal'] .modal-header h3,
+:root[data-ui-style='terminal'] .roll-log-drawer__title,
+:root[data-ui-style='terminal'] .home-page__title {
+  text-shadow: 0 0 10px var(--terminal-glow),
+    0 0 28px var(--terminal-glow-soft);
+}
+
+:root[data-ui-style='terminal'] ::selection {
+  background: color-mix(in srgb, var(--accent-violet) 70%, transparent);
+  color: var(--text-primary);
+}
+
+/* ---- CRT overlay: scanlines, a slow sweep, and a loose flicker ----------- */
+
+/* Home page only — it is the glass over the landing screen, not a layer over
+ * the working UI. Painted above the home content (last child with a z-index)
+ * and click-through. Layer 1 is the static scanline grate; layer 2 is a soft
+ * bright band that sweeps top-to-bottom on a long loop. Only the band's
+ * background-position and the whole layer's opacity animate, so the overlay
+ * composites cheaply. */
+:root[data-ui-style='terminal'] .home-page::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background-image:
+    repeating-linear-gradient(
+      0deg,
+      rgba(0, 0, 0, 0.22) 0 1px,
+      transparent 1px 3px
+    ),
+    linear-gradient(
+      180deg,
+      transparent 0%,
+      color-mix(in srgb, var(--accent-violet-soft) 9%, transparent) 50%,
+      transparent 100%
+    );
+  background-size: auto, 100% 24vh;
+  background-repeat: repeat, no-repeat;
+  opacity: 0.6;
+  animation:
+    terminal-ui-sweep 9s linear infinite,
+    terminal-ui-flicker 7s steps(1, end) infinite;
+}
+
+@keyframes terminal-ui-sweep {
+  from {
+    background-position: 0 0, 0 -26vh;
+  }
+  to {
+    background-position: 0 0, 0 126vh;
+  }
+}
+
+/* Sparse, short dips — a CRT that is holding, not a strobe. */
+@keyframes terminal-ui-flicker {
+  0%,
+  100% {
+    opacity: 0.6;
+  }
+  3% {
+    opacity: 0.46;
+  }
+  4% {
+    opacity: 0.6;
+  }
+  37% {
+    opacity: 0.6;
+  }
+  38% {
+    opacity: 0.52;
+  }
+  39% {
+    opacity: 0.6;
+  }
+  71% {
+    opacity: 0.6;
+  }
+  72% {
+    opacity: 0.56;
+  }
+  73% {
+    opacity: 0.6;
+  }
+}
+
+/* ---- Stepped motion ------------------------------------------------------ */
+
+/* Small state changes snap in two frames instead of easing — the "this is a
+ * terminal, states flip" feel. Spatial transitions (drawers, sheet shifts)
+ * are deliberately left smooth. */
+:root[data-ui-style='terminal'] .btn,
+:root[data-ui-style='terminal'] .app-title,
+:root[data-ui-style='terminal'] .app-header__nav-btn,
+:root[data-ui-style='terminal'] .card,
+:root[data-ui-style='terminal'] .character-list__item,
+:root[data-ui-style='terminal'] .status-card,
+:root[data-ui-style='terminal'] .theme-option,
+:root[data-ui-style='terminal'] .filter-dropdown__btn,
+:root[data-ui-style='terminal'] .sort-dropdown__btn,
+:root[data-ui-style='terminal'] .filter-dropdown__option,
+:root[data-ui-style='terminal'] .sheet-input,
+:root[data-ui-style='terminal'] .sheet-textarea,
+:root[data-ui-style='terminal'] .settings-toggle__track,
+:root[data-ui-style='terminal'] .settings-toggle__track::after {
+  transition-duration: 0.08s;
+  transition-timing-function: steps(2, end);
+}
+
+/* View changes "boot" in as a few discrete frames rather than a fade. */
+@keyframes terminal-ui-boot-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+:root[data-ui-style='terminal'] .page,
+:root[data-ui-style='terminal'] .sheet-page__content {
+  animation: terminal-ui-boot-in 0.32s steps(6, end) both;
+}
+
+/* The GM panel's grid-row expand runs in discrete stops. Duration is shared
+ * with PanelExpand.tsx (DURATION_MS) and must stay untouched. */
+:root[data-ui-style='terminal'] .gm-panel__expand {
+  transition-timing-function: steps(5, end), steps(5, end);
+}
+
+:root[data-ui-style='terminal'] .roll-log-drawer,
+:root[data-ui-style='terminal'] .modal-overlay,
+:root[data-ui-style='terminal'] .modal-content {
+  animation-timing-function: steps(4, end);
+}
+
+/* Toasts arrive/leave in frames and glow like a readout. */
+:root[data-ui-style='terminal'] .notification {
+  animation-duration: 0.16s, 0.4s;
+  animation-timing-function: steps(4, end), steps(6, end);
+  box-shadow: 0 0 0 1px var(--border),
+    0 0 18px var(--terminal-glow-soft);
+}
+
+/* ---- Buttons ------------------------------------------------------------- */
+
+:root[data-ui-style='terminal'] .btn--primary {
+  background: color-mix(in srgb, var(--accent-violet) 22%, var(--bg-base));
+  border-color: var(--accent-violet-soft);
+  color: var(--accent-violet-soft);
+  text-shadow: 0 0 8px var(--terminal-glow);
+}
+
+:root[data-ui-style='terminal'] .btn--primary:hover {
+  background: color-mix(in srgb, var(--accent-violet) 38%, var(--bg-base));
+  box-shadow: 0 0 14px var(--terminal-glow-soft),
+    inset 0 0 12px var(--terminal-glow-soft);
+}
+
+:root[data-ui-style='terminal'] .btn--ghost {
+  background: var(--bg-base);
+}
+
+:root[data-ui-style='terminal'] .btn--ghost:hover {
+  border-color: var(--accent-violet);
+  box-shadow: 0 0 12px var(--terminal-glow-soft);
+}
+
+:root[data-ui-style='terminal'] .btn--danger:hover {
+  box-shadow: 0 0 12px color-mix(in srgb, var(--danger) 45%, transparent);
+}
+
+/* Active nav/tab/toggle states read as lit indicators. */
+:root[data-ui-style='terminal'] .app-header__nav-btn--active,
+:root[data-ui-style='terminal'] .tab-bar__tab--active,
+:root[data-ui-style='terminal'] .mode-toggle__btn--active,
+:root[data-ui-style='terminal'] .sort-dropdown__btn--active,
+:root[data-ui-style='terminal'] .filter-dropdown__btn--active {
+  box-shadow: 0 0 10px var(--terminal-glow-soft),
+    inset 0 0 10px var(--terminal-glow-soft);
+  text-shadow: 0 0 8px var(--terminal-glow);
+}
+
+/* ---- Header -------------------------------------------------------------- */
+
+:root[data-ui-style='terminal'] .app-header {
+  border-bottom-color: color-mix(
+    in srgb,
+    var(--accent-violet) 45%,
+    transparent
+  );
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+}
+
+/* ---- Settings toggle ----------------------------------------------------- */
+
+:root[data-ui-style='terminal'] .settings-toggle__track {
+  background: var(--bg-base);
+}
+
+:root[data-ui-style='terminal']
+  .settings-toggle
+  input:checked
+  + .settings-toggle__track {
+  background: color-mix(in srgb, var(--accent-violet) 38%, var(--bg-base));
+  box-shadow: 0 0 10px var(--terminal-glow-soft);
+}
+
+:root[data-ui-style='terminal']
+  .settings-toggle
+  input:checked
+  + .settings-toggle__track::after {
+  box-shadow: 0 0 8px var(--terminal-glow);
+}
+
+/* ---- Inputs -------------------------------------------------------------- */
+
+:root[data-ui-style='terminal'] input,
+:root[data-ui-style='terminal'] textarea,
+:root[data-ui-style='terminal'] select {
+  caret-color: var(--accent-violet-soft);
+}
+
+:root[data-ui-style='terminal'] .sheet-input:focus,
+:root[data-ui-style='terminal'] .sheet-textarea:focus {
+  border-color: var(--accent-violet-soft);
+  box-shadow: 0 0 0 1px var(--terminal-glow),
+    0 0 12px var(--terminal-glow-soft);
+}
+
+:root[data-ui-style='terminal'] :focus-visible {
+  outline: 1px solid var(--accent-violet-soft);
+  outline-offset: 2px;
+  box-shadow: 0 0 10px var(--terminal-glow);
+}
+
+/* ---- Modals -------------------------------------------------------------- */
+
+/* A terminal doesn't frost glass: flat dark backdrop, glowing frame, snap-in. */
+:root[data-ui-style='terminal'] .modal-overlay {
+  backdrop-filter: none;
+  background: rgba(4, 4, 10, 0.88);
+}
+
+:root[data-ui-style='terminal'] .modal-content {
+  border-color: var(--accent-violet);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent-violet) 30%, transparent),
+    0 0 30px var(--terminal-glow-soft),
+    inset 0 0 40px rgba(0, 0, 0, 0.35);
+}
+
+/* ---- Home page ----------------------------------------------------------- */
+
+:root[data-ui-style='terminal'] .home-page__content {
+  animation: terminal-ui-boot-in 0.45s steps(5, end) both;
+}
+
+:root[data-ui-style='terminal'] .home-nav {
+  animation: terminal-ui-boot-in 0.6s steps(6, end) 0.15s both;
+}
+
+:root[data-ui-style='terminal'] .home-page__title {
+  font-family: var(--terminal-font);
+  font-size: clamp(2.4rem, 8vw, 4.4rem);
+  letter-spacing: 0.22em;
+  text-shadow: 0 0 6px var(--terminal-glow), 0 0 24px var(--terminal-glow),
+    0 0 60px var(--terminal-glow-soft);
+}
+
+/* The shimmering hairline becomes a steady dotted terminal rule. */
+:root[data-ui-style='terminal'] .home-page__title-line {
+  width: min(60%, 320px);
+  background: repeating-linear-gradient(
+    90deg,
+    var(--accent-violet-soft) 0 6px,
+    transparent 6px 12px
+  );
+  opacity: 0.4;
+  animation: none;
+}
+
+:root[data-ui-style='terminal'] .home-page__subtitle {
+  font-style: normal;
+  color: var(--text-secondary);
+}
+
+:root[data-ui-style='terminal'] .home-page__subtitle::before {
+  content: '> ';
+  color: var(--accent-violet-soft);
+}
+
+/* Nav tiles: flat squares that light up — no lift, no sheen, just a target
+ * reticle drawn at the corners on hover. */
+:root[data-ui-style='terminal'] .home-nav__btn {
+  background: var(--bg-surface);
+  box-shadow: none;
+  transition: background-color 0.08s steps(2, end),
+    border-color 0.08s steps(2, end), box-shadow 0.08s steps(2, end);
+}
+
+:root[data-ui-style='terminal'] .home-nav__btn:hover {
+  transform: none;
+  border-color: var(--accent-violet);
+  background: color-mix(in srgb, var(--accent-violet) 10%, var(--bg-surface));
+  box-shadow: 0 0 0 1px var(--accent-violet), 0 0 18px var(--terminal-glow-soft),
+    inset 0 0 18px var(--terminal-glow-soft);
+}
+
+:root[data-ui-style='terminal'] .home-nav__btn:active {
+  transform: none;
+}
+
+:root[data-ui-style='terminal'] .home-nav__btn-inner,
+:root[data-ui-style='terminal'] .home-nav__icon {
+  transition: none;
+}
+
+:root[data-ui-style='terminal'] .home-nav__btn:hover .home-nav__btn-inner,
+:root[data-ui-style='terminal'] .home-nav__btn:active .home-nav__btn-inner,
+:root[data-ui-style='terminal'] .home-nav__btn--primary:hover .home-nav__btn-inner {
+  transform: none;
+}
+
+:root[data-ui-style='terminal'] .home-nav__btn::before {
+  content: '';
+  position: absolute;
+  inset: 5px;
+  transform: none;
+  transition: opacity 0.08s steps(2, end);
+  opacity: 0;
+  /* Four corner ticks (horizontal + vertical gradient per corner). */
+  background:
+    linear-gradient(var(--accent-violet-soft), var(--accent-violet-soft)) left
+      top / 9px 1px no-repeat,
+    linear-gradient(var(--accent-violet-soft), var(--accent-violet-soft)) left
+      top / 1px 9px no-repeat,
+    linear-gradient(var(--accent-violet-soft), var(--accent-violet-soft)) right
+      top / 9px 1px no-repeat,
+    linear-gradient(var(--accent-violet-soft), var(--accent-violet-soft)) right
+      top / 1px 9px no-repeat,
+    linear-gradient(var(--accent-violet-soft), var(--accent-violet-soft)) left
+      bottom / 9px 1px no-repeat,
+    linear-gradient(var(--accent-violet-soft), var(--accent-violet-soft)) left
+      bottom / 1px 9px no-repeat,
+    linear-gradient(var(--accent-violet-soft), var(--accent-violet-soft)) right
+      bottom / 9px 1px no-repeat,
+    linear-gradient(var(--accent-violet-soft), var(--accent-violet-soft)) right
+      bottom / 1px 9px no-repeat;
+  pointer-events: none;
+}
+
+:root[data-ui-style='terminal'] .home-nav__btn:hover::before,
+:root[data-ui-style='terminal'] .home-nav__btn:focus-visible::before {
+  opacity: 1;
+  transform: none;
+}
+
+/* The primary tile is an outlined "selected" key, not a filled one. */
+:root[data-ui-style='terminal'] .home-nav__btn--primary {
+  background: color-mix(in srgb, var(--accent-violet) 16%, var(--bg-surface));
+  border-color: var(--accent-violet-soft);
+  color: var(--accent-violet-soft);
+}
+
+:root[data-ui-style='terminal'] .home-nav__btn--primary:hover {
+  background: color-mix(in srgb, var(--accent-violet) 28%, var(--bg-surface));
+  border-color: var(--accent-violet-soft);
+}
+
+/* ---- Reduced motion ------------------------------------------------------ */
+
+/* Keep the static scanlines and glow (they are texture, not motion); freeze
+ * the sweep, flicker, and boot fades. */
+@media (prefers-reduced-motion: reduce) {
+  :root[data-ui-style='terminal'] .home-page::after,
+  :root[data-ui-style='terminal'] .page,
+  :root[data-ui-style='terminal'] .sheet-page__content,
+  :root[data-ui-style='terminal'] .home-page__content,
+  :root[data-ui-style='terminal'] .home-nav {
+    animation: none;
+  }
+}
