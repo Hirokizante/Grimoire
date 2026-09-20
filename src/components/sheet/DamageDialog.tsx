@@ -25,6 +25,7 @@
  */
 
 import { useState } from 'react'
+import { X } from '@/components/ui/icons'
 
 import { useModalDialog } from '@/hooks/useModalDialog'
 import { useNotification } from '@/context/NotificationContext'
@@ -215,7 +216,14 @@ export default function DamageDialog({
       <div className="modal-content damage-dialog" ref={dialogRef} tabIndex={-1} onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h3>{title}</h3>
-          <button type="button" className="btn btn--icon modal-close" onClick={onClose}>✕</button>
+          <button
+            type="button"
+            className="btn btn--icon modal-close"
+            onClick={onClose}
+            aria-label="Close"
+          >
+            <X size={16} />
+          </button>
         </div>
 
         <div className="damage-dialog__body">

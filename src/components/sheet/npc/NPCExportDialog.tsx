@@ -9,7 +9,7 @@
  */
 
 import { useState } from 'react'
-import { ArrowUpFromLine, Hash } from '@/components/ui/icons'
+import { ArrowUpFromLine, Hash, X } from '@/components/ui/icons'
 
 import { useModalDialog } from '@/hooks/useModalDialog'
 import { useNotification } from '@/context/NotificationContext'
@@ -69,7 +69,7 @@ export default function NPCExportDialog({
             className="btn btn--icon modal-close"
             onClick={onClose}
           >
-            ✕
+            <X size={16} />
           </button>
         </div>
 

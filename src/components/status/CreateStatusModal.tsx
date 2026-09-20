@@ -7,6 +7,8 @@
  */
 
 import { useEffect, useRef, useState } from 'react'
+import { X } from '@/components/ui/icons'
+
 import { useModalDialog } from '@/hooks/useModalDialog'
 
 export interface CreateStatusModalProps {
@@ -55,7 +57,7 @@ export default function CreateStatusModal({
             onClick={onClose}
             aria-label="Close"
           >
-            ✕
+            <X size={16} />
           </button>
         </div>
 

@@ -14,7 +14,7 @@
  */
 
 import { useEffect, useState } from 'react'
-import { ArrowUpFromLine, Hash, RotateCcw, Trash2 } from '@/components/ui/icons'
+import { ArrowUpFromLine, Hash, RotateCcw, Trash2, X } from '@/components/ui/icons'
 
 import { useModalDialog } from '@/hooks/useModalDialog'
 import { useNotification } from '@/context/NotificationContext'
@@ -125,8 +125,9 @@ export default function ExportDialog({ open, onClose }: ExportDialogProps) {
             type="button"
             className="btn btn--icon modal-close"
             onClick={onClose}
+            aria-label="Close"
           >
-            ✕
+            <X size={16} />
           </button>
         </div>
 

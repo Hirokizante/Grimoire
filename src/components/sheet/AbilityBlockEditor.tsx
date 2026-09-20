@@ -24,6 +24,7 @@
  */
 
 import { useState, useEffect, useCallback, Fragment } from 'react'
+import { X } from '@/components/ui/icons'
 
 import SelectDropdown from '@/components/ui/SelectDropdown'
 import AbilityModifierFields from '@/components/sheet/AbilityModifierFields'
@@ -610,7 +611,7 @@ export default function AbilityBlockEditor({
                             aria-label={`Remove ${bar ? bar.name : 'custom'} cost`}
                             title="Remove this cost"
                           >
-                            ✕
+                            <X size={13} />
                           </button>
                         </Fragment>
                       )
@@ -844,7 +845,7 @@ export default function AbilityBlockEditor({
               onClick={closeSubEditor}
               aria-label="Close sub-ability editor"
             >
-              ✕
+              <X size={14} />
             </button>
           </div>
           <div className="ability-editor__sub-panel-body">

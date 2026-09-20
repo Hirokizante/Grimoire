@@ -98,7 +98,7 @@ async function applyLethalDamage(page: Page, panelIndex: number) {
   await page.locator('.damage-dialog input[type=number]').fill('999')
   await page.getByLabel(/Apply Armor/).uncheck()
   await page.getByRole('button', { name: 'Apply Damage' }).click()
-  await page.getByRole('button', { name: '✕' }).click()
+  await page.locator('.damage-dialog').getByRole('button', { name: 'Close' }).click()
   return panel
 }
 
@@ -788,7 +788,7 @@ test.describe('GM Screen', () => {
     await expect(page.locator('.damage-result__alert')).toContainText(
       'Damaged Lung (d20 19)',
     )
-    await page.getByRole('button', { name: '✕' }).click()
+    await page.locator('.damage-dialog').getByRole('button', { name: 'Close' }).click()
 
     await expect(panel.locator('.gm-mw__chip')).toHaveText(/19\s*Damaged Lung/)
     await expect(
@@ -799,7 +799,7 @@ test.describe('GM Screen', () => {
 
     // ---- The second wound fills the track, so the panel warns --------------
     await damageFor(page, panel, 25)
-    await page.getByRole('button', { name: '✕' }).click()
+    await page.locator('.damage-dialog').getByRole('button', { name: 'Close' }).click()
     await expect(panel.locator('.gm-mw__chip')).toHaveCount(2)
     await expect(panel.locator('.gm-mw__warn')).toContainText('Next 0 HP: Downed')
     await expect(
@@ -839,7 +839,7 @@ test.describe('GM Screen', () => {
 
     // ---- With no wound left to take, 0 HP downs the instance ---------------
     await damageFor(page, panel, 25)
-    await page.getByRole('button', { name: '✕' }).click()
+    await page.locator('.damage-dialog').getByRole('button', { name: 'Close' }).click()
     // The condition badge specifically — the wound row's warning pill also
     // carries the word "Downed".
     await expect(panel.locator('.gm-panel__badge--downed')).toHaveText('Downed')
@@ -892,7 +892,7 @@ test.describe('GM Screen', () => {
     await expect(page.locator('.damage-result__alert')).toContainText(
       'Damaged Lung (d20 19)',
     )
-    await page.getByRole('button', { name: '✕' }).click()
+    await page.locator('.damage-dialog').getByRole('button', { name: 'Close' }).click()
 
     await expect(panel.locator('.gm-mw__chip')).toHaveText(/19\s*Damaged Lung/)
     await expect(
@@ -916,7 +916,7 @@ test.describe('GM Screen', () => {
     await page.locator('.damage-dialog input[type=number]').fill('15')
     await page.getByLabel(/Apply Armor/).uncheck()
     await page.getByRole('button', { name: 'Apply Damage' }).click()
-    await page.getByRole('button', { name: '✕' }).click()
+    await page.locator('.damage-dialog').getByRole('button', { name: 'Close' }).click()
     await expect(page.locator('.mw-card--pending')).toBeVisible()
     await expect(
       page.getByRole('button', { name: 'Roll Mortal Wound (d20)' }),
@@ -988,7 +988,7 @@ test.describe('GM Screen', () => {
 
     // ---- With no wound left, 0 HP knocks the character out -----------------
     await damageFor(page, panel, 25)
-    await page.getByRole('button', { name: '✕' }).click()
+    await page.locator('.damage-dialog').getByRole('button', { name: 'Close' }).click()
     await expect(panel.getByRole('img', { name: '0 of 20 hit points' })).toBeVisible()
     await expect(
       page.locator('.notification--error').filter({ hasText: 'KNOCKED OUT' }),
@@ -1250,7 +1250,7 @@ test.describe('GM Screen', () => {
     await page.locator('.damage-dialog input[type=number]').fill('6')
     await page.getByLabel(/Apply Armor/).uncheck()
     await page.getByRole('button', { name: 'Apply Damage' }).click()
-    await page.getByRole('button', { name: '✕' }).click()
+    await page.locator('.damage-dialog').getByRole('button', { name: 'Close' }).click()
 
     const panelHP = await panel.locator('.gm-hp .gm-bar__value').innerText()
 
@@ -1576,9 +1576,9 @@ test.describe('GM Screen', () => {
     // …and a full wound track (two d20-and-name chips, plus the ⚠ pill that
     // takes the row's right edge) overflows the Mortal Wound strip.
     await damageFor(page, panel, 25)
-    await page.getByRole('button', { name: '✕' }).click()
+    await page.locator('.damage-dialog').getByRole('button', { name: 'Close' }).click()
     await damageFor(page, panel, 25)
-    await page.getByRole('button', { name: '✕' }).click()
+    await page.locator('.damage-dialog').getByRole('button', { name: 'Close' }).click()
     await expect(panel.locator('.gm-status-pill')).toHaveCount(5)
     await expect(panel.locator('.gm-mw__chip')).toHaveCount(2)
     await expect(panel.locator('.gm-mw__warn')).toContainText('Knocked Out')

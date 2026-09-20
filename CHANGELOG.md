@@ -4,6 +4,23 @@ All notable changes to Grimoire are documented here. This project is in alpha:
 storage format may change between pre-1.0 releases, so export (or back up) your
 characters regularly.
 
+## Unreleased
+
+### Close buttons show the pixel Close mark, not the X brand logo
+
+- **Every close/dismiss control drew the wrong pixel icon in Terminal.** The
+  style-aware icon set mapped Lucide `X` to Pixelarticons' own `X`, which is the
+  brand logo: modal headers, tab close, the Mortal Wound and status-pill clears,
+  the list-page deletes, and the filter/sort dropdowns all wore it. `X` now maps
+  to Pixelarticons `Close`, and the controls still rendering a typed `✕`/`×`
+  glyph were converted to the same style-aware `X` icon — so Default keeps the
+  pure Lucide X and Terminal shows the pixel Close on every one of them,
+  including the GM Screen's status pills.
+- **Testing.** `icons.test.tsx` pins that Terminal's `X` renders the
+  Pixelarticons `Close` path and not the `X` brand path; the Damage dialog's
+  close button gained the conventional `aria-label`, which `e2e/gm-screen.spec.ts`
+  now targets.
+
 ## v0.13.0-alpha — 2026-09-20
 
 The interface release. Seven commits since `v0.12.0-alpha`, and the app around

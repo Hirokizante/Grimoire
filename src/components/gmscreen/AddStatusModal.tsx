@@ -28,7 +28,7 @@
 
 import { useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Search } from '@/components/ui/icons'
+import { Search, X } from '@/components/ui/icons'
 
 import StatusIcon from '@/components/status/StatusIcon'
 import { useModalDialog } from '@/hooks/useModalDialog'
@@ -105,7 +105,7 @@ export default function AddStatusModal({
             onClick={onClose}
             aria-label="Close"
           >
-            ✕
+            <X size={16} />
           </button>
         </div>
 

@@ -18,6 +18,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react'
+import { X } from '@/components/ui/icons'
 
 import { useModalDialog } from '@/hooks/useModalDialog'
 import { processImage, processImageCrop } from '@/lib/imageProcessing'
@@ -234,7 +235,7 @@ export default function PortraitCropModal({
             onClick={onClose}
             aria-label="Close"
           >
-            ✕
+            <X size={16} />
           </button>
         </div>
 

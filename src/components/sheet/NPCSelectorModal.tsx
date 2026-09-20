@@ -11,7 +11,7 @@
  * closes via useModalDialog, footer has Cancel.
  */
 
-import { User, UserPlus } from '@/components/ui/icons'
+import { User, UserPlus, X } from '@/components/ui/icons'
 
 import { useModalDialog } from '@/hooks/useModalDialog'
 import { useCharacterStore } from '@/store/characterStore'
@@ -59,7 +59,7 @@ export default function NPCSelectorModal({
             onClick={onClose}
             aria-label="Close"
           >
-            ✕
+            <X size={16} />
           </button>
         </div>
 

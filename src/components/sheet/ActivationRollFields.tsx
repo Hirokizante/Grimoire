@@ -22,6 +22,8 @@
  * drops the whole config (an Ability that rolls nothing stores nothing).
  */
 
+import { X } from '@/components/ui/icons'
+
 import SelectDropdown from '@/components/ui/SelectDropdown'
 import { ATTRIBUTE_LIST } from '@/constants/gameData'
 import {
@@ -487,7 +489,7 @@ export default function ActivationRollFields({
                       aria-label={`Remove custom roll ${index + 1}`}
                       title="Remove this roll"
                     >
-                      ✕
+                      <X size={13} />
                     </button>
                   </li>
                 ))}

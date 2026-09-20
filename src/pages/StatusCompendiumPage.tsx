@@ -11,7 +11,7 @@
  */
 
 import { useCallback, useMemo, useRef, useState } from 'react'
-import { ArrowDownFromLine, ArrowUpFromLine, Plus } from '@/components/ui/icons'
+import { ArrowDownFromLine, ArrowUpFromLine, Plus, X } from '@/components/ui/icons'
 
 import ConfirmModal from '@/components/sheet/ConfirmModal'
 import CreateStatusModal from '@/components/status/CreateStatusModal'
@@ -352,7 +352,7 @@ export default function StatusCompendiumPage() {
                   aria-label={`Delete ${status.name}`}
                   onClick={() => setStatusToDelete(status)}
                 >
-                  ×
+                  <X size={14} />
                 </button>
               </li>
             )

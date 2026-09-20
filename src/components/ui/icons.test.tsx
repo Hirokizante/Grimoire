@@ -10,9 +10,11 @@
  */
 
 import { act, render, screen } from '@testing-library/react'
+import { Close as PixelClose } from 'pixelarticons/react/Close'
+import { X as PixelX } from 'pixelarticons/react/X'
 import { beforeEach, test, expect } from 'vitest'
 
-import { Plus } from '@/components/ui/icons'
+import { Plus, X } from '@/components/ui/icons'
 import { useUiStyleStore } from '@/store/uiStyleStore'
 
 beforeEach(() => {
@@ -55,4 +57,21 @@ test('a style switch flips the rendered pack', () => {
     'data-icon-pack',
     'pixelarticons',
   )
+})
+
+test('X renders the pixelarticons Close mark, not the X brand logo', () => {
+  useUiStyleStore.setState({ style: 'terminal' })
+  render(<X data-testid="icon" />)
+  render(<PixelClose data-testid="close" />)
+  render(<PixelX data-testid="brand" />)
+
+  const path = (testId: string) =>
+    screen.getByTestId(testId).querySelector('path')?.getAttribute('d')
+
+  expect(screen.getByTestId('icon')).toHaveAttribute(
+    'data-icon-pack',
+    'pixelarticons',
+  )
+  expect(path('icon')).toBe(path('close'))
+  expect(path('icon')).not.toBe(path('brand'))
 })

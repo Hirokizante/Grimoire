@@ -14,6 +14,7 @@
  */
 
 import { useEffect, useState } from 'react'
+import { X } from '@/components/ui/icons'
 
 import { generateId } from '@/constants/gameData'
 import { useModalDialog } from '@/hooks/useModalDialog'
@@ -109,7 +110,7 @@ export default function CustomAttributeModal({
             onClick={onClose}
             aria-label="Close"
           >
-            ✕
+            <X size={16} />
           </button>
         </div>
 

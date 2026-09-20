@@ -3,7 +3,7 @@
  */
 
 import { useRef, useEffect, useState } from 'react'
-import { Dices, Trash2 } from '@/components/ui/icons'
+import { Dices, Trash2, X } from '@/components/ui/icons'
 import { useRollLogStore } from '@/store/rollLogStore'
 import { useCharacterStore } from '@/store/characterStore'
 import { useAppThemeStore } from '@/store/appThemeStore'
@@ -92,7 +92,7 @@ export default function RollLogDrawer() {
                 onClick={closeDrawer}
                 aria-label="Close"
               >
-                ×
+                <X size={14} />
               </button>
             </div>
 

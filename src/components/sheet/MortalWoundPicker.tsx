@@ -36,7 +36,7 @@
 
 import { useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Search } from '@/components/ui/icons'
+import { Search, X } from '@/components/ui/icons'
 
 import { MORTAL_WOUNDS } from '@/constants/gameData'
 import { useModalDialog } from '@/hooks/useModalDialog'
@@ -106,7 +106,7 @@ export default function MortalWoundPicker({
             onClick={onClose}
             aria-label="Close"
           >
-            ✕
+            <X size={16} />
           </button>
         </div>
 

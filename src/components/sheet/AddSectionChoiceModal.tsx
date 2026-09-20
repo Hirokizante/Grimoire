@@ -7,7 +7,7 @@
  * closes via useEscapeKey, footer has Cancel + the two action buttons.
  */
 
-import { ScrollText, User, FileText } from '@/components/ui/icons'
+import { ScrollText, User, FileText, X } from '@/components/ui/icons'
 
 import { useModalDialog } from '@/hooks/useModalDialog'
 import type { AppIcon } from '@/components/ui/icons'
@@ -79,7 +79,7 @@ export default function AddSectionChoiceModal({
             onClick={onClose}
             aria-label="Close"
           >
-            ✕
+            <X size={16} />
           </button>
         </div>
 

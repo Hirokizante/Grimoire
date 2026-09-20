@@ -9,7 +9,7 @@
  */
 
 import { useState } from 'react'
-import { Plus, Trash2 } from '@/components/ui/icons'
+import { Plus, Trash2, X } from '@/components/ui/icons'
 
 import { generateId } from '@/constants/gameData'
 import { useModalDialog } from '@/hooks/useModalDialog'
@@ -76,7 +76,7 @@ export default function EditLabelsModal({
             onClick={onClose}
             aria-label="Close"
           >
-            ✕
+            <X size={16} />
           </button>
         </div>
 

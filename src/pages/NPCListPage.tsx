@@ -6,7 +6,7 @@
  */
 
 import { useCallback, useMemo, useRef, useState } from 'react'
-import { ArrowDownFromLine, Plus } from '@/components/ui/icons'
+import { ArrowDownFromLine, Plus, X } from '@/components/ui/icons'
 
 import { useCharacterStore } from '@/store/characterStore'
 import {
@@ -344,7 +344,7 @@ export default function NPCListPage() {
                 aria-label={`Delete ${c.name}`}
                 onClick={() => setNpcToDelete(c)}
               >
-                ×
+                <X size={14} />
               </button>
             </li>
           ))}
@@ -385,7 +385,7 @@ export default function NPCListPage() {
                 aria-label={`Delete ${c.name}`}
                 onClick={() => setNpcToDelete(c)}
               >
-                ×
+                <X size={14} />
               </button>
             </li>
           ))}

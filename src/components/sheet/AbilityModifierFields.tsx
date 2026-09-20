@@ -13,6 +13,8 @@
  * the list (an Ability with no modifiers has nothing to toggle on its card).
  */
 
+import { X } from '@/components/ui/icons'
+
 import SelectDropdown from '@/components/ui/SelectDropdown'
 import {
   modifierTargetLabel,
@@ -155,7 +157,7 @@ export default function AbilityModifierFields({
                   aria-label={`Remove ${modifierTargetLabel(mod.target)} modifier`}
                   title="Remove this modifier"
                 >
-                  ✕
+                  <X size={13} />
                 </button>
               </li>
             ))}

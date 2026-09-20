@@ -9,10 +9,11 @@
  *
  * The pixel counterpart is chosen by meaning, not by name — lucide `Dices`
  * maps to pixel `Gamepad`, `Gem` to `DiamondGem`, and the shield variants all
- * collapse onto pixel `Shield`. `strokeWidth` is a Lucide-only prop: the pixel
- * pack is drawn with fills, so it is ignored there. Every icon carries
- * `data-icon-pack` so tests (and the e2e style spec) can pin which pack
- * rendered.
+ * collapse onto pixel `Shield`. `X` is the trap: the pixel pack's own `X` is
+ * the brand logo, so the close/dismiss glyph comes from pixel `Close` instead.
+ * `strokeWidth` is a Lucide-only prop: the pixel pack is drawn with fills, so
+ * it is ignored there. Every icon carries `data-icon-pack` so tests (and the
+ * e2e style spec) can pin which pack rendered.
  *
  * Pixel components are imported per file (`pixelarticons/react/<Name>`) rather
  * than through the package barrel: the barrel re-exports ~2,000 modules, which
@@ -154,6 +155,7 @@ import { ChevronLeft as PixelChevronLeft } from 'pixelarticons/react/ChevronLeft
 import { ChevronRight as PixelChevronRight } from 'pixelarticons/react/ChevronRight'
 import { CircleInfo as PixelCircleInfo } from 'pixelarticons/react/CircleInfo'
 import { Clock as PixelClock } from 'pixelarticons/react/Clock'
+import { Close as PixelClose } from 'pixelarticons/react/Close'
 import { Cloud as PixelCloud } from 'pixelarticons/react/Cloud'
 import { Collapse as PixelCollapse } from 'pixelarticons/react/Collapse'
 import { Cpu as PixelCpu } from 'pixelarticons/react/Cpu'
@@ -221,7 +223,6 @@ import { WarningDiamond as PixelWarningDiamond } from 'pixelarticons/react/Warni
 import { Watch as PixelWatch } from 'pixelarticons/react/Watch'
 import { Waves as PixelWaves } from 'pixelarticons/react/Waves'
 import { Wind as PixelWind } from 'pixelarticons/react/Wind'
-import { X as PixelX } from 'pixelarticons/react/X'
 import { Zap as PixelZap } from 'pixelarticons/react/Zap'
 
 import { useUiStyleStore } from '@/store/uiStyleStore'
@@ -366,6 +367,6 @@ export const UserPlus = makeAppIcon('UserPlus', LucideUserPlus, PixelUserPlus)
 export const Users = makeAppIcon('Users', LucideUsers, PixelUsers)
 export const Wind = makeAppIcon('Wind', LucideWind, PixelWind)
 export const Wrench = makeAppIcon('Wrench', LucideWrench, PixelTools)
-export const X = makeAppIcon('X', LucideX, PixelX)
+export const X = makeAppIcon('X', LucideX, PixelClose)
 export const XCircle = makeAppIcon('XCircle', LucideXCircle, PixelCancel)
 export const Zap = makeAppIcon('Zap', LucideZap, PixelZap)

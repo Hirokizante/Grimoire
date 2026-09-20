@@ -9,7 +9,7 @@
  */
 
 import { useMemo, useState } from 'react'
-import { Search } from '@/components/ui/icons'
+import { Search, X } from '@/components/ui/icons'
 
 import { useModalDialog } from '@/hooks/useModalDialog'
 import { useCharacterStore } from '@/store/characterStore'
@@ -90,7 +90,7 @@ export default function AddCharacterModal({
             onClick={onClose}
             aria-label="Close"
           >
-            ✕
+            <X size={16} />
           </button>
         </div>
 

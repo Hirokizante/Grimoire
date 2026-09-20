@@ -8,6 +8,7 @@
  */
 
 import { useState } from 'react'
+import { X } from '@/components/ui/icons'
 import { useCharacterStore } from '@/store/characterStore'
 import { generateId } from '@/constants/gameData'
 import type { ImportedFont } from '@/types'
@@ -111,7 +112,7 @@ export function FontImportSection() {
                   onClick={() => handleRemove(f.id)}
                   aria-label={`Remove ${f.family}`}
                 >
-                  ×
+                  <X size={13} />
                 </button>
               </span>
             ))}

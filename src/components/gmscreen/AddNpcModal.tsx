@@ -10,7 +10,7 @@
  */
 
 import { useMemo, useState } from 'react'
-import { Plus, Search, Swords } from '@/components/ui/icons'
+import { Plus, Search, Swords, X } from '@/components/ui/icons'
 
 import { useModalDialog } from '@/hooks/useModalDialog'
 import { useCharacterStore } from '@/store/characterStore'
@@ -103,7 +103,7 @@ export default function AddNpcModal({
             onClick={onClose}
             aria-label="Close"
           >
-            ✕
+            <X size={16} />
           </button>
         </div>
 

@@ -11,7 +11,7 @@
  */
 
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowUpFromLine } from '@/components/ui/icons'
+import { ArrowUpFromLine, X } from '@/components/ui/icons'
 
 import ConfirmModal from '@/components/sheet/ConfirmModal'
 import CaptureButton from '@/components/ui/CaptureButton'
@@ -142,7 +142,7 @@ export default function StatusModal() {
             onClick={handleClose}
             aria-label="Close"
           >
-            ✕
+            <X size={16} />
           </button>
         </div>
 
