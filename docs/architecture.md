@@ -155,8 +155,9 @@ stepped motion (page switches and pop-ups are instant in both styles). It is app
 `main.tsx` so its scoped rules win cascade ties against every component stylesheet, and the icon
 swap is a React-level layer — `src/components/ui/icons.tsx` exports every app icon as a wrapper
 that reads the store and renders the active style's pack. The style is
-deliberately color-agnostic (glows derive from the active theme's `--accent-violet-soft`), and
-per-character sheet fonts stay untouched — only the app chrome turns monospace.
+deliberately color-agnostic (glows derive from the active theme's `--accent-violet-soft`). Sheet
+bodies that follow the app theme (NPC sheets, "Match app theme") inherit the chrome's monospace
+with everything else; a sheet with its own font customization keeps it.
 
 ---
 

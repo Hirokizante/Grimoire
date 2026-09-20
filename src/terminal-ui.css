@@ -25,8 +25,8 @@
  */
 
 :root[data-ui-style='terminal'] {
-  --terminal-font: 'SFMono-Regular', ui-monospace, Menlo, Consolas,
-    'Liberation Mono', monospace;
+  --terminal-font: 'Iosevka', ui-monospace, Menlo, Consolas, 'Liberation Mono',
+    monospace;
   --terminal-glow: color-mix(in srgb, var(--accent-violet-soft) 55%, transparent);
   --terminal-glow-soft: color-mix(
     in srgb,
@@ -49,9 +49,10 @@
 
 /* ---- Typography: one monospace voice ------------------------------------- */
 
-/* Sheet content keeps the per-character font choices (they are inline custom
+/* A sheet with its own font customization keeps it (they are inline custom
  * properties on `.character-sheet` and are part of the user's content); the
- * app chrome around it turns monospace. */
+ * app chrome around it turns monospace, and sheets that follow the app theme
+ * (NPC sheets, "Match app theme") inherit it with the rest of the UI. */
 :root[data-ui-style='terminal'] body {
   font-family: var(--terminal-font);
 }

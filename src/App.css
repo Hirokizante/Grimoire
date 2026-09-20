@@ -1090,8 +1090,8 @@ body:has(.modal-overlay) .app-header__nav {
   pointer-events: none;
   z-index: -1;
   overflow: hidden;
-  font-family: 'SFMono-Regular', ui-monospace, Menlo, Consolas,
-    'Liberation Mono', monospace;
+  font-family: 'Iosevka', ui-monospace, Menlo, Consolas, 'Liberation Mono',
+    monospace;
   font-size: clamp(0.62rem, 1.6vw, 0.8rem);
   line-height: 1.6;
   letter-spacing: 0.03em;
@@ -2758,8 +2758,8 @@ body:has(.modal-overlay) .app-header__nav {
   display: flex;
   flex-direction: column;
   gap: 0.15rem;
-  font-family: 'SFMono-Regular', ui-monospace, Menlo, Consolas,
-    'Liberation Mono', monospace;
+  font-family: 'Iosevka', ui-monospace, Menlo, Consolas, 'Liberation Mono',
+    monospace;
   font-size: 0.62rem;
   line-height: 1.4;
   color: var(--accent-violet-soft);
@@ -2812,8 +2812,8 @@ body:has(.modal-overlay) .app-header__nav {
 
 .style-preview--terminal {
   gap: 0.32rem;
-  font-family: 'SFMono-Regular', ui-monospace, Menlo, Consolas,
-    'Liberation Mono', monospace;
+  font-family: 'Iosevka', ui-monospace, Menlo, Consolas, 'Liberation Mono',
+    monospace;
   font-size: 0.62rem;
   line-height: 1.4;
   color: var(--accent-violet-soft);

@@ -164,12 +164,11 @@ test('Match app theme: the sheet renders the app theme and nothing per-sheet', (
   expect(sheet.style.getPropertyValue('--bg-base')).toBe(theme.bgBase)
   expect(sheet.style.getPropertyValue('--hp-bar-color')).toBe(theme.hpBar)
   expect(sheet.style.getPropertyValue('--sheet-bg')).toBe(theme.bgSurface)
-  expect(sheet.style.getPropertyValue('--sheet-heading-font')).toBe(
-    DEFAULT_SHEET_CONFIG.sectionHeadingFontFamily,
-  )
-  expect(sheet.style.getPropertyValue('--sheet-text-font')).toBe(
-    DEFAULT_SHEET_CONFIG.textFontFamily,
-  )
+  // No fonts either: the sheet inherits the app chrome's type — the font
+  // every other menu renders in — exactly like an NPC sheet and a matched GM
+  // panel body.
+  expect(sheet.style.getPropertyValue('--sheet-heading-font')).toBe('')
+  expect(sheet.style.getPropertyValue('--sheet-text-font')).toBe('')
 
   // No flat-section override, no custom CSS, no imported fonts, no Customize
   // button — an NPC sheet has none of them either.

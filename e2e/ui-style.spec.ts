@@ -52,7 +52,7 @@ test('the Terminal style squares the UI, persists, and reverts cleanly', async (
   const bodyFont = await page.evaluate(
     () => getComputedStyle(document.body).fontFamily,
   )
-  expect(bodyFont).toContain('SFMono-Regular')
+  expect(bodyFont).toContain('Iosevka')
 
   // Every icon on the page swaps to the pixel pack.
   const packs = await page.evaluate(() =>
@@ -182,7 +182,7 @@ test('the Terminal style stays inside a phone viewport and pairs with Terminal B
   const titleFont = await page
     .locator('.home-page__title')
     .evaluate((el) => getComputedStyle(el).fontFamily)
-  expect(titleFont).toContain('SFMono-Regular')
+  expect(titleFont).toContain('Iosevka')
 
   // The scanline overlay lives on the home page itself, above its content but
   // never swallowing input.

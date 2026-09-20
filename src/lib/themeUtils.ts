@@ -283,16 +283,21 @@ export function appThemeColorVars(theme: AppTheme): Record<string, string> {
 
 /**
  * CSS custom properties for a STANDALONE sheet body that follows the app
- * theme: the theme's palette plus the default sheet card background and
- * default fonts.
+ * theme: the theme's palette plus the default sheet card background.
+ *
+ * Fonts are deliberately not set. With no per-sheet customization to honor,
+ * the sheet inherits the surrounding app chrome's type — the same font every
+ * other menu renders in, including the Terminal style's monospace — exactly
+ * as a GM panel body with "Match app theme" on does (the `--sheet-*-font`
+ * declarations in sheet.css all fall back to `inherit`).
  *
  * Both standalone sheets build their body through this one function so they
  * cannot drift apart: an NPC sheet always follows the app theme (its `config`
  * is the default), and a character sheet follows it when the
  * Settings → Character Sheets → "Match app theme" switch is on, at which
  * point it passes no `config` at all — `DEFAULT_SHEET_CONFIG` stands in for
- * every per-sheet value (card background, fonts), because those are exactly
- * what the switch disables.
+ * every per-sheet value (card background), because that is exactly what the
+ * switch disables.
  */
 export function appThemeSheetVars(
   theme: AppTheme,
@@ -300,11 +305,6 @@ export function appThemeSheetVars(
 ): CSSProperties {
   return {
     '--sheet-bg': appThemeSheetCardBackground(theme, config),
-    '--sheet-heading-font': config.sectionHeadingFontFamily,
-    '--sheet-heading-weight': config.sectionHeadingFontWeight,
-    '--sheet-label-font': config.labelFontFamily,
-    '--sheet-text-font': config.textFontFamily,
-    '--sheet-helper-font': config.helperTextFontFamily,
     ...appThemeColorVars(theme),
   } as CSSProperties
 }

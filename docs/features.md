@@ -419,8 +419,9 @@ Grimoire is built to support that freedom:
   a character sheet, which keeps the parent tab's choice), persisted per sheet.
 - **Match app theme** — *Settings → Character Sheets → Match app theme* disables the appearance
   customization above at once: every character sheet renders with the active app theme's palette,
-  the default fonts and card background, and no background image or custom CSS — exactly like an NPC
-  sheet. The Customize button is hidden with it, while per-section view modes keep working.
+  the app chrome's fonts and the default card background, and no background image or custom CSS —
+  exactly like an NPC sheet. The Customize button is hidden with it, while per-section view modes
+  keep working.
   Display-only and reversible: nothing about the character record changes (see
   [App settings](#character-sheets-can-match-the-app-theme)).
 
@@ -457,7 +458,8 @@ for them:
   the color theme (every theme pairs with every style):
   - **Default** — the original look: soft corners, system sans, gentle easing.
   - **Terminal** — a retrofuturistic terminal reskin: square corners everywhere, monospace chrome
-    (sheet content keeps each character's own fonts), the **Pixelarticons** icon pack in place of
+    (sheets that follow the app theme inherit it; a sheet with custom fonts keeps them), the
+    **Pixelarticons** icon pack in place of
     Lucide, phosphor glow on headings and active controls (player sheet tabs stay flat so no halo
     bleeds onto the section below), a CRT scanline/sweep overlay on the home page, and stepped
     "frame-by-frame" motion. Page switches and pop-ups open instantly — no fade — matching the

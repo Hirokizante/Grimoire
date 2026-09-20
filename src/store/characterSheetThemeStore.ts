@@ -5,8 +5,8 @@
  * A character sheet normally carries whatever the player built in the
  * Customization panel — palette, card and page backgrounds, fonts, background
  * image, custom CSS. With `matchAppTheme` on, the sheet drops all of it and
- * renders exactly like an NPC sheet: the active app theme's palette, the
- * default sheet fonts, and no page background image. The Customize button is
+ * renders exactly like an NPC sheet: the active app theme's palette, the app
+ * chrome's fonts, and no page background image. The Customize button is
  * hidden with it, since there is nothing left to customize against.
  *
  * NOTE: purely cosmetic and read-only. It changes what the SHEET PAGE renders

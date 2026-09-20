@@ -91,11 +91,12 @@ export default function CharacterSheet({
   const setPoolViewMode = (m: 'grid' | 'list') => updateSectionViewMode('abilityPool', m)
 
   // Settings → Character Sheets → "Match app theme" turns the sheet into the
-  // same presentation an NPC sheet always uses: the app theme's palette, the
-  // default sheet fonts and card background, no custom CSS, no flat-section
-  // layout override, and no Customize button. Cosmetic and read-only — the
-  // character's config is only read, never written, so turning the switch back
-  // off restores every custom value.
+  // same presentation an NPC sheet always uses: the app theme's palette and
+  // default card background, the app chrome's fonts (inherited, like every
+  // other menu), no custom CSS, no flat-section layout override, and no
+  // Customize button. Cosmetic and read-only — the character's config is only
+  // read, never written, so turning the switch back off restores every custom
+  // value.
   const matchAppTheme = useCharacterSheetThemeStore((s) => s.matchAppTheme)
   const appTheme = useAppThemeStore((s) => s.theme)
 

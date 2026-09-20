@@ -121,29 +121,25 @@ test('sheet card/page backgrounds follow the theme except in midnight', () => {
 
 // ---- Standalone sheets that follow the app theme ----------------------------
 
-test('appThemeSheetVars: default config is the theme palette plus default fonts', () => {
+test('appThemeSheetVars: default config is the theme palette plus default card background', () => {
   const vars = appThemeSheetVars('parchment') as Record<string, string>
 
   // The theme's own values, variable for variable.
   expect(vars['--bg-base']).toBe(PARCHMENT_SHEET_COLORS.bgBase)
   expect(vars['--accent-violet']).toBe(PARCHMENT_SHEET_COLORS.accent)
   expect(vars['--hp-bar-color']).toBe(PARCHMENT_SHEET_COLORS.hpBar)
-  // The historical standalone card background and the default font stack —
-  // never a character's own customization.
+  // The historical standalone card background — never a character's own
+  // customization.
   expect(vars['--sheet-bg']).toBe(
     appThemeSheetCardBackground('parchment', DEFAULT_SHEET_CONFIG),
   )
-  expect(vars['--sheet-heading-font']).toBe(
-    DEFAULT_SHEET_CONFIG.sectionHeadingFontFamily,
-  )
-  expect(vars['--sheet-heading-weight']).toBe(
-    DEFAULT_SHEET_CONFIG.sectionHeadingFontWeight,
-  )
-  expect(vars['--sheet-label-font']).toBe(DEFAULT_SHEET_CONFIG.labelFontFamily)
-  expect(vars['--sheet-text-font']).toBe(DEFAULT_SHEET_CONFIG.textFontFamily)
-  expect(vars['--sheet-helper-font']).toBe(
-    DEFAULT_SHEET_CONFIG.helperTextFontFamily,
-  )
+  // No fonts: an unconfigured sheet inherits the app chrome's type, exactly
+  // like every other menu and a matched GM panel body.
+  expect(vars['--sheet-heading-font']).toBeUndefined()
+  expect(vars['--sheet-heading-weight']).toBeUndefined()
+  expect(vars['--sheet-label-font']).toBeUndefined()
+  expect(vars['--sheet-text-font']).toBeUndefined()
+  expect(vars['--sheet-helper-font']).toBeUndefined()
 })
 
 test('appThemeSheetVars: an NPC config renders identically to the default', () => {
