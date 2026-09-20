@@ -15,11 +15,11 @@
 import {
   GitBranch,
   Hourglass,
-  Infinity as InfinityIcon,
+  InfinityIcon,
   RefreshCw,
   Zap,
-  type LucideIcon,
-} from 'lucide-react'
+  type AppIcon,
+} from '@/components/ui/icons'
 
 import type { PanelStatusDuration } from '@/types'
 
@@ -39,7 +39,7 @@ export interface StatusDurationMeta {
   /** One-line reminder of when the duration ends (SRD wording). */
   hint: string
   /** Icon shown beside the label. */
-  Icon: LucideIcon
+  Icon: AppIcon
 }
 
 /**

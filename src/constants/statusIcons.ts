@@ -75,8 +75,8 @@ import {
   Wrench,
   XCircle,
   Zap,
-  type LucideIcon,
-} from 'lucide-react'
+  type AppIcon,
+} from '@/components/ui/icons'
 
 import { RPG_AWESOME_ICON_KEYS } from '@/constants/rpgAwesomeIcons'
 
@@ -105,11 +105,12 @@ export function rpgAwesomeIconLabel(key: string): string {
 }
 
 /**
- * The icon pack that shipped before RPG-Awesome: a curated set of Lucide
+ * The icon pack that shipped before RPG-Awesome: a curated set of icon
  * components, kept only so already-saved statuses still render. New selections
- * never use it.
+ * never use it. They are style-aware wrappers like every other app icon, so a
+ * legacy status follows the active UI style's pack too.
  */
-const LEGACY_LUCIDE_ICONS: Record<string, LucideIcon> = {
+const LEGACY_LUCIDE_ICONS: Record<string, AppIcon> = {
   // Damage & combat
   swords: Swords,
   sword: Sword,
@@ -183,6 +184,6 @@ const LEGACY_LUCIDE_ICONS: Record<string, LucideIcon> = {
  * Resolve a **pre-RPG-Awesome** Lucide key back to its component (or null).
  * Only used as a rendering fallback for statuses saved with the old pack.
  */
-export function legacyStatusIconByName(key: string): LucideIcon | null {
+export function legacyStatusIconByName(key: string): AppIcon | null {
   return LEGACY_LUCIDE_ICONS[key] ?? null
 }

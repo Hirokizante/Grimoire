@@ -147,9 +147,12 @@ properties, which the entire sheet reads from.
 
 The color theme is orthogonal to the **UI style** (`uiStyleStore`, Settings → Interface): `default`
 is the original look, `terminal` is a retrofuturistic reskin — hard edges, monospace chrome,
-phosphor glow, a CRT scanline overlay over the home page, and stepped motion. It is applied as
-`data-ui-style` on `<html>`; the whole override sheet is `src/terminal-ui.css`, imported last in
-`main.tsx` so its scoped rules win cascade ties against every component stylesheet. The style is
+Pixelarticons in place of Lucide, phosphor glow, a CRT scanline overlay over the home page, and
+stepped motion (page switches and pop-ups are instant in both styles). It is applied as
+`data-ui-style` on `<html>`; the CSS override sheet is `src/terminal-ui.css`, imported last in
+`main.tsx` so its scoped rules win cascade ties against every component stylesheet, and the icon
+swap is a React-level layer — `src/components/ui/icons.tsx` exports every app icon as a wrapper
+that reads the store and renders the active style's pack. The style is
 deliberately color-agnostic (glows derive from the active theme's `--accent-violet-soft`), and
 per-character sheet fonts stay untouched — only the app chrome turns monospace.
 

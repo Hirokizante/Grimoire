@@ -11,7 +11,7 @@
  */
 
 import { useCallback, useMemo, useRef, useState } from 'react'
-import { ArrowDownFromLine, ArrowUpFromLine, Plus } from 'lucide-react'
+import { ArrowDownFromLine, ArrowUpFromLine, Plus } from '@/components/ui/icons'
 
 import ConfirmModal from '@/components/sheet/ConfirmModal'
 import CreateStatusModal from '@/components/status/CreateStatusModal'

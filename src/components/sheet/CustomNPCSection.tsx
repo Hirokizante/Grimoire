@@ -17,8 +17,8 @@
  */
 
 import { useState } from 'react'
-import { Trash2, Wind, Shield, Footprints, Target, Heart, Skull } from 'lucide-react'
-import type { LucideIcon } from 'lucide-react'
+import { Trash2, Wind, Shield, Footprints, Target, Heart, Skull } from '@/components/ui/icons'
+import type { AppIcon } from '@/components/ui/icons'
 
 import { useCharacterStore } from '@/store/characterStore'
 import { useDiceRollStore } from '@/store/diceRollStore'
@@ -75,7 +75,7 @@ interface StatCardMeta {
   label: string
   key: keyof NPCStats
   color: string
-  icon: LucideIcon
+  icon: AppIcon
 }
 
 const STATS: StatCardMeta[] = [

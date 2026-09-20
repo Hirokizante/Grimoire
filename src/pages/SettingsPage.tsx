@@ -18,7 +18,7 @@
  */
 
 import { useCallback, useRef, useState } from 'react'
-import { ArchiveRestore, Check, DatabaseBackup } from 'lucide-react'
+import { ArchiveRestore, Check, DatabaseBackup } from '@/components/ui/icons'
 
 import BokehMote from '@/components/home/BokehMote'
 import { buildPreviewMotes } from '@/components/home/bokehField'
@@ -117,7 +117,8 @@ const UI_STYLE_OPTIONS: UiStyleOption[] = [
   {
     id: 'terminal',
     name: 'Terminal',
-    description: 'Retrofuturistic terminal — hard edges, monospace, CRT glow.',
+    description:
+      'Retrofuturistic terminal — hard edges, pixel icons, monospace, CRT glow.',
     preview: (
       <span
         className="style-preview style-preview--terminal"

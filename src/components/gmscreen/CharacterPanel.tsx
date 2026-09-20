@@ -40,7 +40,7 @@
  */
 
 import { useState } from 'react'
-import { Heart, Pencil, Shield, Sparkles, Swords, Wind } from 'lucide-react'
+import { Heart, Pencil, Shield, Sparkles, Swords, Wind } from '@/components/ui/icons'
 
 import DamageDialog from '@/components/sheet/DamageDialog'
 import MortalWoundPicker from '@/components/sheet/MortalWoundPicker'

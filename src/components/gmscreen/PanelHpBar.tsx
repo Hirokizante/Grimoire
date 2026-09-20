@@ -22,7 +22,7 @@
  */
 
 import type { ReactNode } from 'react'
-import { HeartPulse } from 'lucide-react'
+import { HeartPulse } from '@/components/ui/icons'
 
 import PanelStepper from '@/components/gmscreen/PanelStepper'
 

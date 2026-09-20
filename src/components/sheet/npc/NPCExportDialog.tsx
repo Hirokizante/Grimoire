@@ -9,7 +9,7 @@
  */
 
 import { useState } from 'react'
-import { ArrowUpFromLine, Hash } from 'lucide-react'
+import { ArrowUpFromLine, Hash } from '@/components/ui/icons'
 
 import { useModalDialog } from '@/hooks/useModalDialog'
 import { useNotification } from '@/context/NotificationContext'

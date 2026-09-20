@@ -22,7 +22,7 @@
  */
 
 import type { ReactNode } from 'react'
-import { RotateCcw, Zap } from 'lucide-react'
+import { RotateCcw, Zap } from '@/components/ui/icons'
 
 import SegmentedBar from '@/components/ui/SegmentedBar'
 import PanelStepper from '@/components/gmscreen/PanelStepper'

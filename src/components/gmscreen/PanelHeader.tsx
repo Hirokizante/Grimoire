@@ -9,7 +9,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Maximize2, Minimize2, MoreVertical } from 'lucide-react'
+import { Maximize2, Minimize2, MoreVertical } from '@/components/ui/icons'
 
 import type { ScreenPanelDensity } from '@/types'
 

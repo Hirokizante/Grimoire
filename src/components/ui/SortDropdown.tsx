@@ -11,7 +11,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react'
-import { ArrowUpDown, Check, X } from 'lucide-react'
+import { ArrowUpDown, Check, X } from '@/components/ui/icons'
 
 import { useViewportClampedPanel } from '@/hooks/useViewportClampedPanel'
 

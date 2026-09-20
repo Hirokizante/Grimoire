@@ -36,7 +36,7 @@ import {
   Swords,
   Trash2,
   Users,
-} from 'lucide-react'
+} from '@/components/ui/icons'
 
 import ConfirmModal from '@/components/sheet/ConfirmModal'
 import AddCharacterModal from '@/components/gmscreen/AddCharacterModal'

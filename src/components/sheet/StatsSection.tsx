@@ -28,8 +28,8 @@ import {
   Target,
   Heart,
   Pencil,
-} from 'lucide-react'
-import type { LucideIcon } from 'lucide-react'
+} from '@/components/ui/icons'
+import type { AppIcon } from '@/components/ui/icons'
 
 import DamageDialog from '@/components/sheet/DamageDialog'
 import DeathSaveTracker from '@/components/sheet/DeathSaveTracker'
@@ -142,7 +142,7 @@ interface StatToken {
    * line of stat and needs no reservation at all.
    */
   bonus?: number
-  icon: LucideIcon
+  icon: AppIcon
   /** Hex color used for stripe + icon. */
   color: string
   /**

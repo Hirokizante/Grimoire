@@ -21,7 +21,7 @@
  * no live panel state stays a plain badge).
  */
 
-import { Hourglass, RotateCw } from 'lucide-react'
+import { Hourglass, RotateCw } from '@/components/ui/icons'
 
 export interface RechargeBadgeProps {
   /** The ability's Recharge value (`Recharge (4)` → 4). */

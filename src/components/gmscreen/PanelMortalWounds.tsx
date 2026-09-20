@@ -36,7 +36,7 @@
  * growing its own copy of the row — the two could not then drift apart.
  */
 
-import { Skull, TriangleAlert, X } from 'lucide-react'
+import { Skull, TriangleAlert, X } from '@/components/ui/icons'
 import type { CSSProperties } from 'react'
 
 import { useHorizontalWheelScroll } from '@/hooks/useHorizontalWheelScroll'

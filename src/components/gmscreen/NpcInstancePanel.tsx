@@ -32,7 +32,7 @@
  */
 
 import { useMemo, useState } from 'react'
-import { Hourglass, Pencil, Shield, Skull, Swords, Target, Wind } from 'lucide-react'
+import { Hourglass, Pencil, Shield, Skull, Swords, Target, Wind } from '@/components/ui/icons'
 
 import DamageDialog from '@/components/sheet/DamageDialog'
 import MortalWoundPicker from '@/components/sheet/MortalWoundPicker'

@@ -15,7 +15,7 @@
  */
 
 import { useState } from 'react'
-import { RotateCcw } from 'lucide-react'
+import { RotateCcw } from '@/components/ui/icons'
 
 import { MIN_SCREEN_ROUND } from '@/constants/gameData'
 

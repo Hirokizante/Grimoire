@@ -26,6 +26,9 @@ importers:
       lucide-react:
         specifier: ^1.24.0
         version: 1.43.0(react@19.2.8)
+      pixelarticons:
+        specifier: 2.4.1
+        version: 2.4.1(react@19.2.8)
       react:
         specifier: ^19.2.7
         version: 19.2.8
@@ -1038,6 +1041,12 @@ packages:
   picomatch@4.0.7:
     resolution: {integrity: sha512-qcJu88Q2IWqJsDD529JKMdwGm/dvInW4HvQnRwiH9JtihJvzGOscDtHE3x1pBKeUOTysQ8kVmLnJ2kJu7yhcGA==}
     engines: {node: '>=12'}
+
+  pixelarticons@2.4.1:
+    resolution: {integrity: sha512-NIiwuEmBrFT6YG5PdMnOPRsGm0rbz4TiH0P5sgftjrQugxgdF+xtZPgGrgAOL76KUMJ04kk5Bq2lVLnmBg7IPw==}
+    hasBin: true
+    peerDependencies:
+      react: '>=16'
 
   playwright-core@1.63.0:
     resolution: {integrity: sha512-rYCsBF/M5HjUch52bbtVONEFjv6Xu8sm8h72dNlR5bzIE1fvC/bxgspzkjSfU+MweEMmPM8KJebG6nnyxo5mCg==}
@@ -2402,6 +2411,10 @@ snapshots:
   picocolors@1.1.1: {}
 
   picomatch@4.0.7: {}
+
+  pixelarticons@2.4.1(react@19.2.8):
+    dependencies:
+      react: 19.2.8
 
   playwright-core@1.63.0: {}
 

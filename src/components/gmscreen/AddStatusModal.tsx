@@ -28,7 +28,7 @@
 
 import { useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Search } from 'lucide-react'
+import { Search } from '@/components/ui/icons'
 
 import StatusIcon from '@/components/status/StatusIcon'
 import { useModalDialog } from '@/hooks/useModalDialog'

@@ -13,7 +13,7 @@
  * and `restore` to the RIGHT (see `.gm-bar__controls`).
  */
 
-import { Minus, Plus } from 'lucide-react'
+import { Minus, Plus } from '@/components/ui/icons'
 
 export interface PanelStepperProps {
   /** Which end of the bar this control is: `spend` renders −, `restore` renders +. */

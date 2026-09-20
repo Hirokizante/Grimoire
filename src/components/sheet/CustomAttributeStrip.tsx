@@ -20,7 +20,7 @@
  */
 
 import { useState } from 'react'
-import { Pencil } from 'lucide-react'
+import { Pencil } from '@/components/ui/icons'
 
 import { useCharacterStore } from '@/store/characterStore'
 import { useDiceRollStore } from '@/store/diceRollStore'

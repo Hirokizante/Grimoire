@@ -11,7 +11,7 @@
  */
 
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowUpFromLine } from 'lucide-react'
+import { ArrowUpFromLine } from '@/components/ui/icons'
 
 import ConfirmModal from '@/components/sheet/ConfirmModal'
 import CaptureButton from '@/components/ui/CaptureButton'

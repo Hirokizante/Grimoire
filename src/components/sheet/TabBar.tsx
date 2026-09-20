@@ -11,7 +11,7 @@
  */
 
 import { useState } from 'react'
-import { Plus, X, Check, Pencil } from 'lucide-react'
+import { Plus, X, Check, Pencil } from '@/components/ui/icons'
 import { useCharacterStore } from '@/store/characterStore'
 import ConfirmModal from '@/components/sheet/ConfirmModal'
 import type { SheetMode } from '@/pages/CharacterSheetPage'

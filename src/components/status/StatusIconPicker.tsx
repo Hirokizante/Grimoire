@@ -12,7 +12,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Search, Upload, X } from 'lucide-react'
+import { Search, Upload, X } from '@/components/ui/icons'
 
 import { processImage } from '@/lib/imageProcessing'
 import {

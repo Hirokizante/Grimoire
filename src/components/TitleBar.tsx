@@ -7,7 +7,7 @@
  */
 
 import { useEffect, useRef } from 'react'
-import { Users, Swords, Sparkles, Settings, LayoutDashboard } from 'lucide-react'
+import { Users, Swords, Sparkles, Settings, LayoutDashboard } from '@/components/ui/icons'
 
 import { useCharacterStore } from '@/store/characterStore'
 import type { AppView } from '@/store/characterStore'

@@ -11,7 +11,7 @@
  * the store to no-op.
  */
 
-import { ArrowDown, ArrowUp } from 'lucide-react'
+import { ArrowDown, ArrowUp } from '@/components/ui/icons'
 
 import { useCharacterStore } from '@/store/characterStore'
 

@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
-import { ArrowDownFromLine, Plus } from 'lucide-react'
+import { ArrowDownFromLine, Plus } from '@/components/ui/icons'
 
 import { useCharacterStore } from '@/store/characterStore'
 import {

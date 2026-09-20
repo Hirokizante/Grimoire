@@ -2,12 +2,14 @@
  * E2E: the Interface UI-style switch (Settings → Interface).
  *
  * The Terminal style is a global override layer (terminal-ui.css) gated on
- * `data-ui-style` on <html>. The parts worth pinning in a real browser are the
- * ones jsdom cannot see: a component that declares its own radius actually
- * collapsing to 0, the choice surviving a reload, the CRT overlay never
- * intercepting clicks, and phone-width geometry staying inside the viewport.
- * The last test also pins the intended pairing with the Terminal Boot home
- * animation.
+ * `data-ui-style` on <html>, plus a style-aware icon set
+ * (components/ui/icons.tsx) that swaps Lucide for Pixelarticons. The parts
+ * worth pinning in a real browser are the ones jsdom cannot see: a component
+ * that declares its own radius actually collapsing to 0, the choice surviving
+ * a reload, the CRT overlay never intercepting clicks, the icon pack really
+ * swapping in the DOM, pages and pop-ups opening with no entrance animation,
+ * and phone-width geometry staying inside the viewport. The last test also
+ * pins the intended pairing with the Terminal Boot home animation.
  *
  * Runs against the production build via `vite preview` (playwright.config.ts).
  */
@@ -52,6 +54,25 @@ test('the Terminal style squares the UI, persists, and reverts cleanly', async (
   )
   expect(bodyFont).toContain('SFMono-Regular')
 
+  // Every icon on the page swaps to the pixel pack.
+  const packs = await page.evaluate(() =>
+    [
+      ...new Set(
+        [...document.querySelectorAll('[data-icon-pack]')].map((el) =>
+          el.getAttribute('data-icon-pack'),
+        ),
+      ),
+    ],
+  )
+  expect(packs).toEqual(['pixelarticons'])
+
+  // A page mounts with no entrance animation and a modal opens in place.
+  expect(
+    await page
+      .locator('.page')
+      .evaluate((el) => getComputedStyle(el).animationName),
+  ).toBe('none')
+
   // The CRT overlay is home-page-only — no global body layer on the work UI.
   const bodyOverlay = await page.evaluate(() => {
     const style = getComputedStyle(document.body, '::after')
@@ -74,6 +95,72 @@ test('the Terminal style squares the UI, persists, and reverts cleanly', async (
     (el) => getComputedStyle(el).borderRadius,
   )
   expect(restoredRadius).toBe('12px')
+  const restoredPacks = await page.evaluate(() =>
+    [
+      ...new Set(
+        [...document.querySelectorAll('[data-icon-pack]')].map((el) =>
+          el.getAttribute('data-icon-pack'),
+        ),
+      ),
+    ],
+  )
+  expect(restoredPacks).toEqual(['lucide'])
+})
+
+test('the Terminal style opens pop-ups in place and keeps sheet tabs flat', async ({
+  page,
+}) => {
+  await page.goto('./')
+  await page.evaluate(() =>
+    localStorage.setItem('grimoire:ui-style', 'terminal'),
+  )
+  await page.reload()
+
+  // Create a character and a custom tab through the real flows.
+  await page.getByRole('button', { name: 'Characters' }).first().click()
+  await page
+    .getByRole('button', { name: /Create New Character|^New$/ })
+    .first()
+    .click()
+  await page.getByLabel('Character Name').fill('Tab Tester')
+  await page.getByRole('button', { name: 'Create', exact: true }).click()
+  await page.getByRole('tab', { name: 'Edit' }).click()
+  await page.getByRole('button', { name: 'Add new tab' }).click()
+  await page.keyboard.press('Enter')
+
+  // Back on Main so the tab sits above the hero section it must merge with.
+  await page.getByRole('tab', { name: 'Main' }).click()
+
+  // The active tab is flat: no glow halo to bleed onto the section below.
+  const tab = page.locator('.tab-bar__tab--active')
+  await expect(tab).toBeVisible()
+  expect(
+    await tab.evaluate((el) => {
+      const style = getComputedStyle(el)
+      return { boxShadow: style.boxShadow, textShadow: style.textShadow }
+    }),
+  ).toEqual({ boxShadow: 'none', textShadow: 'none' })
+
+  // Its bottom border paints the section's own surface, so the tab and the
+  // section below read as one surface — no seam line between them. The border
+  // color transitions in, so retry until it settles.
+  const sectionBg = await page
+    .locator('.hero-section')
+    .evaluate((el) => getComputedStyle(el).backgroundColor)
+  await expect(tab).toHaveCSS('border-bottom-color', sectionBg)
+
+  // A pop-up (the tab delete confirm) opens with no fade or pop.
+  await page.getByRole('button', { name: 'Delete tab' }).click()
+  const overlay = page.locator('.modal-overlay')
+  await expect(overlay).toBeVisible()
+  expect(
+    await overlay.evaluate((el) => getComputedStyle(el).animationName),
+  ).toBe('none')
+  expect(
+    await page
+      .locator('.modal-content')
+      .evaluate((el) => getComputedStyle(el).animationName),
+  ).toBe('none')
 })
 
 test('the Terminal style stays inside a phone viewport and pairs with Terminal Boot', async ({

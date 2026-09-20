@@ -7,7 +7,7 @@
  */
 
 import { useState, useCallback } from 'react'
-import { Pencil, Check, Trash2 } from 'lucide-react'
+import { Pencil, Check, Trash2 } from '@/components/ui/icons'
 
 import AbilityActivation from '@/components/sheet/AbilityActivation'
 import AbilityBlockList from '@/components/sheet/AbilityBlockList'

@@ -14,7 +14,7 @@
  */
 
 import { useState } from 'react'
-import { ArrowUpFromLine } from 'lucide-react'
+import { ArrowUpFromLine } from '@/components/ui/icons'
 
 import PortraitUploader from '@/components/sheet/PortraitUploader'
 import SheetLabelPills from '@/components/sheet/SheetLabelPills'

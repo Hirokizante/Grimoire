@@ -11,7 +11,7 @@
  * closes via useModalDialog, footer has Cancel.
  */
 
-import { User, UserPlus } from 'lucide-react'
+import { User, UserPlus } from '@/components/ui/icons'
 
 import { useModalDialog } from '@/hooks/useModalDialog'
 import { useCharacterStore } from '@/store/characterStore'

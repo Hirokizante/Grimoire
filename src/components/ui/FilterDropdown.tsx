@@ -13,7 +13,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react'
-import { Check, Filter, X } from 'lucide-react'
+import { Check, Filter, X } from '@/components/ui/icons'
 
 import { useViewportClampedPanel } from '@/hooks/useViewportClampedPanel'
 import type { FilterMode, PageSelection } from '@/store/listPrefsStore'

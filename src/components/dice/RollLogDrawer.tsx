@@ -3,7 +3,7 @@
  */
 
 import { useRef, useEffect, useState } from 'react'
-import { Dices, Trash2 } from 'lucide-react'
+import { Dices, Trash2 } from '@/components/ui/icons'
 import { useRollLogStore } from '@/store/rollLogStore'
 import { useCharacterStore } from '@/store/characterStore'
 import { useAppThemeStore } from '@/store/appThemeStore'

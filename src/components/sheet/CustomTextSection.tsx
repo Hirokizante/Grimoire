@@ -11,7 +11,7 @@
  */
 
 import { useState } from 'react'
-import { Pencil, Check, Trash2 } from 'lucide-react'
+import { Pencil, Check, Trash2 } from '@/components/ui/icons'
 
 import ConfirmModal from '@/components/sheet/ConfirmModal'
 import MarkdownText from '@/components/ui/MarkdownText'

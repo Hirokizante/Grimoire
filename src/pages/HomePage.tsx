@@ -7,7 +7,7 @@
  * homeAnimationStore.
  */
 
-import { Users, Swords, Sparkles, Settings, LayoutDashboard } from 'lucide-react'
+import { Users, Swords, Sparkles, Settings, LayoutDashboard } from '@/components/ui/icons'
 
 import ArcaneGlowAnimation from '@/components/home/ArcaneGlowAnimation'
 import TerminalBootAnimation from '@/components/home/TerminalBootAnimation'

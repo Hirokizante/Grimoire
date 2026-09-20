@@ -6,6 +6,23 @@ characters regularly.
 
 ## Unreleased
 
+### Terminal style: pixel icons, instant transitions, flat sheet tabs
+
+- **Pixelarticons replace Lucide in Terminal.** Every app icon is now imported from a style-aware
+  wrapper set (`src/components/ui/icons.tsx`) that keeps the Lucide name and renders Lucide in
+  Default or its Pixelarticons counterpart in Terminal. Call sites did not change shape; the pack
+  is picked per icon at render time, `strokeWidth` stays Lucide-only, and each icon carries
+  `data-icon-pack` so the swap is observable.
+- **Page switches and pop-ups open instantly.** The Terminal style's stepped boot-in fade is gone:
+  pages mount with no animation and modals / the roll-log drawer open in place (`animation: none`),
+  matching the default style's snappiness. The home page keeps its boot-in.
+- **Player sheet tabs are flat and seamless.** The active tab no longer takes the phosphor glow —
+  its halo bled over the section below and read as a seam between the tab and the page. Tabs now
+  merge into the section exactly like Default.
+- **Testing.** `icons.test.tsx` pins the pack swap per style, the size mapping and the ignored
+  `strokeWidth`; `e2e/ui-style.spec.ts` pins the DOM pack swap in both directions, the
+  no-animation page and modal, and the flat, seam-free tab.
+
 ### Dice badges can read as min-max ranges
 
 - **A new display preference, off by default.** Settings → Dice → *Display dice

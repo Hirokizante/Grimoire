@@ -36,7 +36,7 @@
  */
 
 import { useState } from 'react'
-import { BedDouble, Dices, Plus, Skull, TriangleAlert, X } from 'lucide-react'
+import { BedDouble, Dices, Plus, Skull, TriangleAlert, X } from '@/components/ui/icons'
 
 import MortalWoundPicker from '@/components/sheet/MortalWoundPicker'
 import { MAX_MORTAL_WOUNDS, MORTAL_WOUNDS } from '@/constants/gameData'

@@ -25,8 +25,8 @@
  *   - "flat": flat block for embedding inside the hero section
  */
 
-import { Wind, Shield, Footprints, Target, Heart, Skull } from 'lucide-react'
-import type { LucideIcon } from 'lucide-react'
+import { Wind, Shield, Footprints, Target, Heart, Skull } from '@/components/ui/icons'
+import type { AppIcon } from '@/components/ui/icons'
 
 import { useCharacterStore } from '@/store/characterStore'
 import { useAppThemeStore } from '@/store/appThemeStore'
@@ -66,7 +66,7 @@ export interface NPCStatsSectionProps {
 interface StatTokenMeta {
   label: string
   key: keyof NPCStats
-  icon: LucideIcon
+  icon: AppIcon
   /** Accent hex from the app theme's NPC stat palette. */
   color: string
 }

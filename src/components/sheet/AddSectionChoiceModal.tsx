@@ -7,10 +7,10 @@
  * closes via useEscapeKey, footer has Cancel + the two action buttons.
  */
 
-import { ScrollText, User, FileText } from 'lucide-react'
+import { ScrollText, User, FileText } from '@/components/ui/icons'
 
 import { useModalDialog } from '@/hooks/useModalDialog'
-import type { LucideIcon } from 'lucide-react'
+import type { AppIcon } from '@/components/ui/icons'
 
 export type AddSectionChoice = 'ability' | 'npc' | 'text'
 
@@ -24,7 +24,7 @@ interface ChoiceOption {
   value: AddSectionChoice
   title: string
   description: string
-  icon: LucideIcon
+  icon: AppIcon
 }
 
 const OPTIONS: ChoiceOption[] = [

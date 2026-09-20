@@ -19,7 +19,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { HexColorPicker } from 'react-colorful'
-import { X } from 'lucide-react'
+import { X } from '@/components/ui/icons'
 import { processImage } from '@/lib/imageProcessing'
 import { useCharacterStore } from '@/store/characterStore'
 import { colorVars } from '@/lib/themeUtils'

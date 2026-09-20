@@ -9,7 +9,7 @@
  */
 
 import { useMemo, useState } from 'react'
-import { Search } from 'lucide-react'
+import { Search } from '@/components/ui/icons'
 
 import { useModalDialog } from '@/hooks/useModalDialog'
 import { useCharacterStore } from '@/store/characterStore'

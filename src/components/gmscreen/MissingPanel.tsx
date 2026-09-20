@@ -7,7 +7,7 @@
  * there is no entity to resolve notation against.
  */
 
-import { CircleSlash } from 'lucide-react'
+import { CircleSlash } from '@/components/ui/icons'
 
 export interface MissingPanelProps {
   /** Which kind of panel lost its record (drives the message). */

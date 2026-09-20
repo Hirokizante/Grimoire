@@ -3,7 +3,7 @@
  * haven't been built yet (NPCs, Settings).
  */
 
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft } from '@/components/ui/icons'
 
 import { useCharacterStore } from '@/store/characterStore'
 

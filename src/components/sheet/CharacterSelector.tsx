@@ -13,7 +13,7 @@
  * with the panel's slide-in via CSS transitions.
  */
 
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight } from '@/components/ui/icons'
 
 import { useCharacterStore } from '@/store/characterStore'
 import { colorVars } from '@/lib/themeUtils'

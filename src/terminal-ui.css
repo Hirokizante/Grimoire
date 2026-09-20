@@ -8,6 +8,11 @@
  * properties, so Terminal pairs with Midnight, Parchment, Mikami, or Pitch
  * Black.
  *
+ * The one override CSS cannot express is the icon pack — the style-aware
+ * wrappers in components/ui/icons.tsx swap Lucide for Pixelarticons. Page
+ * switches and pop-ups carry no entrance animation here (a terminal prints
+ * its next screen); only the home page keeps a boot-in fade.
+ *
  * Scoping: every rule keys off `data-ui-style` on <html> (see
  * store/uiStyleStore.ts); the default style is the absence of any override.
  *
@@ -178,7 +183,9 @@
   transition-timing-function: steps(2, end);
 }
 
-/* View changes "boot" in as a few discrete frames rather than a fade. */
+/* The home page's content still "boots" in as a few discrete frames — the
+ * landing screen is the one place the style keeps an entrance. Working pages
+ * and pop-ups deliberately do not animate (see below). */
 @keyframes terminal-ui-boot-in {
   from {
     opacity: 0;
@@ -188,21 +195,18 @@
   }
 }
 
-:root[data-ui-style='terminal'] .page,
-:root[data-ui-style='terminal'] .sheet-page__content {
-  animation: terminal-ui-boot-in 0.32s steps(6, end) both;
-}
-
 /* The GM panel's grid-row expand runs in discrete stops. Duration is shared
  * with PanelExpand.tsx (DURATION_MS) and must stay untouched. */
 :root[data-ui-style='terminal'] .gm-panel__expand {
   transition-timing-function: steps(5, end), steps(5, end);
 }
 
+/* Pop-ups appear in place — no fade, no pop, exactly like a page switch. A
+ * terminal prints its next screen; it does not ease into it. */
 :root[data-ui-style='terminal'] .roll-log-drawer,
 :root[data-ui-style='terminal'] .modal-overlay,
 :root[data-ui-style='terminal'] .modal-content {
-  animation-timing-function: steps(4, end);
+  animation: none;
 }
 
 /* Toasts arrive/leave in frames and glow like a readout. */
@@ -241,9 +245,10 @@
   box-shadow: 0 0 12px color-mix(in srgb, var(--danger) 45%, transparent);
 }
 
-/* Active nav/tab/toggle states read as lit indicators. */
+/* Active nav/toggle states read as lit indicators. Player sheet tabs are
+ * deliberately excluded: the glow halo bleeds over the section below the tab
+ * and reads as a seam between the tab and the page, so tabs stay flat. */
 :root[data-ui-style='terminal'] .app-header__nav-btn--active,
-:root[data-ui-style='terminal'] .tab-bar__tab--active,
 :root[data-ui-style='terminal'] .mode-toggle__btn--active,
 :root[data-ui-style='terminal'] .sort-dropdown__btn--active,
 :root[data-ui-style='terminal'] .filter-dropdown__btn--active {
@@ -444,8 +449,6 @@
  * the sweep, flicker, and boot fades. */
 @media (prefers-reduced-motion: reduce) {
   :root[data-ui-style='terminal'] .home-page::after,
-  :root[data-ui-style='terminal'] .page,
-  :root[data-ui-style='terminal'] .sheet-page__content,
   :root[data-ui-style='terminal'] .home-page__content,
   :root[data-ui-style='terminal'] .home-nav {
     animation: none;

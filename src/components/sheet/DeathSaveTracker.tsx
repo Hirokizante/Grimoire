@@ -16,7 +16,7 @@
  */
 
 import { useState } from 'react'
-import { Dices } from 'lucide-react'
+import { Dices } from '@/components/ui/icons'
 
 import { useNotification } from '@/context/NotificationContext'
 import { useCharacterStore, type DeathSaveResult } from '@/store/characterStore'

@@ -3,7 +3,7 @@
  */
 
 import { useState } from 'react'
-import { Star, Paintbrush, ArrowUpFromLine } from 'lucide-react'
+import { Star, Paintbrush, ArrowUpFromLine } from '@/components/ui/icons'
 
 import PortraitUploader from '@/components/sheet/PortraitUploader'
 import AttributesSection from '@/components/sheet/AttributesSection'

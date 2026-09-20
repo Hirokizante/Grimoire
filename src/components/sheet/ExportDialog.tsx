@@ -14,7 +14,7 @@
  */
 
 import { useEffect, useState } from 'react'
-import { ArrowUpFromLine, Hash, RotateCcw, Trash2 } from 'lucide-react'
+import { ArrowUpFromLine, Hash, RotateCcw, Trash2 } from '@/components/ui/icons'
 
 import { useModalDialog } from '@/hooks/useModalDialog'
 import { useNotification } from '@/context/NotificationContext'

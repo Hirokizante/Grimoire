@@ -10,7 +10,7 @@
  */
 
 import { useMemo, useState } from 'react'
-import { Plus, Search, Swords } from 'lucide-react'
+import { Plus, Search, Swords } from '@/components/ui/icons'
 
 import { useModalDialog } from '@/hooks/useModalDialog'
 import { useCharacterStore } from '@/store/characterStore'

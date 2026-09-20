@@ -18,7 +18,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react'
-import { Camera, Check, Loader2, TriangleAlert } from 'lucide-react'
+import { Camera, Check, Loader2, TriangleAlert } from '@/components/ui/icons'
 
 import { CAPTURE_HIDE_ATTRIBUTE, copyElementImage } from '@/lib/elementCapture'
 import { useOptionalNotification } from '@/context/NotificationContext'

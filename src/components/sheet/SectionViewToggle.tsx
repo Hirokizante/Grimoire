@@ -12,7 +12,7 @@
  * simply does not render the toggle (see the sections' `onViewModeChange`).
  */
 
-import { LayoutGrid, List } from 'lucide-react'
+import { LayoutGrid, List } from '@/components/ui/icons'
 
 export interface SectionViewToggleProps {
   viewMode: 'grid' | 'list'

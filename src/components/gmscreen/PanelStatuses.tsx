@@ -33,7 +33,7 @@
  */
 
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
-import { CirclePlus, Minus, Plus, X } from 'lucide-react'
+import { CirclePlus, Minus, Plus, X } from '@/components/ui/icons'
 
 import AddStatusModal from '@/components/gmscreen/AddStatusModal'
 import StatusIcon from '@/components/status/StatusIcon'

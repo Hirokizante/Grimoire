@@ -21,7 +21,7 @@
  * are separately labelled.
  */
 
-import { Minus, Plus } from 'lucide-react'
+import { Minus, Plus } from '@/components/ui/icons'
 
 import {
   MAX_TOKEN_USES,
