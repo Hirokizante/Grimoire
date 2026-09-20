@@ -280,13 +280,17 @@ body:has(.modal-overlay) .app-header__nav {
   transform: translateY(1px);
 }
 
-.btn--primary {
+/* `btn--info` is ConfirmModal's non-destructive confirm variant (e.g. "New GM
+   screen" → Create), so it shares the primary button's treatment exactly. */
+.btn--primary,
+.btn--info {
   background: var(--accent-violet);
   color: var(--bg-base);
   font-weight: 600;
 }
 
-.btn--primary:hover {
+.btn--primary:hover,
+.btn--info:hover {
   background: var(--accent-violet-soft);
 }
 
@@ -375,6 +379,19 @@ body:has(.modal-overlay) .app-header__nav {
 .btn--danger:hover {
   background: color-mix(in srgb, var(--danger) 25%, transparent);
   border-color: var(--danger);
+}
+
+/* ConfirmModal's cautionary variant (e.g. ExportDialog's "Restore"), mirroring
+   .btn--danger's construction in the amber .notification--warning uses. */
+.btn--warning {
+  background: color-mix(in srgb, #f5c48a 15%, transparent);
+  color: #f5c48a;
+  border-color: color-mix(in srgb, #f5c48a 50%, var(--border));
+}
+
+.btn--warning:hover {
+  background: color-mix(in srgb, #f5c48a 25%, transparent);
+  border-color: #f5c48a;
 }
 
 /* Page-head controls (Import / New / Filter / Sort buttons). Declared after

@@ -220,14 +220,16 @@
 
 /* ---- Buttons ------------------------------------------------------------- */
 
-:root[data-ui-style='terminal'] .btn--primary {
+:root[data-ui-style='terminal'] .btn--primary,
+:root[data-ui-style='terminal'] .btn--info {
   background: color-mix(in srgb, var(--accent-violet) 22%, var(--bg-base));
   border-color: var(--accent-violet-soft);
   color: var(--accent-violet-soft);
   text-shadow: 0 0 8px var(--terminal-glow);
 }
 
-:root[data-ui-style='terminal'] .btn--primary:hover {
+:root[data-ui-style='terminal'] .btn--primary:hover,
+:root[data-ui-style='terminal'] .btn--info:hover {
   background: color-mix(in srgb, var(--accent-violet) 38%, var(--bg-base));
   box-shadow: 0 0 14px var(--terminal-glow-soft),
     inset 0 0 12px var(--terminal-glow-soft);
@@ -244,6 +246,10 @@
 
 :root[data-ui-style='terminal'] .btn--danger:hover {
   box-shadow: 0 0 12px color-mix(in srgb, var(--danger) 45%, transparent);
+}
+
+:root[data-ui-style='terminal'] .btn--warning:hover {
+  box-shadow: 0 0 12px color-mix(in srgb, #f5c48a 45%, transparent);
 }
 
 /* Active nav/toggle states read as lit indicators. Player sheet tabs are
