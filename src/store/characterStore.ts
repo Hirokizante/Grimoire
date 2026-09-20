@@ -235,8 +235,17 @@ export interface CharacterStoreActions {
     id: string,
     updated: AbilityBlock,
   ) => void
-  /** Append an AbilityBlock to a slotted/pool list. */
-  addAbilityBlock: (section: AbilitySection, ability: AbilityBlock) => void
+  /**
+   * Insert an AbilityBlock into a slotted/pool/innate list at `index` — a gap
+   * index into the list as it stands. Omit it (or pass one past the end) to
+   * append, which is what the "+ Add Ability" flow does; duplication passes
+   * the original's index + 1 so the copy lands directly after it.
+   */
+  addAbilityBlock: (
+    section: AbilitySection,
+    ability: AbilityBlock,
+    index?: number,
+  ) => void
   /** Remove an AbilityBlock by id from a slotted/pool list. */
   removeAbilityBlock: (section: AbilitySection, id: string) => void
   /**
@@ -431,8 +440,18 @@ export interface CharacterStoreActions {
    * stamp an updatedAt / autosave on a sheet nothing moved on.
    */
   reorderCustomSection: (tabId: string, fromIndex: number, toIndex: number) => void
-  /** Add an ability block to a custom section (ability sections only). */
-  addCustomAbility: (tabId: string, sectionId: string, ability: AbilityBlock) => void
+  /**
+   * Insert an ability block into a custom ability section at `index` — a gap
+   * index into the section as it stands. Omit it (or pass one past the end) to
+   * append; duplication passes the original's index + 1 so the copy lands
+   * directly after it.
+   */
+  addCustomAbility: (
+    tabId: string,
+    sectionId: string,
+    ability: AbilityBlock,
+    index?: number,
+  ) => void
   /** Update an ability block within a custom section (ability sections only). */
   updateCustomAbility: (tabId: string, sectionId: string, abilityId: string, updated: AbilityBlock) => void
   /** Remove an ability block from a custom section (ability sections only). */
@@ -827,11 +846,12 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
     }))
   },
 
-  addAbilityBlock: (section, ability) => {
-    get().updateCurrentCharacter((char) => ({
-      ...char,
-      [section]: [...char[section], ability],
-    }))
+  addAbilityBlock: (section, ability, index) => {
+    get().updateCurrentCharacter((char) => {
+      const list = [...char[section]]
+      list.splice(clampInsertIndex(index, list.length), 0, ability)
+      return { ...char, [section]: list }
+    })
   },
 
   removeAbilityBlock: (section, id) => {
@@ -1685,7 +1705,7 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
     }))
   },
 
-  addCustomAbility: (tabId, sectionId, ability) => {
+  addCustomAbility: (tabId, sectionId, ability, index) => {
     get().updateCurrentCharacter((char) => ({
       ...char,
       customTabs: char.customTabs.map((t) =>
@@ -1695,7 +1715,9 @@ export const useCharacterStore = create<CharacterStore>()((set, get) => ({
               sections: t.sections.map((s) => {
                 if (s.id !== sectionId) return s
                 if (s.kind !== 'ability') return s
-                return { ...s, abilities: [...s.abilities, ability] }
+                const abilities = [...s.abilities]
+                abilities.splice(clampInsertIndex(index, abilities.length), 0, ability)
+                return { ...s, abilities }
               }),
             }
           : t,

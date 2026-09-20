@@ -66,12 +66,15 @@ import AbilityBlockCard from '@/components/sheet/AbilityBlockCard'
 import AbilityBlockList from '@/components/sheet/AbilityBlockList'
 import AbilityEditorModal from '@/components/sheet/AbilityEditorModal'
 import ConfirmModal from '@/components/sheet/ConfirmModal'
+import PasteAbilityButton from '@/components/sheet/PasteAbilityButton'
 import SectionViewToggle from '@/components/sheet/SectionViewToggle'
 import NpcAbilitiesDndContext, {
   NPC_ABILITIES_SECTION_ID,
 } from '@/components/sheet/npc/NpcAbilitiesDndContext'
 import { useAbilityListDnd } from '@/hooks/useAbilityListDnd'
+import { useAbilityClipboard } from '@/hooks/useAbilityClipboard'
 import { useCharacterStore } from '@/store/characterStore'
+import { cloneAbilityBlock } from '@/lib/abilityClone'
 import { useSubAbilityEditor } from '@/hooks/useSubAbilityEditor'
 import {
   NO_ACTIVATION,
@@ -190,6 +193,7 @@ export default function NPCAbilitiesSection({
   const [editing, setEditing] = useState<AbilityBlock | null>(null)
   const [showEditor, setShowEditor] = useState(false)
   const [abilityToRemove, setAbilityToRemove] = useState<{ id: string; name: string } | null>(null)
+  const { copyAbility } = useAbilityClipboard()
 
   const handleUpdateParent = useCallback(
     (parent: AbilityBlock) => {
@@ -296,6 +300,21 @@ export default function NPCAbilitiesSection({
       slottedAbilities: char.slottedAbilities.filter((a) => a.id !== abilityToRemove.id),
     }))
     setAbilityToRemove(null)
+  }
+
+  /**
+   * A fresh copy of `ability`, landing directly after it. Writes through the
+   * section's own owner — an attached NPC is not the store's current character.
+   * The Basic Attack is a scalar field, so only list entries are ever matched.
+   */
+  const duplicateAbility = (ability: AbilityBlock) => {
+    updateCurrentCharacter((char) => {
+      const index = char.slottedAbilities.findIndex((a) => a.id === ability.id)
+      if (index < 0) return char
+      const list = [...char.slottedAbilities]
+      list.splice(index + 1, 0, cloneAbilityBlock(ability))
+      return { ...char, slottedAbilities: list }
+    })
   }
 
   /**
@@ -411,6 +430,20 @@ export default function NPCAbilitiesSection({
             </button>
             <button
               type="button"
+              className="btn btn--ghost ability-card__action-btn"
+              onClick={() => duplicateAbility(ability)}
+            >
+              Duplicate
+            </button>
+            <button
+              type="button"
+              className="btn btn--ghost ability-card__action-btn"
+              onClick={() => copyAbility(ability)}
+            >
+              Copy
+            </button>
+            <button
+              type="button"
               className="btn btn--ghost ability-card__action-btn ability-card__action-btn--danger"
               onClick={() => handleRemoveRequest(ability.id)}
             >
@@ -464,13 +497,23 @@ export default function NPCAbilitiesSection({
       )}
 
       {isEdit && (
-        <button
-          type="button"
-          className="btn btn--ghost section-add-btn"
-          onClick={openNew}
-        >
-          + Add Ability
-        </button>
+        <div className="section-add-row">
+          <button
+            type="button"
+            className="btn btn--ghost section-add-btn"
+            onClick={openNew}
+          >
+            + Add Ability
+          </button>
+          <PasteAbilityButton
+            onPaste={(ability) =>
+              updateCurrentCharacter((char) => ({
+                ...char,
+                slottedAbilities: [...char.slottedAbilities, ability],
+              }))
+            }
+          />
+        </div>
       )}
 
       {list}

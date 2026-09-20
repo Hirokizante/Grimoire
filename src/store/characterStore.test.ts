@@ -787,6 +787,63 @@ test('reorderAbility: dropping past the last card appends', () => {
   ).toEqual(['a2', 'a3', 'a1'])
 })
 
+/** Minimal slotted/custom ability fixture, identified by its id. */
+function slotAbility(id: string) {
+  return {
+    id,
+    name: id,
+    traits: [],
+    cost: {},
+    damage: '',
+    description: '',
+    overcharge: '',
+    flavorText: '',
+    isMinor: false,
+    showActivate: true,
+    subAbilitiesUnderDescription: [],
+    subAbilitiesUnderOvercharge: [],
+  }
+}
+
+test('addAbilityBlock: inserts at the given index', () => {
+  setupChar()
+  for (const id of ['a1', 'a3']) {
+    useCharacterStore.getState().addAbilityBlock('slottedAbilities', slotAbility(id))
+  }
+  // Duplication inserts the copy at the original's index + 1.
+  useCharacterStore.getState().addAbilityBlock('slottedAbilities', slotAbility('a2'), 1)
+  expect(
+    useCharacterStore.getState().currentCharacter!.slottedAbilities.map((a) => a.id),
+  ).toEqual(['a1', 'a2', 'a3'])
+})
+
+test('addAbilityBlock: an index past the end still appends', () => {
+  setupChar()
+  useCharacterStore.getState().addAbilityBlock('slottedAbilities', slotAbility('a1'))
+  useCharacterStore.getState().addAbilityBlock('slottedAbilities', slotAbility('a2'), 99)
+  expect(
+    useCharacterStore.getState().currentCharacter!.slottedAbilities.map((a) => a.id),
+  ).toEqual(['a1', 'a2'])
+})
+
+test('addCustomAbility: inserts at the given index', () => {
+  setupChar()
+  const tabId = useCharacterStore.getState().addCustomTab('Powers')
+  const sectionId = useCharacterStore.getState().addCustomSection(tabId, 'Offense')
+  for (const id of ['a1', 'a3']) {
+    useCharacterStore.getState().addCustomAbility(tabId, sectionId, slotAbility(id))
+  }
+  useCharacterStore.getState().addCustomAbility(tabId, sectionId, slotAbility('a2'), 1)
+  const section = useCharacterStore
+    .getState()
+    .currentCharacter!.customTabs.find((t) => t.id === tabId)!
+    .sections.find((s) => s.id === sectionId)!
+  expect(section.kind).toBe('ability')
+  expect(
+    (section as { abilities: { id: string }[] }).abilities.map((a) => a.id),
+  ).toEqual(['a1', 'a2', 'a3'])
+})
+
 // ---- Export / versioning ----------------------------------------------------
 // (saveVersion auto-bumps by patch level)
 

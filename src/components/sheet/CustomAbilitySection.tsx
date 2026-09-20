@@ -13,10 +13,13 @@ import AbilityActivation from '@/components/sheet/AbilityActivation'
 import AbilityBlockList from '@/components/sheet/AbilityBlockList'
 import AbilityEditorModal from '@/components/sheet/AbilityEditorModal'
 import ConfirmModal from '@/components/sheet/ConfirmModal'
+import PasteAbilityButton from '@/components/sheet/PasteAbilityButton'
 import SectionViewToggle from '@/components/sheet/SectionViewToggle'
 import SectionReorderButtons from '@/components/sheet/SectionReorderButtons'
 import { useAbilityListDnd } from '@/hooks/useAbilityListDnd'
+import { useAbilityClipboard } from '@/hooks/useAbilityClipboard'
 import { useCharacterStore } from '@/store/characterStore'
+import { cloneAbilityBlock } from '@/lib/abilityClone'
 import { useSubAbilityEditor } from '@/hooks/useSubAbilityEditor'
 import type { AbilityBlock, CustomAbilitySection } from '@/types'
 import type { SheetMode } from '@/pages/CharacterSheetPage'
@@ -47,6 +50,7 @@ export default function CustomAbilitySection({
   const updateCustomAbility = useCharacterStore((s) => s.updateCustomAbility)
   const renameCustomSection = useCharacterStore((s) => s.renameCustomSection)
   const removeCustomSection = useCharacterStore((s) => s.removeCustomSection)
+  const { copyAbility } = useAbilityClipboard()
 
   const [editing, setEditing] = useState<AbilityBlock | null>(null)
   const [showEditor, setShowEditor] = useState(false)
@@ -102,6 +106,17 @@ export default function CustomAbilitySection({
   const handleCancel = () => {
     setShowEditor(false)
     setEditing(null)
+  }
+
+  /** A fresh copy of `ability`, landing directly after it. */
+  const duplicateAbility = (ability: AbilityBlock) => {
+    const index = section.abilities.findIndex((a) => a.id === ability.id)
+    addCustomAbility(
+      tabId,
+      section.id,
+      cloneAbilityBlock(ability),
+      index < 0 ? undefined : index + 1,
+    )
   }
 
   const isListView = viewMode === 'list'
@@ -176,13 +191,18 @@ export default function CustomAbilitySection({
       </div>
 
       {isEdit && (
-        <button
-          type="button"
-          className="btn btn--ghost section-add-btn"
-          onClick={openNew}
-        >
-          + Add Ability
-        </button>
+        <div className="section-add-row">
+          <button
+            type="button"
+            className="btn btn--ghost section-add-btn"
+            onClick={openNew}
+          >
+            + Add Ability
+          </button>
+          <PasteAbilityButton
+            onPaste={(ability) => addCustomAbility(tabId, section.id, ability)}
+          />
+        </div>
       )}
 
       {!isEdit ? (
@@ -215,16 +235,32 @@ export default function CustomAbilitySection({
             <>No abilities yet — click “Add Ability” or drag one in.</>
           }
           actions={(ability) => (
-            <button
-              type="button"
-              className="btn btn--ghost ability-card__action-btn"
-              onClick={() => {
-                setEditing(ability)
-                setShowEditor(true)
-              }}
-            >
-              Edit
-            </button>
+            <>
+              <button
+                type="button"
+                className="btn btn--ghost ability-card__action-btn"
+                onClick={() => {
+                  setEditing(ability)
+                  setShowEditor(true)
+                }}
+              >
+                Edit
+              </button>
+              <button
+                type="button"
+                className="btn btn--ghost ability-card__action-btn"
+                onClick={() => duplicateAbility(ability)}
+              >
+                Duplicate
+              </button>
+              <button
+                type="button"
+                className="btn btn--ghost ability-card__action-btn"
+                onClick={() => copyAbility(ability)}
+              >
+                Copy
+              </button>
+            </>
           )}
         />
       )}

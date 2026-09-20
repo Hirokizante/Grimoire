@@ -19,8 +19,11 @@ import AbilityActivation from '@/components/sheet/AbilityActivation'
 import AbilityBlockCard from '@/components/sheet/AbilityBlockCard'
 import AbilityEditorModal from '@/components/sheet/AbilityEditorModal'
 import ConfirmModal from '@/components/sheet/ConfirmModal'
+import PasteAbilityButton from '@/components/sheet/PasteAbilityButton'
 import MarkdownText from '@/components/ui/MarkdownText'
 import { useCharacterStore } from '@/store/characterStore'
+import { useAbilityClipboard } from '@/hooks/useAbilityClipboard'
+import { cloneAbilityBlock } from '@/lib/abilityClone'
 import type { Character } from '@/types'
 import { useSubAbilityEditor } from '@/hooks/useSubAbilityEditor'
 import type { AbilityBlock } from '@/types'
@@ -88,6 +91,7 @@ export default function CoreAbilitySection({
     null,
   )
   const [innateToRemove, setInnateToRemove] = useState<{ id: string; name: string } | null>(null)
+  const { copyAbility } = useAbilityClipboard()
 
   const handleUpdateParent = useCallback(
     (parent: AbilityBlock) => {
@@ -169,6 +173,14 @@ export default function CoreAbilitySection({
     setInnateToRemove(null)
   }
 
+  /** A fresh copy of an innate ability, landing directly after it. */
+  const duplicateInnate = (ability: AbilityBlock) => {
+    const index = innateAbilities.findIndex((a) => a.id === ability.id)
+    const next = [...innateAbilities]
+    next.splice(index < 0 ? next.length : index + 1, 0, cloneAbilityBlock(ability))
+    updateCoreAbility('innateAbilities', next)
+  }
+
   const hasContent = innateDescription !== '' || innateAbilities.length > 0
 
   return (
@@ -222,6 +234,20 @@ export default function CoreAbilitySection({
                       </button>
                       <button
                         type="button"
+                        className="btn btn--ghost ability-card__action-btn"
+                        onClick={() => duplicateInnate(ability)}
+                      >
+                        Duplicate
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn--ghost ability-card__action-btn"
+                        onClick={() => copyAbility(ability)}
+                      >
+                        Copy
+                      </button>
+                      <button
+                        type="button"
                         className="btn btn--ghost ability-card__action-btn ability-card__action-btn--danger"
                         onClick={() => handleRemoveRequest(ability.id)}
                       >
@@ -238,13 +264,20 @@ export default function CoreAbilitySection({
         )}
 
         {isEdit && (
-          <button
-            type="button"
-            className="btn btn--ghost section-add-btn"
-            onClick={() => openCoreEdit({ field: 'innateAbility', id: '' })}
-          >
-            + Add Innate Ability
-          </button>
+          <div className="section-add-row">
+            <button
+              type="button"
+              className="btn btn--ghost section-add-btn"
+              onClick={() => openCoreEdit({ field: 'innateAbility', id: '' })}
+            >
+              + Add Innate Ability
+            </button>
+            <PasteAbilityButton
+              onPaste={(ability) =>
+                updateCoreAbility('innateAbilities', [...innateAbilities, ability])
+              }
+            />
+          </div>
         )}
 
         {isEdit ? (

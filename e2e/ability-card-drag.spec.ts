@@ -231,7 +231,9 @@ test('a full slotted section refuses a pooled card while it is still in the air'
   await addAbility(page, pool, 'Spare')
   await expect(slotted.locator('.sheet-section__counter')).toHaveText('3 / 3 slots')
 
-  const grip = (await card(pool, 'Spare').locator('.drag-handle').boundingBox())!
+  const spareGrip = card(pool, 'Spare').locator('.drag-handle')
+  await spareGrip.scrollIntoViewIfNeeded()
+  const grip = (await spareGrip.boundingBox())!
   const target = (await card(slotted, 'Two').boundingBox())!
   await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2)
   await page.mouse.down()
@@ -257,7 +259,9 @@ test('a full slotted section refuses a pooled card while it is still in the air'
   await expect(slotted.locator('.sheet-section__counter')).toHaveText('2 / 3 slots')
   await expect(abilityNames(pool)).toHaveText(['Spare', 'Three'])
 
-  const freed = (await card(pool, 'Spare').locator('.drag-handle').boundingBox())!
+  const freedGrip = card(pool, 'Spare').locator('.drag-handle')
+  await freedGrip.scrollIntoViewIfNeeded()
+  const freed = (await freedGrip.boundingBox())!
   const target2 = (await card(slotted, 'Two').boundingBox())!
   await page.mouse.move(freed.x + freed.width / 2, freed.y + freed.height / 2)
   await page.mouse.down()

@@ -158,6 +158,7 @@ src/
 │   │   ├── NPCSelectorModal.tsx   #   Attach an existing NPC to a tab
 │   │   ├── SectionViewToggle.tsx  #   Shared grid/list section switch
 │   │   ├── SectionReorderButtons.tsx # Edit-mode ↑ / ↓ section pair
+│   │   ├── PasteAbilityButton.tsx #   Clipboard Paste, beside + Add Ability
 │   │   ├── ResourceBar.tsx        #   Segmented bar + − / + controls
 │   │   ├── DamageDialog.tsx       #   Apply damage modal
 │   │   ├── RecoverAction.tsx      #   Recover + End Turn buttons
@@ -209,6 +210,7 @@ src/
 │   └── NotificationContext.tsx    # Toast notification system
 ├── hooks/
 │   ├── useAbilityActivation.ts    # Shared Activate planner (sheet or panel)
+│   ├── useAbilityClipboard.ts     # Ability copy/paste clipboard controls
 │   ├── useNpcInstanceActivation.tsx  # GM NPC turns: AP, uses, Recharge
 │   ├── useSubAbilityEditor.tsx    # Sub-ability editor state + handlers
 │   ├── useModalDialog.ts          # Scroll lock, Esc, focus trap/restore
@@ -219,6 +221,7 @@ src/
 │   └── useHorizontalWheelScroll.test.tsx  # Wheel-scroll hook test
 ├── lib/
 │   ├── calculations.ts            # Pure derived-stat formulas (HP, EVA, …)
+│   ├── abilityClone.ts            # Duplicate/paste copy (fresh ids, clean state)
 │   ├── abilityCosts.ts            # Custom cost resolution + affordability
 │   ├── abilityModifiers.ts        # Modifiers → effective values, projections
 │   ├── abilityTraits.ts           # "Name (Value)" trait parser + registry
@@ -250,6 +253,7 @@ src/
 │   └── PlaceholderPage.tsx        # "Coming soon" screen for unbuilt sections
 ├── store/                         # Zustand stores (most with a *.test.ts)
 │   ├── characterStore.ts          # Characters + id-targeted live play
+│   ├── abilityClipboardStore.ts   # One-slot ability copy/paste clipboard
 │   ├── gmScreenStore.ts           # Saved GM screens and panels
 │   ├── diceRollStore.ts           # Dice roll modal lifecycle
 │   ├── rollLogStore.ts            # Persistent roll log
@@ -301,7 +305,7 @@ What they cover:
 - **Pure logic** — `calculations`, `diceParser`, `diceRoller`, `slotLogic`,
   `exportImport`, `db`, `backup`, `themeUtils`, `statusReference`,
   `statusTransfer`, `abilityTraits`, `abilityRecharge`, `abilityModifiers`,
-  `abilityUses`,
+  `abilityUses`, `abilityClone`,
   `abilityCosts`, `markdown`, `emojiCatalog`, and `nacht` (the reference
   character's calculated fields).
 - **`mortalWounds`** — the table resolved face by face, the slot rules, the

@@ -24,11 +24,14 @@ import AbilityActivation from '@/components/sheet/AbilityActivation'
 import AbilityBlockList from '@/components/sheet/AbilityBlockList'
 import AbilityEditorModal from '@/components/sheet/AbilityEditorModal'
 import ConfirmModal from '@/components/sheet/ConfirmModal'
+import PasteAbilityButton from '@/components/sheet/PasteAbilityButton'
 import SectionViewToggle from '@/components/sheet/SectionViewToggle'
 import { useAbilitySlotBudget } from '@/components/sheet/AbilityDropHintContext'
 import { useAbilityListDnd } from '@/hooks/useAbilityListDnd'
+import { useAbilityClipboard } from '@/hooks/useAbilityClipboard'
 import { useSubAbilityEditor } from '@/hooks/useSubAbilityEditor'
 import { useCharacterStore } from '@/store/characterStore'
+import { cloneAbilityBlock } from '@/lib/abilityClone'
 import { formatSlots, isOverflowed, slotsUsed } from '@/lib/slotLogic'
 import type { AbilityBlock, Character } from '@/types'
 import type { SheetMode } from '@/pages/CharacterSheetPage'
@@ -68,6 +71,7 @@ export default function SlottedAbilitiesSection({
   const updateAbilityBlock = useCharacterStore((s) => s.updateAbilityBlock)
   const removeAbilityBlock = useCharacterStore((s) => s.removeAbilityBlock)
   const moveAbility = useCharacterStore((s) => s.moveAbility)
+  const { copyAbility } = useAbilityClipboard()
 
   const [editing, setEditing] = useState<AbilityBlock | null>(null)
   const [showEditor, setShowEditor] = useState(false)
@@ -130,6 +134,16 @@ export default function SlottedAbilitiesSection({
     setAbilityToRemove(null)
   }
 
+  /** A fresh copy of `ability`, landing directly after it. */
+  const duplicateAbility = (ability: AbilityBlock) => {
+    const index = abilities.findIndex((a) => a.id === ability.id)
+    addAbilityBlock(
+      SECTION,
+      cloneAbilityBlock(ability),
+      index < 0 ? undefined : index + 1,
+    )
+  }
+
   const used = slotsUsed(abilities)
   const usedLabel = formatSlots(used)
   const overflow = isOverflowed(abilities, maxSlots)
@@ -158,13 +172,18 @@ export default function SlottedAbilitiesSection({
       </div>
 
       {isEdit && (
-        <button
-          type="button"
-          className="btn btn--ghost section-add-btn"
-          onClick={openNew}
-        >
-          + Add Ability
-        </button>
+        <div className="section-add-row">
+          <button
+            type="button"
+            className="btn btn--ghost section-add-btn"
+            onClick={openNew}
+          >
+            + Add Ability
+          </button>
+          <PasteAbilityButton
+            onPaste={(ability) => addAbilityBlock(SECTION, ability)}
+          />
+        </div>
       )}
 
       {isView ? (
@@ -204,6 +223,20 @@ export default function SlottedAbilitiesSection({
                 onClick={() => openEdit(ability)}
               >
                 Edit
+              </button>
+              <button
+                type="button"
+                className="btn btn--ghost ability-card__action-btn"
+                onClick={() => duplicateAbility(ability)}
+              >
+                Duplicate
+              </button>
+              <button
+                type="button"
+                className="btn btn--ghost ability-card__action-btn"
+                onClick={() => copyAbility(ability)}
+              >
+                Copy
               </button>
               <button
                 type="button"

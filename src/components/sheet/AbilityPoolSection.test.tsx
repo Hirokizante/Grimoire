@@ -20,6 +20,7 @@ import AbilityPoolSection from '@/components/sheet/AbilityPoolSection'
 import SlottedAbilitiesSection from '@/components/sheet/SlottedAbilitiesSection'
 import { NotificationProvider } from '@/context/NotificationContext'
 import { createDefaultCharacter } from '@/constants/gameData'
+import { useAbilityClipboardStore } from '@/store/abilityClipboardStore'
 import { useCharacterStore } from '@/store/characterStore'
 import { abilityUsesRemaining } from '@/lib/abilityUses'
 import type { AbilityBlock, Character } from '@/types'
@@ -132,6 +133,7 @@ function subBlock(): HTMLElement {
 
 beforeEach(() => {
   dbMap.clear()
+  useAbilityClipboardStore.setState({ copied: null })
   useCharacterStore.setState({
     characters: [],
     currentCharacter: null,
@@ -227,4 +229,83 @@ test('the sheet-level sub-ability editor still offers the Show Activate toggle',
     screen.getByRole('dialog', { name: 'Edit Sub-Ability' }),
   ).toBeInTheDocument()
   expect(screen.getByLabelText('Show Activate button')).toBeInTheDocument()
+})
+
+// ---- Duplicate / copy / paste ----------------------------------------------
+
+test('Duplicate inserts a fresh copy directly after the original', () => {
+  const ability = parentAbility()
+  setupCharacter(ability)
+
+  render(
+    <NotificationProvider>
+      <AbilityPoolSection abilities={[ability]} mode="edit" />
+    </NotificationProvider>,
+  )
+
+  fireEvent.click(screen.getByRole('button', { name: 'Duplicate' }))
+
+  const pool = (useCharacterStore.getState().currentCharacter as Character)
+    .abilityPool
+  expect(pool.map((a) => a.name)).toEqual(['Fireball', 'Fireball'])
+  // A new block, not a second view of the same one: every id in the tree is
+  // regenerated, so the two cards cannot collide in the drag context.
+  expect(pool[1].id).not.toBe(pool[0].id)
+  expect(pool[1].subAbilitiesUnderDescription[0].id).not.toBe(
+    pool[0].subAbilitiesUnderDescription[0].id,
+  )
+})
+
+test('Copy arms the Paste button, which appends a fresh clone', () => {
+  const ability = parentAbility()
+  setupCharacter(ability)
+
+  render(
+    <NotificationProvider>
+      <AbilityPoolSection abilities={[ability]} mode="edit" />
+    </NotificationProvider>,
+  )
+
+  // Nothing copied yet: there is nothing to paste, so no Paste affordance.
+  expect(screen.queryByRole('button', { name: 'Paste' })).toBeNull()
+
+  fireEvent.click(screen.getByRole('button', { name: 'Copy' }))
+  // The copy is confirmed with a toast, and the section grows its Paste button.
+  expect(screen.getByText('Copied “Fireball”')).toBeInTheDocument()
+
+  fireEvent.click(screen.getByRole('button', { name: 'Paste' }))
+  const pool = (useCharacterStore.getState().currentCharacter as Character)
+    .abilityPool
+  expect(pool).toHaveLength(2)
+  expect(pool[1].id).not.toBe(pool[0].id)
+})
+
+test('a copy travels between sections through the shared clipboard', () => {
+  const ability = parentAbility()
+  setupCharacter(ability)
+  // Empty the slotted list so the paste's landing is unambiguous.
+  useCharacterStore
+    .getState()
+    .updateCurrentCharacter((char) => ({ ...char, slottedAbilities: [] }))
+
+  render(
+    <NotificationProvider>
+      <AbilityPoolSection abilities={[ability]} mode="edit" />
+      <SlottedAbilitiesSection abilities={[]} maxSlots={3} mode="edit" />
+    </NotificationProvider>,
+  )
+
+  const pool = document.querySelector('.sheet-section--pool') as HTMLElement
+  fireEvent.click(within(pool).getByRole('button', { name: 'Copy' }))
+
+  const slotted = document.querySelector(
+    '.sheet-section--slotted',
+  ) as HTMLElement
+  fireEvent.click(within(slotted).getByRole('button', { name: 'Paste' }))
+
+  const updated = useCharacterStore.getState().currentCharacter as Character
+  expect(updated.slottedAbilities).toHaveLength(1)
+  expect(updated.slottedAbilities[0].id).not.toBe(ability.id)
+  // The original stays put: a paste copies, it does not move.
+  expect(updated.abilityPool).toHaveLength(1)
 })

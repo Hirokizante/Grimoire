@@ -55,6 +55,16 @@ Grimoire is built to support that freedom:
 - **Minor Abilities** — flagged abilities that occupy half a slot instead of a full one.
 - **Ability templates** — pre-filled starting points for common ability types (melee, ranged, buff,
   debuff) that remain fully editable.
+- **Duplicate, copy & paste ability blocks** — in edit mode every ability card carries
+  **Duplicate** (a fresh copy of the block lands directly after it) and **Copy** (snapshots it on
+  the app's one-slot ability clipboard). A **Paste** button then appears beside **+ Add Ability**
+  in every ability section — Slotted Abilities, the Ability Pool, a custom tab's ability sections,
+  Core Innate Abilities, and an NPC's list — and inserts a fresh copy there, so a block can travel
+  between sections and tabs (and between characters) without retyping it. A copy is a **new
+  block**: every block and sub-ability gets a fresh id, the uses budget starts full, and modifier
+  switches start off, while everything authored — name, traits, costs, damage, text, modifiers,
+  activation rolls, sub-abilities — is kept. A custom cost keeps pointing at the source sheet's
+  bar ids, so a bar the pasting sheet does not define simply is not shown.
 - **Copy an ability as an image** — every card, sub-ability blocks included, carries a small capture
   button in its corner that copies a clean, cropped PNG of the block to the device clipboard (or
   downloads it where the clipboard is unavailable). The shot is cropped to the card, hides the

@@ -25,10 +25,13 @@ import AbilityBlockCard from '@/components/sheet/AbilityBlockCard'
 import AbilityBlockList from '@/components/sheet/AbilityBlockList'
 import AbilityEditorModal from '@/components/sheet/AbilityEditorModal'
 import ConfirmModal from '@/components/sheet/ConfirmModal'
+import PasteAbilityButton from '@/components/sheet/PasteAbilityButton'
 import SectionViewToggle from '@/components/sheet/SectionViewToggle'
 import { useAbilityListDnd } from '@/hooks/useAbilityListDnd'
+import { useAbilityClipboard } from '@/hooks/useAbilityClipboard'
 import { useSubAbilityEditor } from '@/hooks/useSubAbilityEditor'
 import { useCharacterStore } from '@/store/characterStore'
+import { cloneAbilityBlock } from '@/lib/abilityClone'
 import { NO_ACTIVATION } from '@/hooks/useAbilityActivation'
 import type { AbilityBlock } from '@/types'
 import type { SheetMode } from '@/pages/CharacterSheetPage'
@@ -53,6 +56,7 @@ export default function AbilityPoolSection({
   const updateAbilityBlock = useCharacterStore((s) => s.updateAbilityBlock)
   const removeAbilityBlock = useCharacterStore((s) => s.removeAbilityBlock)
   const moveAbility = useCharacterStore((s) => s.moveAbility)
+  const { copyAbility } = useAbilityClipboard()
 
   const [editing, setEditing] = useState<AbilityBlock | null>(null)
   const [showEditor, setShowEditor] = useState(false)
@@ -110,6 +114,16 @@ export default function AbilityPoolSection({
     setAbilityToRemove(null)
   }
 
+  /** A fresh copy of `ability`, landing directly after it. */
+  const duplicateAbility = (ability: AbilityBlock) => {
+    const index = abilities.findIndex((a) => a.id === ability.id)
+    addAbilityBlock(
+      SECTION,
+      cloneAbilityBlock(ability),
+      index < 0 ? undefined : index + 1,
+    )
+  }
+
   return (
     <section className="sheet-section sheet-section--pool">
       <div className="sheet-section__heading-row">
@@ -126,13 +140,18 @@ export default function AbilityPoolSection({
       </div>
 
       {isEdit && (
-        <button
-          type="button"
-          className="btn btn--ghost section-add-btn"
-          onClick={openNew}
-        >
-          + Add Ability
-        </button>
+        <div className="section-add-row">
+          <button
+            type="button"
+            className="btn btn--ghost section-add-btn"
+            onClick={openNew}
+          >
+            + Add Ability
+          </button>
+          <PasteAbilityButton
+            onPaste={(ability) => addAbilityBlock(SECTION, ability)}
+          />
+        </div>
       )}
 
       {!isEdit ? (
@@ -181,6 +200,20 @@ export default function AbilityPoolSection({
                 onClick={() => openEdit(ability)}
               >
                 Edit
+              </button>
+              <button
+                type="button"
+                className="btn btn--ghost ability-card__action-btn"
+                onClick={() => duplicateAbility(ability)}
+              >
+                Duplicate
+              </button>
+              <button
+                type="button"
+                className="btn btn--ghost ability-card__action-btn"
+                onClick={() => copyAbility(ability)}
+              >
+                Copy
               </button>
               <button
                 type="button"

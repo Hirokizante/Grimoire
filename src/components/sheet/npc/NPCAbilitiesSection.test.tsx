@@ -20,6 +20,7 @@ import {
   AbilityDropHintContext,
   type AbilityDropHintStore,
 } from '@/components/sheet/AbilityDropHintContext'
+import { useAbilityClipboardStore } from '@/store/abilityClipboardStore'
 import { useCharacterStore } from '@/store/characterStore'
 import { createDefaultNPC } from '@/constants/gameData'
 import type { AbilityBlock, Character } from '@/types'
@@ -169,6 +170,7 @@ function seedNpc(): Character {
 beforeEach(() => {
   dbMap.clear()
   npcRegistrations.current = []
+  useAbilityClipboardStore.setState({ copied: null })
   useCharacterStore.setState({ characters: [], currentCharacter: null })
 })
 
@@ -759,4 +761,58 @@ test('a reorder never moves or touches the Basic Attack', () => {
   expect(stored.slottedAbilities.map((a) => a.id)).toEqual(['a3', 'a1', 'a2'])
   // The Basic Attack is still the one the record was born with, in its place.
   expect(stored.basicAttack).toEqual(npc.basicAttack)
+})
+
+// ---- Duplicate / copy / paste ----------------------------------------------
+
+/** One card of the rendered list, by the ability name on it. */
+function cardByName(name: string): HTMLElement {
+  const card = screen.getByText(name).closest('.ability-card')
+  expect(card).not.toBeNull()
+  return card as HTMLElement
+}
+
+test('Duplicate inserts a fresh copy directly after the original', () => {
+  const npc = seedNpcWithThree()
+  render(
+    <NPCAbilitiesSection
+      abilities={npc.slottedAbilities}
+      ownerId={npc.id}
+      owner={npc}
+      mode="edit"
+    />,
+  )
+
+  fireEvent.click(
+    within(cardByName('Bite')).getByRole('button', { name: 'Duplicate' }),
+  )
+
+  const stored = useCharacterStore.getState().characters[0].slottedAbilities
+  expect(stored.map((a) => a.name)).toEqual(['Claw', 'Bite', 'Bite', 'Howl'])
+  // A new block, not the same one twice: the copy gets its own id.
+  expect(stored[2].id).not.toBe(stored[1].id)
+})
+
+test('Copy arms Paste, which appends a clone to the NPC’s own list', () => {
+  const npc = seedNpcWithThree()
+  render(
+    <NPCAbilitiesSection
+      abilities={npc.slottedAbilities}
+      ownerId={npc.id}
+      owner={npc}
+      mode="edit"
+    />,
+  )
+
+  // Nothing copied yet: there is nothing to paste.
+  expect(screen.queryByRole('button', { name: 'Paste' })).toBeNull()
+
+  fireEvent.click(
+    within(cardByName('Bite')).getByRole('button', { name: 'Copy' }),
+  )
+  fireEvent.click(screen.getByRole('button', { name: 'Paste' }))
+
+  const stored = useCharacterStore.getState().characters[0].slottedAbilities
+  expect(stored.map((a) => a.name)).toEqual(['Claw', 'Bite', 'Howl', 'Bite'])
+  expect(stored[3].id).not.toBe(stored[1].id)
 })
