@@ -47,6 +47,9 @@ export default function CharacterSheetPage() {
     <div
       className={
         'sheet-page' +
+        // Marks the page for the Terminal UI style's grid backdrop: only
+        // theme-matched pages get it (they follow the app canvas, like NPCs).
+        (matchAppTheme ? ' sheet-page--match-app-theme' : '') +
         (hasBg ? ' sheet-page--has-bg' : '') +
         (selectorOpen ? ' sheet-page--selector-open' : '') +
         (customizeOpen ? ' sheet-page--customize-open' : '')

@@ -33,6 +33,7 @@ export default function NPCSheetPage() {
     <div
       className={
         'sheet-page' +
+        ' sheet-page--npc' +
         (hasBg ? ' sheet-page--has-bg' : '') +
         (selectorOpen ? ' sheet-page--selector-open' : '')
       }

@@ -2,7 +2,8 @@
  * terminal-ui.css — the "Terminal" UI style (Settings → Interface).
  *
  * A retrofuturistic terminal reskin layered over the whole app: hard edges,
- * monospace chrome, phosphor glow, a CRT scanline/sweep overlay on the home
+ * monospace chrome, phosphor glow, a retro grid backdrop behind every page,
+ * a CRT scanline/sweep overlay on the home
  * page, and stepped ("frame-by-frame") motion. It is deliberately
  * color-agnostic — every effect is derived from the active app theme's custom
  * properties, so Terminal pairs with Midnight, Parchment, Mikami, or Pitch
@@ -32,6 +33,25 @@
     in srgb,
     var(--accent-violet-soft) 22%,
     transparent
+  );
+  /* The two grid-line gradients, shared by the page backdrop (body::before)
+   * and the sheet-page backdrop so both layers tile in perfect register. */
+  --terminal-grid-lines:
+    linear-gradient(
+      to right,
+      color-mix(in srgb, var(--accent-violet) 7%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--accent-violet) 7%, transparent) 1px,
+      transparent 1px
+    );
+  --terminal-grid-vignette: linear-gradient(
+    180deg,
+    transparent 0%,
+    transparent 55%,
+    rgba(0, 0, 0, 0.45) 100%
   );
 }
 
@@ -84,6 +104,52 @@
 :root[data-ui-style='terminal'] ::selection {
   background: color-mix(in srgb, var(--accent-violet) 70%, transparent);
   color: var(--text-primary);
+}
+
+/* ---- Retro grid backdrop --------------------------------------------------- */
+
+/* A blueprint-style grid behind EVERY page, fixed to the viewport so it does
+ * not scroll with content — the app reads as one persistent display surface
+ * rather than pages sliding over separate canvases. Painted on body::before,
+ * which sits behind #root's content (the .app wrapper and every page canvas
+ * is transparent by default) and never receives pointer events.
+ *
+ * Layer 1 is the fine cell mesh; layer 2 is a soft vignette that sinks the
+ * lower edge into darkness so long pages read as a glowing plotter screen
+ * rather than wallpaper. Both layers derive from the active theme's accent
+ * (same color-mix family as the phosphor glow), so the grid pairs with
+ * Midnight, Parchment, Mikami, and Pitch Black without per-theme overrides.
+ * Static by nature — no repaint cost while scrolling. */
+:root[data-ui-style='terminal'] body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image: var(--terminal-grid-lines), var(--terminal-grid-vignette);
+  /* One size per layer: the two grid gradients tile, the vignette does not.
+   * A short size list would cycle back and tile the vignette per cell. */
+  background-size: 32px 32px, 32px 32px, 100% 100%;
+}
+
+/* Sheet pages repaint the same grid on their own layer: the fixed
+ * .sheet-page__bg-color canvas (z 0) would otherwise cover the body grid
+ * entirely. This one sits above that canvas but below .sheet-page__content
+ * (z 2) and the background-image darken overlay. Both sheet-page variants
+ * here follow the app canvas like every other page — NPC sheets always, and
+ * player sheets only with "Match app theme" on. A player sheet with "Match
+ * app theme" never carries a background image, so the :not() guard only ever
+ * matters for NPCs: when an NPC sheet has its own background image, that
+ * image wins and the grid steps aside. */
+:root[data-ui-style='terminal'] .sheet-page--npc:not(.sheet-page--has-bg)::before,
+:root[data-ui-style='terminal'] .sheet-page--match-app-theme::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background-image: var(--terminal-grid-lines), var(--terminal-grid-vignette);
+  background-size: 32px 32px, 32px 32px, 100% 100%;
 }
 
 /* ---- CRT overlay: scanlines, a slow sweep, and a loose flicker ----------- */

@@ -91,6 +91,7 @@ test('default: the page canvas and background image are the character’s own', 
   const { page } = renderPage(false, 'parchment')
 
   expect(page.className).toContain('sheet-page--has-bg')
+  expect(page.className).not.toContain('sheet-page--match-app-theme')
   expect(page.querySelector('.sheet-page__bg-image')).not.toBeNull()
   expect(page.querySelector('.sheet-page__bg-color')).toHaveStyle({
     backgroundColor: '#321321',
@@ -102,6 +103,7 @@ test('Match app theme: the page canvas follows the app theme and drops the image
   const { pc, page } = renderPage(true, 'parchment')
 
   expect(page.className).not.toContain('sheet-page--has-bg')
+  expect(page.className).toContain('sheet-page--match-app-theme')
   expect(page.querySelector('.sheet-page__bg-image')).toBeNull()
   expect(page.querySelector('.sheet-page__bg-color')).toHaveStyle({
     backgroundColor: appThemeSheetPageBackground(
