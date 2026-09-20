@@ -8,9 +8,10 @@
  * pack at render time.
  *
  * The pixel counterpart is chosen by meaning, not by name — lucide `Dices`
- * maps to pixel `Gamepad`, `Gem` to `DiamondGem`, and the shield variants all
- * collapse onto pixel `Shield`. `X` is the trap: the pixel pack's own `X` is
- * the brand logo, so the close/dismiss glyph comes from pixel `Close` instead.
+ * maps to pixel `Gamepad`, `Gem` to `DiamondGem`, `Footprints` (the Movement
+ * stat) to `ArrowRight`, and the shield variants all collapse onto pixel
+ * `Shield`. `X` is the trap: the pixel pack's own `X` is the brand logo, so
+ * the close/dismiss glyph comes from pixel `Close` instead.
  * `strokeWidth` is a Lucide-only prop: the pixel pack is drawn with fills, so
  * it is ignored there. Every icon carries `data-icon-pack` so tests (and the
  * e2e style spec) can pin which pack rendered.
@@ -140,6 +141,7 @@ import { ArrowBarDown as PixelArrowBarDown } from 'pixelarticons/react/ArrowBarD
 import { ArrowBarUp as PixelArrowBarUp } from 'pixelarticons/react/ArrowBarUp'
 import { ArrowDown as PixelArrowDown } from 'pixelarticons/react/ArrowDown'
 import { ArrowLeft as PixelArrowLeft } from 'pixelarticons/react/ArrowLeft'
+import { ArrowRight as PixelArrowRight } from 'pixelarticons/react/ArrowRight'
 import { ArrowUp as PixelArrowUp } from 'pixelarticons/react/ArrowUp'
 import { Bomb as PixelBomb } from 'pixelarticons/react/Bomb'
 import { Brush as PixelBrush } from 'pixelarticons/react/Brush'
@@ -179,7 +181,6 @@ import { Hash as PixelHash } from 'pixelarticons/react/Hash'
 import { Heart as PixelHeart } from 'pixelarticons/react/Heart'
 import { HotelBed as PixelHotelBed } from 'pixelarticons/react/HotelBed'
 import { Hourglass as PixelHourglass } from 'pixelarticons/react/Hourglass'
-import { Human as PixelHuman } from 'pixelarticons/react/Human'
 import { Infinity as PixelInfinity } from 'pixelarticons/react/Infinity'
 import { Key as PixelKey } from 'pixelarticons/react/Key'
 import { Layout as PixelLayout } from 'pixelarticons/react/Layout'
@@ -305,7 +306,7 @@ export const FileText = makeAppIcon('FileText', LucideFileText, PixelFileText)
 export const Filter = makeAppIcon('Filter', LucideFilter, PixelFilter)
 export const Flame = makeAppIcon('Flame', LucideFlame, PixelFire)
 export const FlaskConical = makeAppIcon('FlaskConical', LucideFlaskConical, PixelPotion)
-export const Footprints = makeAppIcon('Footprints', LucideFootprints, PixelHuman)
+export const Footprints = makeAppIcon('Footprints', LucideFootprints, PixelArrowRight)
 export const Gem = makeAppIcon('Gem', LucideGem, PixelDiamondGem)
 export const Ghost = makeAppIcon('Ghost', LucideGhost, PixelAlien)
 export const GitBranch = makeAppIcon('GitBranch', LucideGitBranch, PixelGitBranch)

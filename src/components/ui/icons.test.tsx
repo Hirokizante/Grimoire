@@ -10,11 +10,13 @@
  */
 
 import { act, render, screen } from '@testing-library/react'
+import { ArrowRight as PixelArrowRight } from 'pixelarticons/react/ArrowRight'
 import { Close as PixelClose } from 'pixelarticons/react/Close'
+import { Human as PixelHuman } from 'pixelarticons/react/Human'
 import { X as PixelX } from 'pixelarticons/react/X'
 import { beforeEach, test, expect } from 'vitest'
 
-import { Plus, X } from '@/components/ui/icons'
+import { Footprints, Plus, X } from '@/components/ui/icons'
 import { useUiStyleStore } from '@/store/uiStyleStore'
 
 beforeEach(() => {
@@ -74,4 +76,23 @@ test('X renders the pixelarticons Close mark, not the X brand logo', () => {
   )
   expect(path('icon')).toBe(path('close'))
   expect(path('icon')).not.toBe(path('brand'))
+})
+
+test('Footprints (the Movement stat) renders the pixel ArrowRight mark', () => {
+  useUiStyleStore.setState({ style: 'terminal' })
+  render(<Footprints data-testid="icon" />)
+  render(<PixelArrowRight data-testid="arrow" />)
+  render(<PixelHuman data-testid="human" />)
+
+  const paths = (testId: string) =>
+    [...screen.getByTestId(testId).querySelectorAll('path')].map((p) =>
+      p.getAttribute('d'),
+    )
+
+  expect(screen.getByTestId('icon')).toHaveAttribute(
+    'data-icon-pack',
+    'pixelarticons',
+  )
+  expect(paths('icon')).toEqual(paths('arrow'))
+  expect(paths('icon')).not.toEqual(paths('human'))
 })

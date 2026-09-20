@@ -641,6 +641,16 @@ function tokenColor(container: HTMLElement, label: string): string {
   return (token as HTMLElement).style.getPropertyValue('--token-color')
 }
 
+/** Read a token's leading icon from the rendered panel. */
+function tokenIcon(container: HTMLElement, label: string): SVGElement {
+  const token = Array.from(container.querySelectorAll('.gm-token')).find(
+    (el) => el.querySelector('.gm-token__label')?.textContent === label,
+  )
+  const icon = token?.querySelector('svg')
+  if (!icon) throw new Error(`no icon on the token labelled ${label}`)
+  return icon
+}
+
 test('CharacterPanel: stat tokens use the app theme, never the sheet palette', () => {
   // Pin the app theme to Parchment while the sheet keeps the Midnight-default
   // palette, so the two palettes genuinely differ — otherwise this assertion
@@ -1542,6 +1552,17 @@ test('every stat token on both panel kinds leads with an icon', () => {
     { label: 'Move', icon: true },
     { label: 'DC', icon: true },
   ])
+})
+
+test('NPC panel: the Move token wears the Movement icon, not a sword', () => {
+  const { container } = renderNpcPanel(makeBase(), 'compact')
+
+  // The sheet's Movement row renders `Footprints`; the panel badge draws the
+  // same style-aware glyph — Lucide footprints in Default, the pixel arrow in
+  // Terminal (pinned by icons.test.tsx) — never an ability/milestone sword.
+  const icon = tokenIcon(container, 'Move')
+  expect(icon).toHaveClass('lucide-footprints')
+  expect(icon).not.toHaveClass('lucide-swords')
 })
 
 test('a panel with no AP left dims, keeping its AP block (and the way back) bright', () => {

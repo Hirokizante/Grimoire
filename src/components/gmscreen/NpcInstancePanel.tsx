@@ -32,7 +32,7 @@
  */
 
 import { useMemo, useState } from 'react'
-import { Hourglass, Pencil, Shield, Skull, Swords, Target, Wind } from '@/components/ui/icons'
+import { Footprints, Hourglass, Pencil, Shield, Skull, Target, Wind } from '@/components/ui/icons'
 
 import DamageDialog from '@/components/sheet/DamageDialog'
 import MortalWoundPicker from '@/components/sheet/MortalWoundPicker'
@@ -337,7 +337,7 @@ export default function NpcInstancePanel({
           <span className="gm-token__value">{armor}</span>
         </span>
         <span className="gm-token" style={{ '--token-color': statColors.movement } as React.CSSProperties}>
-          <Swords size={13} /> <span className="gm-token__label">Move</span>
+          <Footprints size={13} /> <span className="gm-token__label">Move</span>
           <span className="gm-token__value">{movement}</span>
         </span>
         <span className="gm-token" style={{ '--token-color': statColors.saveDC } as React.CSSProperties}>

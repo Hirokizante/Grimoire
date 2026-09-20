@@ -6,6 +6,22 @@ characters regularly.
 
 ## Unreleased
 
+### The Movement stat is an arrow in Terminal, and the GM Screen agrees
+
+- **Terminal's Movement glyph is an arrow, not a person.** The style-aware
+  `Footprints` icon — the one every sheet's Movement token renders — mapped to
+  Pixelarticons `Human`, which reads as a bystander rather than a stat. It now
+  maps to Pixelarticons `ArrowRight`, matching the stat's meaning; Default
+  keeps the Lucide footprints.
+- **The GM Screen's NPC Move badge drew a sword.** Every NPC-instance panel's
+  Move token led with the `Swords` glyph in both styles — the same icon the
+  milestone badge and the "Add NPC" buttons use — instead of the Movement
+  icon. It now renders `Footprints`, so it matches the sheet's Movement token:
+  footprints in Default, the pixel arrow in Terminal.
+- **Testing.** `icons.test.tsx` pins that Terminal's `Footprints` renders the
+  Pixelarticons `ArrowRight` paths (not `Human`), and `GMScreenPanels.test.tsx`
+  pins that the NPC panel's Move token leads with `Footprints`, not `Swords`.
+
 ### Close buttons show the pixel Close mark, not the X brand logo
 
 - **Every close/dismiss control drew the wrong pixel icon in Terminal.** The
