@@ -26,11 +26,7 @@ import { useState } from 'react'
 
 import { useCharacterStore } from '@/store/characterStore'
 import { useAppThemeStore } from '@/store/appThemeStore'
-import {
-  appThemeSheetCardBackground,
-  appThemeSheetColors,
-  colorVars,
-} from '@/lib/themeUtils'
+import { appThemeSheetVars } from '@/lib/themeUtils'
 import { useImportedFonts } from '@/hooks/useImportedFonts'
 import type { Character } from '@/types'
 import type { SheetMode } from '@/pages/CharacterSheetPage'
@@ -71,7 +67,6 @@ export default function NPCSheet({
   // CustomNPCSection, which applies no colors of its own — the player
   // sheet's theme variables win there.
   const appTheme = useAppThemeStore((s) => s.theme)
-  const themeColors = appThemeSheetColors(appTheme)
 
   const entity = npc ?? storeNpc
   const [showExport, setShowExport] = useState(false)
@@ -80,15 +75,7 @@ export default function NPCSheet({
 
   const isNPC = entity.kind === 'npc'
   const { config } = entity
-  const styleVars = {
-    '--sheet-bg': appThemeSheetCardBackground(appTheme, config),
-    '--sheet-heading-font': config.sectionHeadingFontFamily,
-    '--sheet-heading-weight': config.sectionHeadingFontWeight,
-    '--sheet-label-font': config.labelFontFamily,
-    '--sheet-text-font': config.textFontFamily,
-    '--sheet-helper-font': config.helperTextFontFamily,
-    ...colorVars(themeColors),
-  } as React.CSSProperties
+  const styleVars = appThemeSheetVars(appTheme, config)
 
   return (
     <div

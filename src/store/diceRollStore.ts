@@ -26,6 +26,8 @@ import { applyRollAdvantage } from '@/lib/diceAdvantage'
 import { applyCriticalHit, removeCriticalHit } from '@/lib/diceCrit'
 import { useCharacterStore } from '@/store/characterStore'
 import { useAppThemeStore } from '@/store/appThemeStore'
+import type { AppTheme } from '@/store/appThemeStore'
+import { useCharacterSheetThemeStore } from '@/store/characterSheetThemeStore'
 import { appThemeSheetColors } from '@/lib/themeUtils'
 import type {
   AbilityBlock,
@@ -132,31 +134,55 @@ export interface DiceRollActions {
 
 export type DiceRollStore = DiceRollState & DiceRollActions
 
+/** The character's config with the app theme's sheet palette swapped in. */
+function withAppThemeColors(character: Character, theme: AppTheme): Character {
+  return {
+    ...character,
+    config: { ...character.config, colors: appThemeSheetColors(theme) },
+  }
+}
+
 /**
  * The entity whose theme the dice-result modal should render with.
  *
- * - Player sheets: their own per-sheet customization.
+ * - Player sheets: their own per-sheet customization — unless the
+ *   "Match app theme" character-sheet setting is on, in which case the sheet
+ *   page renders the app theme and the modal follows it. That setting is
+ *   scoped to the sheet page itself (the character is `currentCharacter`);
+ *   a GM panel's roll keeps the panel body's palette, which its own
+ *   "Match app theme" switch governs.
  * - Standalone NPC sheets: no customization exists, so the app theme's NPC
  *   palette (matches NPCSheet).
  * - Embedded NPC sections (inside a player sheet tab): the host player
- *   sheet's colors, so the modal matches the page it was rolled from.
+ *   sheet's colors, so the modal matches the page it was rolled from (the app
+ *   theme when that host sheet is itself matching it).
  */
 export function themeEntity(): Character | null {
   const { rollCharacter } = useDiceRollStore.getState()
   if (!rollCharacter) return null
-  if (rollCharacter.kind !== 'npc') return rollCharacter
 
-  // Standalone vs embedded: an embedded NPC section lives inside a custom
-  // tab of a player character whose `currentCharacter` is that player.
-  const current = useCharacterStore.getState().currentCharacter
-  if (current && current.kind === 'character' && current.id !== rollCharacter.id) {
-    return current
-  }
   const appTheme = useAppThemeStore.getState().theme
-  return {
-    ...rollCharacter,
-    config: { ...rollCharacter.config, colors: appThemeSheetColors(appTheme) },
+  const matchAppTheme = useCharacterSheetThemeStore.getState().matchAppTheme
+  const current = useCharacterStore.getState().currentCharacter
+
+  let entity = rollCharacter
+  if (rollCharacter.kind === 'npc') {
+    // Standalone vs embedded: an embedded NPC section lives inside a custom
+    // tab of a player character whose `currentCharacter` is that player.
+    if (current && current.kind === 'character' && current.id !== rollCharacter.id) {
+      entity = current
+    } else {
+      // Standalone NPC sheet (or a GM-screen instance): no customization.
+      return withAppThemeColors(rollCharacter, appTheme)
+    }
   }
+
+  // Only the sheet page itself follows the character-sheet setting.
+  const onOwnSheet =
+    current !== null && current.kind === 'character' && current.id === entity.id
+  return matchAppTheme && onOwnSheet
+    ? withAppThemeColors(entity, appTheme)
+    : entity
 }
 
 export const useDiceRollStore = create<DiceRollStore>()((set, get) => ({

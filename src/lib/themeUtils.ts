@@ -10,6 +10,7 @@ import type { CSSProperties } from 'react'
 import type { PanelStatusDuration, SheetColors, SheetConfig } from '@/types'
 import {
   DEFAULT_SHEET_COLORS,
+  DEFAULT_SHEET_CONFIG,
   MIKAMI_SHEET_COLORS,
   PARCHMENT_SHEET_COLORS,
   PITCH_BLACK_SHEET_COLORS,
@@ -278,6 +279,34 @@ export function appThemeSheetPageBackground(
  */
 export function appThemeColorVars(theme: AppTheme): Record<string, string> {
   return colorVars(appThemeSheetColors(theme))
+}
+
+/**
+ * CSS custom properties for a STANDALONE sheet body that follows the app
+ * theme: the theme's palette plus the default sheet card background and
+ * default fonts.
+ *
+ * Both standalone sheets build their body through this one function so they
+ * cannot drift apart: an NPC sheet always follows the app theme (its `config`
+ * is the default), and a character sheet follows it when the
+ * Settings → Character Sheets → "Match app theme" switch is on, at which
+ * point it passes no `config` at all — `DEFAULT_SHEET_CONFIG` stands in for
+ * every per-sheet value (card background, fonts), because those are exactly
+ * what the switch disables.
+ */
+export function appThemeSheetVars(
+  theme: AppTheme,
+  config: SheetConfig = DEFAULT_SHEET_CONFIG,
+): CSSProperties {
+  return {
+    '--sheet-bg': appThemeSheetCardBackground(theme, config),
+    '--sheet-heading-font': config.sectionHeadingFontFamily,
+    '--sheet-heading-weight': config.sectionHeadingFontWeight,
+    '--sheet-label-font': config.labelFontFamily,
+    '--sheet-text-font': config.textFontFamily,
+    '--sheet-helper-font': config.helperTextFontFamily,
+    ...appThemeColorVars(theme),
+  } as CSSProperties
 }
 
 /**

@@ -12,6 +12,7 @@ import { Users, Swords, Sparkles, Settings, LayoutDashboard } from '@/components
 import { useCharacterStore } from '@/store/characterStore'
 import type { AppView } from '@/store/characterStore'
 import { useAppThemeStore } from '@/store/appThemeStore'
+import { useCharacterSheetThemeStore } from '@/store/characterSheetThemeStore'
 import { colorVars } from '@/lib/themeUtils'
 import faviconUrl from '/favicon.svg'
 import faviconAltUrl from '/favicon_alt.svg'
@@ -29,6 +30,7 @@ export default function TitleBar() {
   const closeNPC = useCharacterStore((s) => s.closeNPC)
   const setView = useCharacterStore((s) => s.setView)
   const appTheme = useAppThemeStore((s) => s.theme)
+  const matchAppTheme = useCharacterSheetThemeStore((s) => s.matchAppTheme)
 
   // Publish the bar's live height as --app-header-h on <html> so fixed
   // panels that dock beneath it (customize drawer, char-selector, modal
@@ -67,9 +69,12 @@ export default function TitleBar() {
   // While a player character sheet is open, the title bar inherits the
   // sheet's own color scheme: injecting the sheet's palette as inline CSS
   // custom properties shadows the app-theme root vars for this subtree.
-  // NPC sheets have no per-sheet customization and stay on the app theme.
+  // NPC sheets have no per-sheet customization and stay on the app theme —
+  // and so does a character sheet with "Match app theme" on.
   const headerStyle =
-    onSheet && !onNpcSheet ? (colorVars(currentCharacter.config.colors) as React.CSSProperties) : undefined
+    onSheet && !onNpcSheet && !matchAppTheme
+      ? (colorVars(currentCharacter.config.colors) as React.CSSProperties)
+      : undefined
 
   const navButtons: NavButton[] = [
     {

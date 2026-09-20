@@ -7,10 +7,12 @@
  * the dice-badge display option (whether highlighted notation reads as written
  * or as the min–max range it can roll), the GM Screen display options (whether
  * a player panel's expanded sheet body keeps its own customization or follows
- * the app theme like an NPC panel), the home page animation picker (on/off +
- * which ambient effect plays behind the title), and the full-app Backup &
- * Restore section. Per-sheet color themes live in each sheet's Customization
- * panel and are stored on the character.
+ * the app theme like an NPC panel), the character-sheet display option
+ * (whether a sheet keeps its own customization or follows the app theme like
+ * an NPC sheet), the home page animation picker (on/off + which ambient effect
+ * plays behind the title), and the full-app Backup & Restore section.
+ * Per-sheet color themes live in each sheet's Customization panel and are
+ * stored on the character.
  *
  * Backup & Restore: downloads EVERYTHING (characters, NPCs, statuses, version
  * history, roll log) as a single JSON file; restoring replaces all current
@@ -35,6 +37,7 @@ import { downloadJson } from '@/lib/exportImport'
 import { useAppThemeStore } from '@/store/appThemeStore'
 import type { AppTheme } from '@/store/appThemeStore'
 import { useCharacterStore } from '@/store/characterStore'
+import { useCharacterSheetThemeStore } from '@/store/characterSheetThemeStore'
 import { useDiceDisplayStore } from '@/store/diceDisplayStore'
 import { useGMScreenStore } from '@/store/gmScreenStore'
 import { useGmPanelThemeStore } from '@/store/gmPanelThemeStore'
@@ -176,6 +179,12 @@ export default function SettingsPage() {
   const setTheme = useAppThemeStore((s) => s.setTheme)
   const diceShowRanges = useDiceDisplayStore((s) => s.showRanges)
   const setDiceShowRanges = useDiceDisplayStore((s) => s.setShowRanges)
+  const characterSheetMatchAppTheme = useCharacterSheetThemeStore(
+    (s) => s.matchAppTheme,
+  )
+  const setCharacterSheetMatchAppTheme = useCharacterSheetThemeStore(
+    (s) => s.setMatchAppTheme,
+  )
   const gmPanelMatchAppTheme = useGmPanelThemeStore((s) => s.matchAppTheme)
   const setGmPanelMatchAppTheme = useGmPanelThemeStore((s) => s.setMatchAppTheme)
   const homeAnimation = useHomeAnimationStore((s) => s.animation)
@@ -360,6 +369,39 @@ export default function SettingsPage() {
               </button>
             )
           })}
+        </div>
+      </section>
+
+      <section
+        className="settings-section"
+        aria-labelledby="settings-character-sheets-heading"
+      >
+        <h2
+          className="settings-section__title"
+          id="settings-character-sheets-heading"
+        >
+          Character Sheets
+        </h2>
+
+        <div className="settings-toggle-row">
+          <span
+            className="settings-toggle-row__label"
+            id="character-sheet-match-theme-label"
+            title="Hide the Customize button and render every character sheet with the app theme, like an NPC sheet"
+          >
+            Match app theme
+          </span>
+          <label className="settings-toggle">
+            <input
+              type="checkbox"
+              checked={characterSheetMatchAppTheme}
+              onChange={(e) =>
+                setCharacterSheetMatchAppTheme(e.target.checked)
+              }
+              aria-labelledby="character-sheet-match-theme-label"
+            />
+            <span className="settings-toggle__track" aria-hidden="true" />
+          </label>
         </div>
       </section>
 

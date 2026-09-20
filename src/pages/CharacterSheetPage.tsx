@@ -17,6 +17,10 @@
 
 import { useState } from 'react'
 import { useCharacterStore } from '@/store/characterStore'
+import { useAppThemeStore } from '@/store/appThemeStore'
+import { useCharacterSheetThemeStore } from '@/store/characterSheetThemeStore'
+import { appThemeSheetPageBackground } from '@/lib/themeUtils'
+import { DEFAULT_SHEET_CONFIG } from '@/constants/gameData'
 import CharacterSheet from '@/components/sheet/CharacterSheet'
 import CharacterSelector from '@/components/sheet/CharacterSelector'
 import CustomizationPanel from '@/components/sheet/CustomizationPanel'
@@ -25,6 +29,11 @@ export type SheetMode = 'edit' | 'view'
 
 export default function CharacterSheetPage() {
   const currentCharacter = useCharacterStore((s) => s.currentCharacter)
+  // With "Match app theme" on, the page canvas and the sheet body both follow
+  // the app theme, exactly like an NPC sheet page — including dropping the
+  // character's background image (see CharacterSheet for the body).
+  const matchAppTheme = useCharacterSheetThemeStore((s) => s.matchAppTheme)
+  const appTheme = useAppThemeStore((s) => s.theme)
   const [mode, setMode] = useState<SheetMode>('view')
   const [selectorOpen, setSelectorOpen] = useState(false)
   const [customizeOpen, setCustomizeOpen] = useState(false)
@@ -32,7 +41,7 @@ export default function CharacterSheetPage() {
   if (!currentCharacter) return null
 
   const { config } = currentCharacter
-  const hasBg = !!config.backgroundImage
+  const hasBg = !matchAppTheme && !!config.backgroundImage
 
   return (
     <div
@@ -48,7 +57,11 @@ export default function CharacterSheetPage() {
        * z-index and paints over it, so the image takes priority. */}
       <div
         className="sheet-page__bg-color"
-        style={{ backgroundColor: config.pageBackgroundColor }}
+        style={{
+          backgroundColor: matchAppTheme
+            ? appThemeSheetPageBackground(appTheme, DEFAULT_SHEET_CONFIG)
+            : config.pageBackgroundColor,
+        }}
       />
       {hasBg && (
         <>

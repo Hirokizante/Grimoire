@@ -6,6 +6,25 @@ characters regularly.
 
 ## Unreleased
 
+### Character sheets can match the app theme
+
+- **A new display preference, off by default.** *Settings → Character Sheets → Match app theme*
+  makes every character sheet drop its whole customization — palette, card and page backgrounds,
+  fonts, background image, and custom CSS — and render with the active app theme, exactly as an NPC
+  sheet always renders. The Customize button is hidden with it, since there is nothing left to
+  customize against.
+- **One voice around the sheet.** The page canvas, title bar, character selector, dice result modal,
+  and roll-log drawer all follow the app theme while the switch is on, so nothing around the sheet
+  disagrees with it; Combat Stats read the shared per-theme stat palette like an NPC row.
+- **Display only and reversible.** The character record is never written: turning the switch back
+  off restores every custom color, font, image, and CSS rule, and exports, versions, and backups are
+  unaffected. Both standalone sheet bodies now build their style through one helper
+  (`appThemeSheetVars` in `themeUtils.ts`), so a matching character sheet and an NPC sheet cannot
+  drift apart.
+- **Covered by** `characterSheetThemeStore.test.ts`, `CharacterSheet.test.tsx`,
+  `CharacterSheetPage.test.tsx`, the `appThemeSheetVars` tests in `themeUtils.test.ts`, and
+  `diceRollStore.test.ts`'s theme resolution.
+
 ### Terminal style: pixel icons, instant transitions, flat sheet tabs
 
 - **Pixelarticons replace Lucide in Terminal.** Every app icon is now imported from a style-aware

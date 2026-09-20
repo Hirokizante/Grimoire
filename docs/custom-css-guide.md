@@ -45,9 +45,10 @@ your sheet. Three consequences matter:
   never behaviour or your data.
 
 Custom CSS belongs to **your sheet page**: it is not applied inside the GM
-Screen's expanded panels, it is ignored on the sheet page if the GM turns on
-*Settings → GM Screen → Match app theme*, and it does not follow you onto a
-different character's (or an NPC's) sheet — those load their own styling.
+Screen's expanded panels, it does not follow you onto a different character's
+(or an NPC's) sheet — those load their own styling — and it is skipped along
+with the rest of a sheet's customization while *Settings → Character Sheets →
+Match app theme* is on.
 
 ### The two things you can change
 

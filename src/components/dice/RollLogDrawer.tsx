@@ -7,6 +7,7 @@ import { Dices, Trash2 } from '@/components/ui/icons'
 import { useRollLogStore } from '@/store/rollLogStore'
 import { useCharacterStore } from '@/store/characterStore'
 import { useAppThemeStore } from '@/store/appThemeStore'
+import { useCharacterSheetThemeStore } from '@/store/characterSheetThemeStore'
 import { colorVars, appThemeColorVars } from '@/lib/themeUtils'
 import { advantageSummary } from '@/lib/diceAdvantage'
 import { criticalSummary } from '@/lib/diceCrit'
@@ -22,18 +23,20 @@ export default function RollLogDrawer() {
   const clearAll = useRollLogStore((s) => s.clearAll)
   const character = useCharacterStore((s) => s.currentCharacter)
   const appTheme = useAppThemeStore((s) => s.theme)
+  const matchAppTheme = useCharacterSheetThemeStore((s) => s.matchAppTheme)
 
   const drawerRef = useRef<HTMLDivElement>(null)
   const [expanded, setExpanded] = useState<string | null>(null)
   const [clearConfirm, setClearConfirm] = useState(false)
 
   // Match the dice-result modal's theming: player sheets use their own
-  // colors; standalone NPC sheets follow the app theme. The drawer lives
-  // outside the sheet card, so embedded NPC sections also follow the app
-  // theme rather than the host player's palette.
+  // colors (unless "Match app theme" is on, which makes the whole sheet page
+  // follow the app theme); standalone NPC sheets always follow it. The drawer
+  // lives outside the sheet card, so embedded NPC sections also follow the
+  // app theme rather than the host player's palette.
   const themeStyle = !character
     ? undefined
-    : character.kind === 'npc'
+    : character.kind === 'npc' || matchAppTheme
       ? appThemeColorVars(appTheme)
       : colorVars(character.config.colors)
 

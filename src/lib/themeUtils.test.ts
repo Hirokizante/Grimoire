@@ -5,6 +5,7 @@ import {
   appThemeColorVars,
   appThemeStatColors,
   appThemeSheetPageBackground,
+  appThemeSheetVars,
   appThemeStatusDurationColors,
   colorVars,
   gmPanelSheetPresentation,
@@ -18,6 +19,7 @@ import {
   createDefaultCharacter,
   createDefaultNPC,
   DEFAULT_SHEET_COLORS,
+  DEFAULT_SHEET_CONFIG,
   MIKAMI_SHEET_COLORS,
   PARCHMENT_SHEET_COLORS,
   PITCH_BLACK_SHEET_COLORS,
@@ -114,6 +116,44 @@ test('sheet card/page backgrounds follow the theme except in midnight', () => {
     const colors = appThemeSheetColors(theme)
     expect(appThemeSheetCardBackground(theme, config)).toBe(colors.bgSurface)
     expect(appThemeSheetPageBackground(theme, config)).toBe(colors.bgBase)
+  }
+})
+
+// ---- Standalone sheets that follow the app theme ----------------------------
+
+test('appThemeSheetVars: default config is the theme palette plus default fonts', () => {
+  const vars = appThemeSheetVars('parchment') as Record<string, string>
+
+  // The theme's own values, variable for variable.
+  expect(vars['--bg-base']).toBe(PARCHMENT_SHEET_COLORS.bgBase)
+  expect(vars['--accent-violet']).toBe(PARCHMENT_SHEET_COLORS.accent)
+  expect(vars['--hp-bar-color']).toBe(PARCHMENT_SHEET_COLORS.hpBar)
+  // The historical standalone card background and the default font stack —
+  // never a character's own customization.
+  expect(vars['--sheet-bg']).toBe(
+    appThemeSheetCardBackground('parchment', DEFAULT_SHEET_CONFIG),
+  )
+  expect(vars['--sheet-heading-font']).toBe(
+    DEFAULT_SHEET_CONFIG.sectionHeadingFontFamily,
+  )
+  expect(vars['--sheet-heading-weight']).toBe(
+    DEFAULT_SHEET_CONFIG.sectionHeadingFontWeight,
+  )
+  expect(vars['--sheet-label-font']).toBe(DEFAULT_SHEET_CONFIG.labelFontFamily)
+  expect(vars['--sheet-text-font']).toBe(DEFAULT_SHEET_CONFIG.textFontFamily)
+  expect(vars['--sheet-helper-font']).toBe(
+    DEFAULT_SHEET_CONFIG.helperTextFontFamily,
+  )
+})
+
+test('appThemeSheetVars: an NPC config renders identically to the default', () => {
+  // An NPC record carries the default config, so a character sheet that passes
+  // no config at all (the "Match app theme" switch) must land on the exact same
+  // style an NPC sheet renders — under every app theme.
+  for (const theme of APP_THEMES) {
+    expect(appThemeSheetVars(theme, createDefaultNPC().config)).toEqual(
+      appThemeSheetVars(theme),
+    )
   }
 })
 

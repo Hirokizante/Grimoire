@@ -21,7 +21,13 @@
 import { useState } from 'react'
 
 import { useCharacterStore } from '@/store/characterStore'
-import { colorVars } from '@/lib/themeUtils'
+import { useAppThemeStore } from '@/store/appThemeStore'
+import { useCharacterSheetThemeStore } from '@/store/characterSheetThemeStore'
+import {
+  appThemeSheetVars,
+  appThemeStatColors,
+  colorVars,
+} from '@/lib/themeUtils'
 import { useImportedFonts } from '@/hooks/useImportedFonts'
 import type { Character, SheetColors } from '@/types'
 import type { SheetMode } from '@/pages/CharacterSheetPage'
@@ -84,9 +90,18 @@ export default function CharacterSheet({
   const setSlottedViewMode = (m: 'grid' | 'list') => updateSectionViewMode('slottedAbilities', m)
   const setPoolViewMode = (m: 'grid' | 'list') => updateSectionViewMode('abilityPool', m)
 
+  // Settings → Character Sheets → "Match app theme" turns the sheet into the
+  // same presentation an NPC sheet always uses: the app theme's palette, the
+  // default sheet fonts and card background, no custom CSS, no flat-section
+  // layout override, and no Customize button. Cosmetic and read-only — the
+  // character's config is only read, never written, so turning the switch back
+  // off restores every custom value.
+  const matchAppTheme = useCharacterSheetThemeStore((s) => s.matchAppTheme)
+  const appTheme = useAppThemeStore((s) => s.theme)
+
   const EMPTY_FONTS: never[] = []
   const importedFonts = useCharacterStore((s) => s.currentCharacter?.config.importedFonts ?? EMPTY_FONTS)
-  useImportedFonts(importedFonts)
+  useImportedFonts(matchAppTheme ? EMPTY_FONTS : importedFonts)
 
   const char = character ?? storeCharacter
   const [showMilestoneDialog, setShowMilestoneDialog] = useState(false)
@@ -100,26 +115,30 @@ export default function CharacterSheet({
 
   const { config } = char
   const c = config.colors
-  const styleVars = {
-    '--sheet-bg': config.backgroundColor,
-    '--sheet-heading-font': config.sectionHeadingFontFamily,
-    '--sheet-heading-weight': config.sectionHeadingFontWeight,
-    '--sheet-label-font': config.labelFontFamily,
-    '--sheet-text-font': config.textFontFamily,
-    '--sheet-helper-font': config.helperTextFontFamily,
-    ...sheetColorVars(c),
-  } as React.CSSProperties
+  const styleVars = matchAppTheme
+    ? appThemeSheetVars(appTheme)
+    : ({
+        '--sheet-bg': config.backgroundColor,
+        '--sheet-heading-font': config.sectionHeadingFontFamily,
+        '--sheet-heading-weight': config.sectionHeadingFontWeight,
+        '--sheet-label-font': config.labelFontFamily,
+        '--sheet-text-font': config.textFontFamily,
+        '--sheet-helper-font': config.helperTextFontFamily,
+        ...sheetColorVars(c),
+      } as React.CSSProperties)
 
   return (
     <div
       className={
         'character-sheet' +
-        (config.hideSectionBackground ? ' character-sheet--flat' : '') +
+        (!matchAppTheme && config.hideSectionBackground
+          ? ' character-sheet--flat'
+          : '') +
         (mode === 'edit' ? ' character-sheet--edit' : ' character-sheet--view')
       }
       style={styleVars}
     >
-      {config.customCss && (
+      {!matchAppTheme && config.customCss && (
         <style
           dangerouslySetInnerHTML={{ __html: config.customCss }}
         />
@@ -152,7 +171,14 @@ export default function CharacterSheet({
 
       {activeTab === 'main' ? (
         <>
-          <HeroSection character={char} mode={mode} onLevelUp={() => setShowMilestoneDialog(true)} onCustomize={onCustomizeToggle} onExport={() => setShowExport(true)} />
+          <HeroSection
+            character={char}
+            mode={mode}
+            onLevelUp={() => setShowMilestoneDialog(true)}
+            onCustomize={matchAppTheme ? undefined : onCustomizeToggle}
+            onExport={() => setShowExport(true)}
+            tokenColors={matchAppTheme ? appThemeStatColors(appTheme) : undefined}
+          />
 
           <CoreAbilitySection
             innateDescription={char.innateDescription}

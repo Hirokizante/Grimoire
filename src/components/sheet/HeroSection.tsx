@@ -11,6 +11,7 @@ import StatsSection from '@/components/sheet/StatsSection'
 import SheetLabelPills from '@/components/sheet/SheetLabelPills'
 import EditLabelsModal from '@/components/sheet/EditLabelsModal'
 import { useCharacterStore } from '@/store/characterStore'
+import type { StatColorKey } from '@/lib/themeUtils'
 import type { Character } from '@/types'
 import type { SheetMode } from '@/pages/CharacterSheetPage'
 
@@ -20,9 +21,16 @@ export interface HeroSectionProps {
   onLevelUp?: () => void
   onCustomize?: () => void
   onExport?: () => void
+  /**
+   * Combat Stats accents for the embedded {@link StatsSection}. Passed when
+   * the sheet follows the app theme (see `characterSheetThemeStore`) so the
+   * row reads like an NPC sheet's; omitted on a customized sheet, which keeps
+   * its own token colors.
+   */
+  tokenColors?: Partial<Record<StatColorKey, string>>
 }
 
-export default function HeroSection({ character, mode = 'view', onLevelUp, onCustomize, onExport }: HeroSectionProps) {
+export default function HeroSection({ character, mode = 'view', onLevelUp, onCustomize, onExport, tokenColors }: HeroSectionProps) {
   const updateCharacter = useCharacterStore((s) => s.updateCharacter)
   const setCharacterLabels = useCharacterStore((s) => s.setCharacterLabels)
   const update = (updater: (c: Character) => Character) =>
@@ -159,6 +167,7 @@ export default function HeroSection({ character, mode = 'view', onLevelUp, onCus
           mode={mode}
           variant="flat"
           showCustomAttributes
+          tokenColors={tokenColors}
         />
         <AttributesSection character={character} attributes={character.attributes} mode={mode} variant="flat" />
       </div>

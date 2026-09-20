@@ -58,11 +58,13 @@ tracking resources and rolling dice.
   sheet.
 - **Customization** — every sheet colour as a swatch, 14 one-click theme
   presets, per-element font selection, a background image, and an optional raw
-  CSS box.
+  CSS box — or switched off app-wide so every character sheet follows the app
+  theme like an NPC sheet.
 - **Import / export** — versioned JSON exports with a browsable version history
   and an "update existing" merge, plus a full backup and restore of all app data
   in Settings.
-- **App settings** — app-wide themes and the home page animation.
+- **App settings** — app-wide themes, sheet and GM-panel theme matching, dice
+  display, and the home page animation.
 
 This is a summary: the complete behaviour reference — every option, default, and
 limitation — lives in [docs/features.md](docs/features.md).

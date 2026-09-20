@@ -417,6 +417,12 @@ Grimoire is built to support that freedom:
 - **View modes per section** — grid or list layout for Slotted Abilities, Ability Pool, each custom
   section, and an NPC's Abilities (on the NPC's own sheet page *and* in every bundled-NPC section of
   a character sheet, which keeps the parent tab's choice), persisted per sheet.
+- **Match app theme** — *Settings → Character Sheets → Match app theme* disables the appearance
+  customization above at once: every character sheet renders with the active app theme's palette,
+  the default fonts and card background, and no background image or custom CSS — exactly like an NPC
+  sheet. The Customize button is hidden with it, while per-section view modes keep working.
+  Display-only and reversible: nothing about the character record changes (see
+  [App settings](#character-sheets-can-match-the-app-theme)).
 
 ### Writing custom CSS
 
@@ -441,7 +447,9 @@ for them:
   **Mikami** (Nord on near-black, from Ghostty), and **Pitch Black** (pure black with cream, gold,
   and muted teal, from Ghostty).
 - **Persistence** — the choice persists in `localStorage` and applies before first paint.
-- **Sheet color themes are unaffected** — those stay per-character in the Customization panel.
+- **Sheet color themes are unaffected by default** — those stay per-character in the Customization
+  panel. *Settings → Character Sheets → Match app theme* can make character sheets follow the app
+  theme instead.
 
 ### UI style
 
@@ -492,6 +500,19 @@ Pick the ambient effect behind the home page title in Settings:
 - **Display only** — the character's own sheet page, its Customization panel, and its exports are
   never changed.
 
+### Character sheets can match the app theme
+
+- **Settings → Character Sheets → Match app theme** drops a character sheet's whole customization —
+  palette, fonts, card and page backgrounds, background image, and custom CSS — and renders it with
+  the active app theme, exactly as an NPC sheet always renders. The Customize button is hidden with
+  it, since there is nothing left to customize against.
+- **Follows the sheet everywhere** — the page canvas, title bar, character selector, dice result
+  modal, and roll-log drawer all stay on the app theme too, so nothing around the sheet disagrees
+  with it.
+- **Off by default**, so each sheet keeps the character's own customization unless asked otherwise.
+- **Display only and reversible** — the character record is never changed; turning the switch back
+  off restores every custom value, and exports, versions, and backups are unaffected.
+
 ### One Combat Stats palette for every sheet
 
 `STAT_TOKEN_COLORS` in `themeUtils.ts` gives each app theme a tuned accent per stat, covering both
@@ -509,8 +530,8 @@ rows a sheet can show:
   contrast; the shipped palettes sit at ≥ 18 and ≥ 3.7:1.
 - **Who reads it** — a standalone NPC sheet reads this palette because it has no customization of
   its own; a player's own sheet page uses the character's per-sheet token colors from the
-  Customization panel, while a **GM panel's Combat Stats row — either kind — always reads this
-  palette** (see [GM Screen](gm-screen.md)).
+  Customization panel (or this palette when *Match app theme* is on), while a **GM panel's Combat
+  Stats row — either kind — always reads this palette** (see [GM Screen](gm-screen.md)).
 - **Embedded NPC sections** — NPC sections embedded in a player character sheet never apply colors
   of their own, so the player sheet's theme takes precedence there.
 

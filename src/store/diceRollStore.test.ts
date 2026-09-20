@@ -73,6 +73,7 @@ vi.mock('@/store/appThemeStore', async (importOriginal) => {
 import { useDiceRollStore, themeEntity } from '@/store/diceRollStore'
 import { useCharacterStore } from '@/store/characterStore'
 import { useAppThemeStore } from '@/store/appThemeStore'
+import { useCharacterSheetThemeStore } from '@/store/characterSheetThemeStore'
 import { PARCHMENT_SHEET_COLORS } from '@/constants/gameData'
 import { rollNotation } from '@/lib/diceRoller'
 import { blankAbility } from '@/components/sheet/AbilityBlockEditor'
@@ -97,6 +98,8 @@ beforeEach(() => {
   nextId.value = 1
   rollQueue.length = 0
   useAppThemeStore.setState({ theme: 'parchment' })
+  // localStorage.clear() does not reset already-hydrated store state.
+  useCharacterSheetThemeStore.setState({ matchAppTheme: false })
   useDiceRollStore.setState({
     isVisible: false,
     result: null,
@@ -119,6 +122,70 @@ test('player sheet rolls theme with their own colors', () => {
   })
   useDiceRollStore.setState({ rollCharacter: player })
   expect(themeEntity()).toBe(player)
+})
+
+test('player sheet rolls follow the app theme when the sheet matches it', () => {
+  // Settings → Character Sheets → "Match app theme": the sheet page renders
+  // the app theme, so the modal it opens must too. The record itself is only
+  // read, never rewritten.
+  useCharacterSheetThemeStore.setState({ matchAppTheme: true })
+  const player = makePlayer({
+    id: 'player-1',
+    config: {
+      ...createDefaultCharacter().config,
+      colors: { ...DEFAULT_SHEET_COLORS, accent: '#123456' },
+    },
+  })
+  useCharacterStore.setState({
+    currentCharacter: player,
+    characters: [player],
+  })
+  useDiceRollStore.setState({ rollCharacter: player })
+
+  const entity = themeEntity()
+  expect(entity?.id).toBe('player-1')
+  expect(entity?.config.colors).toEqual(PARCHMENT_SHEET_COLORS)
+  expect(player.config.colors.accent).toBe('#123456')
+})
+
+test('GM panel player rolls ignore the character-sheet setting', () => {
+  // The setting is scoped to the sheet page: a player panel's body is themed
+  // by the GM's own "Match app theme" switch (gmPanelThemeStore), so its roll
+  // modal keeps the panel body's palette here.
+  useCharacterSheetThemeStore.setState({ matchAppTheme: true })
+  const player = makePlayer({
+    id: 'player-2',
+    config: {
+      ...createDefaultCharacter().config,
+      colors: { ...DEFAULT_SHEET_COLORS, accent: '#654321' },
+    },
+  })
+  useCharacterStore.setState({ currentCharacter: null, characters: [player] })
+  useDiceRollStore.setState({ rollCharacter: player })
+
+  const entity = themeEntity()
+  expect(entity?.id).toBe('player-2')
+  expect(entity?.config.colors.accent).toBe('#654321')
+})
+
+test('embedded NPC section rolls inherit the host sheet colors when matching', () => {
+  useCharacterSheetThemeStore.setState({ matchAppTheme: true })
+  const player = makePlayer({
+    id: 'player-1',
+    config: {
+      ...createDefaultCharacter().config,
+      colors: { ...DEFAULT_SHEET_COLORS, accent: '#123456' },
+    },
+  })
+  useCharacterStore.setState({
+    currentCharacter: player,
+    characters: [player],
+  })
+  useDiceRollStore.setState({ rollCharacter: makeNPC() })
+
+  const entity = themeEntity()
+  expect(entity?.id).toBe('player-1')
+  expect(entity?.config.colors).toEqual(PARCHMENT_SHEET_COLORS)
 })
 
 test('embedded NPC section rolls inherit the host player sheet colors', () => {

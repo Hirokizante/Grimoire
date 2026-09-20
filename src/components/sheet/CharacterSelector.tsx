@@ -16,6 +16,7 @@
 import { ChevronLeft, ChevronRight } from '@/components/ui/icons'
 
 import { useCharacterStore } from '@/store/characterStore'
+import { useCharacterSheetThemeStore } from '@/store/characterSheetThemeStore'
 import { colorVars } from '@/lib/themeUtils'
 import type { Character } from '@/types'
 
@@ -36,6 +37,7 @@ export default function CharacterSelector({
   const characters = useCharacterStore((s) => s.characters)
   const currentCharacter = useCharacterStore((s) => s.currentCharacter)
   const selectCharacter = useCharacterStore((s) => s.selectCharacter)
+  const matchAppTheme = useCharacterSheetThemeStore((s) => s.matchAppTheme)
 
   const list: Character[] =
     kind === 'npc'
@@ -44,9 +46,11 @@ export default function CharacterSelector({
 
   // On a player character sheet, the selector inherits that sheet's color
   // scheme: inline CSS custom properties shadow the app-theme root vars for
-  // both the panel and its toggle tab. NPC pages stay on the app theme.
+  // both the panel and its toggle tab. NPC pages stay on the app theme — and
+  // so does a character sheet with "Match app theme" on.
   const paletteStyle =
     kind === 'character' &&
+    !matchAppTheme &&
     currentCharacter !== null &&
     currentCharacter.kind !== 'npc'
       ? (colorVars(currentCharacter.config.colors) as React.CSSProperties)
