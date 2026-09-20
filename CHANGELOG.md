@@ -4,7 +4,51 @@ All notable changes to Grimoire are documented here. This project is in alpha:
 storage format may change between pre-1.0 releases, so export (or back up) your
 characters regularly.
 
-## Unreleased
+## v0.13.0-alpha — 2026-09-20
+
+The interface release. Seven commits since `v0.12.0-alpha`, and the app around
+the character becomes the thing you get to choose. **Settings → Interface** adds
+a UI style picker: *Default* is the look you know, *Terminal* is a
+retrofuturistic reskin — square corners, Iosevka monospace chrome, phosphor
+glow, pixel icons, a CRT overlay on the home page, and motion that steps where
+it does not snap — and because style and color are independent, Terminal pairs
+with any theme. Character sheets can now be told to match the app theme, fonts
+included, dropping their customization display-only and reversibly; dice badges
+can read as the min–max range they can roll; helper text is cut across settings,
+panels, and modals; and a minor ability's Activate strip finally matches the
+card it sits under.
+
+**No migration to run** — the IndexedDB schema stays at version 5 and no stored
+record changed shape: every new preference is localStorage-only and applied
+before first paint, the Terminal reskin is a scoped stylesheet over the same
+DOM, and matching a sheet to the app theme only changes what the render reads.
+A sheet with a font customization of its own keeps it.
+
+### A Terminal interface style
+
+- **Settings → Interface gains a UI style picker.** *Default* is the existing
+  look — soft corners, system sans, gentle easing. *Terminal* is a
+  retrofuturistic reskin: square corners everywhere, monospace chrome, phosphor
+  glow on headings and active controls, a CRT scanline/sweep overlay on the home
+  page, and stepped frame-by-frame motion, with an inline preview on each card.
+  It is built to pair with the **Terminal Boot** home animation, but works with
+  either.
+- **A reskin, not a theme — and never a data change.** The style changes shape,
+  typography, and motion, never palettes: Terminal pairs with Midnight,
+  Parchment, Mikami, or Pitch Black, and per-character sheet customization is
+  untouched. The whole override layer is `src/terminal-ui.css`, imported last in
+  `main.tsx` so its scoped rules win cascade ties; its one `!important` is the
+  global radius reset that squares off the 160+ radius declarations spread
+  across four stylesheets, and all of its motion honors `prefers-reduced-motion`.
+- **Display only and reversible.** The choice persists to localStorage
+  (`grimoire:ui-style`, applied as `data-ui-style` on `<html>` before first
+  paint); no character, screen, or status record is written, and switching back
+  to Default restores the original look exactly.
+- **Covered by** `uiStyleStore.test.ts` — the default, the valid-value guard,
+  the localStorage round-trip and its failure path — and `e2e/ui-style.spec.ts`:
+  the attribute applied, a component's own radius collapsing to 0px,
+  persistence across reload, a clean revert, the home-only click-through
+  overlay, and a 360px viewport with no overflow.
 
 ### Character sheets can match the app theme
 
@@ -16,6 +60,11 @@ characters regularly.
 - **One voice around the sheet.** The page canvas, title bar, character selector, dice result modal,
   and roll-log drawer all follow the app theme while the switch is on, so nothing around the sheet
   disagrees with it; Combat Stats read the shared per-theme stat palette like an NPC row.
+- **The fonts follow the app too.** An NPC sheet, and a player sheet with *Match app theme* on,
+  no longer render in the default Georgia/system-sans pair: `appThemeSheetVars` stopped setting the
+  `--sheet-*-font` properties, so both inherit the chrome's type — system-ui in Default, Iosevka in
+  Terminal, headings at the chrome's 600 weight — while a sheet with a font choice of its own keeps
+  it.
 - **Display only and reversible.** The character record is never written: turning the switch back
   off restores every custom color, font, image, and CSS rule, and exports, versions, and backups are
   unaffected. Both standalone sheet bodies now build their style through one helper
@@ -25,13 +74,17 @@ characters regularly.
   `CharacterSheetPage.test.tsx`, the `appThemeSheetVars` tests in `themeUtils.test.ts`, and
   `diceRollStore.test.ts`'s theme resolution.
 
-### Terminal style: pixel icons, instant transitions, flat sheet tabs
+### Terminal style: pixel icons, Iosevka, instant transitions, flat sheet tabs
 
 - **Pixelarticons replace Lucide in Terminal.** Every app icon is now imported from a style-aware
   wrapper set (`src/components/ui/icons.tsx`) that keeps the Lucide name and renders Lucide in
   Default or its Pixelarticons counterpart in Terminal. Call sites did not change shape; the pack
   is picked per icon at render time, `strokeWidth` stays Lucide-only, and each icon carries
   `data-icon-pack` so the swap is observable.
+- **Iosevka becomes the chrome's voice.** The Terminal style's monospace stack (`--terminal-font`),
+  the Terminal Boot animation, and both Settings previews now ship Iosevka with the app — bundled
+  via `@fontsource` at latin 400, 400 italic, 500, 600, and 700 — so the style no longer depends on
+  what monospace the device happens to have.
 - **Page switches and pop-ups open instantly.** The Terminal style's stepped boot-in fade is gone:
   pages mount with no animation and modals / the roll-log drawer open in place (`animation: none`),
   matching the default style's snappiness. The home page keeps its boot-in.
@@ -40,7 +93,7 @@ characters regularly.
   merge into the section exactly like Default.
 - **Testing.** `icons.test.tsx` pins the pack swap per style, the size mapping and the ignored
   `strokeWidth`; `e2e/ui-style.spec.ts` pins the DOM pack swap in both directions, the
-  no-animation page and modal, and the flat, seam-free tab.
+  no-animation page and modal, the flat, seam-free tab, and the Iosevka font stack.
 
 ### Dice badges can read as min-max ranges
 
@@ -63,6 +116,30 @@ characters regularly.
   `DiceHighlighter.test.tsx` pins the relabel, that the click still rolls the
   notation, and the no-character fallback; `e2e/dice-notation.spec.ts` toggles the
   setting in Settings, reloads, and pins the badge plus the unchanged roll.
+
+### Less helper text across settings, panels, and modals
+
+- **The app stopped explaining itself twice.** About 200 lines of hint copy are gone — Settings
+  lost a paragraph under nearly every section, and the GM Screen's Add Status modal, the ability
+  block and limited-uses editors, the modifier fields, the activation-roll fields, the
+  custom-attribute modals, the customization panel, and the add-section picker all dropped their
+  blurbs — leaving labels, placeholders, and live values to carry the meaning. The hints that
+  guard a real edge case stayed: the Mortal Wound picker still says when the track has no free
+  slot, and the labels modal still warns that labels never leave the device.
+- **Testing.** `ActivationRollFields.test.tsx`, `AbilityLimitedUsesEditor.test.tsx`, and
+  `CustomAttributeStrip.test.tsx` drop the assertions that pinned the removed copy; the surviving
+  hints keep theirs.
+
+### A minor ability's Activate strip reads as part of its card
+
+- **A minor ability card is a dashed violet tint, but its Activate strip was solid,** so the card
+  read as two mismatched pieces. The outline and tint now continue into the strip, scoped to the
+  direct child footer so a sub-ability's borderless footer is never caught, with per-side border
+  styles so no line crosses the card/footer seam.
+- **The Minor pill's all-caps text sits optically centred.** Browsers centre the font's line box,
+  not the capitals, and in fonts like Garamond/"Hoefler Text" the caps hugged the pill's top edge;
+  `text-box: trim-both cap alphabetic` trims the box to cap height and baseline where supported,
+  leaving the previous padding as the fallback.
 
 ## v0.12.0-alpha — 2026-09-19
 
