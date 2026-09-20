@@ -1720,6 +1720,19 @@
   color: var(--bg-base);
 }
 
+/* A pill of all-caps text: the browser centres the FONT's line box, not the
+   capitals, and in fonts whose ascent/descent metrics sit off-centre (the
+   Garamond/"Hoefler Text" option, for one) the caps visibly hug the top edge.
+   Trim the box to the cap height and alphabetic baseline where `text-box` is
+   supported, then let equal padding do the centring. The 1px padding above is
+   the fallback for browsers without `text-box` — unchanged appearance there. */
+@supports (text-box: trim-both cap alphabetic) {
+  .ability-card__minor-badge {
+    text-box: trim-both cap alphabetic;
+    padding: 5px 7px;
+  }
+}
+
 .ability-card__traits {
   list-style: none;
   margin: 0;
@@ -3593,6 +3606,20 @@
   border-bottom-left-radius: 10px;
   border-bottom-right-radius: 10px;
   background: var(--bg-surface-raised);
+}
+
+/* A minor ability's dashed violet outline and translucent tint continue into
+   the Activate strip, so the card and its footer read as one dashed block.
+   Scoped to the direct child footer so a sub-ability block's footer (borderless
+   by its own rule) is never caught. The border styles are per side on purpose:
+   a `border-style` shorthand would restore the `border-top: none` above and
+   draw a line across the card/footer seam. */
+.ability-activation:has(> .ability-card--minor) > .ability-activation__footer {
+  border-left-style: dashed;
+  border-right-style: dashed;
+  border-bottom-style: dashed;
+  border-color: var(--accent-violet);
+  background: color-mix(in srgb, var(--accent-violet) 6%, transparent);
 }
 
 .ability-activation__btn {
