@@ -41,6 +41,8 @@ import { useCharacterSheetThemeStore } from '@/store/characterSheetThemeStore'
 import { useDiceDisplayStore } from '@/store/diceDisplayStore'
 import { useGMScreenStore } from '@/store/gmScreenStore'
 import { useGmPanelThemeStore } from '@/store/gmPanelThemeStore'
+import { useGmScreenViewStore } from '@/store/gmScreenViewStore'
+import type { GmScreenViewMode } from '@/store/gmScreenViewStore'
 import { useHomeAnimationStore } from '@/store/homeAnimationStore'
 import type { HomeAnimation } from '@/store/homeAnimationStore'
 import { useRollLogStore } from '@/store/rollLogStore'
@@ -69,6 +71,14 @@ interface UiStyleOption {
   name: string
   description: string
   /** Tiny inline preview of the style's shape language. */
+  preview: React.ReactNode
+}
+
+interface ViewModeOption {
+  id: GmScreenViewMode
+  name: string
+  description: string
+  /** Tiny inline preview of the layout's shape. */
   preview: React.ReactNode
 }
 
@@ -134,6 +144,39 @@ const UI_STYLE_OPTIONS: UiStyleOption[] = [
   },
 ]
 
+const GM_VIEW_MODE_OPTIONS: ViewModeOption[] = [
+  {
+    id: 'grid',
+    name: 'Grid',
+    description: 'Draggable panels in two columns — the classic GM screen.',
+    preview: (
+      <span className="style-preview" aria-hidden="true">
+        <span className="style-preview__card" />
+        <span className="style-preview__card style-preview__card--right" />
+      </span>
+    ),
+  },
+  {
+    id: 'immersive',
+    name: 'Immersive List',
+    description:
+      'A character rail on the left and one encounter-ready sheet at a time.',
+    preview: (
+      <span className="style-preview style-preview--split" aria-hidden="true">
+        <span className="style-preview__rail">
+          <span className="style-preview__dot" />
+          <span className="style-preview__dot" />
+          <span className="style-preview__dot" />
+        </span>
+        <span className="style-preview__card style-preview__card--wide">
+          <span className="style-preview__line" />
+          <span className="style-preview__line style-preview__line--short" />
+        </span>
+      </span>
+    ),
+  },
+]
+
 const THEME_OPTIONS: ThemeOption[] = [
   {
     id: 'midnight',
@@ -187,6 +230,8 @@ export default function SettingsPage() {
   )
   const gmPanelMatchAppTheme = useGmPanelThemeStore((s) => s.matchAppTheme)
   const setGmPanelMatchAppTheme = useGmPanelThemeStore((s) => s.setMatchAppTheme)
+  const gmViewMode = useGmScreenViewStore((s) => s.viewMode)
+  const setGmViewMode = useGmScreenViewStore((s) => s.setViewMode)
   const homeAnimation = useHomeAnimationStore((s) => s.animation)
   const setHomeAnimation = useHomeAnimationStore((s) => s.setAnimation)
   const homeAnimationEnabled = useHomeAnimationStore((s) => s.enabled)
@@ -439,6 +484,39 @@ export default function SettingsPage() {
         <h2 className="settings-section__title" id="settings-gm-screen-heading">
           GM Screen
         </h2>
+
+        <div className="theme-picker" role="radiogroup" aria-label="GM Screen layout">
+          {GM_VIEW_MODE_OPTIONS.map((option) => {
+            const isActive = gmViewMode === option.id
+            return (
+              <button
+                key={option.id}
+                type="button"
+                role="radio"
+                aria-checked={isActive}
+                className={
+                  'theme-option' + (isActive ? ' theme-option--active' : '')
+                }
+                onClick={() => setGmViewMode(option.id)}
+              >
+                <span className="animation-preview" aria-hidden="true">
+                  {option.preview}
+                </span>
+                <span className="theme-option__label">
+                  <span className="theme-option__name">{option.name}</span>
+                  {isActive && (
+                    <span className="theme-option__check" aria-hidden="true">
+                      <Check size={14} />
+                    </span>
+                  )}
+                </span>
+                <span className="theme-option__desc">
+                  {option.description}
+                </span>
+              </button>
+            )
+          })}
+        </div>
 
         <div className="settings-toggle-row">
           <span

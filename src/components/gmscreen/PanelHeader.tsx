@@ -1,10 +1,17 @@
 /**
  * PanelHeader — shared header row for every GM Screen panel.
  *
- * Shows the 48px circular portrait, name (+ optional subtitle), the
- * compact/expanded density toggle, and the ⋯ panel menu. The drag handle
- * itself lives in {@link SortablePanel} so it sits outside the panel chrome
- * and stays reachable in every density.
+ * Shows the portrait, name (+ optional subtitle), the compact/expanded density
+ * toggle, and the ⋯ panel menu. The drag handle itself lives in
+ * {@link SortablePanel} so it sits outside the panel chrome and stays
+ * reachable in every density.
+ *
+ * The encounter view additionally passes `tokens` — its combat stat pills —
+ * which sit in the header's lead block: the name and subtitle share the top
+ * line, the tokens line up under them, both beside the portrait. The longer
+ * layout reads "Name Player" on one line (no truncating the player name to
+ * fit tokens beside it) and lets the tokens run the full width under the
+ * names instead of wrapping onto two rows of their own.
  */
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
@@ -30,8 +37,19 @@ export interface PanelHeaderProps {
   menuItems: PanelMenuItem[]
   /** Extra badge slot (e.g. an NPC condition badge). */
   badge?: React.ReactNode
+  /**
+   * Inline stat pills (the encounter view's combat stat tokens), rendered
+   * under the name/subtitle line, beside the portrait.
+   */
+  tokens?: React.ReactNode
   /** Marks a downed/dead instance: dims the label and strikes it through. */
   dimmed?: boolean
+  /**
+   * Hide the compact/expanded toggle. The encounter view always shows its
+   * sheet body, so it has nothing for the toggle to do; grid panels keep it
+   * (the default).
+   */
+  showDensityToggle?: boolean
 }
 
 /** Gap between the kebab and its menu, matching the old in-panel placement. */
@@ -47,7 +65,9 @@ export default function PanelHeader({
   onDensityChange,
   menuItems,
   badge,
+  tokens,
   dimmed = false,
+  showDensityToggle = true,
 }: PanelHeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [menuPlacement, setMenuPlacement] = useState({ top: 0, left: 0 })
@@ -125,34 +145,42 @@ export default function PanelHeader({
 
   return (
     <header className="gm-panel__header">
-      {portrait ? (
-        <img className="gm-panel__portrait" src={portrait} alt="" />
-      ) : (
-        <div className="gm-panel__portrait gm-panel__portrait--empty" aria-hidden="true" />
-      )}
+      <div className="gm-panel__lead">
+        {portrait ? (
+          <img className="gm-panel__portrait" src={portrait} alt="" />
+        ) : (
+          <div className="gm-panel__portrait gm-panel__portrait--empty" aria-hidden="true" />
+        )}
 
-      <div className="gm-panel__identity">
-        <span
-          className={'gm-panel__name' + (dimmed ? ' gm-panel__name--dimmed' : '')}
-          title={name}
-        >
-          {name}
-        </span>
-        {subtitle && <span className="gm-panel__subtitle">{subtitle}</span>}
+        <div className="gm-panel__lead-text">
+          <div className="gm-panel__identity">
+            <span
+              className={'gm-panel__name' + (dimmed ? ' gm-panel__name--dimmed' : '')}
+              title={name}
+            >
+              {name}
+            </span>
+            {subtitle && <span className="gm-panel__subtitle">{subtitle}</span>}
+          </div>
+
+          {tokens}
+        </div>
       </div>
 
       {badge}
 
       <div className="gm-panel__controls">
-        <button
-          type="button"
-          className="btn btn--icon gm-panel__density"
-          onClick={() => onDensityChange(expanded ? 'compact' : 'expanded')}
-          aria-label={expanded ? `Collapse ${name}` : `Expand ${name}`}
-          title={expanded ? 'Collapse panel' : 'Expand panel'}
-        >
-          {expanded ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
-        </button>
+        {showDensityToggle && (
+          <button
+            type="button"
+            className="btn btn--icon gm-panel__density"
+            onClick={() => onDensityChange(expanded ? 'compact' : 'expanded')}
+            aria-label={expanded ? `Collapse ${name}` : `Expand ${name}`}
+            title={expanded ? 'Collapse panel' : 'Expand panel'}
+          >
+            {expanded ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
+          </button>
+        )}
 
         <div className="gm-panel__menu-wrap" ref={menuWrapRef}>
           <button

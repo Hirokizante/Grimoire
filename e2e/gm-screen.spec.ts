@@ -2320,3 +2320,234 @@ test.describe('GM Screen', () => {
     await expect(header).toHaveCSS('pointer-events', 'auto')
   })
 })
+
+test.describe('GM Screen — immersive list view', () => {
+  /** The Settings page's GM Screen layout picker. */
+  const LAYOUT_PICKER = '[aria-label="GM Screen layout"]'
+
+  async function openSettings(page: Page) {
+    await page.getByRole('button', { name: 'Settings' }).click()
+    await expect(page.locator(LAYOUT_PICKER)).toBeVisible()
+  }
+
+  async function switchToImmersive(page: Page) {
+    await openSettings(page)
+    await page
+      .locator(LAYOUT_PICKER)
+      .getByRole('radio', { name: /Immersive List/ })
+      .click()
+    await expect(
+      page.locator(LAYOUT_PICKER).getByRole('radio', { name: /Immersive List/ }),
+    ).toHaveAttribute('aria-checked', 'true')
+  }
+
+  test('the layout setting renders the drawer + encounter sheet and persists', async ({
+    page,
+  }) => {
+    await gotoHome(page)
+
+    await createPlayerCharacter(page, 'Vex')
+    await createNpc(page, 'Bandit')
+
+    await gotoGmScreen(page)
+    await page.getByRole('button', { name: 'New Screen' }).first().click()
+    await page.getByLabel('Screen name').fill('Immersive Session')
+    await page.getByRole('button', { name: 'Create' }).click()
+    await expect(page.getByRole('tab', { name: 'Immersive Session' })).toBeVisible()
+
+    // Grid view (default): the drawer is not in the DOM yet.
+    await expect(page.locator('.gm-drawer')).toHaveCount(0)
+
+    await switchToImmersive(page)
+
+    // Back on the GM screen: the drawer exists, empty for a new screen.
+    await gotoGmScreen(page)
+    await expect(page.locator('.gm-drawer')).toBeVisible()
+    await expect(page.locator('.gm-drawer-card')).toHaveCount(0)
+
+    // The Add actions live in the drawer now.
+    await page.locator('.gm-drawer').getByRole('button', { name: 'Add Character' }).click()
+    await page.getByRole('button', { name: /Vex/ }).click()
+    await page.locator('.gm-drawer').getByRole('button', { name: 'Add NPC' }).click()
+    const npcRow = page.locator('.gm-picker__list .gm-picker__item').filter({
+      hasText: 'Bandit',
+    })
+    await npcRow.click()
+    await npcRow.click()
+    await page.getByRole('button', { name: 'Done' }).click()
+
+    // Three quick-reference cards: the player and two instances.
+    await expect(page.locator('.gm-drawer-card')).toHaveCount(3)
+    // Number badges differentiate the two instances of the same base.
+    await expect(page.locator('.gm-drawer-card__num')).toHaveText(['1', '2'])
+
+    // The first panel is mounted by default: Vex's encounter sheet.
+    await expect(page.locator('.gm-encounter--character')).toBeVisible()
+    await expect(page.locator('.gm-encounter--character .gm-hp__track')).toBeVisible()
+
+    // Selecting a card swaps the main area to that instance. Click the card's
+    // select button (its body).
+    await page
+      .locator('.gm-drawer-card')
+      .filter({ hasText: 'Bandit 2' })
+      .locator('.gm-drawer-card__body')
+      .click()
+    await expect(page.locator('.gm-encounter--npc')).toBeVisible()
+    await expect(
+      page.locator('.gm-encounter--npc').getByRole('button', { name: 'Damage…' }),
+    ).toBeVisible()
+
+    // The encounter sheet runs the game: damage through its own chrome.
+    await page
+      .locator('.gm-encounter--npc')
+      .getByRole('button', { name: 'Damage…' })
+      .click()
+    await page.locator('.damage-dialog input[type=number]').fill('5')
+    // Armor off: the default statblock's armor would roll a d6 reduction per
+    // point and blur the expected result (the other specs do the same).
+    await page.getByLabel(/Apply Armor/).uncheck()
+    await page.getByRole('button', { name: 'Apply Damage' }).click()
+    await page
+      .locator('.damage-dialog')
+      .getByRole('button', { name: 'Close' })
+      .click()
+    await expect(
+      page.locator('.gm-encounter--npc').getByRole('img', { name: '15 of 20 hit points' }),
+    ).toBeVisible()
+
+    // ...and the drawer card mirrors it, read-only.
+    await expect(
+      page
+        .locator('.gm-drawer-card')
+        .filter({ hasText: 'Bandit 2' })
+        .locator('.gm-drawer-card__hp-value'),
+    ).toHaveText(/15/)
+
+    // The setting persists across a reload (localStorage, like the other
+    // view preferences). Autosave is debounced by 500ms; pause like a real
+    // GM would so the last write has been committed before the unload.
+    await page.waitForTimeout(700)
+    await page.reload()
+    await gotoGmScreen(page)
+    await expect(page.locator('.gm-drawer')).toBeVisible()
+    await expect(page.locator('.gm-drawer-card')).toHaveCount(3)
+  })
+
+  test('a long drawer list pins the footer: no document scroll, buttons on screen', async ({
+    page,
+  }) => {
+    await gotoHome(page)
+    await createNpc(page, 'Bandit')
+
+    await gotoGmScreen(page)
+    await page.getByRole('button', { name: 'New Screen' }).first().click()
+    await page.getByLabel('Screen name').fill('Crowded Session')
+    await page.getByRole('button', { name: 'Create' }).click()
+    await switchToImmersive(page)
+    await gotoGmScreen(page)
+
+    // Spawn enough instances that the card list must scroll inside the
+    // drawer (six instances far outgrow any viewport's worth of cards).
+    await page.locator('.gm-drawer').getByRole('button', { name: 'Add NPC' }).click()
+    const npcRow = page.locator('.gm-picker__list .gm-picker__item').filter({
+      hasText: 'Bandit',
+    })
+    for (let i = 0; i < 6; i++) await npcRow.click()
+    await page.getByRole('button', { name: 'Done' }).click()
+    await expect(page.locator('.gm-drawer-card')).toHaveCount(6)
+
+    // The immersive page owns the viewport: the document itself never
+    // scrolls, no matter how tall the sheet or the list grows (the encounter
+    // sheet scrolls inside the main area instead).
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () => document.documentElement.scrollHeight - document.documentElement.clientHeight,
+        ),
+      )
+      .toBeLessThanOrEqual(0)
+
+    // The footer's Add buttons are on screen with the list overflowing, and
+    // so is the "Characters" header — the drawer is pinned as one column.
+    const viewport = page.viewportSize()!
+    const footer = page.locator('.gm-drawer__foot')
+    await expect(footer.getByRole('button', { name: 'Add Character' })).toBeVisible()
+    await expect(footer.getByRole('button', { name: 'Add NPC' })).toBeVisible()
+    const footerBox = (await footer.boundingBox())!
+    expect(footerBox.y + footerBox.height).toBeLessThanOrEqual(viewport.height)
+    await expect(page.locator('.gm-drawer__title')).toBeInViewport()
+
+    // The long list scrolls inside the drawer: its overflow is real (the
+    // pinned footer is why) on any viewport worth of cards.
+    const listOverflows = await page
+      .locator('.gm-drawer__list')
+      .evaluate((el) => el.scrollHeight > el.clientHeight)
+    expect(listOverflows).toBe(true)
+
+    // Collapsed: the drawer keeps its pinned geometry.
+    await page.getByRole('button', { name: 'Collapse character list' }).click()
+    await expect(page.locator('.gm-drawer__rail')).toBeVisible()
+    const drawerBox = await page.locator('.gm-drawer').boundingBox()
+    expect(drawerBox!.y + drawerBox!.height).toBeLessThanOrEqual(viewport.height)
+  })
+
+  test('collapsing the drawer shrinks it to a portrait rail', async ({ page }) => {
+    await gotoHome(page)
+    await createPlayerCharacter(page, 'Vex')
+    await createNpc(page, 'Bandit')
+
+    await gotoGmScreen(page)
+    await page.getByRole('button', { name: 'New Screen' }).first().click()
+    await page.getByLabel('Screen name').fill('Rail Session')
+    await page.getByRole('button', { name: 'Create' }).click()
+    await switchToImmersive(page)
+    await gotoGmScreen(page)
+
+    await page.locator('.gm-drawer').getByRole('button', { name: 'Add Character' }).click()
+    await page.getByRole('button', { name: /Vex/ }).click()
+    await page.locator('.gm-drawer').getByRole('button', { name: 'Add NPC' }).click()
+    const npcRow = page.locator('.gm-picker__list .gm-picker__item').filter({
+      hasText: 'Bandit',
+    })
+    await npcRow.click()
+    await npcRow.click()
+    await page.getByRole('button', { name: 'Done' }).click()
+
+    await expect(page.locator('.gm-drawer-card')).toHaveCount(3)
+
+    // Collapse: the card list gives way to the portrait rail; the drawer
+    // box itself narrows rather than vanishing. (The width transition is
+    // 190ms, so settle before measuring the narrower box.)
+    const widthBefore = await page
+      .locator('.gm-drawer')
+      .evaluate((el) => el.getBoundingClientRect().width)
+    await page.getByRole('button', { name: 'Collapse character list' }).click()
+    await expect(page.locator('.gm-drawer__rail')).toBeVisible()
+    await expect(page.locator('.gm-drawer-card')).toHaveCount(0)
+    await page.waitForTimeout(300)
+
+    const widthAfter = await page
+      .locator('.gm-drawer')
+      .evaluate((el) => el.getBoundingClientRect().width)
+    expect(widthAfter).toBeLessThan(widthBefore)
+    expect(widthAfter).toBeGreaterThan(0)
+
+    // Rail portraits keep their badges; selecting one swaps the main area.
+    await expect(page.locator('.gm-drawer-rail-item__num')).toHaveText(['1', '2'])
+    await page.locator('.gm-drawer-rail-item[title="Bandit 2"]').click()
+    await expect(page.locator('.gm-encounter--npc')).toBeVisible()
+    // The collapsed drawer frees the rail's width, so the encounter's ability
+    // masonry gains a third column (two when expanded).
+    await expect(
+      page.locator('.gm-encounter--npc .ability-grid--list'),
+    ).toHaveCSS('column-count', '3')
+
+    // Expand again: the full card list is back, and the ability masonry drops
+    // back to two columns.
+    await page.getByRole('button', { name: 'Expand character list' }).click()
+    await expect(page.locator('.gm-drawer-card')).toHaveCount(3)
+    await expect(
+      page.locator('.gm-encounter--npc .ability-grid--list'),
+    ).toHaveCSS('column-count', '2')
+  })
+})

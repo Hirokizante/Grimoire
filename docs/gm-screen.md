@@ -72,6 +72,67 @@ NPC instances follow one rule: **instances are deltas, not clones.**
 
 ## Using it
 
+### View modes
+
+- **Settings → GM Screen → Layout** — **Grid** (the default) or **Immersive
+  List**. An app-level preference in localStorage, like the panel theming
+  switch: it changes how a screen *displays* on this browser, never what the
+  screen *contains*, so the screen record and backups are untouched.
+- **Grid** — the classic surface: draggable panels flowing down two columns.
+- **Immersive List** — a **character list drawer** slides out from the left,
+  and the rest of the screen shows **one character at a time** as a compact,
+  encounter-ready sheet.
+
+### The immersive list view
+
+- **The character drawer** — every panel on the screen (player characters and
+  spawned NPC instances) appears in the drawer as a read-only quick-reference
+  card: portrait, name, HP, the GM's tracked status pills, and the stat
+  tokens. None of the panel controls are there — no steppers, no damage
+  dialog, no menus — because the card's single interaction is **selecting the
+  character**, which mounts their encounter sheet in the main area.
+- **The drawer owns its column** — the immersive view is one screen of
+  chrome over a drawer-and-sheet row: the encounter sheet scrolls *inside*
+  the main area, so the page itself never scrolls. The drawer therefore stays
+  wholly visible however long its list grows — the "Characters" header, the
+  list (which scrolls itself) and the footer's Add Character / Add NPC
+  buttons are all always on screen.
+- **The rail** — collapsing the drawer (the chevron in its header) shrinks it
+  rather than hiding it: a vertical portrait rail on the left edge. Each rail
+  entry is still selectable, and each NPC instance carries a **number badge**
+  — the instance's 1-based ordinal among the screen's instances of the same
+  base, shown only when that base has more than one instance, which is exactly
+  when three spawned Bandits need telling apart.
+- **One glance vocabulary** — the drawer follows the panel chrome's dimming:
+  downed/dead instances dim and strike through their name, and a character out
+  of Action Points dims their card, so the drawer and the main area agree at a
+  glance.
+- **The main area** — the selected character's **encounter sheet**: the same
+  chrome a grid panel carries (header with the ⋯ menu, HP bar with the live
+  status strip and Damage dialog, the Mortal Wound track, the AP meter — all
+  wired to the same store actions), over a read-only body: combat stats and
+  attributes on top, then abilities owning the full width (list-view cards
+  packed as masonry — two columns, a third while the drawer is collapsed, one
+  on a phone — so more abilities show at once), with the skills table last as
+  reference material.
+- **No flavor, no editing** — the body omits the Innate narrative prose,
+  description, and background; level up, import/export, and customize live on
+  the sheet page (the menu's "Open sheet"). Everything renders in view mode;
+  running the character happens through the chrome, exactly as on a grid
+  panel.
+- **Add actions live in the drawer** — Add Character / Add NPC sit in the
+  drawer's footer (and a compact add button on the rail); the toolbar row
+  above the layout carries only the round tracker.
+- **Reordering** — drag a drawer card by its body itself (no dedicated grip;
+  a 6px activation distance keeps a plain click selecting rather than
+  dragging), or a rail portrait itself; the same `movePanel` action and array
+  order the grid view uses.
+- **Selection** — session state, not screen data: the first panel is mounted
+  on entry, and the selection falls back to the first panel when the current
+  one disappears. The drawer always starts expanded.
+- **Phones** — the expanded drawer overlays the main area instead of
+  squeezing it; the collapsed rail stays a slim column.
+
 ### Screens
 
 - **Create and switch** — create as many screens as you like ("Session 4", "Dungeon Run")

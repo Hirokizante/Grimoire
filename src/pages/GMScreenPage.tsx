@@ -49,11 +49,13 @@ import MissingPanel from '@/components/gmscreen/MissingPanel'
 
 import { useCharacterStore } from '@/store/characterStore'
 import { useGMScreenStore } from '@/store/gmScreenStore'
+import { useGmScreenViewStore } from '@/store/gmScreenViewStore'
 import { useRollLogStore } from '@/store/rollLogStore'
 import { useNotification } from '@/context/NotificationContext'
 import { distributeIntoColumns, resolvePanels } from '@/lib/gmScreenUtils'
 import { logInstanceTurnRoll } from '@/lib/gmScreenTurns'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
+import ImmersiveGMScreen from '@/components/gmscreen/immersive/ImmersiveGMScreen'
 
 import '@/components/gmscreen/gmscreen.css'
 
@@ -72,6 +74,9 @@ export default function GMScreenPage() {
   const removePanel = useGMScreenStore((s) => s.removePanel)
   const setScreenRound = useGMScreenStore((s) => s.setScreenRound)
   const startNewRound = useGMScreenStore((s) => s.startNewRound)
+  // Settings → GM Screen → Layout: the classic two-column grid, or the
+  // immersive list view (drawer + one encounter sheet at a time).
+  const viewMode = useGmScreenViewStore((s) => s.viewMode)
   const logRoll = useRollLogStore((s) => s.logRoll)
   const selectCharacter = useCharacterStore((s) => s.selectCharacter)
   const characters = useCharacterStore((s) => s.characters)
@@ -339,34 +344,55 @@ export default function GMScreenPage() {
         </div>
       ) : (
         <>
-          <div className="gm-screen__toolbar">
-            <button
-              type="button"
-              className="btn btn--primary"
-              onClick={() => setShowAddCharacter(true)}
-            >
-              <Users size={14} />
-              Add Character
-            </button>
-            <button
-              type="button"
-              className="btn btn--ghost"
-              onClick={() => setShowAddNpc(true)}
-            >
-              <Swords size={14} />
-              Add NPC
-            </button>
-            {/* The round tracker rides the same row as the Add actions, pushed
-                to the right: it is the encounter-level control, not another
-                panel source. */}
-            <RoundTracker
-              round={screen.round}
-              onRoundChange={(round) => setScreenRound(screen.id, round)}
-              onNewRound={handleNewRound}
-            />
-          </div>
+          {viewMode === 'immersive' ? (
+            /* Immersive list view: the Add actions live in the drawer, so
+               the toolbar row carries only the round tracker. */
+            <>
+              <div className="gm-screen__toolbar gm-screen__toolbar--immersive">
+                <RoundTracker
+                  round={screen.round}
+                  onRoundChange={(round) => setScreenRound(screen.id, round)}
+                  onNewRound={handleNewRound}
+                />
+              </div>
+              <ImmersiveGMScreen
+                screen={screen}
+                resolved={resolved}
+                onOpenSheet={openCharacterSheet}
+                onAddCharacter={() => setShowAddCharacter(true)}
+                onAddNpc={() => setShowAddNpc(true)}
+              />
+            </>
+          ) : (
+            <>
+              <div className="gm-screen__toolbar">
+                <button
+                  type="button"
+                  className="btn btn--primary"
+                  onClick={() => setShowAddCharacter(true)}
+                >
+                  <Users size={14} />
+                  Add Character
+                </button>
+                <button
+                  type="button"
+                  className="btn btn--ghost"
+                  onClick={() => setShowAddNpc(true)}
+                >
+                  <Swords size={14} />
+                  Add NPC
+                </button>
+                {/* The round tracker rides the same row as the Add actions, pushed
+                    to the right: it is the encounter-level control, not another
+                    panel source. */}
+                <RoundTracker
+                  round={screen.round}
+                  onRoundChange={(round) => setScreenRound(screen.id, round)}
+                  onNewRound={handleNewRound}
+                />
+              </div>
 
-          {panels.length === 0 ? (
+              {panels.length === 0 ? (
             <div className="empty-state gm-screen__empty">
               <p className="muted">
                 This screen is empty — add a player character or spawn an NPC to begin.
@@ -459,6 +485,8 @@ export default function GMScreenPage() {
                 ) : null}
               </DragOverlay>
             </DndContext>
+              )}
+            </>
           )}
         </>
       )}

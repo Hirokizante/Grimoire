@@ -378,6 +378,26 @@
   min-width: 0;
 }
 
+/* The header's lead block: portrait beside a two-line stack — the name and
+   subtitle on the top line, the encounter's combat stat tokens under them.
+   Grid panels render the same anatomy with no tokens, so the lead is just
+   portrait + name and looks exactly as it always did. */
+.gm-panel__lead {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.gm-panel__lead-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
 .gm-panel__portrait {
   width: 48px;
   height: 48px;
@@ -395,7 +415,6 @@
   display: flex;
   flex-direction: column;
   min-width: 0;
-  flex: 1 1 auto;
 }
 
 .gm-panel__name {
@@ -639,6 +658,10 @@
 }
 
 .gm-hp__fill {
+  /* Block, not inline: the drawer card's track sits inside a <button> (which
+     may only contain phrasing content), so its fill is a <span> — an inline
+     box ignores height/width entirely and the bar renders empty. */
+  display: block;
   height: 100%;
   /* --hp-bar-color is defined by every app theme (index.css) AND injected per
      sheet by colorVars(). Falling back to --accent-blush keeps the fill
@@ -1724,5 +1747,798 @@ button.gm-status-pill__main:hover {
 
   .gm-status-pill__step {
     width: 0.95rem;
+  }
+}
+
+/* ---- Immersive list view ------------------------------------------------- */
+
+/* The immersive layout owns the viewport: the GM screen in this mode is one
+   screen of chrome (title row, screen pills, round tracker) over a
+   drawer-and-sheet row that never scrolls itself — the encounter sheet scrolls
+   INSIDE the main area instead. That is what keeps the drawer wholly visible
+   at all times (collapsed or expanded), its Add Character / Add NPC footer
+   included: no scroll position can push it past the bottom edge or the
+   navbar, because there is no scroll position.
+   4.5rem (3.5rem under 600px) is .app-main's own vertical padding, so page +
+   app chrome measure exactly one screen (--app-header-h, measured live). */
+
+.gm-screen:has(.gm-immersive) {
+  height: calc(100dvh - var(--app-header-h) - 4.5rem);
+  overflow: hidden;
+}
+
+/* The head and round-tracker rows stay full height; the layout row gives. */
+.gm-screen:has(.gm-immersive) .gm-screen__head,
+.gm-screen:has(.gm-immersive) .gm-screen__toolbar {
+  flex: 0 0 auto;
+}
+
+@media (max-width: 600px) {
+  .gm-screen:has(.gm-immersive) {
+    height: calc(100dvh - var(--app-header-h) - 3.5rem);
+  }
+}
+
+.gm-immersive {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.gm-immersive__main {
+  /* Stretches to the row's height and scrolls its own content, so a tall
+     encounter sheet scrolls here instead of taking the drawer (and its footer)
+     off screen with it. */
+  flex: 1 1 auto;
+  align-self: stretch;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.gm-immersive__empty {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 3rem 1rem;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  gap: 0.5rem;
+}
+
+.gm-screen__toolbar--immersive {
+  /* No Add actions in this view (they live in the drawer), so the round
+     tracker owns the row; its own margin-left: auto still pins it right. */
+  justify-content: flex-end;
+}
+
+/* ---- Character drawer ----------------------------------------------------- */
+
+/* Slide-out list. Expanded = full quick-reference cards; collapsed = the
+   portrait rail (the drawer shrinks, never vanishes). The width transition is
+   the "slide": the card list is re-rendered between the two states, so no
+   measurement is needed.
+
+   The drawer is a column of three parts — head, scrollable list/rail, footer
+   — capped to the layout row's height (which is the viewport's, since the
+   immersive page never scrolls). So the "Characters" header and the Add
+   Character / Add NPC footer stay on screen however long the list grows: a
+   long list scrolls inside the drawer, never pushing the footer off. */
+
+.gm-drawer {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  max-height: 100%;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-surface);
+  overflow: hidden;
+}
+
+.gm-drawer--expanded {
+  width: 21rem;
+  transition: width 190ms cubic-bezier(0.22, 0.75, 0.3, 1);
+}
+
+.gm-drawer--collapsed {
+  width: 4.25rem;
+  transition: width 190ms cubic-bezier(0.22, 0.75, 0.3, 1);
+}
+
+.gm-drawer__head {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.5rem 0.55rem 0.45rem;
+  border-bottom: 1px solid var(--border-soft);
+  flex: 0 0 auto;
+}
+
+.gm-drawer--collapsed .gm-drawer__head {
+  justify-content: center;
+  padding-left: 0;
+  padding-right: 0;
+  border-bottom: none;
+}
+
+.gm-drawer__title {
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.gm-drawer__toggle {
+  flex: 0 0 auto;
+  color: var(--text-secondary);
+}
+
+.gm-drawer__toggle:hover {
+  background: var(--bg-surface-hover);
+  color: var(--text-primary);
+}
+
+.gm-drawer__list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.55rem;
+}
+
+.gm-drawer__empty {
+  margin: 0.5rem 0.25rem;
+  font-size: 0.82rem;
+  text-align: center;
+}
+
+.gm-drawer__foot {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 0.4rem;
+  padding: 0.55rem;
+  border-top: 1px solid var(--border-soft);
+}
+
+.gm-drawer__foot .btn {
+  flex: 1 1 auto;
+  padding-left: 0.4rem;
+  padding-right: 0.4rem;
+  font-size: 0.8rem;
+}
+
+/* ---- Drawer card (expanded list) ------------------------------------------ */
+
+/* The card is its own drag surface: the whole body starts a reorder drag (the
+   pointer sensor's 6px activation distance keeps a plain click selecting), so
+   there is no grip and the body owns the drawer's full width. */
+
+.gm-drawer-card {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+}
+
+.gm-drawer-card--dragging {
+  opacity: 0.4;
+}
+
+.gm-drawer-card__body {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  gap: 0.5rem;
+  /* Extra right padding keeps the info column clear of the remove button
+     that floats over the body's top-right corner. */
+  padding: 0.5rem 1.8rem 0.5rem 0.55rem;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  background: var(--bg-surface);
+  text-align: left;
+  cursor: grab;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.gm-drawer-card__body:hover {
+  background: var(--bg-surface-hover);
+}
+
+.gm-drawer-card__body:active {
+  cursor: grabbing;
+}
+
+.gm-drawer-card--selected .gm-drawer-card__body {
+  border-color: var(--accent-violet);
+  background: color-mix(in srgb, var(--accent-violet) 12%, var(--bg-surface));
+}
+
+/* The remove button lives INSIDE the panel's top-right corner: absolutely
+   positioned over the body's corner rather than a sibling column beside it,
+   which put it outside the bordered panel and off-centre. The body keeps its
+   right padding clear so the button never overlaps text. */
+.gm-drawer-card__remove {
+  position: absolute;
+  top: 0.3rem;
+  right: 0.3rem;
+  z-index: 1;
+  width: 1.4rem;
+  height: 1.4rem;
+  padding: 0;
+  /* .btn is a flex row centred by its own padding; a padding-free icon box
+     needs an explicit centre or the X hugs the left edge (see .capture-btn). */
+  justify-content: center;
+  color: var(--text-muted);
+}
+
+.gm-drawer-card__remove:hover {
+  color: var(--danger);
+  background: transparent;
+}
+
+.gm-drawer-card__portrait {
+  flex: 0 0 36px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--bg-surface-raised);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+}
+
+.gm-drawer-card__portrait img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.gm-drawer-card--missing .gm-drawer-card__body {
+  border-style: dashed;
+  align-items: center;
+}
+
+.gm-drawer-card__missing-note {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+}
+
+.gm-drawer-card__info {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.gm-drawer-card__name-row {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  min-width: 0;
+}
+
+.gm-drawer-card__name {
+  font-weight: 600;
+  font-size: 0.88rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gm-drawer-card--impaired .gm-drawer-card__name {
+  text-decoration: line-through;
+  color: var(--text-secondary);
+}
+
+.gm-drawer-card--dead .gm-drawer-card__body {
+  opacity: 0.75;
+}
+
+.gm-drawer-card--no-ap .gm-drawer-card__info,
+.gm-drawer-card--no-ap .gm-drawer-card__portrait {
+  opacity: 0.55;
+}
+
+.gm-drawer-card__num {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.1rem;
+  height: 1.1rem;
+  padding: 0 0.25rem;
+  border-radius: 999px;
+  border: 1px solid var(--accent-violet);
+  background: color-mix(in srgb, var(--accent-violet) 18%, transparent);
+  color: var(--text-primary);
+  font-size: 0.66rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.gm-drawer-card__condition {
+  flex: 0 0 auto;
+  padding: 0.05rem 0.35rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--danger) 65%, var(--border));
+  color: var(--danger);
+  font-size: 0.6rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.gm-drawer-card__condition--downed {
+  border-color: color-mix(in srgb, var(--accent-blush) 55%, var(--border));
+  color: var(--accent-blush);
+}
+
+.gm-drawer-card__subtitle {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gm-drawer-card__hp {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+}
+
+.gm-drawer-card__hp-value {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.gm-drawer-card__hp-max {
+  color: var(--text-muted);
+  font-weight: 400;
+  font-size: 0.72rem;
+}
+
+.gm-drawer-card__hp-track {
+  flex: 1 1 3rem;
+  height: 6px;
+}
+
+.gm-drawer-card__statuses {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+}
+
+.gm-drawer-card__statuses::-webkit-scrollbar {
+  display: none;
+}
+
+/* Tokens are icon + value only (the stat's meaning lives in the icon and the
+   tooltip), sized so all four fit the card on a single row. */
+.gm-drawer-card__tokens {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0.25rem;
+}
+
+.gm-drawer-card__tokens .gm-token {
+  font-size: 0.68rem;
+  padding: 0.12rem 0.4rem;
+  min-width: 0;
+}
+
+.gm-drawer-card__tokens .gm-token__value {
+  font-size: 0.68rem;
+}
+
+/* ---- Drawer rail (collapsed) ----------------------------------------------- */
+
+.gm-drawer__rail {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.55rem 0.35rem;
+}
+
+.gm-drawer-rail-item {
+  position: relative;
+  flex: 0 0 auto;
+  width: 3rem;
+  height: 3rem;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--bg-surface-raised);
+  overflow: visible;
+  cursor: grab;
+}
+
+.gm-drawer-rail-item img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+.gm-drawer-rail-item__empty {
+  position: absolute;
+  inset: 0.5rem;
+  border-radius: 50%;
+  background: var(--bg-surface-hover);
+}
+
+.gm-drawer-rail-item--selected {
+  border-color: var(--accent-violet);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-violet) 45%, transparent);
+}
+
+.gm-drawer-rail-item--impaired {
+  opacity: 0.55;
+}
+
+.gm-drawer-rail-item--dragging {
+  opacity: 0.4;
+}
+
+.gm-drawer-rail-item--missing {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3rem;
+  height: 3rem;
+  border: 1px dashed var(--border);
+  border-radius: 50%;
+  color: var(--text-muted);
+  overflow: hidden;
+}
+
+.gm-drawer-rail-item__num {
+  position: absolute;
+  right: -0.2rem;
+  bottom: -0.2rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.05rem;
+  height: 1.05rem;
+  padding: 0 0.2rem;
+  border-radius: 999px;
+  border: 1px solid var(--accent-violet);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-size: 0.62rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.gm-drawer__rail-add {
+  flex: 0 0 auto;
+  color: var(--text-secondary);
+}
+
+.gm-drawer__rail-add:hover {
+  background: var(--bg-surface-hover);
+  color: var(--text-primary);
+}
+
+/* ---- Encounter sheet (main area) ------------------------------------------- */
+
+/* Reuses the panel chrome classes (.gm-panel base + no-ap/downed/dead dims)
+   so running a character here behaves — and dims — exactly like a grid
+   panel. The body is always mounted, so there is no expand animation.
+
+   The chrome is condensed into the fewest rows the at-a-glance reading
+   allows: combat stat tokens inline in the header, HP on its own meter row,
+   FP/AP (or an NPC's AP + cooldown count) sharing one row, the Mortal Wound
+   track, END below it, and the attribute boxes with the stacked turn buttons
+   on one last row. Everything the sheet body used to print above the
+   abilities lives here instead. */
+
+.gm-encounter {
+  width: 100%;
+}
+
+.gm-encounter--missing {
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  padding: 2rem 1rem;
+  text-align: center;
+}
+
+/* The encounter's combat stat pills, in the header's lead block under the
+   name/subtitle line. They take the full width beside the portrait and wrap
+   within it, so six pills stay on one line at every width the main area is
+   wider than a phone — the old right-of-the-name placement squeezed them
+   onto two rows. Each pill keeps the shared `.gm-token` look (accent border
+   + wash) the grid panels' token rows use. */
+.gm-encounter__tokens {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+/* The encounter header is one visual unit, so the lead grows a step: a larger
+   portrait carrying two lines beside it — "Character Name Player Name" on the
+   top line (the player name reads as a continuation of the name, so it is no
+   longer truncated to fit tokens beside it), the stat pills under them with
+   the full width beside the portrait to lay out on one row. */
+.gm-encounter .gm-panel__portrait {
+  width: 56px;
+  height: 56px;
+  flex-basis: 56px;
+}
+
+.gm-encounter .gm-panel__identity {
+  flex-direction: row;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+/* One visual phrase: "Character Name Player Name". The subtitle keeps its
+   ellipsis when there is no room, but it is the first thing to shrink, not
+   the thing that gets pushed onto another row. */
+.gm-encounter .gm-panel__subtitle {
+  flex-shrink: 1;
+}
+
+.gm-encounter .gm-panel__subtitle:not(:last-child)::after {
+  content: '\200B';
+}
+
+/* One meter row holding two pools side by side (FP | AP for a player, AP +
+   the cooldown pill for an NPC instance). The meters split the row evenly and
+   their tracks flex, so both stay readable at any width. */
+.gm-encounter__row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.gm-encounter__row > .gm-meter {
+  flex: 1 1 12rem;
+}
+
+.gm-encounter__row > .gm-ap__cooling {
+  margin-left: auto;
+}
+
+/* ---- PanelMeter: the one-line resource meter ------------------------------ */
+
+/* `[icon Label n/max track − +]` — the grid panels' two-line bars condensed
+   to one row. Same steppers (`.gm-step`), same track heights, same value
+   typography (`.gm-bar__*`) as PanelHpBar / PanelApBar; only the layout is
+   single-line. */
+
+.gm-meter {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  min-width: 0;
+}
+
+.gm-meter__icon {
+  flex: 0 0 auto;
+}
+
+/* The track flexes to fill the row; its inner SegmentedBar is suppressed of
+   its own head (the meter's row carries label + value) and sized like the HP
+   track. */
+.gm-meter__track {
+  flex: 1 1 3.5rem;
+  min-width: 2rem;
+}
+
+.gm-meter__track .seg-bar__head {
+  display: none;
+}
+
+.gm-meter__track .seg-bar__track,
+.gm-meter__track .seg-bar__track--empty {
+  height: 8px;
+}
+
+/* ---- Attributes row: boxes + stacked turn buttons -------------------------- */
+
+/* The last chrome row: the five attribute boxes in one line, with the End
+   Turn / Recover buttons stacked in a narrow column at the right — two
+   controls, one row of sheet. The boxes reuse the sheet's `.attr-box` (same
+   abbr/value/name anatomy, same hover and roll click) at the encounter's
+   condensed size. */
+.gm-encounter__attributes {
+  display: flex;
+  align-items: stretch;
+  gap: 0.5rem;
+}
+
+.gm-encounter__attr-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0.4rem;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Encounter-sized attribute boxes: the sheet page's anatomy, one visual step
+   down so the row stays a single line of chrome rather than a block of
+   sheet. */
+.gm-encounter__attr-list .attr-box {
+  padding: 0.3rem 0.4rem 0.35rem;
+  gap: 0.05rem;
+}
+
+.gm-encounter__attr-list .attr-box__value {
+  font-size: 1.25rem;
+  min-width: 0;
+}
+
+.gm-encounter__turn {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.3rem;
+  flex: 0 0 auto;
+}
+
+.gm-encounter__turn-btn {
+  padding: 0.3rem 0.7rem;
+  font-size: 0.78rem;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+}
+
+/* The body wrapper carries the sheet presentation classes (see
+   gmPanelSheetPresentation) plus this one; the .gm-panel__sheet overrides
+   apply as in an expanded grid panel, and the encounter adds the two-part
+   full-width layout below. */
+.gm-encounter__sheet {
+  margin-top: 0.35rem;
+}
+
+/* The working block stacks: abilities own the full width — narrower blocks,
+   more of them visible at once, which is the whole point of the encounter
+   view — and the skills table drops below it, out of the running order. */
+.gm-encounter__columns {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.gm-encounter__abilities,
+.gm-encounter__skills {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+/* Skills at the bottom run as a dense multi-column table: fifteen rows in one
+   column would push the sheet very tall, and the GM only consults them. */
+.gm-encounter__skills .skill-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+  gap: 0.1rem 0.75rem;
+}
+
+/* The section rules under `.gm-panel__sheet` expect their sections stacked
+   in one column; stacked full-width they keep the same transparent-card look
+   without doubled borders. */
+.gm-encounter__columns .sheet-section {
+  margin: 0;
+}
+
+/* The encounter body's list-view ability cards pack into two masonry columns:
+   the main area is far wider than a grid panel, and a single column wastes it
+   — two columns double how many abilities the GM sees without scrolling.
+   CSS multi-column (not grid) is what keeps them *flush*: a grid aligns rows,
+   so a tall card leaves a gap under its shorter neighbour, while multi-column
+   packs each card against the last — the same masonry the sheet page's card
+   view uses. Hierarchy still holds (Innate → Basic Attack → Fatebreaker, then
+   slotted, in DOM order); only the *packing* is denser. */
+.gm-encounter__sheet .ability-grid--list {
+  display: block;
+  column-count: 2;
+  column-gap: 0.55rem;
+}
+
+.gm-encounter__sheet .ability-grid--list > * {
+  break-inside: avoid;
+  width: auto;
+  margin-bottom: 0.55rem;
+  min-width: 0;
+}
+
+@media (max-width: 900px) {
+  .gm-encounter__sheet .ability-grid--list {
+    column-count: 1;
+  }
+}
+
+/* A collapsed drawer frees the rail's width, so the encounter's ability
+   columns gain a third. Scoped above the one-column breakpoint so it can
+   never fight the phone layout. */
+@media (min-width: 901px) {
+  .gm-immersive:has(.gm-drawer--collapsed)
+    .gm-encounter__sheet
+    .ability-grid--list {
+    column-count: 3;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gm-drawer--expanded,
+  .gm-drawer--collapsed {
+    transition: none;
+  }
+}
+
+@media (max-width: 700px) {
+  /* The expanded drawer overlays the main area instead of squeezing it: a
+     phone has no width to share between a list and a sheet. */
+  .gm-immersive {
+    position: relative;
+  }
+
+  .gm-drawer--expanded {
+    position: absolute;
+    inset: 0 auto 0 0;
+    z-index: 44;
+    max-height: none;
+    box-shadow: 0 8px 24px rgb(0 0 0 / 45%);
+    width: min(21rem, calc(100vw - 4.5rem));
+  }
+
+  /* The condensed chrome wraps on a phone: the attribute boxes drop to two
+     rows of five (three then two is worse for scanning) and the turn buttons
+     take the full width below them. */
+  .gm-encounter__attributes {
+    flex-direction: column;
+  }
+
+  .gm-encounter__turn {
+    flex-direction: row;
+  }
+
+  .gm-encounter__turn-btn {
+    flex: 1 1 0;
   }
 }

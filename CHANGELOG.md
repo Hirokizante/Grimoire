@@ -6,6 +6,82 @@ characters regularly.
 
 ## Unreleased
 
+### The immersive list view runs tighter
+
+- **The immersive view owns the screen; the drawer never moves.** The
+  view used to sit in the scrolling document: a sticky drawer first slid up
+  until its "Characters" header rode under the app navbar, and its footer's
+  Add Character / Add NPC buttons were only visible when the drawer's full
+  height happened to fit the remaining viewport. Now the immersive view
+  sizes itself to exactly one screen (page + app chrome = `100dvh`): the
+  encounter sheet scrolls **inside** the main area and the document never
+  scrolls, so the drawer keeps its natural height at the left edge with the
+  header, the self-scrolling list, and the footer's Add buttons all on
+  screen whatever the list's length.
+- **Drawer cards drag by their whole body.** The dedicated reorder grip is
+  gone: the card itself is the drag surface (a plain click still selects —
+  the pointer sensor's 6px activation distance is unchanged), so the card
+  owns the drawer's full width. The collapsed rail's portraits already
+  dragged themselves and are unchanged.
+- **Drawer stat tokens are icon and value only.** The text label is dropped
+  (the icon carries the stat's meaning; a tooltip spells it out), and the
+  tokens no longer wrap — all four fit the card on a single row.
+- **The drawer card's HP bar fills again.** The fill is a `<span>` inside a
+  `<button>` (buttons may only contain phrasing content), and an inline box
+  ignores `height`/`width` — so every drawer card rendered a dark empty track
+  even at full health. The shared `.gm-hp__fill` now sets `display: block`,
+  which fixes the drawer without touching the grid panel's working bar.
+- **The remove button sits inside its panel.** A drawer card's remove (×)
+  button was a flex sibling of the card body, so it rendered outside the
+  bordered panel and looked off-centre; it now floats over the body's
+  top-right corner (the body's right padding keeps text clear of it).
+- **The encounter sheet shows more abilities at once.** Ability blocks own
+  the full width of the main area and pack **two masonry columns** (one below
+  ~900px, and a **third when the drawer is collapsed** to its portrait rail),
+  roughly doubling how many cards are visible without scrolling; hierarchy
+  still holds in DOM order — Innate Abilities, Basic Attack, Fatebreaker,
+  then slotted abilities, and an NPC's Basic Attack pinned to the head of its
+  list. Multi-column packing keeps the cards flush even when they differ in
+  height. The skills table moves to the bottom of the sheet as reference
+  material, running as a dense multi-column table rather than a tall single
+  column.
+
+### The GM Screen has an immersive list view
+
+- **Settings → GM Screen → Layout** — a new option switches the screen
+  between **Grid** (the draggable two-column surface, still the default) and
+  the new **Immersive List** view. Like the panel theming switch, it is an
+  app-level preference in localStorage: it changes how a screen displays on
+  this browser, never what the screen contains.
+- **The character drawer** — the immersive view's left edge holds every panel
+  on the screen as a read-only quick-reference card: portrait, name, HP, the
+  GM's tracked status pills, and the stat tokens, with none of the panel
+  controls. Its one interaction is selecting the character, which mounts
+  their sheet in the main area. Collapsing the drawer shrinks it to a
+  vertical portrait rail rather than hiding it; each rail entry stays
+  selectable and carries a number badge for an NPC base with multiple
+  instances (the 1-based ordinal among that base's instances on the screen).
+- **The encounter sheet** — the main area shows the selected character as a
+  compact, encounter-ready sheet: the same live chrome a grid panel carries
+  (header menu, HP bar with statuses and Damage, Mortal Wound track, AP
+  meter) over a read-only body of combat stats, attributes, abilities, and
+  skills. The Innate narrative prose, description, and background are
+  stripped; nothing is editable; level up, import/export, and customize stay
+  on the sheet page. Add Character / Add NPC moved into the drawer footer
+  (with a compact add button on the rail), and the round tracker owns the
+  toolbar row.
+- **Reordering** — drawer cards drag by their whole body (rail portraits drag
+  themselves) through the same `movePanel` action and array order the grid
+  uses, so both views describe one order.
+- **Small enablers** — `PanelHeader` grew an optional `showDensityToggle`
+  (the encounter sheet always shows its body), and `CoreAbilitySection` grew
+  `hideInnateNarrative` (the encounter body renders the Core Ability cards
+  without the flavor text).
+- **Testing.** `GMScreenImmersive.test.tsx` pins the drawer's read-only
+  contract, selection, the rail badges, reorder-through-`movePanel`, and the
+  missing-record placeholder; `e2e/gm-screen.spec.ts` drives the setting, the
+  drawer, the rail, and a damage action end to end.
+
 ### The Movement stat is an arrow in Terminal, and the GM Screen agrees
 
 - **Terminal's Movement glyph is an arrow, not a person.** The style-aware

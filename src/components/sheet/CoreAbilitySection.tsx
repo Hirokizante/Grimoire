@@ -43,6 +43,13 @@ export interface CoreAbilitySectionProps {
   /** Explicit entity for dice notation (GM-screen panels). */
   owner?: Character
   mode?: SheetMode
+  /**
+   * Suppress the Innate narrative prose while keeping the ability cards
+   * (Innate Abilities, Basic Attack, Fatebreaker). The GM Screen's encounter
+   * view strips flavor text — the innate description is reference material,
+   * not at-the-table information — but its ability cards stay live.
+   */
+  hideInnateNarrative?: boolean
 }
 
 /** Core ability fields editable through this section (mirrors the store). */
@@ -67,6 +74,7 @@ export default function CoreAbilitySection({
   ownerId,
   owner,
   mode = 'view',
+  hideInnateNarrative = false,
 }: CoreAbilitySectionProps) {
   const isEdit = mode === 'edit'
   const storeOwnerId = useCharacterStore((s) => s.currentCharacter?.id)
@@ -182,6 +190,7 @@ export default function CoreAbilitySection({
   }
 
   const hasContent = innateDescription !== '' || innateAbilities.length > 0
+  const showNarrative = !hideInnateNarrative && (isEdit || innateDescription !== '')
 
   return (
     <section className="sheet-section sheet-section--core">
@@ -193,7 +202,7 @@ export default function CoreAbilitySection({
         </p>
       )}
 
-      {(isEdit || innateDescription) && (
+      {showNarrative && (
         <div className="core-innate">
           <span className="core-innate__label">Innate</span>
           {isEdit ? (

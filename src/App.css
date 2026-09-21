@@ -2849,6 +2849,43 @@ body:has(.modal-overlay) .app-header__nav {
   animation: terminalCursorBlink 1s steps(1) infinite;
 }
 
+/* ---- Settings: GM Screen layout thumbnails -------------------------------- */
+
+/* Grid sketch: two panels side by side — the classic two-column surface. */
+.style-preview__card--right {
+  margin-left: auto;
+}
+
+/* Immersive sketch: a portrait rail beside one wide sheet card. */
+.style-preview--split {
+  gap: 0.55rem;
+}
+
+.style-preview__rail {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.3rem;
+  width: 1.5rem;
+  height: 2rem;
+  padding: 0 0.3rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-surface-raised);
+}
+
+.style-preview__dot {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--accent-violet) 55%, transparent);
+}
+
+.style-preview__card--wide {
+  flex: 1 1 auto;
+  max-width: 6rem;
+}
+
 /* ---- Settings: backup & restore ------------------------------------------ */
 
 .backup-actions {
