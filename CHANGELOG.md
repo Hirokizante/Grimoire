@@ -4,7 +4,58 @@ All notable changes to Grimoire are documented here. This project is in alpha:
 storage format may change between pre-1.0 releases, so export (or back up) your
 characters regularly.
 
-## Unreleased
+## v0.14.0-alpha — 2026-09-21
+
+The at-the-table release. Six commits since `v0.13.0-alpha`, and the GM Screen
+gains a second way to run an encounter: the **Immersive List** view — a pinned
+character drawer on the left, a single encounter-ready sheet in the main area, all
+on one screen that never scrolls the page. Ability Blocks learn to **duplicate,
+copy and paste**, so an ability travels between sections, tabs and characters
+without retyping it. The Terminal style grows a **retro grid backdrop behind every
+page**, and the icon set settles down: **Movement** is an arrow rather than a
+person, close buttons wear the pixel **Close** mark rather than the X brand logo,
+and ConfirmModal’s info and warning confirm buttons are finally framed to their
+intent.
+
+**No migration to run** — the IndexedDB schema stays at version 5 and no stored
+record changed shape: the view switch is a localStorage preference, the ability
+clipboard is in-memory only, and every fix is render-side.
+
+### The GM Screen has an immersive list view
+
+- **Settings → GM Screen → Layout** — a new option switches the screen
+  between **Grid** (the draggable two-column surface, still the default) and
+  the new **Immersive List** view. Like the panel theming switch, it is an
+  app-level preference in localStorage: it changes how a screen displays on
+  this browser, never what the screen contains.
+- **The character drawer** — the immersive view's left edge holds every panel
+  on the screen as a read-only quick-reference card: portrait, name, HP, the
+  GM's tracked status pills, and the stat tokens, with none of the panel
+  controls. Its one interaction is selecting the character, which mounts
+  their sheet in the main area. Collapsing the drawer shrinks it to a
+  vertical portrait rail rather than hiding it; each rail entry stays
+  selectable and carries a number badge for an NPC base with multiple
+  instances (the 1-based ordinal among that base's instances on the screen).
+- **The encounter sheet** — the main area shows the selected character as a
+  compact, encounter-ready sheet: the same live chrome a grid panel carries
+  (header menu, HP bar with statuses and Damage, Mortal Wound track, AP
+  meter) over a read-only body of combat stats, attributes, abilities, and
+  skills. The Innate narrative prose, description, and background are
+  stripped; nothing is editable; level up, import/export, and customize stay
+  on the sheet page. Add Character / Add NPC moved into the drawer footer
+  (with a compact add button on the rail), and the round tracker owns the
+  toolbar row.
+- **Reordering** — drawer cards drag by their whole body (rail portraits drag
+  themselves) through the same `movePanel` action and array order the grid
+  uses, so both views describe one order.
+- **Small enablers** — `PanelHeader` grew an optional `showDensityToggle`
+  (the encounter sheet always shows its body), and `CoreAbilitySection` grew
+  `hideInnateNarrative` (the encounter body renders the Core Ability cards
+  without the flavor text).
+- **Testing.** `GMScreenImmersive.test.tsx` pins the drawer's read-only
+  contract, selection, the rail badges, reorder-through-`movePanel`, and the
+  missing-record placeholder; `e2e/gm-screen.spec.ts` drives the setting, the
+  drawer, the rail, and a damage action end to end.
 
 ### The immersive list view runs tighter
 
@@ -46,41 +97,55 @@ characters regularly.
   material, running as a dense multi-column table rather than a tall single
   column.
 
-### The GM Screen has an immersive list view
+### Ability Blocks can be duplicated, copied and pasted
 
-- **Settings → GM Screen → Layout** — a new option switches the screen
-  between **Grid** (the draggable two-column surface, still the default) and
-  the new **Immersive List** view. Like the panel theming switch, it is an
-  app-level preference in localStorage: it changes how a screen displays on
-  this browser, never what the screen contains.
-- **The character drawer** — the immersive view's left edge holds every panel
-  on the screen as a read-only quick-reference card: portrait, name, HP, the
-  GM's tracked status pills, and the stat tokens, with none of the panel
-  controls. Its one interaction is selecting the character, which mounts
-  their sheet in the main area. Collapsing the drawer shrinks it to a
-  vertical portrait rail rather than hiding it; each rail entry stays
-  selectable and carries a number badge for an NPC base with multiple
-  instances (the 1-based ordinal among that base's instances on the screen).
-- **The encounter sheet** — the main area shows the selected character as a
-  compact, encounter-ready sheet: the same live chrome a grid panel carries
-  (header menu, HP bar with statuses and Damage, Mortal Wound track, AP
-  meter) over a read-only body of combat stats, attributes, abilities, and
-  skills. The Innate narrative prose, description, and background are
-  stripped; nothing is editable; level up, import/export, and customize stay
-  on the sheet page. Add Character / Add NPC moved into the drawer footer
-  (with a compact add button on the rail), and the round tracker owns the
-  toolbar row.
-- **Reordering** — drawer cards drag by their whole body (rail portraits drag
-  themselves) through the same `movePanel` action and array order the grid
-  uses, so both views describe one order.
-- **Small enablers** — `PanelHeader` grew an optional `showDensityToggle`
-  (the encounter sheet always shows its body), and `CoreAbilitySection` grew
-  `hideInnateNarrative` (the encounter body renders the Core Ability cards
-  without the flavor text).
-- **Testing.** `GMScreenImmersive.test.tsx` pins the drawer's read-only
-  contract, selection, the rail badges, reorder-through-`movePanel`, and the
-  missing-record placeholder; `e2e/gm-screen.spec.ts` drives the setting, the
-  drawer, the rail, and a damage action end to end.
+- **Cards grow Duplicate and Copy in edit mode, and every ability section grows a
+  Paste button.** Duplicate lands a fresh copy of the block directly after the
+  original; Copy snapshots it onto an app-level one-slot clipboard, confirmed with
+  a toast. Once anything is on the clipboard, a Paste button appears beside
+  **+ Add Ability** in every ability section — Slotted Abilities, the Ability Pool,
+  a custom tab’s ability sections, Core Innate Abilities and an NPC’s list — and
+  inserts the block there, so an ability can travel between sections, between tabs
+  and even between characters without retyping it; the button clears when the
+  clipboard is empty.
+- **A copy is a new block, not a second view.** `cloneAbilityBlock` deep-clones the
+  tree and regenerates every id — sub-abilities included — so two cards can never
+  share a dnd-kit id, and resets live-play state: the uses budget starts full and
+  modifier switches start off. Everything authored travels (name, traits, costs,
+  damage, text, modifiers, activation rolls, sub-abilities), and a custom cost keeps
+  pointing at the source sheet’s bar ids — a bar the pasting sheet does not define
+  simply is not shown.
+- **The clipboard is in-memory only and shared app-wide**, so nothing is persisted;
+  `addAbilityBlock` / `addCustomAbility` grew an optional insert index (duplication
+  passes index + 1) through the existing `clampInsertIndex` contract, and the Add and
+  Paste buttons share a `.section-add-row` flex row — the stat-bars-add pattern —
+  so they read as two controls with a real gap, while the card footer wraps its now
+  five actions.
+- **Testing.** `abilityClone.test.ts`, `abilityClipboardStore.test.ts` and
+  `characterStore.test.ts` pin the clone, the clipboard and the insert-index store
+  paths; `AbilityPoolSection.test.tsx` and `NPCAbilitiesSection.test.tsx` pin the
+  buttons per surface; and `e2e/ability-copy-paste.spec.ts` drives the flow in a real
+  browser. The slotted-overflow drag spec now scrolls its grip into view: the taller
+  card footer had pushed it just below the test viewport.
+
+### The Terminal style gets a retro grid backdrop on every page
+
+- **Behind every page sits a blueprint grid**, fixed to the viewport so it never
+  scrolls with the content: the app reads as one persistent display surface rather
+  than pages sliding over separate canvases. The fine cell mesh carries a soft
+  vignette that sinks the lower edge into darkness, and both layers derive from the
+  active theme’s accent — the same `color-mix` family as the phosphor glow — so
+  the grid pairs with Midnight, Parchment, Mikami and Pitch Black with no per-theme
+  overrides. It is static by nature: no repaint cost while scrolling, and the layer
+  never receives pointer events.
+- **Sheet pages repaint the same grid on their own layer**, above the background
+  canvas that would otherwise cover it: NPC sheets always, and player sheets only
+  with *Match app theme* on — the two cases that follow the app canvas like every
+  other page. An NPC sheet carrying its own background image keeps the image and
+  the grid steps aside.
+- **Testing.** `CharacterSheetPage.test.tsx` pins the class that opts a player sheet
+  into the grid — present with *Match app theme*, absent with the character’s own
+  customization.
 
 ### The Movement stat is an arrow in Terminal, and the GM Screen agrees
 
@@ -112,6 +177,19 @@ characters regularly.
   Pixelarticons `Close` path and not the `X` brand path; the Damage dialog's
   close button gained the conventional `aria-label`, which `e2e/gm-screen.spec.ts`
   now targets.
+
+### ConfirmModal’s info and warning confirm buttons are framed to their intent
+
+- **The non-destructive confirm looked like a neutral button.** ConfirmModal’s
+  `btn--info` variant (e.g. “New GM screen” → Create) is the confirm button, but
+  only `btn--primary` was styled violet, so Create sat beside Cancel reading as a
+  third neutral control. `btn--info` now shares the primary’s fill, text and hover
+  exactly — in both interface styles, with Terminal’s phosphor glow included.
+- **The cautionary confirm had no frame at all.** ExportDialog’s “Restore” uses
+  `btn--warning`, which rendered unstyled plain like the neutral buttons; it now
+  gets its own amber treatment mirroring `.btn--danger`’s construction (the same
+  amber the warning notifications use), with a glowing hover in Terminal.
+
 
 ## v0.13.0-alpha — 2026-09-20
 
