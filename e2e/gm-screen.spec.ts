@@ -684,7 +684,13 @@ test.describe('GM Screen', () => {
     expect(badgeBox.badgeRight).toBeLessThanOrEqual(badgeBox.pillLeft)
     const names = page.locator('.gm-panel--npc .gm-panel__name')
     await expect(names.nth(0)).toHaveText('Bandit')
-    await expect(names.nth(1)).toHaveText('Bandit 2')
+    await expect(names.nth(1)).toHaveText('Bandit')
+
+    // Multiple instances of one base are told apart by their ordinal badge in
+    // the grid panel header, not by a number baked into the name.
+    await expect(
+      page.locator('.gm-panel--npc .gm-panel__numbadge'),
+    ).toHaveText(['1', '2'])
 
     // The drag grip is the ONLY way to reorder a panel, so it must be visible
     // at rest. Its icon once computed to `width: 0px` inside this stretched
@@ -2389,7 +2395,7 @@ test.describe('GM Screen — immersive list view', () => {
     // select button (its body).
     await page
       .locator('.gm-drawer-card')
-      .filter({ hasText: 'Bandit 2' })
+      .filter({ has: page.locator('.gm-drawer-card__num', { hasText: /^2$/ }) })
       .locator('.gm-drawer-card__body')
       .click()
     await expect(page.locator('.gm-encounter--npc')).toBeVisible()
@@ -2419,7 +2425,7 @@ test.describe('GM Screen — immersive list view', () => {
     await expect(
       page
         .locator('.gm-drawer-card')
-        .filter({ hasText: 'Bandit 2' })
+        .filter({ has: page.locator('.gm-drawer-card__num', { hasText: /^2$/ }) })
         .locator('.gm-drawer-card__hp-value'),
     ).toHaveText(/15/)
 
@@ -2534,7 +2540,10 @@ test.describe('GM Screen — immersive list view', () => {
 
     // Rail portraits keep their badges; selecting one swaps the main area.
     await expect(page.locator('.gm-drawer-rail-item__num')).toHaveText(['1', '2'])
-    await page.locator('.gm-drawer-rail-item[title="Bandit 2"]').click()
+    await page
+      .locator('.gm-drawer-rail-item')
+      .filter({ has: page.locator('.gm-drawer-rail-item__num', { hasText: /^2$/ }) })
+      .click()
     await expect(page.locator('.gm-encounter--npc')).toBeVisible()
     // The collapsed drawer frees the rail's width, so the encounter's ability
     // masonry gains a third column (two when expanded).

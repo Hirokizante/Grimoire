@@ -26,6 +26,11 @@
  * screen and all four fit the card on a single row: players carry
  * Eva/Arm/END/FP, NPC instances Eva/Arm/Move/DC, from the same shared stat
  * palette.
+ *
+ * An NPC instance's ordinal badge (see `resolvePanels`' `instanceNumber`) sits
+ * beside the card's name and on the rail portrait's corner — the instance's
+ * only identifier, since multiples of one base no longer carry a number in
+ * their name.
  */
 
 import { useSortable } from '@dnd-kit/sortable'
@@ -57,12 +62,6 @@ import type { ResolvedPanel } from '@/lib/gmScreenUtils'
 
 export interface DrawerCardProps {
   entry: ResolvedPanel
-  /**
-   * The instance's 1-based ordinal among the screen's instances of the same
-   * NPC base — shown only when that base has more than one instance, which is
-   * exactly when three spawned Bandits need telling apart.
-   */
-  instanceNumber?: number
   /** True while this entry is the one mounted in the main area. */
   selected?: boolean
   onSelect: () => void
@@ -116,7 +115,6 @@ function entryVitals(entry: ResolvedPanel, appTheme: AppTheme) {
 
 export default function DrawerCard({
   entry,
-  instanceNumber,
   selected = false,
   onSelect,
   onRemove,
@@ -230,12 +228,12 @@ export default function DrawerCard({
             <span className="gm-drawer-card__name" title={entry.displayName}>
               {entry.displayName}
             </span>
-            {instanceNumber !== undefined && (
+            {entry.instanceNumber !== undefined && (
               <span
                 className="gm-drawer-card__num"
-                title={`Instance ${instanceNumber} of this NPC on the screen`}
+                title={`Instance ${entry.instanceNumber} of this NPC on the screen`}
               >
-                {instanceNumber}
+                {entry.instanceNumber}
               </span>
             )}
             {dead && (
@@ -385,14 +383,12 @@ export default function DrawerCard({
  */
 export interface DrawerRailItemProps {
   entry: ResolvedPanel
-  instanceNumber?: number
   selected?: boolean
   onSelect: () => void
 }
 
 export function DrawerRailItem({
   entry,
-  instanceNumber,
   selected = false,
   onSelect,
 }: DrawerRailItemProps) {
@@ -455,9 +451,9 @@ export function DrawerRailItem({
       ) : (
         <span className="gm-drawer-rail-item__empty" aria-hidden="true" />
       )}
-      {instanceNumber !== undefined && (
+      {entry.instanceNumber !== undefined && (
         <span className="gm-drawer-rail-item__num" aria-hidden="true">
-          {instanceNumber}
+          {entry.instanceNumber}
         </span>
       )}
     </button>

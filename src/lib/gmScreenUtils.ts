@@ -98,9 +98,45 @@ export interface ResolvedPanel {
   displayName: string
   /**
    * Secondary line: the base NPC's name for an instance whose label differs
-   * from it ("Bandit 2" over "Bandit"), otherwise null.
+   * from it (a renamed instance), otherwise null.
    */
   subtitle: string | null
+  /**
+   * An NPC instance's 1-based ordinal among the screen's instances of the same
+   * base, present only when that base has **more than one** instance — the
+   * number its badge shows. Instances are told apart by this badge (and absent
+   * entirely for a unique instance or a player character), never by a number
+   * baked into the name. See {@link computeInstanceNumbers}.
+   */
+  instanceNumber?: number
+}
+
+/**
+ * 1-based ordinals for NPC-instance panels whose base has **more than one**
+ * instance on the screen — the drawer's card/rail number badges, a grid panel's
+ * header badge, and the encounter sheet's header badge all read from this.
+ * Unique instances (and player characters) get none.
+ *
+ * The ordinal follows the screen's panel order, so it is stable across
+ * reorders exactly as the old numeric name suffixes were not.
+ */
+export function computeInstanceNumbers(
+  resolved: ResolvedPanel[],
+): Map<string, number> {
+  const groups = new Map<string, string[]>()
+  for (const entry of resolved) {
+    if (entry.panel.kind === 'npc-instance') {
+      const ids = groups.get(entry.panel.baseNpcId) ?? []
+      ids.push(entry.panel.id)
+      groups.set(entry.panel.baseNpcId, ids)
+    }
+  }
+  const numbers = new Map<string, number>()
+  for (const ids of groups.values()) {
+    if (ids.length < 2) continue
+    ids.forEach((id, index) => numbers.set(id, index + 1))
+  }
+  return numbers
 }
 
 /** Resolve every panel of a screen against the character list. */
@@ -109,7 +145,7 @@ export function resolvePanels(
   characters: Character[],
 ): ResolvedPanel[] {
   const byId = new Map(characters.map((c) => [c.id, c]))
-  return panels.map((panel) => {
+  const resolved = panels.map((panel): ResolvedPanel => {
     if (panel.kind === 'character') {
       const entity = byId.get(panel.characterId) ?? null
       return {
@@ -129,6 +165,14 @@ export function resolvePanels(
       subtitle: base && panel.label && panel.label !== base.name ? base.name : null,
     }
   })
+  // One badge number per multi-instance base, resolved over the whole screen —
+  // what every instance surface (drawer, grid panel, encounter sheet) renders.
+  const numbers = computeInstanceNumbers(resolved)
+  for (const entry of resolved) {
+    const number = numbers.get(entry.panel.id)
+    if (number !== undefined) entry.instanceNumber = number
+  }
+  return resolved
 }
 
 /**

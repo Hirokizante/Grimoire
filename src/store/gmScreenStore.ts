@@ -219,8 +219,10 @@ export interface GMScreenActions {
    */
   addCharacterPanel: (screenId: string, characterId: string) => boolean
   /**
-   * Spawn a fresh NPC instance from a base record, at full HP, with an
-   * auto-numbered label ("Bandit", "Bandit 2", …). Returns the panel id.
+   * Spawn a fresh NPC instance from a base record, at full HP, labelled with
+   * the base's name (an explicit `label` overrides it — a GM's own name for
+   * this instance). Multiple instances of one base are told apart by their
+   * ordinal badge, never by a number baked into the name. Returns the panel id.
    */
   addNpcInstancePanel: (
     screenId: string,
@@ -503,24 +505,6 @@ export function npcMortalWoundAllowance(base: Character | null | undefined): num
     : 0
 }
 
-/**
- * Auto-numbered label for a new instance of `base`: the base name the first
- * time, then "Name 2", "Name 3", … skipping numbers already in use.
- */
-function autoInstanceLabel(screen: GMScreen, base: Character): string {
-  const used = new Set<string>()
-  for (const p of screen.panels) {
-    if (p.kind === 'npc-instance' && p.baseNpcId === base.id) used.add(p.label)
-  }
-  const instanceCount = screen.panels.filter(
-    (p) => p.kind === 'npc-instance' && p.baseNpcId === base.id,
-  ).length
-  if (instanceCount === 0) return base.name
-  let n = instanceCount + 1
-  while (used.has(`${base.name} ${n}`)) n++
-  return `${base.name} ${n}`
-}
-
 /** Panel id for a new panel. */
 function newPanelId(): string {
   return generateId()
@@ -772,7 +756,9 @@ export const useGMScreenStore = create<GMScreenStore>()((set, get) => {
         .getState()
         .characters.find((c) => c.id === baseNpcId)
       const id = newPanelId()
-      const resolvedLabel = label?.trim() || (base ? autoInstanceLabel(screen, base) : '')
+      // The base's own name (a GM-supplied label wins). Multiple instances of
+      // one base are told apart by their ordinal badge, never a number here.
+      const resolvedLabel = label?.trim() || base?.name || ''
       // A fresh instance has taken no wounds (its allowance is the base's
       // `npcStats.mortalWounds`, read at damage time — not copied here), spent
       // none of its limited abilities' uses, and flipped none of its modifier
@@ -809,7 +795,7 @@ export const useGMScreenStore = create<GMScreenStore>()((set, get) => {
     duplicatePanel: (screenId, panelId) => {
       const found = findInstance(screenId, panelId)
       if (!found) return null
-      const { screen, panel } = found
+      const { panel } = found
       const base = useCharacterStore
         .getState()
         .characters.find((c) => c.id === panel.baseNpcId)
@@ -832,7 +818,7 @@ export const useGMScreenStore = create<GMScreenStore>()((set, get) => {
       const copy: ScreenPanel = {
         ...panel,
         id,
-        label: base ? autoInstanceLabel(screen, base) : panel.label,
+        label: base?.name || panel.label,
         statuses: [],
         state,
       }

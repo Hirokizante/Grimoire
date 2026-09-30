@@ -4,6 +4,24 @@ All notable changes to Grimoire are documented here. This project is in alpha:
 storage format may change between pre-1.0 releases, so export (or back up) your
 characters regularly.
 
+## Unreleased
+
+### NPC instance names drop their numbers
+
+- **No more "Bandit 2"** — spawning multiple instances of one NPC base no
+  longer renames them with a numeric suffix. Every instance is labelled with
+  the base's own name (a GM's rename still wins), and instances are told apart
+  by their **number badge** instead. No stored data changes shape: existing
+  panels keep whatever label they carry, and panels whose label was an
+  auto-numbered default are no longer distinguishable by name on the screen
+  (their badge takes over).
+- **The number badge is everywhere the panel is** — the instance's 1-based
+  ordinal among the screen's instances of the same base (shown only when that
+  base has more than one instance) already rode the drawer card, the rail
+  portrait and the encounter sheet header; the **grid panel header now carries
+  it too**, so both GM Screen views identify instances the same way. The
+  ordinal follows panel order, so reordering renumbers the badges.
+
 ## v0.14.0-alpha — 2026-09-21
 
 The at-the-table release. Six commits since `v0.13.0-alpha`, and the GM Screen

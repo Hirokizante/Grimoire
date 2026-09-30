@@ -60,6 +60,13 @@ export interface NpcInstancePanelProps {
   screenId: string
   /** The base's name, when it differs from the instance label. */
   subtitle: string | null
+  /**
+   * This instance's 1-based ordinal among the screen's instances of the same
+   * base, present only for a multi-instance base (see `resolvePanels`). Shown
+   * as the header's number badge — the instance's only identifier, since
+   * multiples no longer carry a number in their name.
+   */
+  instanceNumber?: number
   onOpenBase: () => void
   onRemove: () => void
 }
@@ -75,6 +82,7 @@ export default function NpcInstancePanel({
   base,
   screenId,
   subtitle,
+  instanceNumber,
   onOpenBase,
   onRemove,
 }: NpcInstancePanelProps) {
@@ -248,6 +256,16 @@ export default function NpcInstancePanel({
         onDensityChange={(d) => setPanelDensity(screenId, panel.id, d)}
         menuItems={menuItems}
         dimmed={impaired}
+        nameBadge={
+          instanceNumber !== undefined ? (
+            <span
+              className="gm-panel__numbadge"
+              title={`Instance ${instanceNumber} of this NPC on the screen`}
+            >
+              {instanceNumber}
+            </span>
+          ) : undefined
+        }
         badge={
           <span
             className={`gm-panel__badge gm-panel__badge--${condition}`}

@@ -164,7 +164,10 @@ export type ScreenPanel =
       kind: 'npc-instance'
       /** Reference to the NPC template record. */
       baseNpcId: string
-      /** Display name; defaults to the base name, disambiguated ("Bandit 2"). */
+      /**
+       * Display name; defaults to the base name. Multiple instances of one base
+       * are told apart by their ordinal badge, not by a number in the name.
+       */
       label: string
       state: NpcInstanceState
     })

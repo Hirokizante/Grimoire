@@ -38,6 +38,13 @@ export interface PanelHeaderProps {
   /** Extra badge slot (e.g. an NPC condition badge). */
   badge?: React.ReactNode
   /**
+   * A small pill rendered inline right after the name — an NPC instance's
+   * ordinal badge (see `resolvePanels`' `instanceNumber`). Distinct from
+   * {@link PanelHeaderProps.badge}, which is the group pinned to the header's
+   * right edge.
+   */
+  nameBadge?: React.ReactNode
+  /**
    * Inline stat pills (the encounter view's combat stat tokens), rendered
    * under the name/subtitle line, beside the portrait.
    */
@@ -65,6 +72,7 @@ export default function PanelHeader({
   onDensityChange,
   menuItems,
   badge,
+  nameBadge,
   tokens,
   dimmed = false,
   showDensityToggle = true,
@@ -154,11 +162,14 @@ export default function PanelHeader({
 
         <div className="gm-panel__lead-text">
           <div className="gm-panel__identity">
-            <span
-              className={'gm-panel__name' + (dimmed ? ' gm-panel__name--dimmed' : '')}
-              title={name}
-            >
-              {name}
+            <span className="gm-panel__name-row">
+              <span
+                className={'gm-panel__name' + (dimmed ? ' gm-panel__name--dimmed' : '')}
+                title={name}
+              >
+                {name}
+              </span>
+              {nameBadge}
             </span>
             {subtitle && <span className="gm-panel__subtitle">{subtitle}</span>}
           </div>

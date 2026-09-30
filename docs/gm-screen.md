@@ -88,9 +88,10 @@ NPC instances follow one rule: **instances are deltas, not clones.**
 - **The character drawer** — every panel on the screen (player characters and
   spawned NPC instances) appears in the drawer as a read-only quick-reference
   card: portrait, name, HP, the GM's tracked status pills, and the stat
-  tokens. None of the panel controls are there — no steppers, no damage
-  dialog, no menus — because the card's single interaction is **selecting the
-  character**, which mounts their encounter sheet in the main area.
+  tokens, with an NPC instance's **number badge** beside the name. None of the
+  panel controls are there — no steppers, no damage dialog, no menus —
+  because the card's single interaction is **selecting the character**, which
+  mounts their encounter sheet in the main area.
 - **The drawer owns its column** — the immersive view is one screen of
   chrome over a drawer-and-sheet row: the encounter sheet scrolls *inside*
   the main area, so the page itself never scrolls. The drawer therefore stays
@@ -99,10 +100,15 @@ NPC instances follow one rule: **instances are deltas, not clones.**
   buttons are all always on screen.
 - **The rail** — collapsing the drawer (the chevron in its header) shrinks it
   rather than hiding it: a vertical portrait rail on the left edge. Each rail
-  entry is still selectable, and each NPC instance carries a **number badge**
-  — the instance's 1-based ordinal among the screen's instances of the same
-  base, shown only when that base has more than one instance, which is exactly
-  when three spawned Bandits need telling apart.
+  entry is still selectable and keeps its number badge.
+- **Number badges tell instances apart** — an NPC instance's **number badge**
+  is its 1-based ordinal among the screen's instances of the same base, shown
+  only when that base has more than one instance (exactly when three spawned
+  Bandits need telling apart). It appears on the drawer card and rail portrait
+  and on the grid panel's header, and it is the instance's *only* identifier:
+  multiples of one base no longer carry a number in their name (every instance
+  is labelled with the base's own name). The ordinal follows the screen's
+  panel order, so reordering renumbers the badges.
 - **One glance vocabulary** — the drawer follows the panel chrome's dimming:
   downed/dead instances dim and strike through their name, and a character out
   of Action Points dims their card, so the drawer and the main area agree at a
@@ -150,8 +156,8 @@ NPC instances follow one rule: **instances are deltas, not clones.**
 
 ### Compact and expanded panels
 
-- **Compact** — a glance-height card (portrait, name, HP bar, the **Action Point meter**,
-  key stat tokens, condition badge).
+- **Compact** — a glance-height card (portrait, name, an NPC instance's **number badge**,
+  HP bar, the **Action Point meter**, key stat tokens, condition badge).
 - **Expanded** — renders the sheet content inline.
 - **The same condensed body** — expanded player and NPC panels use the **same condensed
   body** (`PanelSheet`), so a panel reads identically whichever kind of sheet it holds:
@@ -470,7 +476,9 @@ NPC instances follow one rule: **instances are deltas, not clones.**
   plus that instance's own modifier switches. Each part of the activation is logged
   separately with an `ability-activation` source.
 - **Instance labels** — rolls from an instance are noted with the instance label
-  ("Bandit 2"), so they stay distinguishable.
+  (the base's name, and the panel's own label after a rename). Multiple instances of
+  one base share that name; their ordinal **number badge** is what tells the panels
+  apart on the screen.
 - **Roll log** — the roll-log drawer is available on the screen in "all characters" mode.
 
 ### Reordering and layout
@@ -599,7 +607,7 @@ is a discriminated union:
 | `setScreenRound` | Manual edit of the round counter (whole number, floored at 1); writes the label only — it never starts a turn |
 | `startNewRound` | Advances the round and starts **every** panel's turn: each instance refills AP and rolls its own Recharge Die, each character runs the sheet's End Turn. Returns `{ round, instanceTurns, characterTurns }` for the caller's toast and roll-log writes; skips panels whose record is gone |
 | `addCharacterPanel` | Returns `false` (no state change) for a character already on the screen |
-| `addNpcInstancePanel` | Spawns at full HP, a full turn (3 AP, nothing cooling), full ability budgets and the base's own switch state, with an auto-numbered label ("Bandit", "Bandit 2", …) |
+| `addNpcInstancePanel` | Spawns at full HP, a full turn (3 AP, nothing cooling), full ability budgets and the base's own switch state, labelled with the base's name (an explicit `label` wins); multiple instances are told apart by their ordinal number badge, not a number in the name |
 | `duplicatePanel` | NPC instances only — spawns a *fresh* instance, never a copy of its HP, AP, cooldowns, ability uses or modifier switches |
 | `createNpcBaseAndInstance` | Quick-create: writes a base NPC record without navigating, then spawns |
 | `removePanel`, `movePanel`, `setPanelDensity`, `renameInstance` | Panel management (reorder is wired to @dnd-kit sortable) |
