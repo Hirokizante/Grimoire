@@ -1,9 +1,10 @@
 /**
  * AddNpcModal — spawn NPC instances onto the GM screen from NPC base records.
  *
- * Every row spawns a fresh instance at full HP (labelled "Bandit", "Bandit 2",
- * …) and shows how many instances of that base are already on this screen.
- * The footer's "New NPC…" field creates a base record and immediately spawns
+ * Every row spawns a fresh instance at full HP, labelled with the base’s own
+ * name (multiples are told apart by their ordinal badge, never a number in the
+ * name), and shows how many instances of that base are already on this screen.
+ * The footer’s "New NPC..." field creates a base record and immediately spawns
  * an instance of it in one step, without navigating away from the screen.
  *
  * Follows the modal conventions: header ✕ (dismiss) plus a footer Done.

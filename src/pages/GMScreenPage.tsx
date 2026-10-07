@@ -462,6 +462,7 @@ export default function GMScreenPage() {
                               base={entry.entity}
                               screenId={screen.id}
                               subtitle={entry.subtitle}
+                              instanceNumber={entry.instanceNumber}
                               onOpenBase={() => openCharacterSheet(entry.entity!.id)}
                               onRemove={() => removePanel(screen.id, entry.panel.id)}
                             />

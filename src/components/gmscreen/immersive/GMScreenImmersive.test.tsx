@@ -5,7 +5,8 @@
  * quick-reference card (name, HP, tracked statuses, stat tokens — and NO
  * panel controls), selecting a card mounts that character's encounter sheet
  * in the main area, the collapsed drawer shrinks to a portrait rail whose
- * number badges appear only for an NPC base with multiple instances, the
+ * number badges appear only for an NPC base with multiple instances (and
+ * identify those instances by number rather than a number in their name), the
  * drawer reorders through the same `movePanel` action as the grid, and a
  * deleted record renders a removable placeholder rather than breaking the
  * list. The encounter sheet itself is pinned read-only with no Innate
@@ -163,14 +164,15 @@ function characterPanel(id: string): GMScreen['panels'][number] {
 
 function instancePanel(
   id: string,
-  label: string,
   statuses: GMScreen['panels'][number]['statuses'] = [],
 ): GMScreen['panels'][number] {
   return {
     kind: 'npc-instance',
     id,
     baseNpcId: NPC.id,
-    label,
+    // Instances of one base keep the base name; the ordinal badge is what
+    // tells them apart (see resolvePanels' instanceNumber).
+    label: NPC.name,
     density: 'compact',
     statuses,
     state: {
@@ -189,8 +191,8 @@ function instancePanel(
 /** Seed a screen with a player and two instances of one NPC base. */
 function seed(panels: GMScreen['panels'] = [
   characterPanel('panel-pc'),
-  instancePanel('panel-npc-1', 'Bandit'),
-  instancePanel('panel-npc-2', 'Bandit 2', [
+  instancePanel('panel-npc-1'),
+  instancePanel('panel-npc-2', [
     { statusId: POISONED.id, duration: 'quick', stacks: 2 },
   ]),
 ]) {
@@ -258,6 +260,19 @@ function drawerCard(name: string) {
   return remove.closest('.gm-drawer-card') as HTMLElement
 }
 
+/**
+ * The drawer card for one NPC instance, identified by its ordinal badge —
+ * instances of one base share the base name, so the number is what tells them
+ * apart.
+ */
+function drawerInstanceCard(instanceNumber: number): HTMLElement {
+  const badge = Array.from(
+    document.querySelectorAll('.gm-drawer-card__num'),
+  ).find((el) => el.textContent === String(instanceNumber))
+  if (!badge) throw new Error(`no drawer card with badge ${instanceNumber}`)
+  return badge.closest('.gm-drawer-card') as HTMLElement
+}
+
 beforeEach(() => {
   window.localStorage.clear()
   dragEndRef.current = null
@@ -273,12 +288,16 @@ test('the drawer lists every panel as a read-only quick-reference card', () => {
 
   const drawer = screen.getByLabelText('Character list')
 
-  // All three panels present, with the glance data the spec asks for.
-  // ('Bandit' matches both the first instance's name and Bandit 2's
-  // subtitle — the base name shown under a renamed label.)
+  // All three panels present, with the glance data the spec asks for. Both
+  // instances keep the base name 'Bandit'; their ordinal badges tell them
+  // apart.
   expect(within(drawer).getByText('Vex')).toBeInTheDocument()
-  expect(within(drawer).getAllByText('Bandit').length).toBeGreaterThanOrEqual(1)
-  expect(within(drawer).getByText('Bandit 2')).toBeInTheDocument()
+  expect(within(drawer).getAllByText('Bandit')).toHaveLength(2)
+  expect(
+    Array.from(drawer.querySelectorAll('.gm-drawer-card__num')).map(
+      (el) => el.textContent,
+    ),
+  ).toEqual(['1', '2'])
   // Player HP (14/…): the character's real pool, read-only.
   const vexCard = drawerCard('Vex')
   expect(vexCard.querySelector('.gm-drawer-card__hp-value')?.textContent).toContain('14')
@@ -320,18 +339,22 @@ test('the first panel is mounted by default and selecting a card swaps the main 
     screen.getAllByRole('button', { name: 'Vex options' }).length,
   ).toBeGreaterThanOrEqual(1)
 
-  fireEvent.click(within(drawerCard('Bandit 2')).getByText('Bandit 2'))
+  const second = drawerInstanceCard(2)
+  fireEvent.click(within(second).getByText('Bandit'))
 
-  // The main area now carries Bandit 2's encounter sheet: its interactive
-  // chrome (panel menu, Add status) exists.
+  // The main area now carries the second instance's encounter sheet: its
+  // interactive chrome exists, and its ordinal badge reads 2.
   expect(
-    screen.getAllByRole('button', { name: 'Bandit 2 options' }).length,
+    screen.getAllByRole('button', { name: 'Bandit options' }).length,
   ).toBeGreaterThanOrEqual(1)
   expect(
-    screen.getAllByRole('button', { name: 'Add status to Bandit 2' }).length,
+    screen.getAllByRole('button', { name: 'Add status to Bandit' }).length,
   ).toBeGreaterThanOrEqual(1)
+  expect(
+    document.querySelector('.gm-encounter--npc .gm-panel__numbadge')?.textContent,
+  ).toBe('2')
   // ...and the card reads as selected.
-  const body = within(drawerCard('Bandit 2')).getByText('Bandit 2').closest('button')
+  const body = within(second).getByText('Bandit').closest('button')
   expect(body).toHaveAttribute('aria-pressed', 'true')
 })
 
@@ -339,11 +362,11 @@ test('the drawer card statuses are static — no stack steppers, no reference cl
   seed()
   renderImmersive()
 
-  const card = drawerCard('Bandit 2')
+  const card = drawerInstanceCard(2)
 
   // Read-only pill: the stack count prints, but no stepper or open-reference
   // button exists anywhere in the card.
-  expect(within(card).getAllByText('2').length).toBeGreaterThanOrEqual(1)
+  expect(card.querySelector('.gm-status-pill__count')?.textContent).toBe('2')
   expect(
     within(card).queryByRole('button', { name: /stack of Poisoned/ }),
   ).not.toBeInTheDocument()
@@ -362,7 +385,7 @@ test('the encounter sheet is a read-only, encounter-ready sheet', () => {
     innateDescription: 'Born of the void between stars.',
   }
   useCharacterStore.setState({ characters: [player, NPC], currentCharacter: null })
-  seed([characterPanel('panel-pc'), instancePanel('panel-npc-1', 'Bandit')])
+  seed([characterPanel('panel-pc'), instancePanel('panel-npc-1')])
   renderImmersive()
 
   // Chrome: HP, AP and the Add Status affordance are present.
@@ -406,18 +429,24 @@ test('collapsing the drawer shrinks it to a portrait rail with instance number b
   expect(badges[1].textContent).toBe('2')
 
   // The rail is still the drawer: selecting from it swaps the main area.
-  fireEvent.click(within(rail).getByTitle('Bandit 2'))
+  // Both portraits are titled with the base name; the badges tell them apart.
+  const railItems = within(rail).getAllByTitle('Bandit')
+  expect(railItems).toHaveLength(2)
+  fireEvent.click(railItems[1])
   expect(
-    screen.getAllByRole('button', { name: 'Bandit 2 options' }).length,
-  ).toBeGreaterThanOrEqual(1)
+    document.querySelector('.gm-encounter--npc .gm-panel__numbadge')?.textContent,
+  ).toBe('2')
 })
 
 test('instance number badges appear only when a base has multiple instances', () => {
-  seed([characterPanel('panel-pc'), instancePanel('panel-npc-1', 'Bandit')])
+  seed([characterPanel('panel-pc'), instancePanel('panel-npc-1')])
   renderImmersive()
 
-  // A lone Bandit needs no badge; the expanded cards print none.
+  // A lone Bandit needs no badge; the expanded cards and the encounter header
+  // print none.
   expect(document.querySelector('.gm-drawer-card__num')).toBeNull()
+  expect(document.querySelector('.gm-panel__numbadge')).toBeNull()
+  expect(document.querySelector('.gm-drawer-rail-item__num')).toBeNull()
 })
 
 test('the drawer reorders through the same movePanel action as the grid', () => {
@@ -425,7 +454,7 @@ test('the drawer reorders through the same movePanel action as the grid', () => 
   renderImmersive()
   expect(sortableIds.current.size).toBe(3)
 
-  // Replay a drag: Bandit 2 (panel-npc-2) dropped onto the first position.
+  // Replay a drag: the second instance (panel-npc-2) dropped onto first.
   act(() => {
     dragEndRef.current?.({
       active: { id: 'panel-npc-2' },

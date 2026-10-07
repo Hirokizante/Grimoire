@@ -191,9 +191,10 @@ test('AddNpcModal: spawning twice from one base creates two instances', () => {
 
   const created = panels()
   expect(created).toHaveLength(2)
+  // Both keep the base name: instances are told apart by their ordinal badge.
   expect(created.map((p) => (p.kind === 'npc-instance' ? p.label : ''))).toEqual([
     'Bandit',
-    'Bandit 2',
+    'Bandit',
   ])
   // Both spawned at full HP — independent pools over one base.
   for (const panel of created) {

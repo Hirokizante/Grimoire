@@ -9,10 +9,11 @@
  *
  * The drawer never fully collapses: toggling it shrinks it to a vertical
  * portrait rail so the main area can dominate while every character stays one
- * click away. The rail carries each NPC instance's number badge — the
- * instance's 1-based ordinal among the screen's instances of the same base,
- * shown only when that base has more than one instance on the screen, which is
- * exactly when three spawned Bandits need telling apart.
+ * click away. Both the rail and the cards carry each NPC instance's number
+ * badge — the instance's 1-based ordinal among the screen's instances of the
+ * same base, shown only when that base has more than one instance on the
+ * screen, which is exactly when three spawned Bandits need telling apart (see
+ * `computeInstanceNumbers`, resolved onto each panel by `resolvePanels`).
  *
  * Reordering drags the cards (grip on an expanded card, the portrait itself on
  * the rail) through the same dnd-kit sensors and `movePanel` action the grid
@@ -21,7 +22,7 @@
  * enter the screen in this view — with a compact add button on the rail.
  */
 
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import {
   DndContext,
   KeyboardSensor,
@@ -52,28 +53,6 @@ export interface CharacterDrawerProps {
   onAddNpc: () => void
 }
 
-/**
- * 1-based ordinals for NPC-instance panels whose base has **more than one**
- * instance on the screen — the rail's number badges and the cards' badge both
- * read from this. Unique instances (and player characters) get none.
- */
-function computeInstanceNumbers(resolved: ResolvedPanel[]): Map<string, number> {
-  const groups = new Map<string, string[]>()
-  for (const entry of resolved) {
-    if (entry.panel.kind === 'npc-instance') {
-      const ids = groups.get(entry.panel.baseNpcId) ?? []
-      ids.push(entry.panel.id)
-      groups.set(entry.panel.baseNpcId, ids)
-    }
-  }
-  const numbers = new Map<string, number>()
-  for (const ids of groups.values()) {
-    if (ids.length < 2) continue
-    ids.forEach((id, index) => numbers.set(id, index + 1))
-  }
-  return numbers
-}
-
 export default function CharacterDrawer({
   resolved,
   selectedPanelId,
@@ -89,11 +68,6 @@ export default function CharacterDrawer({
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
-  )
-
-  const instanceNumbers = useMemo(
-    () => computeInstanceNumbers(resolved),
-    [resolved],
   )
 
   const handleDragEnd = (event: DragEndEvent) => {
@@ -143,7 +117,6 @@ export default function CharacterDrawer({
                 <DrawerRailItem
                   key={entry.panel.id}
                   entry={entry}
-                  instanceNumber={instanceNumbers.get(entry.panel.id)}
                   selected={entry.panel.id === selectedPanelId}
                   onSelect={() => onSelectPanel(entry.panel.id)}
                 />
@@ -169,7 +142,6 @@ export default function CharacterDrawer({
                 <DrawerCard
                   key={entry.panel.id}
                   entry={entry}
-                  instanceNumber={instanceNumbers.get(entry.panel.id)}
                   selected={entry.panel.id === selectedPanelId}
                   onSelect={() => onSelectPanel(entry.panel.id)}
                   onRemove={() => onRemovePanel(entry.panel.id)}

@@ -1,6 +1,6 @@
 /**
  * Unit tests for the GM Screen store — screen CRUD, panel operations, the
- * duplicate-character guard, instance auto-labeling, instance live state
+ * duplicate-character guard, instance labels, instance live state
  * (damage / heal / downed), and per-screen debounced autosave.
  *
  * IndexedDB is mocked so the store can be exercised in isolation, mirroring
@@ -226,7 +226,7 @@ test('addNpcInstancePanel: spawns at full HP with the base name', async () => {
   })
 })
 
-test('addNpcInstancePanel: auto-numbers subsequent instances of the same base', async () => {
+test('addNpcInstancePanel: every instance keeps the base name (no numeric suffix)', async () => {
   const screen = await useGMScreenStore.getState().createScreen('S')
   const npc = makeNpc({ id: 'n1' })
   seedCharacters(npc)
@@ -236,13 +236,15 @@ test('addNpcInstancePanel: auto-numbers subsequent instances of the same base', 
   store.addNpcInstancePanel(screen.id, npc.id)
   store.addNpcInstancePanel(screen.id, npc.id)
 
+  // Instances are told apart by their ordinal badge (see resolvePanels /
+  // computeInstanceNumbers), not by a number baked into the name.
   const labels = useGMScreenStore
     .getState()
     .screens[0].panels.map((p) => (p.kind === 'npc-instance' ? p.label : ''))
-  expect(labels).toEqual(['Bandit', 'Bandit 2', 'Bandit 3'])
+  expect(labels).toEqual(['Bandit', 'Bandit', 'Bandit'])
 })
 
-test('addNpcInstancePanel: an explicit label wins over auto-numbering', async () => {
+test('addNpcInstancePanel: an explicit label wins over the base name', async () => {
   const screen = await useGMScreenStore.getState().createScreen('S')
   const npc = makeNpc({ id: 'n1' })
   seedCharacters(npc)
@@ -271,7 +273,7 @@ test('instances of the same base keep independent HP', async () => {
   expect(b?.kind === 'npc-instance' && b.state.currentHP).toBe(20)
 })
 
-test('duplicatePanel: spawns a fresh instance at full HP with a new label', async () => {
+test('duplicatePanel: spawns a fresh instance at full HP, labelled with the base name', async () => {
   const screen = await useGMScreenStore.getState().createScreen('S')
   const npc = makeNpc({ id: 'n1' })
   seedCharacters(npc)
@@ -286,7 +288,7 @@ test('duplicatePanel: spawns a fresh instance at full HP with a new label', asyn
   expect(panels).toHaveLength(2)
   expect(copyId).not.toBe(original.id)
   const copy = panels.find((p) => p.id === copyId)
-  expect(copy?.kind === 'npc-instance' && copy.label).toBe('Bandit 2')
+  expect(copy?.kind === 'npc-instance' && copy.label).toBe('Bandit')
   expect(copy?.kind === 'npc-instance' && copy.state.currentHP).toBe(20)
 })
 
@@ -303,7 +305,7 @@ test('renameInstance: renames only the targeted instance', async () => {
 
   const panels = useGMScreenStore.getState().screens[0].panels
   expect(panels.find((p) => p.id === first.id)).toMatchObject({ label: 'Scout' })
-  expect(panels.find((p) => p.id === second.id)).toMatchObject({ label: 'Bandit 2' })
+  expect(panels.find((p) => p.id === second.id)).toMatchObject({ label: 'Bandit' })
 })
 
 // ---- Instance live state --------------------------------------------------

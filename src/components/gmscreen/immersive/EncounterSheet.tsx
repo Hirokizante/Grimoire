@@ -226,6 +226,7 @@ export default function EncounterSheet({
       panel={entry.panel}
       base={entry.entity}
       subtitle={entry.subtitle}
+      instanceNumber={entry.instanceNumber}
       onOpenBase={onOpenSheet}
       onRemove={onRemove}
     />
@@ -534,6 +535,8 @@ interface EncounterNpcInstanceProps {
   panel: Extract<ScreenPanel, { kind: 'npc-instance' }>
   base: NonNullable<ResolvedPanel['entity']>
   subtitle: string | null
+  /** This instance's ordinal badge, for a multi-instance base (see resolvePanels). */
+  instanceNumber?: number
   onOpenBase: (characterId: string) => void
   onRemove: () => void
 }
@@ -543,6 +546,7 @@ function EncounterNpcInstance({
   panel,
   base,
   subtitle,
+  instanceNumber,
   onOpenBase,
   onRemove,
 }: EncounterNpcInstanceProps) {
@@ -661,6 +665,16 @@ function EncounterNpcInstance({
         menuItems={menuItems}
         tokens={buildHeaderTokens('npc', entity, stats)}
         dimmed={impaired}
+        nameBadge={
+          instanceNumber !== undefined ? (
+            <span
+              className="gm-panel__numbadge"
+              title={`Instance ${instanceNumber} of this NPC on the screen`}
+            >
+              {instanceNumber}
+            </span>
+          ) : undefined
+        }
         badge={
           <span
             className={`gm-panel__badge gm-panel__badge--${condition}`}

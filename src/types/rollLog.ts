@@ -41,7 +41,7 @@ export type RollSource =
        * rules context of the roll.
        */
       type: 'recharge'
-      /** Instance label the turn belonged to (e.g. "Bandit 2"). */
+      /** Instance label the turn belonged to (the base name, e.g. "Bandit"). */
       npcName: string
       /** Names of the abilities this roll recharged (empty when none). */
       recharged: string[]
